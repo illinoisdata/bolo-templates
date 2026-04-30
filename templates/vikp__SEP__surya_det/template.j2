@@ -1,0 +1,43 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/vikp__SEP__surya_det" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+
+import requests
+from io import BytesIO
+from pathlib import Path
+
+import torch
+from PIL import Image
+from transformers import AutoImageProcessor, AutoModelForSemanticSegmentation
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    response = requests.get(image_path)
+    response.raise_for_status()
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processor = AutoImageProcessor.from_pretrained(repo_id)
+model = AutoModelForSemanticSegmentation.from_pretrained(repo_id, ignore_mismatched_sizes=True).to(device)
+model.eval()
+
+inputs = processor(image, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+target_sizes = [(image.height, image.width)]
+processed = processor.post_process_semantic_segmentation(outputs, target_sizes=target_sizes)
+segmentation_mask = processed[0].cpu().numpy()
+RESULT = {"segmentation_mask": segmentation_mask}
+
+if __name__ == "__main__":
+    save_path = Path(output_dir)
+    save_path.mkdir(parents=True, exist_ok=True)
+    mask_image = Image.fromarray(segmentation_mask.astype("uint8"))
+    mask_image.save(save_path / "segmentation_mask.png")

@@ -1,0 +1,48 @@
+{% set repo_id = "basel/ATTACK-BERT" %}
+{% set device = "cuda:0" %}
+{% set sentences = ["Attacker takes a screenshot", "Attacker captures the screen"] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/basel__SEP__ATTACK-BERT" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sentences = {{ sentences | tojson }}
+output_dir = "{{ output_dir }}"
+
+import os
+import json
+
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(torch_device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    sentences,
+    padding=True,
+    truncation=True,
+    return_tensors="pt",
+)
+encoded_inputs = {key: tensor.to(torch_device) for key, tensor in encoded_inputs.items()}
+with torch.no_grad():
+    model_outputs = model(**encoded_inputs)
+
+hidden_states = model_outputs.last_hidden_state
+attention_mask = encoded_inputs["attention_mask"]
+mask = attention_mask.unsqueeze(-1)
+masked_hidden = hidden_states * mask
+summed_hidden = masked_hidden.sum(dim=1)
+mask_sums = mask.sum(dim=1).clamp(min=1e-9)
+sentence_embeddings = summed_hidden / mask_sums
+embeddings = sentence_embeddings.cpu().tolist()
+
+RESULT = {"embeddings": embeddings}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "embeddings.json")
+    with open(output_path, "w") as output_file:
+        json.dump(RESULT["embeddings"], output_file)

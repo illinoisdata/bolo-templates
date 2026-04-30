@@ -1,0 +1,75 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set query_text = "What is ColBERT retrieval?" %}
+{% set passage_text = "ColBERT uses contextual late interaction to compute dense passage representations." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/colbert-ir__SEP__colbertv2.0" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query_text = "{{ query_text }}"
+passage_text = "{{ passage_text }}"
+output_dir = "{{ output_dir }}"
+
+import numbers
+from pathlib import Path
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+from transformers import AutoModel, AutoTokenizer
+
+
+def tokenize_text(text: str):
+    encoding = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+    return {key: value.to(torch_device) for key, value in encoding.items()}
+
+
+def mean_pooling(hidden_states: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+    mask = attention_mask.unsqueeze(-1).expand(hidden_states.size()).float()
+    masked_hidden_states = hidden_states * mask
+    sum_embeddings = masked_hidden_states.sum(dim=1)
+    mask_sum = mask.sum(dim=1).clamp(min=1e-9)
+    return sum_embeddings / mask_sum
+
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(torch_device)
+model.eval()
+
+query_inputs = tokenize_text(query_text)
+passage_inputs = tokenize_text(passage_text)
+
+with torch.no_grad():
+    query_outputs = model(**query_inputs)
+    passage_outputs = model(**passage_inputs)
+
+query_embedding = mean_pooling(query_outputs.last_hidden_state, query_inputs["attention_mask"])
+passage_embedding = mean_pooling(passage_outputs.last_hidden_state, passage_inputs["attention_mask"])
+query_embedding = F.normalize(query_embedding, p=2, dim=1)
+passage_embedding = F.normalize(passage_embedding, p=2, dim=1)
+
+similarity_score = torch.matmul(query_embedding, passage_embedding.transpose(0, 1)).item()
+query_embedding_np = query_embedding.squeeze(0).cpu().numpy()
+passage_embedding_np = passage_embedding.squeeze(0).cpu().numpy()
+
+RESULT = {
+    "query_embedding": query_embedding_np,
+    "passage_embedding": passage_embedding_np,
+    "cosine_similarity": float(similarity_score),
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    for key, value in RESULT.items():
+        if isinstance(value, np.ndarray):
+            np.save(output_path / f"{key}.npy", value)
+        elif isinstance(value, numbers.Real):
+            with open(output_path / f"{key}.txt", "w", encoding="utf-8") as file:
+                file.write(str(value))
+        else:
+            with open(output_path / f"{key}.txt", "w", encoding="utf-8") as file:
+                file.write(str(value))

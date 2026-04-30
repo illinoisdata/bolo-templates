@@ -1,0 +1,66 @@
+{% set repo_id = repo_id | default("microsoft/layoutxlm-base") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__layoutxlm-base") %}
+{% set words = words | default(["Invoice", "Date", "Total"]) %}
+{% set boxes = boxes | default([[0, 0, 360, 90], [0, 110, 360, 200], [0, 220, 360, 310]]) %}
+{% set max_length = max_length | default(512) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+image_path = "{{ image_path }}"
+words = {{ words }}
+boxes = {{ boxes }}
+max_length = {{ max_length }}
+
+from pathlib import Path
+from io import BytesIO
+
+import requests
+from PIL import Image
+import torch
+from transformers import AutoModel, AutoProcessor
+
+inference_device = torch.device(device)
+
+
+def load_rgb_image(source_path: str) -> Image.Image:
+    if source_path.startswith(("http://", "https://")):
+        response = requests.get(source_path)
+        response.raise_for_status()
+        return Image.open(BytesIO(response.content)).convert("RGB")
+    return Image.open(source_path).convert("RGB")
+
+
+document_image = load_rgb_image(image_path)
+processor = AutoProcessor.from_pretrained(repo_id)
+processor.image_processor.apply_ocr = False
+model = AutoModel.from_pretrained(repo_id)
+model = model.to(inference_device)
+model.eval()
+
+processed_inputs = processor(
+    images=document_image,
+    text=words,
+    boxes=boxes,
+    padding="max_length",
+    truncation=True,
+    max_length=max_length,
+    return_tensors="pt",
+)
+device_inputs = {
+    key: tensor.to(inference_device) if isinstance(tensor, torch.Tensor) else tensor
+    for key, tensor in processed_inputs.items()
+}
+
+with torch.no_grad():
+    outputs = model(**device_inputs)
+
+last_hidden_state = outputs.last_hidden_state.cpu()
+
+RESULT = {"last_hidden_state": last_hidden_state}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    torch.save(RESULT["last_hidden_state"], output_path / "last_hidden_state.pt")

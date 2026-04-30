@@ -1,0 +1,74 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/wav2vec2-large-xlsr-53" %}
+{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set sampling_rate = 16000 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+sampling_rate = {{ sampling_rate }}
+
+import torch
+import numpy as np
+import torchaudio
+from transformers import AutoFeatureExtractor, AutoModelForPreTraining
+import requests
+from io import BytesIO
+import soundfile as sf
+
+# Load feature extractor and model
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+
+# Load audio from local path or URL
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    response = requests.get(audio_path)
+    audio_bytes = BytesIO(response.content)
+    waveform, sr = sf.read(audio_bytes)
+else:
+    waveform, sr = sf.read(audio_path)
+
+if waveform.ndim > 1:
+    waveform = waveform.mean(axis=1)
+
+if sr != sampling_rate:
+    waveform_tensor = torch.from_numpy(waveform).float().unsqueeze(0)
+    resampler = torchaudio.transforms.Resample(orig_freq=sr, new_freq=sampling_rate)
+    waveform_tensor = resampler(waveform_tensor)
+    waveform = waveform_tensor.squeeze(0).cpu().numpy()
+    sr = sampling_rate
+
+# Preprocess input
+inputs = feature_extractor(waveform, sampling_rate=sr, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+# Inference
+with torch.no_grad():
+    outputs = model(**inputs)
+
+# Post-process outputs
+
+def _to_numpy(value):
+    if isinstance(value, torch.Tensor):
+        return value.detach().cpu().numpy()
+    if isinstance(value, (list, tuple)):
+        return type(value)(_to_numpy(v) for v in value)
+    if isinstance(value, dict):
+        return {k: _to_numpy(v) for k, v in value.items()}
+    return value
+
+raw_outputs = {k: v for k, v in outputs.__dict__.items() if not k.startswith("_")}
+processed_outputs = {}
+for key, value in raw_outputs.items():
+    numpy_value = _to_numpy(value)
+    processed_outputs[key] = numpy_value
+
+RESULT = {k: v for k, v in processed_outputs.items()}
+
+if __name__ == "__main__":
+    import os
+    os.makedirs("outputs", exist_ok=True)
+    for key, value in RESULT.items():
+        if value is None:
+            continue
+        np.save(os.path.join("outputs", f"{key}.npy"), value)

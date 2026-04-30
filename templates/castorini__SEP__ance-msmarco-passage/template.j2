@@ -1,0 +1,40 @@
+{% set input_queries = ["what is the capital of France?", "Explain how transformers work."] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/castorini__SEP__ance-msmarco-passage" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_queries = {{ input_queries | tojson }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoTokenizer, AutoModel
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    input_queries,
+    padding=True,
+    truncation=True,
+    return_tensors="pt",
+)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+pooled_embeddings = outputs.pooler_output.detach().cpu()
+pooled_embeddings_list = pooled_embeddings.tolist()
+
+RESULT = {"pooled_embeddings": pooled_embeddings_list}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    embeddings_file = output_path / "pooled_embeddings.json"
+    with embeddings_file.open("w", encoding="utf-8") as handle:
+        json.dump(RESULT["pooled_embeddings"], handle, ensure_ascii=False)

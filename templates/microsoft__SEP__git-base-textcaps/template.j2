@@ -1,0 +1,50 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set prompt = "A photo of a cat." %}
+{% set max_new_tokens = 50 %}
+{% set num_beams = 3 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__git-base-textcaps/result" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import os
+from io import BytesIO
+
+import requests
+from PIL import Image
+from transformers import AutoModelForCausalLM, AutoProcessor
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = AutoModelForCausalLM.from_pretrained(repo_id).to(device)
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    response = requests.get(image_path, timeout=30)
+    response.raise_for_status()
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = processor(images=image, text=prompt, return_tensors="pt")
+inputs = inputs.to(device)
+
+generated_ids = model.generate(
+    **inputs,
+    max_new_tokens=max_new_tokens,
+    num_beams=num_beams,
+    eos_token_id=processor.tokenizer.eos_token_id,
+    pad_token_id=processor.tokenizer.pad_token_id,
+)
+
+caption = processor.tokenizer.decode(generated_ids[0], skip_special_tokens=True).strip()
+
+RESULT = {"caption": caption}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "caption.txt")
+    with open(output_path, "w", encoding="utf-8") as output_file:
+        output_file.write(RESULT["caption"])

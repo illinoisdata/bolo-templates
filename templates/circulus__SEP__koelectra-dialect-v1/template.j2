@@ -1,0 +1,41 @@
+{% set input_text = "오늘 문장의 감정을 분석해 주세요." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/circulus__SEP__koelectra-dialect-v1" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import json
+from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSequenceClassification.from_pretrained(repo_id)
+
+if isinstance(device, str) and device.lower().startswith("cuda"):
+    device_parts = device.split(":")
+    pipeline_device = int(device_parts[1]) if len(device_parts) > 1 else 0
+else:
+    pipeline_device = -1
+
+preprocessed_input = input_text
+classify_pipeline = pipeline(
+    "text-classification",
+    model=model,
+    tokenizer=tokenizer,
+    device=pipeline_device,
+    return_all_scores=True,
+    function_to_apply="sigmoid",
+    top_k=None,
+)
+
+pipeline_output = classify_pipeline(preprocessed_input)
+
+RESULT = {"multi_label_scores": pipeline_output}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    output_file = output_path / "multi_label_scores.json"
+    with output_file.open("w", encoding="utf-8") as outfile:
+        json.dump(RESULT["multi_label_scores"], outfile, ensure_ascii=False, indent=2)

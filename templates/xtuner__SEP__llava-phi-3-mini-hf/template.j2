@@ -1,0 +1,25 @@
+{% set repo_id = "xtuner/llava-phi-3-mini-hf" %}
+{% set device = "cpu" %}
+{% set output_dir = "/tmp" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+from transformers import AutoProcessor
+
+processor = AutoProcessor.from_pretrained(repo_id)
+image_processor = processor.image_processor
+
+RESULT = {
+    "image_processor_type": type(image_processor).__name__,
+    "patch_size": getattr(image_processor, "patch_size", None),
+    "size": getattr(image_processor, "size", None),
+}
+
+if __name__ == "__main__":
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    destination.joinpath("debug.txt").write_text(str(RESULT), encoding="utf-8")

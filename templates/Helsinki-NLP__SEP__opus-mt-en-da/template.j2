@@ -1,0 +1,49 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set english_text = "The quick brown fox jumps over the lazy dog." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-en-da" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+english_text = "{{ english_text }}"
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(
+    english_text,
+    return_tensors="pt",
+    max_length=512,
+    truncation=True,
+)
+inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+
+with torch.inference_mode():
+    generated_tokens = model.generate(
+        **inputs,
+        max_new_tokens=128,
+        num_beams=4,
+    )
+
+translated_text = tokenizer.batch_decode(
+    generated_tokens,
+    skip_special_tokens=True,
+)[0]
+
+RESULT = {
+    "translation": translated_text,
+}
+
+if __name__ == "__main__":
+    output_dir_path = Path(output_dir)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
+    translation_path = output_dir_path / "translation.txt"
+    translation_path.write_text(RESULT["translation"], encoding="utf-8")

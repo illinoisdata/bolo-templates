@@ -1,0 +1,25 @@
+{% set source_text = ["Hello world!", ">>ara<< I can't help you because I'm busy."] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-tc-big-en-ar" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = {{ source_text | tojson }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model_inputs = tokenizer(source_text, return_tensors="pt", padding=True, truncation=True)
+model_inputs = {key: value.to(device) for key, value in model_inputs.items()}
+generated_tokens = model.generate(**model_inputs)
+translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    translation_file = output_path / "translations.txt"
+    translation_file.write_text("\n".join(RESULT["translations"]), encoding="utf-8")

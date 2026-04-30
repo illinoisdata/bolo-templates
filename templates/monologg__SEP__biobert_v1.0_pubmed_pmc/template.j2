@@ -1,0 +1,41 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set text_input = "The patient presented with signs of pulmonary embolism and subsequent clinical observations were carefully documented." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/monologg__SEP__biobert_v1.0_pubmed_pmc" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+text_inputs = [text_input]
+
+from pathlib import Path
+
+import numpy as np
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(text_inputs, return_tensors="pt", padding=True, truncation=True).to(device)
+with torch.no_grad():
+    outputs = model(**inputs)
+
+last_hidden_state = outputs.last_hidden_state.detach().cpu().numpy()
+pooler_output = outputs.pooler_output
+if pooler_output is not None:
+    pooler_output = pooler_output.detach().cpu().numpy()
+
+result_dict = {"last_hidden_state": last_hidden_state}
+if pooler_output is not None:
+    result_dict["pooler_output"] = pooler_output
+RESULT = result_dict
+
+if __name__ == "__main__":
+    export_path = Path(output_dir)
+    export_path.mkdir(parents=True, exist_ok=True)
+    np.save(export_path / "last_hidden_state.npy", RESULT["last_hidden_state"])
+    if "pooler_output" in RESULT:
+        np.save(export_path / "pooler_output.npy", RESULT["pooler_output"])

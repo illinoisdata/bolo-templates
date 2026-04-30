@@ -1,0 +1,39 @@
+{% set repo_id = "jplu/tiny-tf-bert-random" %}
+{% set device = "cuda:0" %}
+{% set text = "The quick brown fox jumps over the lazy dog." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/jplu__SEP__tiny-tf-bert-random" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import numpy as np
+import torch
+from transformers import AutoConfig, AutoModel, AutoTokenizer
+
+# Load config and initialize model with random weights
+config = AutoConfig.from_pretrained(repo_id)
+model = AutoModel.from_config(config).to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+encoded_inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=64)
+encoded_inputs = {key: tensor.to(device) for key, tensor in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+last_hidden_state = outputs.last_hidden_state
+result_tensor = last_hidden_state.detach().cpu()
+
+RESULT = {"last_hidden_state": result_tensor}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    np.save(
+        os.path.join(output_dir, "last_hidden_state.npy"),
+        RESULT["last_hidden_state"].numpy(),
+    )

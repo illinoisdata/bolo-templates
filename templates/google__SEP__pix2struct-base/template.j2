@@ -1,0 +1,43 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set prompt_text = "Describe the image in detail." %}
+{% set max_length = 256 %}
+{% set num_beams = 1 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__pix2struct-base" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+prompt_text = "{{ prompt_text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from io import BytesIO
+from pathlib import Path
+import requests
+from PIL import Image
+from transformers import AutoProcessor, Pix2StructForConditionalGeneration
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = Pix2StructForConditionalGeneration.from_pretrained(repo_id)
+model.to(device)
+
+if image_path.startswith(("http://", "https://")):
+    response = requests.get(image_path)
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(Path(image_path)).convert("RGB")
+
+inputs = processor(images=image, text=[prompt_text], return_tensors="pt")
+inputs = inputs.to(device)
+
+generated_ids = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+generated_texts = processor.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+caption = generated_texts[0]
+
+RESULT = {"generated_text": caption}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

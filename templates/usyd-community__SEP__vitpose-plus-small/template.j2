@@ -1,0 +1,104 @@
+{% set repo_id = "usyd-community/vitpose-plus-small" %}
+{% set device = "cuda:0" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/usyd-community__SEP__vitpose-plus-small" %}
+{% set person_detection_repo_id = "PekingU/rtdetr_r50vd_coco_o365" %}
+{% set person_detection_threshold = 0.3 %}
+{% set pose_threshold = 0.3 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+person_detection_repo_id = "{{ person_detection_repo_id }}"
+person_detection_threshold = {{ person_detection_threshold }}
+pose_threshold = {{ pose_threshold }}
+
+import json
+import os
+
+from PIL import Image
+import requests
+import torch
+from transformers import AutoProcessor, RTDetrForObjectDetection, VitPoseForPoseEstimation
+
+person_processor = AutoProcessor.from_pretrained(person_detection_repo_id)
+person_model = RTDetrForObjectDetection.from_pretrained(person_detection_repo_id).to(device)
+person_model.eval()
+
+pose_processor = AutoProcessor.from_pretrained(repo_id)
+pose_model = VitPoseForPoseEstimation.from_pretrained(repo_id).to(device)
+pose_model.eval()
+
+if image_path.startswith("http"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+person_inputs = person_processor(images=image, return_tensors="pt").to(device)
+with torch.no_grad():
+    detection_outputs = person_model(**person_inputs)
+
+target_sizes = torch.tensor([(image.height, image.width)], dtype=torch.long)
+person_results = person_processor.post_process_object_detection(
+    detection_outputs,
+    target_sizes=target_sizes,
+    threshold=person_detection_threshold,
+)
+
+person_result = person_results[0]
+person_boxes = person_result["boxes"]
+person_labels = person_result["labels"]
+person_scores = person_result["scores"]
+
+person_mask = person_labels == 0
+person_boxes = person_boxes[person_mask]
+person_scores = person_scores[person_mask]
+
+person_detections = []
+pose_results_serialized = []
+
+if person_boxes.numel() > 0:
+    coco_boxes = person_boxes.clone()
+    coco_boxes[:, 2] -= coco_boxes[:, 0]
+    coco_boxes[:, 3] -= coco_boxes[:, 1]
+    coco_boxes_list = coco_boxes.tolist()
+    person_scores_list = person_scores.tolist()
+    person_detections = [
+        {"box": box, "score": score}
+        for box, score in zip(coco_boxes_list, person_scores_list)
+    ]
+
+    pose_inputs = pose_processor(image, boxes=[coco_boxes_list], return_tensors="pt").to(device)
+    with torch.no_grad():
+        pose_outputs = pose_model(**pose_inputs)
+    pose_result_list = pose_processor.post_process_pose_estimation(
+        pose_outputs,
+        boxes=[coco_boxes_list],
+        threshold=pose_threshold,
+    )[0]
+    for idx, person_pose in enumerate(pose_result_list):
+        label_ids = person_pose["labels"].tolist()
+        pose_results_serialized.append(
+            {
+                "box": coco_boxes_list[idx],
+                "keypoints": person_pose["keypoints"].tolist(),
+                "labels": label_ids,
+                "label_names": [
+                    pose_model.config.id2label[label_id] for label_id in label_ids
+                ],
+                "scores": person_pose["scores"].tolist(),
+            }
+        )
+
+RESULT = {
+    "person_detections": person_detections,
+    "pose_results": pose_results_serialized,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "person_detections.json"), "w") as f:
+        json.dump(RESULT["person_detections"], f)
+    with open(os.path.join(output_dir, "pose_results.json"), "w") as f:
+        json.dump(RESULT["pose_results"], f)

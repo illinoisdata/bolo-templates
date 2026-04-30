@@ -1,0 +1,43 @@
+{% set image_path = image_path | default('/u/yli77/projects/ML-code-generation/data/image1.jpeg') %}
+{% set output_dir = output_dir | default('/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ddobokki__SEP__ko-trocr') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+
+import os
+from io import BytesIO
+from pathlib import Path
+
+import requests
+import torch
+import unicodedata
+from PIL import Image
+from transformers import AutoProcessor, AutoTokenizer, VisionEncoderDecoderModel
+
+torch_device = torch.device(device)
+
+processor = AutoProcessor.from_pretrained(repo_id)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = VisionEncoderDecoderModel.from_pretrained(repo_id)
+model = model.to(torch_device)
+model.eval()
+
+if image_path.startswith(("http://", "https://")):
+    response = requests.get(image_path)
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+pixel_values = processor(image, return_tensors="pt").pixel_values.to(torch_device)
+generated_ids = model.generate(pixel_values, max_length=64)
+generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+generated_text = unicodedata.normalize("NFC", generated_text)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    text_path = Path(output_dir) / "generated_text.txt"
+    text_path.write_text(RESULT["generated_text"], encoding="utf-8")

@@ -1,0 +1,54 @@
+{% set repo_id = "sarvamai/sarvam-translate" %}
+{% set device = "cuda:0" %}
+{% set input_text = "Be the change you wish to see in the world." %}
+{% set target_language = "Hindi" %}
+{% set max_new_tokens = 1024 %}
+{% set do_sample = true %}
+{% set temperature = 0.01 %}
+{% set num_return_sequences = 1 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/sarvamai__SEP__sarvam-translate/results" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+target_language = "{{ target_language }}"
+max_new_tokens = {{ max_new_tokens }}
+do_sample = {{ do_sample }}
+temperature = {{ temperature }}
+num_return_sequences = {{ num_return_sequences }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import os
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForCausalLM.from_pretrained(repo_id).to(device)
+
+messages = [
+    {"role": "system", "content": f"Translate the text below to {target_language}."},
+    {"role": "user", "content": input_text},
+]
+input_prompt = tokenizer.apply_chat_template(
+    messages,
+    tokenize=False,
+    add_generation_prompt=True,
+)
+
+model_inputs = tokenizer([input_prompt], return_tensors="pt").to(device)
+generated_ids = model.generate(
+    **model_inputs,
+    max_new_tokens=max_new_tokens,
+    do_sample=do_sample,
+    temperature=temperature,
+    num_return_sequences=num_return_sequences,
+)
+output_ids = generated_ids[0][len(model_inputs.input_ids[0]):].tolist()
+output_text = tokenizer.decode(output_ids, skip_special_tokens=True)
+
+RESULT = {"translation": output_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "translation.txt")
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(RESULT["translation"])

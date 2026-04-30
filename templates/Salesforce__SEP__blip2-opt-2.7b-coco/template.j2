@@ -1,0 +1,13 @@
+{% set placeholder = "debug" %}
+
+placeholder = "{{ placeholder }}"
+
+import inspect
+from transformers.models.blip_2.modeling_blip_2 import Blip2ForConditionalGeneration
+
+print(inspect.getsource(Blip2ForConditionalGeneration.prepare_inputs_for_generation))
+
+RESULT = {"placeholder": placeholder}
+
+if __name__ == "__main__":
+    pass

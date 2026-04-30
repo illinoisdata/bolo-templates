@@ -1,0 +1,33 @@
+{% set source_texts = ["Labdien, kā jums klājas?"] %}
+{% set max_length = 256 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-lv-en" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_texts = {{ source_texts | tojson }}
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+batch_inputs = source_texts if isinstance(source_texts, (list, tuple)) else [source_texts]
+encoded_inputs = tokenizer(batch_inputs, return_tensors="pt", padding=True, truncation=True)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+generated_tokens = model.generate(**encoded_inputs, max_length=max_length, num_beams=num_beams)
+translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    translations_path = output_path / "translations.txt"
+    translations_path.write_text("\n".join(RESULT["translations"]), encoding="utf-8")

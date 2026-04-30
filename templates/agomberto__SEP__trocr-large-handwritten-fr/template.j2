@@ -1,0 +1,44 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/agomberto__SEP__trocr-large-handwritten-fr" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set max_length = 64 %}
+{% set num_beams = 4 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+image_path = "{{ image_path }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+
+import os
+from io import BytesIO
+
+import requests
+from PIL import Image
+import torch
+from transformers import AutoImageProcessor, AutoTokenizer, VisionEncoderDecoderModel
+
+image_processor = AutoImageProcessor.from_pretrained(repo_id)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = VisionEncoderDecoderModel.from_pretrained(repo_id).to(device)
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    response = requests.get(image_path)
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+pixel_values = image_processor(images=image, return_tensors="pt").pixel_values.to(device)
+
+generated_ids = model.generate(pixel_values, max_length=max_length, num_beams=num_beams)
+generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "generated_text.txt")
+    with open(output_path, "w", encoding="utf-8") as writer:
+        writer.write(RESULT["generated_text"])

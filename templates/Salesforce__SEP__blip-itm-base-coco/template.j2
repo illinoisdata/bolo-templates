@@ -1,0 +1,50 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set prompt = "A woman and a dog sitting together in a beach." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Salesforce__SEP__blip-itm-base-coco" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from urllib.parse import urlparse
+import json
+import requests
+import torch
+from PIL import Image
+from transformers import AutoProcessor, BlipForImageTextRetrieval
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = BlipForImageTextRetrieval.from_pretrained(repo_id).to(device)
+model.eval()
+
+is_url = urlparse(image_path).scheme in {"http", "https"}
+raw_image = (
+    Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+    if is_url
+    else Image.open(Path(image_path)).convert("RGB")
+)
+encoded_inputs = processor(raw_image, prompt, return_tensors="pt")
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    itm_outputs = model(**encoded_inputs)
+    cosine_outputs = model(**encoded_inputs, use_itm_head=False)
+
+itm_scores = itm_outputs[0]
+cosine_score = cosine_outputs[0]
+
+RESULT = {
+    "itm_scores": itm_scores.cpu().tolist(),
+    "cosine_score": cosine_score.cpu().tolist(),
+}
+
+if __name__ == "__main__":
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    with open(output_dir / "itm_scores.json", "w", encoding="utf-8") as handle:
+        json.dump(RESULT["itm_scores"], handle)
+    with open(output_dir / "cosine_score.json", "w", encoding="utf-8") as handle:
+        json.dump(RESULT["cosine_score"], handle)

@@ -1,0 +1,43 @@
+{% set input_text = "The latest chapter details the protagonist's journey across distant lands, weaving in themes of resilience and wonder." %}
+{% set prefix = "summarize: " %}
+{% set max_length = 200 %}
+{% set min_length = 30 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/cnicu__SEP__t5-small-booksum" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+prefix = "{{ prefix }}"
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+
+prefixed_text = f"{prefix}{input_text}"
+inputs = tokenizer(prefixed_text, return_tensors="pt", truncation=True, max_length=512)
+input_tensors = {k: v.to(device) for k, v in inputs.items()}
+
+generated_tokens = model.generate(
+    **input_tensors,
+    max_length=max_length,
+    min_length=min_length,
+    num_beams=num_beams,
+    early_stopping=True,
+)
+
+summary_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+
+RESULT = {"summary": summary_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "summary.txt").write_text(summary_text, encoding="utf-8")

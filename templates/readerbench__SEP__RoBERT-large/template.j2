@@ -1,0 +1,36 @@
+{% set text_input = "Acesta este un exemplu de propoziție în limba română." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/readerbench__SEP__RoBERT-large" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(text_input, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+last_hidden_state = outputs.last_hidden_state.detach().cpu()
+pooler_output = outputs.pooler_output.detach().cpu() if outputs.pooler_output is not None else None
+
+RESULT = {
+    "last_hidden_state": last_hidden_state,
+    "pooler_output": pooler_output,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    torch.save(RESULT["last_hidden_state"], output_path / "last_hidden_state.pt")
+    if RESULT["pooler_output"] is not None:
+        torch.save(RESULT["pooler_output"], output_path / "pooler_output.pt")

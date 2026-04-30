@@ -1,0 +1,6 @@
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+import inspect
+from transformers import InformerForPrediction
+print(inspect.signature(InformerForPrediction.forward))
+print(inspect.getsource(InformerForPrediction))

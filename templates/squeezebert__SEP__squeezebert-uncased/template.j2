@@ -1,0 +1,61 @@
+{%- set masked_text = "The quick brown fox jumps over the lazy [MASK]." -%}
+{%- set top_k = 5 -%}
+{%- set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/squeezebert__SEP__squeezebert-uncased" -%}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+masked_text = "{{ masked_text }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(masked_text, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+
+input_ids = inputs["input_ids"]
+mask_token_id = tokenizer.mask_token_id
+base_ids = input_ids.detach().clone().cpu()
+mask_positions = (base_ids[0] == mask_token_id).nonzero(as_tuple=True)[0].tolist()
+
+predictions = []
+for mask_index in mask_positions:
+    mask_logits = logits[0, mask_index, :]
+    probabilities = torch.softmax(mask_logits, dim=-1)
+    topk_probs, topk_indices = torch.topk(probabilities, k=top_k)
+    tokens = tokenizer.convert_ids_to_tokens(topk_indices.tolist())
+    filled_texts = []
+    for candidate_id in topk_indices.tolist():
+        candidate_ids = base_ids.clone()
+        candidate_ids[0, mask_index] = candidate_id
+        filled_text = tokenizer.decode(candidate_ids[0], skip_special_tokens=True)
+        filled_texts.append(filled_text)
+    predictions.append(
+        {
+            "mask_index": mask_index,
+            "tokens": tokens,
+            "probabilities": [float(p) for p in topk_probs.tolist()],
+            "filled_texts": filled_texts,
+        }
+    )
+
+RESULT = {"predictions": predictions}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "fill_mask_predictions.json")
+    with open(output_path, "w", encoding="utf-8") as file:
+        json.dump(RESULT["predictions"], file, ensure_ascii=False, indent=2)

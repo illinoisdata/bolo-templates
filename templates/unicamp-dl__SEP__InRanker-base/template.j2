@@ -1,0 +1,72 @@
+{% set query = "What is the best way to learn deep learning?" %}
+{% set docs = [
+    "The capital of France is Paris",
+    "Learn deep learning with InRanker and transformers"
+] %}
+{% set generation_max_new_tokens = 16 %}
+{% set generation_num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/unicamp-dl__SEP__InRanker-base" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query = "{{ query }}"
+docs = {{ docs | tojson }}
+generation_max_new_tokens = {{ generation_max_new_tokens }}
+generation_num_beams = {{ generation_num_beams }}
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+
+device_obj = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device_obj)
+
+prompt_template = "query: {query} document: {doc} relevance:"
+input_texts = [prompt_template.format(query=query, doc=doc) for doc in docs]
+encoded_inputs = tokenizer(
+    input_texts,
+    return_tensors="pt",
+    padding="longest",
+    truncation=True,
+)
+encoded_inputs = {key: value.to(device_obj) for key, value in encoded_inputs.items()}
+
+generated_outputs = model.generate(
+    **encoded_inputs,
+    max_new_tokens=generation_max_new_tokens,
+    num_beams=generation_num_beams,
+)
+generated_outputs = generated_outputs.cpu()
+decoded_outputs = tokenizer.batch_decode(generated_outputs, skip_special_tokens=True)
+normalized_outputs = [output.strip() for output in decoded_outputs]
+
+normalized_scores = []
+for output in normalized_outputs:
+    try:
+        normalized_scores.append(float(output))
+    except ValueError:
+        normalized_scores.append(output)
+
+scored_docs = [
+    {"doc": doc, "score": score}
+    for doc, score in zip(docs, normalized_scores)
+]
+
+RESULT = {
+    "decoded_outputs": normalized_outputs,
+    "scored_docs": scored_docs,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    decoded_path = os.path.join(output_dir, "decoded_outputs.json")
+    scored_path = os.path.join(output_dir, "scored_docs.json")
+    with open(decoded_path, "w", encoding="utf-8") as decoded_file:
+        json.dump(RESULT["decoded_outputs"], decoded_file, ensure_ascii=False, indent=2)
+    with open(scored_path, "w", encoding="utf-8") as scored_file:
+        json.dump(RESULT["scored_docs"], scored_file, ensure_ascii=False, indent=2)

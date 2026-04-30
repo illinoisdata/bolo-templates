@@ -1,0 +1,8 @@
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+
+import transformers
+
+print(transformers.__version__)
+import pkgutil
+print([m.name for m in pkgutil.iter_modules(transformers.__path__) if "coreference" in m.name])

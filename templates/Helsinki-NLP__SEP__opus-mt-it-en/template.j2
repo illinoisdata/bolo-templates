@@ -1,0 +1,30 @@
+{% set input_text = "Ciao, come stai?" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-it-en" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import json
+from transformers import MarianTokenizer, MarianMTModel
+
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
+model = MarianMTModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = [input_text]
+encoded_inputs = tokenizer(inputs, return_tensors="pt", padding=True, truncation=True)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+generated_tokens = model.generate(**encoded_inputs)
+translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    save_path = Path(output_dir)
+    save_path.mkdir(parents=True, exist_ok=True)
+    (save_path / "translations.json").write_text(
+        json.dumps(RESULT["translations"], ensure_ascii=False, indent=2)
+    )

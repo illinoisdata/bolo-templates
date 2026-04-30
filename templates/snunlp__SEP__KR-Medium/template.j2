@@ -1,0 +1,35 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set text_input = "오늘 기분이 어떠신가요?" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/snunlp__SEP__KR-Medium" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded_input = tokenizer(text_input, return_tensors="pt", truncation=True)
+encoded_input = {key: value.to(device) for key, value in encoded_input.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_input)
+
+cls_embedding = outputs.last_hidden_state[:, 0, :].squeeze(0).cpu().tolist()
+
+RESULT = {"cls_embedding": cls_embedding}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    save_path = os.path.join(output_dir, "cls_embedding.json")
+    with open(save_path, "w", encoding="utf-8") as handle:
+        json.dump(RESULT["cls_embedding"], handle, ensure_ascii=False)

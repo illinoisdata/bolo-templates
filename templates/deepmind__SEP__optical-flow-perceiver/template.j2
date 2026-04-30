@@ -1,0 +1,59 @@
+{% set repo_id = "deepmind/optical-flow-perceiver" %}
+{% set device = "cuda:0" %}
+{% set image1_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set image2_path = "/u/yli77/projects/ML-code-generation/data/image2.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/deepmind__SEP__optical-flow-perceiver" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image1_path = "{{ image1_path }}"
+image2_path = "{{ image2_path }}"
+output_dir = "{{ output_dir }}"
+
+from transformers import PerceiverForOpticalFlow
+import torch
+import torch.nn.functional as F
+from PIL import Image
+import requests
+from io import BytesIO
+import numpy as np
+from pathlib import Path
+
+# Model instantiation
+model = PerceiverForOpticalFlow.from_pretrained(repo_id).to(device)
+
+# Image utilities
+def load_frame(path: str) -> Image.Image:
+    if path.startswith("http://") or path.startswith("https://"):
+        response = requests.get(path)
+        image = Image.open(BytesIO(response.content))
+    else:
+        image = Image.open(path)
+    return image.convert("RGB").resize((496, 368), Image.BILINEAR)
+
+frame1 = load_frame(image1_path)
+frame2 = load_frame(image2_path)
+
+# Create patch tensors
+def frame_to_patches(frame: Image.Image) -> torch.Tensor:
+    array = np.asarray(frame, dtype=np.float32) / 255.0
+    tensor = torch.from_numpy(array).permute(2, 0, 1)
+    patches = F.unfold(tensor.unsqueeze(0), kernel_size=3, padding=1)
+    _, patch_dim, height_width = patches.shape
+    height = frame.size[1]
+    width = frame.size[0]
+    return patches.view(1, patch_dim, height, width)
+
+patches = torch.stack([frame_to_patches(frame1), frame_to_patches(frame2)], dim=1)
+inputs = patches.to(device)
+
+# Inference
+outputs = model(inputs=inputs)
+flow = outputs.logits.detach().cpu().numpy()
+
+# Result dictionary
+RESULT = {"flow": flow}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    np.save(Path(output_dir) / "flow.npy", RESULT["flow"])

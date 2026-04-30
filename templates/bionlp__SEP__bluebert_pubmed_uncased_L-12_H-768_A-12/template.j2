@@ -1,0 +1,59 @@
+{% set masked_text = "The patient was prescribed a new [MASK]." %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/bionlp__SEP__bluebert_pubmed_uncased_L-12_H-768_A-12" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+masked_text = "{{ masked_text }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import BertForMaskedLM, AutoTokenizer
+
+torch_device = torch.device(device)
+
+# Use the original BERT tokenizer since this checkpoint is derived from bert-base-uncased
+tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+model = BertForMaskedLM.from_pretrained(repo_id).to(torch_device)
+model.eval()
+
+inputs = tokenizer(masked_text, return_tensors="pt")
+inputs = {key: value.to(torch_device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+mask_positions = torch.nonzero(inputs["input_ids"] == tokenizer.mask_token_id, as_tuple=False)
+
+mask_predictions = []
+for mask_position in mask_positions:
+    batch_index, token_index = mask_position.tolist()
+    mask_logits = logits[batch_index, token_index, :]
+    topk = torch.topk(mask_logits, top_k)
+    candidates = []
+    for token_id, score in zip(topk.indices.tolist(), topk.values.tolist()):
+        candidates.append(
+            {
+                "token": tokenizer.convert_ids_to_tokens(token_id),
+                "score": float(score),
+            }
+        )
+    mask_predictions.append(
+        {
+            "mask_index": int(token_index),
+            "predictions": candidates,
+        }
+    )
+
+RESULT = {"mask_predictions": mask_predictions}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "fill_mask_predictions.json")
+    with open(output_path, "w", encoding="utf-8") as output_file:
+        json.dump(RESULT, output_file, ensure_ascii=False, indent=2)

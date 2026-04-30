@@ -1,0 +1,56 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/timm__SEP__vit_base_patch32_clip_224.openai' %}
+{% set image_path = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+image_path = "{{ image_path }}"
+
+from io import BytesIO
+from pathlib import Path
+from urllib.parse import urlparse
+from urllib.request import urlopen
+
+import torch
+from PIL import Image
+from transformers import AutoImageProcessor, AutoModelForImageClassification
+import json
+
+processor = AutoImageProcessor.from_pretrained(repo_id)
+model = AutoModelForImageClassification.from_pretrained(repo_id).to(device)
+model.eval()
+
+parsed_image_path = urlparse(image_path)
+if parsed_image_path.scheme in {"http", "https"}:
+    with urlopen(image_path) as response:
+        buffer = BytesIO(response.read())
+    image = Image.open(buffer)
+else:
+    image = Image.open(image_path)
+image = image.convert("RGB")
+
+inputs = processor(images=image, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+probabilities = torch.softmax(logits, dim=1)
+predicted_class_index = int(torch.argmax(probabilities, dim=1)[0])
+
+RESULT = {
+    "logits": logits.detach().cpu().tolist(),
+    "probabilities": probabilities.detach().cpu().tolist(),
+    "predicted_class_index": predicted_class_index,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    for key, value in RESULT.items():
+        file_path = output_path / f"{key}.json"
+        with file_path.open("w", encoding="utf-8") as out_file:
+            json.dump(value, out_file)

@@ -1,0 +1,34 @@
+{% set text_input = "Replace me by any text you'd like." %}
+{% set max_length = 256 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bigbird-pegasus-large-bigpatent" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+device = torch.device(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(text_input, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+decoded_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+summary = decoded_texts[0].strip()
+
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    summary_path = os.path.join(output_dir, "summary.txt")
+    with open(summary_path, "w", encoding="utf-8") as f:
+        f.write(RESULT["summary"])

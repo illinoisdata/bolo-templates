@@ -1,0 +1,29 @@
+{% set repo_id = "lmsys/fastchat-t5-3b-v1.0" %}
+{% set device = "cuda:0" %}
+{% set prompt = "Hello, how are you?" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/lmsys__SEP__fastchat-t5-3b-v1.0" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+output_ids = model.generate(**inputs)
+generated_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "generated_text.txt"), "w") as f:
+        f.write(RESULT["generated_text"])

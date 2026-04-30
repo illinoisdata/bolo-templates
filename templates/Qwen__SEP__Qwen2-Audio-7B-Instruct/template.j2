@@ -1,0 +1,60 @@
+{% set repo_id = "Qwen/Qwen2-Audio-7B-Instruct" %}
+{% set device = "cuda:0" %}
+{% set audio = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set instruction = "What's that sound?" %}
+{% set system_prompt = "You are a helpful assistant." %}
+{% set max_length = 256 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qwen__SEP__Qwen2-Audio-7B-Instruct" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio = "{{ audio }}"
+instruction = "{{ instruction }}"
+system_prompt = "{{ system_prompt }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+from io import BytesIO
+from urllib.request import urlopen
+import librosa
+import torch
+from transformers import Qwen2AudioForConditionalGeneration, AutoProcessor
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = Qwen2AudioForConditionalGeneration.from_pretrained(repo_id)
+model = model.to(device)
+
+conversation = [
+    {'role': 'system', 'content': system_prompt},
+    {'role': 'user', 'content': [
+        {'type': 'audio', 'audio_url': audio},
+        {'type': 'text', 'text': instruction},
+    ]},
+]
+
+text = processor.apply_chat_template(conversation, add_generation_prompt=True, tokenize=False)
+
+if audio.startswith("http://") or audio.startswith("https://"):
+    audio_data = BytesIO(urlopen(audio).read())
+    waveform, sr = librosa.load(audio_data, sr=processor.feature_extractor.sampling_rate)
+else:
+    waveform, sr = librosa.load(audio, sr=processor.feature_extractor.sampling_rate)
+audios = [waveform]
+
+inputs = processor(text=text, audios=audios, return_tensors="pt", padding=True)
+for key, value in inputs.items():
+    if isinstance(value, torch.Tensor):
+        inputs[key] = value.to(device)
+
+generate_ids = model.generate(**inputs, max_length=max_length)
+generate_ids = generate_ids[:, inputs.input_ids.size(1):]
+
+response = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
+
+RESULT = {'response': response}
+
+if __name__ == "__main__":
+    import os
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "response.txt"), "w") as f:
+        f.write(RESULT['response'])

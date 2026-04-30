@@ -1,0 +1,26 @@
+{% set text = "This is a test." %}
+{% set max_length = 512 %}
+{% set num_beams = 4 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(text, return_tensors="pt").to(device)
+translated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+decoded = tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)
+translation = decoded[0]
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    with open("translation.txt", "w", encoding="utf-8") as f:
+        f.write(RESULT["translation"])

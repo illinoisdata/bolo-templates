@@ -1,0 +1,35 @@
+{% set prompt = "grammar: This sentences has has bads grammar." %}
+{% set max_length = 256 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/vennify__SEP__t5-base-grammar-correction" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_prompt = "{{ prompt }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(text_prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+
+corrected_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"corrected_text": corrected_text}
+
+if __name__ == "__main__":
+    target_dir = Path(output_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    output_path = target_dir / "corrected_text.txt"
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(RESULT["corrected_text"])

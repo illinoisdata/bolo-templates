@@ -1,0 +1,8 @@
+{% set repo_id = "Felix92/doctr-torch-parseq-multilingual-v1" %}
+{% set device = "cuda:0" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+
+import doctr
+print(dir(doctr))

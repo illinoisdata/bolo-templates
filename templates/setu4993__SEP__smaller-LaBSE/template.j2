@@ -1,0 +1,57 @@
+{% set sentences_anchor = ["dog", "Puppies are nice.", "I enjoy taking long walks along the beach with my dog."] %}
+{% set sentences_target = ["cane", "I cuccioli sono carini.", "Mi piace fare lunghe passeggiate lungo la spiaggia con il mio cane."] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/setu4993__SEP__smaller-LaBSE" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sentences_anchor = {{ sentences_anchor }}
+sentences_target = {{ sentences_target }}
+output_dir = "{{ output_dir }}"
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+from pathlib import Path
+from transformers import AutoModel, AutoTokenizer
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model = model.to(device)
+model = model.eval()
+
+tokenized_anchor = tokenizer(
+    sentences_anchor, padding=True, truncation=True, return_tensors="pt"
+)
+tokenized_target = tokenizer(
+    sentences_target, padding=True, truncation=True, return_tensors="pt"
+)
+tokenized_anchor = {key: value.to(device) for key, value in tokenized_anchor.items()}
+tokenized_target = {key: value.to(device) for key, value in tokenized_target.items()}
+
+with torch.no_grad():
+    anchor_outputs = model(**tokenized_anchor)
+    target_outputs = model(**tokenized_target)
+
+anchor_embeddings = anchor_outputs.pooler_output
+target_embeddings = target_outputs.pooler_output
+normalized_anchor_embeddings = F.normalize(anchor_embeddings, p=2, dim=-1)
+normalized_target_embeddings = F.normalize(target_embeddings, p=2, dim=-1)
+similarity_matrix = torch.matmul(
+    normalized_anchor_embeddings, normalized_target_embeddings.transpose(0, 1)
+)
+
+RESULT = {
+    "anchor_embeddings": anchor_embeddings,
+    "target_embeddings": target_embeddings,
+    "normalized_anchor_embeddings": normalized_anchor_embeddings,
+    "normalized_target_embeddings": normalized_target_embeddings,
+    "similarity_matrix": similarity_matrix,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    for key, tensor in RESULT.items():
+        array = tensor.detach().cpu().numpy()
+        np.save(output_path / f"{key}.npy", array)

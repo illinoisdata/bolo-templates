@@ -1,0 +1,66 @@
+{% set audio_input = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/MU-NLPC__SEP__whisper-small-audio-captioning" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_input = "{{ audio_input }}"
+output_dir = "{{ output_dir }}"
+
+import io
+from pathlib import Path
+
+import librosa
+import numpy as np
+import requests
+import soundfile as sf
+import torch
+from transformers import (
+    WhisperFeatureExtractor,
+    WhisperForConditionalGeneration,
+    WhisperTokenizer,
+)
+
+feature_extractor = WhisperFeatureExtractor.from_pretrained(repo_id)
+tokenizer = WhisperTokenizer.from_pretrained(repo_id, language="en", task="transcribe")
+model = WhisperForConditionalGeneration.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+
+def _load_audio(path_or_url: str, target_sr: int):
+    source = str(path_or_url)
+    if source.startswith(("http://", "https://")):
+        response = requests.get(source)
+        response.raise_for_status()
+        stream = io.BytesIO(response.content)
+        audio, sampling_rate = sf.read(stream)
+    else:
+        audio, sampling_rate = sf.read(source)
+    audio = np.asarray(audio, dtype=np.float32)
+    if audio.ndim > 1:
+        audio = np.mean(audio, axis=1)
+    if sampling_rate != target_sr:
+        audio = librosa.resample(audio, orig_sr=sampling_rate, target_sr=target_sr)
+        sampling_rate = target_sr
+    return audio, sampling_rate
+
+
+# Pre-process input
+audio, sampling_rate = _load_audio(audio_input, feature_extractor.sampling_rate)
+features = feature_extractor(audio, sampling_rate=sampling_rate, return_tensors="pt").input_features
+inputs = features.to(device)
+
+# Run inference
+with torch.inference_mode():
+    generated_ids = model.generate(
+        input_features=inputs,
+        max_length=100,
+    )
+
+# Post-process & build RESULT dict
+caption = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+RESULT = {"caption": caption}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "caption.txt").write_text(RESULT["caption"], encoding="utf-8")

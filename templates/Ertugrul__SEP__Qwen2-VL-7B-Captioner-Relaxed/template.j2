@@ -1,0 +1,73 @@
+{% set image_path = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
+{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Ertugrul__SEP__Qwen2-VL-7B-Captioner-Relaxed' %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+
+import io
+from pathlib import Path
+
+import requests
+import torch
+from PIL import Image
+from transformers import AutoProcessor, Qwen2VLForConditionalGeneration
+
+device_type = device.split(":")[0]
+dtype = torch.bfloat16 if device_type == "cuda" else torch.float32
+model = Qwen2VLForConditionalGeneration.from_pretrained(repo_id, torch_dtype=dtype)
+model = model.to(device)
+model.eval()
+processor = AutoProcessor.from_pretrained(repo_id)
+
+def load_image(source: str) -> Image.Image:
+    if source.startswith(("http://", "https://")):
+        response = requests.get(source)
+        response.raise_for_status()
+        return Image.open(io.BytesIO(response.content)).convert("RGB")
+    return Image.open(source).convert("RGB")
+
+image = load_image(image_path)
+
+conversation = [
+    {
+        "role": "user",
+        "content": [
+            {"type": "image"},
+            {"type": "text", "text": "Describe this image."},
+        ],
+    }
+]
+
+text_prompt = processor.apply_chat_template(conversation, add_generation_prompt=True)
+inputs = processor(text=[text_prompt], images=[image], padding=True, return_tensors="pt")
+input_batch = {name: tensor.to(device) for name, tensor in inputs.items()}
+
+with torch.inference_mode():
+    generated_ids = model.generate(
+        **input_batch,
+        max_new_tokens=384,
+        do_sample=True,
+        temperature=0.7,
+        top_k=50,
+        use_cache=True,
+    )
+
+input_ids = input_batch["input_ids"]
+generated_sequences = [
+    generated_row[input_row.shape[0] :]
+    for input_row, generated_row in zip(input_ids, generated_ids)
+]
+decoded_outputs = processor.batch_decode(
+    generated_sequences, skip_special_tokens=True, clean_up_tokenization_spaces=True
+)
+output_text = decoded_outputs[0]
+
+RESULT = {"caption": output_text}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    output_file = Path(output_dir) / "caption.txt"
+    with open(output_file, "w", encoding="utf-8") as writer:
+        writer.write(RESULT["caption"])

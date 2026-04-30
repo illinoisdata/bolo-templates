@@ -1,0 +1,38 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__trocr-large-handwritten" %}
+{% set max_length = 128 %}
+{% set num_beams = 4 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+
+from pathlib import Path
+from PIL import Image
+import requests
+from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+
+processor = TrOCRProcessor.from_pretrained(repo_id)
+model = VisionEncoderDecoderModel.from_pretrained(repo_id)
+model.to(device)
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = processor(images=image, return_tensors="pt")
+pixel_values = inputs.pixel_values.to(device)
+
+generated_ids = model.generate(pixel_values, max_length=max_length, num_beams=num_beams)
+generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

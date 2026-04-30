@@ -1,0 +1,56 @@
+{% set input_text = "HuggingFace is creating a <mask> that the community uses to solve NLP tasks." %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__mobilebert-uncased" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded = tokenizer(input_text, return_tensors="pt")
+encoded = {name: tensor.to(device) for name, tensor in encoded.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded)
+
+logits = outputs.logits
+mask_token_id = tokenizer.mask_token_id
+
+mask_positions_tensor = torch.where(encoded["input_ids"][0] == mask_token_id)[0]
+mask_positions = [int(position.item()) for position in mask_positions_tensor]
+
+vocab_size = logits.size(-1)
+limit_k = min(top_k, vocab_size)
+
+predictions = []
+for mask_index in mask_positions:
+    mask_logits = logits[0, mask_index, :]
+    topk = torch.topk(mask_logits, k=limit_k)
+    token_ids = [int(token_id.item()) for token_id in topk.indices]
+    scores = [float(score.item()) for score in topk.values]
+    tokens = [tokenizer.decode([token_id], skip_special_tokens=True).strip() for token_id in token_ids]
+    predictions.append({
+        "mask_index": mask_index,
+        "token_ids": token_ids,
+        "tokens": tokens,
+        "scores": scores,
+    })
+
+RESULT = {"mask_predictions": predictions}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    result_path = Path(output_dir) / "mask_predictions.json"
+    with open(result_path, "w", encoding="utf-8") as handle:
+        json.dump(RESULT["mask_predictions"], handle, ensure_ascii=False, indent=2)

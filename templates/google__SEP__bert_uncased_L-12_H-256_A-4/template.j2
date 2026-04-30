@@ -1,0 +1,59 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set text_input = text_input | default("The capital of France is [MASK].") %}
+{% set top_k = top_k | default(5) %}
+{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-12_H-256_A-4") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+torch_device = torch.device(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForMaskedLM.from_pretrained(repo_id)
+model.to(torch_device)
+model.eval()
+
+encoded_input = tokenizer(text_input, return_tensors="pt")
+encoded_input = {key: tensor.to(torch_device) for key, tensor in encoded_input.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_input)
+logits = outputs.logits
+input_ids = encoded_input["input_ids"]
+mask_token_id = tokenizer.mask_token_id
+mask_positions = (input_ids == mask_token_id).nonzero(as_tuple=True)
+
+fill_mask_results = []
+for batch_index, seq_index in zip(mask_positions[0].tolist(), mask_positions[1].tolist()):
+    token_logits = logits[int(batch_index), int(seq_index)]
+    topk = token_logits.topk(top_k)
+    topk_indices = topk.indices
+    candidate_tokens = tokenizer.convert_ids_to_tokens(topk_indices.tolist())
+    topk_probabilities = torch.softmax(token_logits, dim=-1)[topk_indices].tolist()
+    predictions = [
+        {"token": token, "score": float(score)}
+        for token, score in zip(candidate_tokens, topk_probabilities)
+    ]
+    fill_mask_results.append(
+        {
+            "batch_index": int(batch_index),
+            "mask_position": int(seq_index),
+            "predictions": predictions,
+        }
+    )
+
+RESULT = {"fill_mask": fill_mask_results}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    result_file = output_path / "fill_mask.json"
+    result_file.write_text(json.dumps(RESULT["fill_mask"], indent=2))

@@ -1,0 +1,70 @@
+{% set audio_path = '/u/yli77/projects/ML-code-generation/data/audio.wav' %}
+{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/patrickvonplaten__SEP__tiny-wav2vec2-no-tokenizer' %}
+{% set target_sampling_rate = 16000 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+output_dir = "{{ output_dir }}"
+target_sampling_rate = {{ target_sampling_rate }}
+
+import io
+from pathlib import Path
+from urllib.parse import urlparse
+
+import numpy as np
+import requests
+import soundfile as sf
+import torch
+import torch.nn.functional as F
+from transformers import AutoFeatureExtractor, AutoModel
+
+torch_device = torch.device(device)
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(torch_device)
+model.eval()
+
+def _is_url(path: str) -> bool:
+    parsed = urlparse(path)
+    return parsed.scheme in ("http", "https")
+
+
+def _read_audio(path: str):
+    if _is_url(path):
+        response = requests.get(path)
+        response.raise_for_status()
+        buffer = io.BytesIO(response.content)
+        waveform, sampling_rate = sf.read(buffer, dtype="float32")
+    else:
+        waveform, sampling_rate = sf.read(path, dtype="float32")
+    if waveform.ndim > 1:
+        waveform = waveform.mean(axis=1)
+    if sampling_rate != target_sampling_rate:
+        ratio = target_sampling_rate / sampling_rate
+        tensor_waveform = torch.from_numpy(waveform).to(torch.float32)
+        tensor_waveform = tensor_waveform.unsqueeze(0).unsqueeze(0)
+        resampled = F.interpolate(
+            tensor_waveform,
+            scale_factor=ratio,
+            mode="linear",
+            align_corners=False,
+        )
+        waveform = resampled.squeeze().numpy()
+        sampling_rate = target_sampling_rate
+    return waveform, sampling_rate
+
+waveform, sampling_rate = _read_audio(audio_path)
+inputs = feature_extractor(waveform, sampling_rate=sampling_rate, return_tensors="pt")
+inputs = {k: v.to(torch_device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+last_hidden_state = outputs.last_hidden_state[0].cpu().numpy()
+RESULT = {"last_hidden_state": last_hidden_state}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    for key, value in RESULT.items():
+        target_file = output_path / f"{key}.npy"
+        np.save(target_file, value)

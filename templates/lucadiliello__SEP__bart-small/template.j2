@@ -1,0 +1,40 @@
+{% set prompt = "The quick brown fox jumps over the lazy dog." %}
+{% set max_length = 128 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/lucadiliello__SEP__bart-small" %}
+{% set result_file_name = "generated.txt" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+result_file_name = "{{ result_file_name }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(prompt, return_tensors="pt", truncation=True)
+inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+
+generated_ids = model.generate(
+    **inputs,
+    max_length=max_length,
+    num_beams=num_beams,
+    early_stopping=True,
+)
+
+decoded_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"generated_text": decoded_text}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    result_path = Path(output_dir) / result_file_name
+    result_path.write_text(RESULT["generated_text"], encoding="utf-8")

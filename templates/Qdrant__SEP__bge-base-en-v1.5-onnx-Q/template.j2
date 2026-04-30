@@ -1,0 +1,53 @@
+{% set repo_id = "Qdrant/bge-base-en-v1.5-onnx-Q" %}
+{% set base_model = "BAAI/bge-base-en-v1.5" %}
+{% set device = "cuda:0" %}
+{% set texts = ["The quick brown fox jumps over the lazy dog.", "A fast auburn fox leaps above a sleepy canine."] %}
+{% set max_length = 128 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qdrant__SEP__bge-base-en-v1.5-onnx-Q" %}
+repo_id = "{{ repo_id }}"
+base_model = "{{ base_model }}"
+device = "{{ device }}"
+texts = {{ texts }}
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+# Load tokenizer and model from base_model for inference
+# repo_id is the ONNX port; base_model contains original PyTorch weights
+
+tokenizer = AutoTokenizer.from_pretrained(base_model)
+model = AutoModel.from_pretrained(base_model)
+model = model.to(device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    texts,
+    padding=True,
+    truncation=True,
+    max_length=max_length,
+    return_tensors="pt",
+)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+last_hidden_state = outputs.last_hidden_state
+attention_mask = encoded_inputs["attention_mask"].unsqueeze(-1)
+masked_sum = (last_hidden_state * attention_mask).sum(dim=1)
+mask_denom = attention_mask.sum(dim=1).clamp(min=1e-9)
+pooled_embeddings = masked_sum / mask_denom
+embeddings = pooled_embeddings.cpu().tolist()
+
+RESULT = {"embeddings": embeddings}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "embeddings.json")
+    with open(output_path, "w", encoding="utf-8") as writer:
+        json.dump(RESULT["embeddings"], writer, ensure_ascii=False, indent=2)

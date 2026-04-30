@@ -1,0 +1,53 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set image_path = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
+{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__vit-mae-large' %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import numpy as np
+import requests
+import torch
+from PIL import Image
+from transformers import AutoImageProcessor, ViTMAEForPreTraining
+
+# Load processor and model
+processor = AutoImageProcessor.from_pretrained(repo_id)
+model = ViTMAEForPreTraining.from_pretrained(repo_id)
+model.to(device)
+
+# Pre-process input
+if image_path.startswith("http"):
+    image = Image.open(requests.get(image_path, stream=True).raw)
+else:
+    image = Image.open(image_path)
+inputs = processor(images=image, return_tensors="pt")
+for k, v in inputs.items():
+    inputs[k] = v.to(device)
+
+# Run inference
+outputs = model(**inputs)
+
+# Post-process & build RESULT dict
+loss = outputs.loss.cpu().item()
+mask = outputs.mask.cpu().numpy()
+ids_restore = outputs.ids_restore.cpu().numpy()
+
+RESULT = {
+    "loss": loss,
+    "mask": mask,
+    "ids_restore": ids_restore,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    # save loss
+    with open(os.path.join(output_dir, "loss.txt"), "w") as f:
+        f.write(str(RESULT["loss"]))
+    # save arrays
+    np.save(os.path.join(output_dir, "mask.npy"), RESULT["mask"])
+    np.save(os.path.join(output_dir, "ids_restore.npy"), RESULT["ids_restore"])

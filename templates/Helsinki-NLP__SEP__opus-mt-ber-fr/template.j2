@@ -1,0 +1,29 @@
+{% set source_text = "Hello, world!" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-ber-fr" %}
+{% set num_beams = 4 %}
+{% set max_new_tokens = 128 %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = "{{ source_text }}"
+output_dir = "{{ output_dir }}"
+num_beams = {{ num_beams }}
+max_new_tokens = {{ max_new_tokens }}
+
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
+
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(source_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+generated_tokens = model.generate(**inputs, num_beams=num_beams, max_new_tokens=max_new_tokens)
+translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "translations.txt").write_text("\n".join(translations), encoding="utf-8")

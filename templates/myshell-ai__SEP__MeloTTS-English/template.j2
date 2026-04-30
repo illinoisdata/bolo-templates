@@ -1,0 +1,7 @@
+{% set repo_id = repo_id %}
+
+repo_id = "{{ repo_id }}"
+
+from huggingface_hub import list_repo_files
+
+print(list_repo_files(repo_id))

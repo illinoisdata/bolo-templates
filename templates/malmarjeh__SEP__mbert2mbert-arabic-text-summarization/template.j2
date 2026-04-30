@@ -1,0 +1,55 @@
+{% set repo_id = "malmarjeh/mbert2mbert-arabic-text-summarization" %}
+{% set device = "cuda:0" %}
+{% set text = "شهدت مدينة طرابلس، مساء أمس الأربعاء، احتجاجات شعبية وأعمال شغب لليوم الثالث على التوالي، وذلك بسبب تردي الوضع المعيشي والاقتصادي. واندلعت مواجهات عنيفة وعمليات كر وفر ما بين الجيش اللبناني والمحتجين استمرت لساعات، إثر محاولة فتح الطرقات المقطوعة، ما أدى إلى إصابة العشرات من الطرفين." %}
+{% set pad_token_id = None %}
+{% set num_beams = 3 %}
+{% set repetition_penalty = 3.0 %}
+{% set max_length = 200 %}
+{% set length_penalty = 1.0 %}
+{% set no_repeat_ngram_size = 3 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/malmarjeh__SEP__mbert2mbert-arabic-text-summarization" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+pad_token_id = {{ pad_token_id }}
+num_beams = {{ num_beams }}
+repetition_penalty = {{ repetition_penalty }}
+max_length = {{ max_length }}
+length_penalty = {{ length_penalty }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
+from arabert.preprocess import ArabertPreprocessor
+import os
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+
+preprocessor = ArabertPreprocessor(model_name=repo_id)
+text = preprocessor.preprocess(text)
+
+summarizer = pipeline(
+    "text-generation",
+    model=model,
+    tokenizer=tokenizer
+)
+raw_outputs = summarizer(
+    text,
+    pad_token_id=tokenizer.eos_token_id if pad_token_id is None else pad_token_id,
+    num_beams=num_beams,
+    repetition_penalty=repetition_penalty,
+    max_length=max_length,
+    length_penalty=length_penalty,
+    no_repeat_ngram_size=no_repeat_ngram_size
+)
+summary = raw_outputs[0]["generated_text"]
+
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "summary.txt"), "w", encoding="utf-8") as f:
+        f.write(RESULT["summary"])

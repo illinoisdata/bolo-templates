@@ -1,0 +1,38 @@
+{% set repo_id = "microsoft/layoutlm-base-uncased" %}
+{% set device = "cuda:0" %}
+{% set image = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
+{% set words = ["Hello", "world", "!"] %}
+{% set boxes = [[0, 0, 100, 100], [100, 0, 200, 100], [200, 0, 300, 150]] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__layoutlm-base-uncased" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image = "{{ image }}"
+words = {{ words }}
+boxes = {{ boxes }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoModel, AutoProcessor
+import torch
+from PIL import Image
+import requests
+from io import BytesIO
+import os
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+
+if image.startswith("http://") or image.startswith("https://"):
+    image = Image.open(BytesIO(requests.get(image).content)).convert("RGB")
+else:
+    image = Image.open(image).convert("RGB")
+
+encoding = processor(image=image, text=words, boxes=boxes, return_tensors="pt", is_split_into_words=True).to(device)
+outputs = model(**encoding)
+last_hidden_state = outputs.last_hidden_state
+
+RESULT = {"last_hidden_state": last_hidden_state}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    torch.save(RESULT["last_hidden_state"].cpu(), os.path.join(output_dir, "last_hidden_state.pt"))

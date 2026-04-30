@@ -1,0 +1,45 @@
+{% set prompt = "Write a short email thanking a friend for sharing flan with an alpaca." %}
+{% set max_length = 128 %}
+{% set num_beams = 1 %}
+{% set do_sample = false %}
+{% set temperature = 1.0 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/declare-lab__SEP__flan-alpaca-gpt4-xl" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+do_sample = {{ "True" if do_sample else "False" }}
+temperature = {{ temperature }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+execution_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(execution_device)
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {key: value.to(execution_device) for key, value in inputs.items()}
+
+generated_ids = model.generate(
+    **inputs,
+    max_length=max_length,
+    num_beams=num_beams,
+    do_sample=do_sample,
+    temperature=temperature,
+)
+
+generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_text.txt").write_text(
+        RESULT["generated_text"], encoding="utf-8"
+    )

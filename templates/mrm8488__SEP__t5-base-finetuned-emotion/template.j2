@@ -1,0 +1,38 @@
+{% set repo_id = "mrm8488/t5-base-finetuned-emotion" %}
+{% set device = "cuda:0" %}
+{% set text = "I wish you were here but it is impossible" %}
+{% set max_length = 2 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/mrm8488__SEP__t5-base-finetuned-emotion" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+# Preprocess input
+inputs = tokenizer(text, return_tensors="pt")
+input_ids = inputs.input_ids.to(device)
+
+# Run inference
+output_ids = model.generate(input_ids=input_ids, max_length=max_length)
+
+# Post-process and build RESULT
+decoded = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
+label = decoded[0]
+
+RESULT = {"label": label}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "label.txt")
+    with open(output_path, "w") as f:
+        f.write(label)

@@ -1,0 +1,32 @@
+{% set text_input = "This sentence has a error in grammar." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/prithivida__SEP__grammar_error_correcter_v1" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+inputs = tokenizer(text_input, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+generated_ids = model.generate(
+    **inputs,
+    num_beams=4,
+    max_new_tokens=128,
+    no_repeat_ngram_size=3,
+)
+
+corrected_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"corrected_text": corrected_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "corrected_text.txt").write_text(corrected_text, encoding="utf-8")

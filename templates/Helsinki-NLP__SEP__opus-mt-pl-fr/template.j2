@@ -1,0 +1,50 @@
+{% set repo_id = "Helsinki-NLP/opus-mt-pl-fr" %}
+{% set device = "cuda:0" %}
+{% set input_text = "Dzień dobry! Czy możesz przetłumaczyć ten tekst na francuski?" %}
+{% set num_beams = 6 %}
+{% set max_length = 128 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-pl-fr" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+num_beams = {{ num_beams }}
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+    padding="longest",
+    max_length=max_length,
+)
+encoded = {key: value.to(device) for key, value in encoded.items()}
+
+with torch.no_grad():
+    generated = model.generate(
+        **encoded,
+        num_beams=num_beams,
+        max_length=max_length,
+    )
+
+translation = tokenizer.decode(
+    generated[0],
+    skip_special_tokens=True,
+)
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    file_path = output_path / "translation.txt"
+    file_path.write_text(RESULT["translation"], encoding="utf-8")

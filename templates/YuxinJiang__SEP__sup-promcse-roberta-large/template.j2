@@ -1,0 +1,42 @@
+{% set sentence_inputs = ["A woman is reading a book.", "A man is playing a guitar."] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/YuxinJiang__SEP__sup-promcse-roberta-large" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sentence_inputs = {{ sentence_inputs }}
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+tokenized_inputs = tokenizer(
+    sentence_inputs,
+    padding=True,
+    truncation=True,
+    return_tensors="pt"
+)
+tokenized_inputs = {key: tensor.to(device) for key, tensor in tokenized_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**tokenized_inputs)
+
+sequence_output = outputs.last_hidden_state
+pooled_output = getattr(outputs, "pooler_output", None)
+if pooled_output is None:
+    pooled_output = sequence_output[:, 0, :]
+
+embeddings = pooled_output.detach().cpu()
+
+RESULT = {"embeddings": embeddings.tolist()}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    embeddings_path = os.path.join(output_dir, "sentence_embeddings.json")
+    with open(embeddings_path, "w", encoding="utf-8") as output_file:
+        json.dump(RESULT, output_file, ensure_ascii=False, indent=2)

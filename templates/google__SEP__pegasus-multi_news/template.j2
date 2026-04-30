@@ -1,0 +1,39 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set document = "Google's Pegasus model is designed for abstractive summarization. This example document explains how to use the model for multi-document summarization. It can condense long inputs into concise summaries while preserving the main ideas." %}
+{% set summary_min_length = 60 %}
+{% set summary_max_length = 200 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__pegasus-multi_news" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+document = """{{ document }}"""
+summary_min_length = {{ summary_min_length }}
+summary_max_length = {{ summary_max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+inputs = tokenizer(document, truncation=True, max_length=1024, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+generated_ids = model.generate(
+    **inputs,
+    min_length=summary_min_length,
+    max_length=summary_max_length,
+    num_beams=num_beams,
+)
+summary = tokenizer.batch_decode(
+    generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True
+)[0]
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    summary_path = output_path / "summary.txt"
+    summary_path.write_text(RESULT["summary"], encoding="utf-8")

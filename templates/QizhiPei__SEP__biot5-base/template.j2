@@ -1,0 +1,33 @@
+{% set repo_id = "QizhiPei/biot5-base" %}
+{% set device = "cuda:0" %}
+{% set prompt = "What is the function of hemoglobin?" %}
+{% set max_length = 50 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/QizhiPei__SEP__biot5-base" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(prompt, return_tensors="pt").to(device)
+
+generated_ids = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+
+generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    import os, json
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "generated_text.json"), "w") as f:
+        json.dump(RESULT["generated_text"], f)

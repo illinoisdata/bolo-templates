@@ -1,0 +1,35 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-tc-big-fr-en" %}
+{% set text_inputs = ["J'ai adoré l'Angleterre.", "C'était la seule chose à faire."] %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+text_inputs = {{ text_inputs | tojson }}
+
+import torch
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+torch_device = torch.device(device)
+model = model.to(torch_device)
+model.eval()
+
+inputs = tokenizer(text_inputs, return_tensors="pt", padding=True, truncation=True)
+inputs = {k: v.to(torch_device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_tokens = model.generate(**inputs)
+
+translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    translations_file = output_path / "translations.txt"
+    translations_file.write_text("\n".join(RESULT["translations"]), encoding="utf-8")

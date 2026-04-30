@@ -1,0 +1,61 @@
+{% set repo_id = repo_id | default("usyd-community/vitpose-plus-base") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set dataset_index = dataset_index | default(0) %}
+{% set keypoint_threshold = keypoint_threshold | default(0.3) %}
+{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/usyd-community__SEP__vitpose-plus-base") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+dataset_index = {{ dataset_index }}
+keypoint_threshold = {{ keypoint_threshold }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import requests
+import torch
+from PIL import Image
+from transformers import AutoProcessor, VitPoseForPoseEstimation
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = VitPoseForPoseEstimation.from_pretrained(repo_id).to(device)
+id2label = {int(key): value for key, value in model.config.id2label.items()}
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+full_box = [[0, 0, image.width, image.height]]
+boxes_per_image = [full_box]
+inputs = processor(image, boxes=boxes_per_image, return_tensors="pt").to(device)
+inputs["dataset_index"] = torch.tensor([dataset_index], device=device)
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+pose_results = processor.post_process_pose_estimation(
+    outputs, boxes=boxes_per_image, threshold=keypoint_threshold
+)
+pose_result = pose_results[0]
+pose_annotations = []
+
+for person_pose in pose_result:
+    pose_annotations.append(
+        {
+            "keypoints": person_pose["keypoints"].cpu().tolist(),
+            "labels": [id2label[label.item()] for label in person_pose["labels"]],
+            "scores": person_pose["scores"].cpu().tolist(),
+        }
+    )
+
+RESULT = {"pose_annotations": pose_annotations}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    output_file = Path(output_dir) / "pose_annotations.json"
+    with open(output_file, "w", encoding="utf-8") as fout:
+        json.dump(RESULT["pose_annotations"], fout, ensure_ascii=False, indent=2)

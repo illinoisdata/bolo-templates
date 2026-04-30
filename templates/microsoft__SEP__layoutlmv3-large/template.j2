@@ -1,0 +1,87 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set doc_image_path = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
+{% set question = "What is the invoice number?" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__layoutlmv3-large" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+doc_image_path = "{{ doc_image_path }}"
+question = "{{ question }}"
+output_dir = "{{ output_dir }}"
+
+from io import BytesIO
+from pathlib import Path
+from urllib.parse import urlparse
+
+import easyocr
+import numpy as np
+import requests
+import torch
+from PIL import Image
+from transformers import AutoModelForQuestionAnswering, AutoProcessor
+
+torch_device = torch.device(device)
+processor = AutoProcessor.from_pretrained(repo_id)
+processor.image_processor.apply_ocr = False
+model = AutoModelForQuestionAnswering.from_pretrained(repo_id)
+model.to(torch_device)
+model.eval()
+
+def load_image(source_path: str) -> Image.Image:
+    parsed = urlparse(source_path)
+    if parsed.scheme in {"http", "https"}:
+        response = requests.get(source_path, stream=True)
+        response.raise_for_status()
+        return Image.open(BytesIO(response.content)).convert("RGB")
+    return Image.open(source_path).convert("RGB")
+
+document_image = load_image(doc_image_path)
+reader = easyocr.Reader(["en"], gpu=torch_device.type != "cpu")
+np_image = np.array(document_image)
+ocr_results = reader.readtext(np_image)
+if not ocr_results:
+    raise RuntimeError("EasyOCR did not detect any text in the provided document image.")
+
+image_width, image_height = document_image.size
+
+def scale_coord(value: float, max_value: int) -> int:
+    if max_value == 0:
+        return 0
+    scaled = int(round(value * 1000 / max_value))
+    return max(0, min(1000, scaled))
+
+texts = []
+boxes = []
+for bbox, text, _ in ocr_results:
+    texts.append(text)
+    x_coords, y_coords = zip(*bbox)
+    boxes.append([
+        scale_coord(min(x_coords), image_width),
+        scale_coord(min(y_coords), image_height),
+        scale_coord(max(x_coords), image_width),
+        scale_coord(max(y_coords), image_height),
+    ])
+
+encoding = processor(document_image, text=texts, boxes=boxes, return_tensors="pt")
+inputs = {key: value.to(torch_device) for key, value in encoding.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits.squeeze(0)
+end_logits = outputs.end_logits.squeeze(0)
+start_index = int(torch.argmax(start_logits))
+end_index = int(torch.argmax(end_logits))
+if end_index < start_index:
+    end_index = start_index
+
+input_ids_tensor = inputs["input_ids"][0].cpu()
+answer_ids = input_ids_tensor[start_index : end_index + 1].tolist()
+answer = processor.tokenizer.decode(answer_ids, skip_special_tokens=True).strip()
+
+RESULT = {"answer": answer}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "answer.txt").write_text(RESULT["answer"], encoding="utf-8")

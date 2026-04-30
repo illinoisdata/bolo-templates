@@ -1,0 +1,53 @@
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Seznam__SEP__simcse-dist-mpnet-czeng-cs-en" %}
+{% set text_a = "Dnes je výborné počasí na procházku po parku." %}
+{% set text_b = "Večer si oblíbím dobrý film a uvařím si čaj." %}
+{% set max_length = 512 %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_a = "{{ text_a }}"
+text_b = "{{ text_b }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoModel, AutoTokenizer
+import torch
+
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+inputs = tokenizer(
+    [text_a, text_b],
+    padding=True,
+    truncation=True,
+    max_length=max_length,
+    return_tensors="pt",
+)
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+embeddings = outputs.last_hidden_state[:, 0, :]
+similarity = torch.nn.functional.cosine_similarity(embeddings[0:1], embeddings[1:2], dim=1)[0]
+
+embeddings_cpu = embeddings.cpu()
+similarity_value = similarity.cpu().item()
+
+RESULT = {
+    "embeddings": embeddings_cpu.tolist(),
+    "similarity_score": similarity_value,
+}
+
+if __name__ == "__main__":
+    import json
+    import os
+
+    os.makedirs(output_dir, exist_ok=True)
+    embeddings_path = os.path.join(output_dir, "embeddings.json")
+    similarity_path = os.path.join(output_dir, "similarity.txt")
+    with open(embeddings_path, "w", encoding="utf-8") as embeddings_file:
+        json.dump(RESULT["embeddings"], embeddings_file)
+    with open(similarity_path, "w", encoding="utf-8") as similarity_file:
+        similarity_file.write(str(RESULT["similarity_score"]))

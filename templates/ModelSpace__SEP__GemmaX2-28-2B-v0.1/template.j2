@@ -1,0 +1,33 @@
+{% set repo_id = "ModelSpace/GemmaX2-28-2B-v0.1" %}
+{% set device = "cuda:0" %}
+{% set text = "Translate this from Chinese to English:\nChinese: 我爱机器翻译\nEnglish:" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ModelSpace__SEP__GemmaX2-28-2B-v0.1" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = """{{ text }}"""
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
+import os
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForCausalLM.from_pretrained(repo_id)
+model.to(device)
+
+# Pre-process input
+inputs = tokenizer(text, return_tensors="pt").to(device)
+
+# Run inference
+outputs = model.generate(**inputs, max_new_tokens=50)
+
+# Post-process & build RESULT dict
+translation = tokenizer.decode(outputs[0], skip_special_tokens=True)
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "translation.txt"), "w", encoding="utf-8") as f:
+        f.write(RESULT["translation"])

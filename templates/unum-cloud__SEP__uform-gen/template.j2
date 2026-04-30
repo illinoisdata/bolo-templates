@@ -1,0 +1,70 @@
+{% set prompt = "[cap] Summarize the visual content of the image." %}
+{% set max_new_tokens = 128 %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/unum-cloud__SEP__uform-gen" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+from urllib.parse import urlparse
+
+import requests
+import torch
+from PIL import Image
+from transformers.modeling_utils import PreTrainedModel
+from uform.gen_model import VLMForCausalLM, VLMProcessor
+
+
+def _patched_move_missing_keys_from_meta_to_device(self, missing_keys, *args, **kwargs):
+    return missing_keys
+
+PreTrainedModel._move_missing_keys_from_meta_to_device = (
+    _patched_move_missing_keys_from_meta_to_device
+)
+VLMForCausalLM.mark_tied_weights_as_initialized = (
+    lambda self, loading_info: loading_info
+)
+VLMForCausalLM._initialize_weights = lambda self, *args, **kwargs: None
+
+processor = VLMProcessor.from_pretrained(repo_id)
+model = VLMForCausalLM.from_pretrained(repo_id).to(device)
+
+def _load_image(path_or_url: str) -> Image.Image:
+    parsed = urlparse(path_or_url)
+    if parsed.scheme in {"http", "https"}:
+        response = requests.get(path_or_url, stream=True)
+        response.raise_for_status()
+        return Image.open(response.raw).convert("RGB")
+    return Image.open(path_or_url).convert("RGB")
+
+image = _load_image(image_path)
+inputs = processor(texts=[prompt], images=[image], return_tensors="pt")
+inputs = inputs.to(device)
+
+with torch.inference_mode():
+    output = model.generate(
+        **inputs,
+        do_sample=False,
+        use_cache=True,
+        max_new_tokens=max_new_tokens,
+        eos_token_id=32001,
+        pad_token_id=processor.tokenizer.pad_token_id,
+    )
+
+prompt_len = inputs["input_ids"].shape[1]
+generated_tokens = output[:, prompt_len:]
+generated_text = processor.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"caption": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = Path(output_dir) / "caption.txt"
+    with open(output_path, "w", encoding="utf-8") as output_file:
+        output_file.write(RESULT["caption"])

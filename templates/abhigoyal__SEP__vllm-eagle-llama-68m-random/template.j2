@@ -1,0 +1,44 @@
+{% set repo_id = "abhigoyal/vllm-eagle-llama-68m-random" %}
+{% set device = "cuda:0" %}
+{% set prompt = "Hello, how are you?" %}
+{% set max_new_tokens = 20 %}
+{% set temperature = 1.0 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/abhigoyal__SEP__vllm-eagle-llama-68m-random" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+output_dir = "{{ output_dir }}"
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import LlamaConfig, LlamaForCausalLM, LlamaTokenizer
+
+config_path = hf_hub_download(repo_id, filename="config.json")
+with open(config_path, "r", encoding="utf-8") as config_file:
+    raw_config = json.load(config_file)
+model_config_data = raw_config.get("model", raw_config)
+llama_config = LlamaConfig(**model_config_data)
+base_model_name = model_config_data.get("_name_or_path", repo_id)
+
+tokenizer = LlamaTokenizer.from_pretrained(base_model_name, use_fast=False)
+model = LlamaForCausalLM.from_pretrained(repo_id, config=llama_config).to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model.generate(**inputs, max_new_tokens=max_new_tokens, temperature=temperature)
+generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    import os
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "generated_text.txt")
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(RESULT["generated_text"])

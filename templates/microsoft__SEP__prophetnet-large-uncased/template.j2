@@ -1,0 +1,41 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set source_text = "the us state department said wednesday it had received no formal word from bolivia that it was expelling the us ambassador there but said the charges made against him are baseless" %}
+{% set max_length = 142 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__prophetnet-large-uncased" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = """{{ source_text }}"""
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import os
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+inputs = tokenizer(source_text, return_tensors="pt", truncation=True)
+inputs = inputs.to(device)
+
+generated_ids = model.generate(
+    **inputs,
+    max_length=max_length,
+    num_beams=num_beams,
+)
+
+generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+generated_text = generated_texts[0].strip()
+
+RESULT = {
+    "generated_text": generated_text,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    result_path = os.path.join(output_dir, "generated_text.txt")
+    with open(result_path, "w", encoding="utf-8") as f:
+        f.write(RESULT["generated_text"])

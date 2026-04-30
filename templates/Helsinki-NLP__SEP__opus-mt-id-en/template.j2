@@ -1,0 +1,32 @@
+{% set repo_id = "Helsinki-NLP/opus-mt-id-en" %}
+{% set device = "cuda:0" %}
+{% set source_text = "Halo dunia!" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-id-en" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = "{{ source_text }}"
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(source_text, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+generated_tokens = model.generate(**inputs)
+translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    output_file = output_path / "translations.txt"
+    with output_file.open("w", encoding="utf-8") as file:
+        for translation in RESULT["translations"]:
+            file.write(translation + "\n")

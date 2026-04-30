@@ -1,0 +1,14 @@
+import pathlib
+import transformers
+
+root = pathlib.Path(transformers.__file__).resolve().parent
+matches = []
+for candidate in root.rglob("*.py"):
+    try:
+        content = candidate.read_text()
+    except Exception:
+        continue
+    if "SafetyChecker" in content:
+        matches.append(candidate)
+for match in matches[:20]:
+    print(match)

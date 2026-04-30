@@ -1,0 +1,8 @@
+repo_id = "magic-leap-community/superglue_outdoor"
+
+import importlib
+import pkgutil
+import transformers
+
+modules = sorted(m.name for m in pkgutil.iter_modules(importlib.import_module("transformers.models").__path__))
+print(modules)

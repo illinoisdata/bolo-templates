@@ -1,0 +1,31 @@
+{% set repo_id = "google/mt5-xl" %}
+{% set device = "cuda:0" %}
+{% set text = "Hello, how are you?" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__mt5-xl" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+output_dir = "{{ output_dir }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoded = tokenizer(text, return_tensors="pt")
+encoded = {k: v.to(device) for k, v in encoded.items()}
+
+outputs = model.generate(**encoded)
+
+generated = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+generated_text = generated[0]
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    import os
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "generated_text.txt"), "w", encoding="utf-8") as f:
+        f.write(RESULT["generated_text"])

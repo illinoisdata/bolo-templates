@@ -1,0 +1,67 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set text = "The capital of France is [MASK]." %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__multiberts-seed_0" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForPreTraining, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+model.eval()
+
+tokenized_inputs = tokenizer(text, return_tensors="pt")
+tokenized_inputs = {name: tensor.to(device) for name, tensor in tokenized_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**tokenized_inputs)
+
+mlm_logits = outputs.prediction_logits
+ns_logits = outputs.seq_relationship_logits
+input_ids = tokenized_inputs["input_ids"]
+mask_token_id = tokenizer.mask_token_id
+predictions = []
+
+if mask_token_id is not None:
+    mask_positions = (input_ids == mask_token_id).nonzero(as_tuple=False)
+    for position in mask_positions:
+        batch_index = position[0].item()
+        sequence_index = position[1].item()
+        logits = mlm_logits[batch_index, sequence_index]
+        k = min(top_k, logits.size(-1))
+        topk = torch.topk(logits, k)
+        probabilities = torch.softmax(logits, dim=-1)
+        topk_indices = topk.indices.tolist()
+        topk_tokens = tokenizer.convert_ids_to_tokens(topk_indices)
+        topk_scores = probabilities[topk.indices].tolist()
+        predictions.append({
+            "mask_index": sequence_index,
+            "tokens": topk_tokens,
+            "scores": topk_scores,
+        })
+
+ns_probabilities = torch.softmax(ns_logits, dim=-1)
+next_sentence_probs = {
+    "not_next": ns_probabilities[0, 0].item(),
+    "is_next": ns_probabilities[0, 1].item(),
+}
+
+RESULT = {
+    "mlm_predictions": predictions,
+    "next_sentence_probs": next_sentence_probs,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "result.json").write_text(json.dumps(RESULT, indent=2))

@@ -1,0 +1,50 @@
+{% set repo_id = "facebook/dpr-reader-single-nq-base" %}
+{% set device = "cuda:0" %}
+{% set questions = ["What is love?"] %}
+{% set titles = ["Haddaway"] %}
+{% set texts = ["'What Is Love' is a song recorded by the artist Haddaway"] %}
+{% set output_dir = "./" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+questions = {{ questions }}
+titles = {{ titles }}
+texts = {{ texts }}
+output_dir = "{{ output_dir }}"
+
+import os
+import numpy as np
+import torch
+from transformers import DPRReaderTokenizer, DPRReader
+
+tokenizer = DPRReaderTokenizer.from_pretrained(repo_id)
+model = DPRReader.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    questions=questions,
+    titles=titles,
+    texts=texts,
+    return_tensors="pt",
+)
+for k, v in encoded_inputs.items():
+    encoded_inputs[k] = v.to(device)
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+start_logits = outputs.start_logits.detach().cpu().numpy()
+end_logits = outputs.end_logits.detach().cpu().numpy()
+relevance_logits = outputs.relevance_logits.detach().cpu().numpy()
+
+RESULT = {
+    "start_logits": start_logits,
+    "end_logits": end_logits,
+    "relevance_logits": relevance_logits,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    np.save(os.path.join(output_dir, "start_logits.npy"), RESULT["start_logits"])
+    np.save(os.path.join(output_dir, "end_logits.npy"), RESULT["end_logits"])
+    np.save(os.path.join(output_dir, "relevance_logits.npy"), RESULT["relevance_logits"])

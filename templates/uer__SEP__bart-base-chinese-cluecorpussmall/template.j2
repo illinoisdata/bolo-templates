@@ -1,0 +1,31 @@
+{% set text_input = "中国的首都是[MASK]京" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/uer__SEP__bart-base-chinese-cluecorpussmall" %}
+{% set max_length = 50 %}
+{% set num_beams = 1 %}
+{% set do_sample = False %}
+{% set num_return_sequences = 1 %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+do_sample = {{ do_sample }}
+num_return_sequences = {{ num_return_sequences }}
+from pathlib import Path
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+inputs = tokenizer(text_input, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items() if key != "token_type_ids"}
+generated_ids = model.generate(**inputs, max_length=max_length, do_sample=do_sample, num_beams=num_beams, num_return_sequences=num_return_sequences)
+decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+decoded_text = decoded[0] if decoded else ""
+RESULT = {"generated_text": decoded_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

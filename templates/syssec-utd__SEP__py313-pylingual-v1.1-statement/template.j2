@@ -1,0 +1,42 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set text_inputs = ["summarize: The quick brown fox jumps over the lazy dog."] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/syssec-utd__SEP__py313-pylingual-v1.1-statement" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_inputs = {{ text_inputs }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    text_inputs,
+    padding=True,
+    truncation=True,
+    return_tensors="pt",
+)
+encoded_inputs = {key: value.to(torch_device) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(**encoded_inputs)
+
+generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+generated_text = [segment.strip() for segment in generated_text]
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    serialized = "\n".join(RESULT["generated_text"])
+    (output_path / "generated_text.txt").write_text(serialized, encoding="utf-8")

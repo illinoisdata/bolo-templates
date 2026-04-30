@@ -1,0 +1,49 @@
+{% set input_text = '안녕하세요. 반갑습니다.' %}
+{% set max_length = 20 %}
+{% set min_length = 8 %}
+{% set num_beams = 4 %}
+{% set length_penalty = 1.5 %}
+{% set no_repeat_ngram_size = 2 %}
+{% set early_stopping = true %}
+{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/kykim__SEP__bertshared-kor-base' %}
+
+repo_id = '{{ repo_id }}'
+device = '{{ device }}'
+input_text = '{{ input_text }}'
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+num_beams = {{ num_beams }}
+length_penalty = {{ length_penalty }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+early_stopping = {{ early_stopping }}
+output_dir = '{{ output_dir }}'
+
+import torch
+from transformers import BertTokenizerFast, EncoderDecoderModel
+
+tokenizer = BertTokenizerFast.from_pretrained(repo_id)
+model = EncoderDecoderModel.from_pretrained(repo_id)
+model.to(device)
+
+inputs = tokenizer(input_text, return_tensors='pt').to(device)
+
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_length=max_length,
+        min_length=min_length,
+        num_beams=num_beams,
+        length_penalty=length_penalty,
+        no_repeat_ngram_size=no_repeat_ngram_size,
+        early_stopping=early_stopping,
+    )
+
+generated_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
+
+RESULT = {'generated_text': generated_text}
+
+if __name__ == '__main__':
+    from pathlib import Path
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    with open(Path(output_dir) / 'generated_text.txt', 'w', encoding='utf-8') as f:
+        f.write(RESULT['generated_text'])

@@ -1,0 +1,17 @@
+{% set repo_id = "microsoft/xprophetnet-large-wiki100-cased" %}
+repo_id = "{{ repo_id }}"
+
+import json
+from huggingface_hub import hf_hub_download, list_repo_files
+
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+with open(tokenizer_config_path, "r", encoding="utf-8") as config_file:
+    tokenizer_config = json.load(config_file)
+
+print(json.dumps(tokenizer_config, indent=2))
+print(list_repo_files(repo_id))
+
+RESULT = {"ready": True}
+
+if __name__ == "__main__":
+    pass

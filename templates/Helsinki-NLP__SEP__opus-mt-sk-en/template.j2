@@ -1,0 +1,28 @@
+{% set input_text = "Ahoj, ako sa máš?" %}
+{% set max_new_tokens = 64 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-sk-en" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+
+import os
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(input_text, return_tensors="pt", padding=True)
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+generated_tokens = model.generate(**inputs, max_new_tokens=max_new_tokens)
+generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, "generated_text.txt")
+    with open(output_file, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(RESULT["generated_text"]))

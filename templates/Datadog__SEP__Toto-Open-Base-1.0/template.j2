@@ -1,0 +1,10 @@
+{% set repo_id = repo_id %}
+
+repo_id = "{{ repo_id }}"
+
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id, "config.json")
+
+with open(config_path) as f:
+    print(f.read())

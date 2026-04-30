@@ -1,0 +1,51 @@
+{% set repo_id = "uclanlp/visualbert-vqa-coco-pre" %}
+{% set device = "cuda:0" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set question = "What object is the focus of the image?" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/uclanlp__SEP__visualbert-vqa-coco-pre" %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+image_path = {{ image_path | tojson }}
+question = {{ question | tojson }}
+output_dir = {{ output_dir | tojson }}
+
+import json
+import os
+from io import BytesIO
+
+import requests
+import torch
+from PIL import Image
+from transformers import AutoModelForPreTraining, AutoProcessor
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+model.eval()
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    response = requests.get(image_path)
+    response.raise_for_status()
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = processor(images=image, text=question, return_tensors="pt")
+inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+
+outputs = model(**inputs)
+
+prediction_logits = outputs.prediction_logits.detach().cpu()
+sequence_relationship_logits = outputs.seq_relationship_logits.detach().cpu()
+
+RESULT = {
+    "prediction_logits": prediction_logits.tolist(),
+    "sequence_relationship_logits": sequence_relationship_logits.tolist(),
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    for key, payload in RESULT.items():
+        path = os.path.join(output_dir, f"{key}.json")
+        with open(path, "w") as handle:
+            json.dump(payload, handle)

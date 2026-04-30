@@ -1,0 +1,69 @@
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/AdrienB134__SEP__ColBERTv2.0-spanish-mmarcoES" %}
+{% set query_text = "¿Qué ventajas ofrece ColBERTv2 para la recuperación de información?" %}
+{% set doc_text = "ColBERTv2 es una arquitectura densa de recuperación que representa consultas y pasajes mediante embeddings MaxSim." %}
+{% set max_length = 128 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+query_text = "{{ query_text }}"
+doc_text = "{{ doc_text }}"
+max_length = {{ max_length }}
+
+from pathlib import Path
+
+import torch
+import torch.nn.functional as F
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+device = torch.device(device)
+model = model.to(device)
+model.eval()
+
+def _extract_embedding(model_outputs):
+    if getattr(model_outputs, "pooler_output", None) is not None:
+        embedding = model_outputs.pooler_output
+    else:
+        embedding = model_outputs.last_hidden_state[:, 0]
+    return F.normalize(embedding, dim=-1)
+
+
+query_inputs = tokenizer(
+    query_text,
+    truncation=True,
+    max_length=max_length,
+    padding="longest",
+    return_tensors="pt",
+)
+doc_inputs = tokenizer(
+    doc_text,
+    truncation=True,
+    max_length=max_length,
+    padding="longest",
+    return_tensors="pt",
+)
+query_inputs = {name: tensor.to(device) for name, tensor in query_inputs.items()}
+doc_inputs = {name: tensor.to(device) for name, tensor in doc_inputs.items()}
+
+with torch.no_grad():
+    query_outputs = model(**query_inputs)
+    doc_outputs = model(**doc_inputs)
+
+query_embedding = _extract_embedding(query_outputs).squeeze(0).cpu()
+doc_embedding = _extract_embedding(doc_outputs).squeeze(0).cpu()
+similarity = torch.dot(query_embedding, doc_embedding).item()
+
+RESULT = {
+    "query_embedding": query_embedding,
+    "doc_embedding": doc_embedding,
+    "similarity": similarity,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    torch.save(RESULT["query_embedding"], output_path / "query_embedding.pt")
+    torch.save(RESULT["doc_embedding"], output_path / "doc_embedding.pt")
+    (output_path / "similarity.txt").write_text(str(RESULT["similarity"]))

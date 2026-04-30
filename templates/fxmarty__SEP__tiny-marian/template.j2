@@ -1,0 +1,30 @@
+{% set text_input = "This is a sample English sentence to translate into Spanish." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/fxmarty__SEP__tiny-marian" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+inference_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(inference_device)
+
+inputs = tokenizer(text_input, return_tensors="pt", padding=True)
+inputs = {key: value.to(inference_device) for key, value in inputs.items()}
+
+generated_tokens = model.generate(**inputs, num_beams=4, max_length=128)
+translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    translation_file = output_path / "translation.txt"
+    translation_file.write_text("\n".join(RESULT["translation"]), encoding="utf-8")

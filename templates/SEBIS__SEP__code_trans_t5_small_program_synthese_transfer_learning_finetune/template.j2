@@ -1,0 +1,55 @@
+{% set repo_id = "SEBIS/code_trans_t5_small_program_synthese_transfer_learning_finetune" %}
+{% set device = "cuda:0" %}
+{% set prompt = "you are given an array of numbers a and a number b , compute the difference of elements in a and b" %}
+{% set prefix = "program synthesis: " %}
+{% set max_length = 512 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/SEBIS__SEP__code_trans_t5_small_program_synthese_transfer_learning_finetune" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+prefix = "{{ prefix }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+device_obj = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device_obj)
+model.eval()
+
+input_text = prefix + prompt
+encoded_inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    padding=True,
+    truncation=True,
+    max_length=max_length,
+)
+encoded_inputs = {key: value.to(device_obj) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    generated_tokens = model.generate(
+        **encoded_inputs,
+        max_length=max_length,
+        num_beams=num_beams,
+    )
+
+generated_programs = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+RESULT = {"generated_programs": generated_programs}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir) / "generated_programs.txt"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as out_file:
+        for program in generated_programs:
+            out_file.write(program)
+            out_file.write("\n")

@@ -1,0 +1,55 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hustvl__SEP__vitmatte-small-composition-1k" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+
+from io import BytesIO
+from pathlib import Path
+
+import numpy as np
+import requests
+import torch
+from PIL import Image
+from transformers import AutoImageProcessor, VitMatteForImageMatting
+
+torch_device = torch.device(device)
+if torch_device.type == "cuda" and not torch.cuda.is_available():
+    raise RuntimeError(f"CUDA device {device!r} is not available.")
+
+processor = AutoImageProcessor.from_pretrained(repo_id)
+model = VitMatteForImageMatting.from_pretrained(repo_id).to(torch_device)
+model.eval()
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    response = requests.get(image_path)
+    response.raise_for_status()
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+trimap = Image.new("L", image.size, 128)
+inputs = processor(image, trimaps=trimap, return_tensors="pt")
+inputs = {key: value.to(torch_device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+alpha_tensor = outputs.alphas
+alpha_tensor = alpha_tensor.squeeze()
+while alpha_tensor.ndim > 2:
+    alpha_tensor = alpha_tensor[0]
+alpha_tensor = alpha_tensor.cpu()
+
+alpha_array = np.asarray(alpha_tensor, dtype=np.float32)
+alpha_array = np.clip(alpha_array, 0.0, 1.0)
+alpha_mask = Image.fromarray((alpha_array * 255.0).round().astype(np.uint8))
+
+RESULT = {"alpha_mask": alpha_mask}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    RESULT["alpha_mask"].save(output_path / "alpha_mask.png")

@@ -1,0 +1,35 @@
+{% set repo_id = "mrm8488/t5-base-finetuned-question-generation-ap" %}
+{% set device = "cuda:0" %}
+{% set answer = "Manuel" %}
+{% set context = "Manuel has created RuPERTa-base with the support of HF-Transformers and Google" %}
+{% set max_length = 64 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/mrm8488__SEP__t5-base-finetuned-question-generation-ap" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+answer = "{{ answer }}"
+context = "{{ context }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+import os
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+input_text = "answer: %s  context: %s </s>" % (answer, context)
+features = tokenizer([input_text], return_tensors="pt")
+input_ids = features["input_ids"].to(device)
+attention_mask = features["attention_mask"].to(device)
+
+output_ids = model.generate(input_ids=input_ids, attention_mask=attention_mask, max_length=max_length)
+decoded = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"question": decoded}
+
+if __name__ == "__main__":
+    with open(os.path.join(output_dir, "question.txt"), "w") as f:
+        f.write(RESULT["question"])

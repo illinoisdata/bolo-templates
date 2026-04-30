@@ -1,0 +1,36 @@
+{% set device = device %}
+{% set repo_id = repo_id %}
+{% set source_text = "Aquest és un exemple de text en català per a la traducció." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-ca-es" %}
+{% set max_length = 512 %}
+{% set num_beams = 4 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = "{{ source_text }}"
+output_dir = "{{ output_dir }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+
+from pathlib import Path
+
+from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
+
+inputs = tokenizer(source_text, return_tensors="pt", padding=True, truncation=True)
+inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+
+generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    translation_text = "\n".join(RESULT["translations"])
+    (output_path / "translation.txt").write_text(translation_text, encoding="utf-8")

@@ -1,0 +1,49 @@
+{% set repo_id = "transformer3/H2-keywordextractor" %}
+{% set device = "cuda:0" %}
+{% set inputs = "I love AutoTrain 🤗" %}
+{% set max_length = 128 %}
+{% set min_length = 12 %}
+{% set num_beams = 4 %}
+{% set length_penalty = 1.0 %}
+{% set no_repeat_ngram_size = 3 %}
+{% set output_dir = "./" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+inputs = "{{ inputs }}"
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+num_beams = {{ num_beams }}
+length_penalty = {{ length_penalty }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+# Pre-process input
+inputs_encoded = tokenizer(inputs, return_tensors="pt").to(device)
+
+# Run inference
+generated_ids = model.generate(
+    **inputs_encoded,
+    max_length=max_length,
+    min_length=min_length,
+    num_beams=num_beams,
+    length_penalty=length_penalty,
+    no_repeat_ngram_size=no_repeat_ngram_size,
+)
+
+# Post-process & build RESULT dict
+summary = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+RESULT = {"summary_text": summary}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "summary.txt")
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(RESULT["summary_text"])

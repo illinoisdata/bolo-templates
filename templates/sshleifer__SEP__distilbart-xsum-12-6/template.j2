@@ -1,0 +1,53 @@
+{% set input_text = "The Transformers library provides state-of-the-art models for summarization tasks." %}
+{% set max_length = 142 %}
+{% set min_length = 56 %}
+{% set num_beams = 6 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/sshleifer__SEP__distilbart-xsum-12-6" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+_tokenizer = AutoTokenizer.from_pretrained(repo_id)
+_model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+_device = torch.device(device)
+_model = _model.to(_device)
+_model.eval()
+
+_tokenized_inputs = _tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+    max_length=1024,
+)
+_tokenized_inputs = {key: value.to(_device) for key, value in _tokenized_inputs.items()}
+
+_generated_ids = _model.generate(
+    **_tokenized_inputs,
+    max_length=max_length,
+    min_length=min_length,
+    num_beams=num_beams,
+    early_stopping=True,
+)
+
+_summary = _tokenizer.batch_decode(
+    _generated_ids,
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=True,
+)[0]
+
+RESULT = {"summary": _summary}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    summary_path = os.path.join(output_dir, "summary.txt")
+    with open(summary_path, "w", encoding="utf-8") as summary_file:
+        summary_file.write(RESULT["summary"])

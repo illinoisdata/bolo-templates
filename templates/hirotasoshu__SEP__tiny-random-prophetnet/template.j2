@@ -1,0 +1,36 @@
+{% set input_text = "The quick brown fox jumps over the lazy dog." %}
+{% set max_new_tokens = 32 %}
+{% set num_return_sequences = 1 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hirotasoshu__SEP__tiny-random-prophetnet" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_new_tokens = {{ max_new_tokens }}
+num_return_sequences = {{ num_return_sequences }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoded_inputs = tokenizer(input_text, return_tensors="pt")
+encoded_inputs = {k: tensor.to(device) for k, tensor in encoded_inputs.items()}
+
+generated_ids = model.generate(
+    **encoded_inputs,
+    max_new_tokens=max_new_tokens,
+    num_return_sequences=num_return_sequences,
+)
+
+generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_texts}
+
+if __name__ == "__main__":
+    root = Path(output_dir)
+    root.mkdir(parents=True, exist_ok=True)
+    text_path = root / "generated_text.txt"
+    text_path.write_text("\n".join(RESULT["generated_text"]), encoding="utf-8")

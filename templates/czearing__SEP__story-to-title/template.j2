@@ -1,0 +1,28 @@
+{% set repo_id = "czearing/story-to-title" %}
+{% set device = "cuda:0" %}
+{% set story_text = "A young screenwriter discovers a haunted notebook that writes award-winning film titles, yet each success comes at a personal cost." %}
+{% set max_length = 60 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/czearing__SEP__story-to-title" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+story_text = """{{ story_text }}"""
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+inputs = tokenizer(story_text, return_tensors="pt", truncation=True)
+inputs = {key: value.to(device) for key, value in inputs.items()}
+generated_ids = model.generate(**inputs, max_length=max_length, num_beams=num_beams, early_stopping=True)
+decoded_titles = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+generated_title = decoded_titles[0]
+RESULT = {"generated_title": generated_title}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_title.txt").write_text(RESULT["generated_title"], encoding="utf-8")

@@ -1,0 +1,11 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+
+from huggingface_hub import HfApi
+
+api = HfApi()
+print(api.list_repo_files(repo_id))
+print(api.list_repo_files("paust/pko-t5-base"))

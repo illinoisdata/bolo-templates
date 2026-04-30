@@ -1,0 +1,32 @@
+{% set query_text = "Quelle ville abrite la Tour Eiffel ?" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/AgentPublic__SEP__dpr-ctx_encoder-fr_qa-camembert" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query_text = "{{ query_text }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import numpy as np
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model = model.to(device)
+
+encoding = tokenizer(query_text, return_tensors="pt")
+encoding = {k: v.to(device) for k, v in encoding.items()}
+
+with torch.no_grad():
+    outputs = model(**encoding)
+    embeddings_tensor = outputs.pooler_output
+
+embeddings = embeddings_tensor.detach().cpu().numpy()
+
+RESULT = {"embeddings": embeddings}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    np.save(Path(output_dir) / "embeddings.npy", RESULT["embeddings"])

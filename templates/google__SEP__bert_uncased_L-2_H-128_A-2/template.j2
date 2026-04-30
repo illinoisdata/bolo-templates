@@ -1,0 +1,30 @@
+{% set text_inputs = ["The quick brown fox jumps over the lazy dog.", "Transformers power modern NLP."] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-2_H-128_A-2" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_inputs = {{ text_inputs }}
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded_inputs = tokenizer(text_inputs, padding=True, truncation=True, return_tensors="pt")
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+last_hidden_state = outputs.last_hidden_state.cpu()
+RESULT = {"last_hidden_state": last_hidden_state}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    torch.save(RESULT["last_hidden_state"], output_path / "last_hidden_state.pt")

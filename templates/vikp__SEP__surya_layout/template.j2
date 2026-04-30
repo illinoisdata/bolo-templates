@@ -1,0 +1,43 @@
+{% set repo_id = "vikp/surya_layout" %}
+{% set device = "cuda:0" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/vikp__SEP__surya_layout" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoImageProcessor, AutoModelForSemanticSegmentation
+from PIL import Image
+import requests
+from io import BytesIO
+import os
+import torch
+import numpy as np
+
+processor = AutoImageProcessor.from_pretrained(repo_id)
+model = AutoModelForSemanticSegmentation.from_pretrained(repo_id, ignore_mismatched_sizes=True).to(device)
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(BytesIO(requests.get(image_path).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = processor(image, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+segmentation = processor.post_process_semantic_segmentation(outputs, target_sizes=[image.size[::-1]])[0]
+if isinstance(segmentation, torch.Tensor):
+    segmentation = segmentation.cpu().numpy()
+else:
+    segmentation = np.asarray(segmentation)
+
+RESULT = {"segmentation_mask": segmentation}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    np.save(os.path.join(output_dir, "segmentation_mask.npy"), RESULT["segmentation_mask"])

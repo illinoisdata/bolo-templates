@@ -1,0 +1,48 @@
+{% set prompt = "Teams must rotate their encryption keys regularly and audit all privileged access." %}
+{% set prefix = "summarize: " %}
+{% set max_new_tokens = 128 %}
+{% set num_beams = 4 %}
+{% set min_length = 30 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/syssec-utd__SEP__py39-pylingual-v1-statement" %}
+{% set result_filename = "generated_text.txt" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = """{{ prompt }}"""
+prefix = "{{ prefix }}"
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
+min_length = {{ min_length }}
+output_dir = "{{ output_dir }}"
+result_filename = "{{ result_filename }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+prefixed_prompt = f"{prefix}{prompt}"
+inputs = tokenizer(prefixed_prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+generated_tokens = model.generate(
+    **inputs,
+    max_new_tokens=max_new_tokens,
+    min_length=min_length,
+    num_beams=num_beams,
+    early_stopping=True,
+)
+
+generated_tokens = generated_tokens.cpu()
+generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0].strip()
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / result_filename).write_text(RESULT["generated_text"], encoding="utf-8")

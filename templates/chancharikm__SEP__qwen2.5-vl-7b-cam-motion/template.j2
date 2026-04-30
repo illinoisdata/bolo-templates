@@ -1,0 +1,85 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set video_input_path = "/u/yli77/projects/ML-code-generation/data/video.avi" %}
+{% set question_text = "Describe the camera motion in this video." %}
+{% set max_new_tokens = 128 %}
+{% set fps = 8.0 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/chancharikm__SEP__qwen2.5-vl-7b-cam-motion" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+video_input_path = "{{ video_input_path }}"
+question_text = "{{ question_text }}"
+max_new_tokens = {{ max_new_tokens }}
+fps = {{ fps }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+
+from qwen_vl_utils import process_vision_info
+from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
+
+processor = AutoProcessor.from_pretrained("Qwen/Qwen2.5-VL-7B-Instruct")
+model = Qwen2_5_VLForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.bfloat16)
+model = model.to(device)
+
+if video_input_path.startswith("file://") or video_input_path.startswith("http://") or video_input_path.startswith("https://"):
+    video_uri = video_input_path
+else:
+    video_uri = Path(video_input_path).expanduser().resolve().as_uri()
+
+messages = [
+    {
+        "role": "user",
+        "content": [
+            {"type": "video", "video": video_uri, "fps": fps},
+            {"type": "text", "text": question_text},
+        ],
+    }
+]
+
+text_prompt = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+image_inputs, video_inputs, video_kwargs = process_vision_info(messages, return_video_kwargs=True)
+inputs = processor(
+    text=[text_prompt],
+    images=image_inputs,
+    videos=video_inputs,
+    padding=True,
+    return_tensors="pt",
+    **video_kwargs,
+)
+inputs = inputs.to(device)
+
+with torch.inference_mode():
+    outputs = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=False,
+        return_dict_in_generate=True,
+    )
+
+prefix_lengths = inputs.attention_mask.sum(dim=1).tolist()
+generated_ids_trimmed = [
+    sequence[prefix_len:]
+    for sequence, prefix_len in zip(outputs.sequences, prefix_lengths)
+]
+output_text = processor.batch_decode(
+    generated_ids_trimmed,
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=False,
+)
+
+RESULT = {"generated_text": output_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    for key, value in RESULT.items():
+        target_file = output_path / f"{key}.txt"
+        if isinstance(value, str):
+            target_file.write_text(value, encoding="utf-8")
+        elif isinstance(value, list):
+            target_file.write_text("\n".join(value), encoding="utf-8")
+        else:
+            target_file.write_text(str(value), encoding="utf-8")

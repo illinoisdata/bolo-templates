@@ -1,0 +1,74 @@
+{% set english_sentences = ["dog", "Puppies are nice.", "I enjoy taking long walks along the beach with my dog."] %}
+{% set italian_sentences = ["cane", "I cuccioli sono carini.", "Mi piace fare lunghe passeggiate lungo la spiaggia con il mio cane."] %}
+{% set japanese_sentences = ["犬", "子犬はいいです", "私は犬と一緒にビーチを散歩するのが好きです"] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/setu4993__SEP__LaBSE" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+english_sentences = {{ english_sentences | tojson }}
+italian_sentences = {{ italian_sentences | tojson }}
+japanese_sentences = {{ japanese_sentences | tojson }}
+output_dir = "{{ output_dir }}"
+
+import os
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+
+def tokenize_batch(texts):
+    tokenized = tokenizer(texts, return_tensors="pt", padding=True, truncation=True)
+    return {key: tensor.to(device) for key, tensor in tokenized.items()}
+
+english_inputs = tokenize_batch(english_sentences)
+italian_inputs = tokenize_batch(italian_sentences)
+japanese_inputs = tokenize_batch(japanese_sentences)
+
+with torch.no_grad():
+    english_outputs = model(**english_inputs)
+    italian_outputs = model(**italian_inputs)
+    japanese_outputs = model(**japanese_inputs)
+
+english_embeddings = english_outputs.pooler_output
+italian_embeddings = italian_outputs.pooler_output
+japanese_embeddings = japanese_outputs.pooler_output
+
+english_norm = F.normalize(english_embeddings, p=2, dim=1)
+italian_norm = F.normalize(italian_embeddings, p=2, dim=1)
+japanese_norm = F.normalize(japanese_embeddings, p=2, dim=1)
+
+
+def similarity(a, b):
+    return torch.matmul(a, b.transpose(0, 1))
+
+english_italian_similarity = similarity(english_norm, italian_norm)
+english_japanese_similarity = similarity(english_norm, japanese_norm)
+italian_japanese_similarity = similarity(italian_norm, japanese_norm)
+
+english_embeddings_np = english_embeddings.detach().cpu().numpy()
+italian_embeddings_np = italian_embeddings.detach().cpu().numpy()
+japanese_embeddings_np = japanese_embeddings.detach().cpu().numpy()
+english_italian_similarity_np = english_italian_similarity.cpu().numpy()
+english_japanese_similarity_np = english_japanese_similarity.cpu().numpy()
+italian_japanese_similarity_np = italian_japanese_similarity.cpu().numpy()
+
+RESULT = {
+    "english_embeddings": english_embeddings_np,
+    "italian_embeddings": italian_embeddings_np,
+    "japanese_embeddings": japanese_embeddings_np,
+    "english_italian_similarity": english_italian_similarity_np,
+    "english_japanese_similarity": english_japanese_similarity_np,
+    "italian_japanese_similarity": italian_japanese_similarity_np,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    for name, array in RESULT.items():
+        np.save(os.path.join(output_dir, f"{name}.npy"), array)

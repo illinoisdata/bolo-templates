@@ -1,0 +1,48 @@
+{% set repo_id = "facebook/flava-full" %}
+{% set device = "cuda:0" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set text = "a photo of a cat" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__flava-full" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text = "{{ text }}"
+output_dir = "{{ output_dir }}"
+
+import os
+from transformers import AutoProcessor, AutoModelForPreTraining
+import torch
+from PIL import Image
+import requests
+from io import BytesIO
+import numpy as np
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+model.config.return_loss = False
+
+# Load image
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(BytesIO(requests.get(image_path).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = processor(text=text, images=image, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+# Inference
+with torch.no_grad():
+    outputs = model(**inputs)
+    image_features = outputs.image_embeddings.cpu().numpy()
+    text_features = outputs.text_embeddings.cpu().numpy()
+
+RESULT = {
+    "image_features": image_features,
+    "text_features": text_features,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    np.save(os.path.join(output_dir, "image_features.npy"), RESULT["image_features"])
+    np.save(os.path.join(output_dir, "text_features.npy"), RESULT["text_features"])

@@ -1,0 +1,59 @@
+{% set input_text = "The capital of France is [MASK]." %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-12_H-512_A-8" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+logits = outputs.logits
+
+mask_token_id = tokenizer.mask_token_id
+mask_positions = (inputs["input_ids"] == mask_token_id).nonzero(as_tuple=False)
+
+candidates = []
+batch_input_ids = inputs["input_ids"]
+
+for batch_index, mask_index in mask_positions.tolist():
+    mask_logits = logits[batch_index, mask_index]
+    mask_probs = torch.softmax(mask_logits, dim=-1)
+    topk_probs, topk_indices = torch.topk(mask_probs, top_k)
+    for prob, token_id in zip(topk_probs.tolist(), topk_indices.tolist()):
+        filled_input = batch_input_ids[batch_index].clone()
+        filled_input[mask_index] = token_id
+        sequence = tokenizer.decode(filled_input, skip_special_tokens=True)
+        candidates.append(
+            {
+                "mask_index": int(mask_index),
+                "token": tokenizer.convert_ids_to_tokens(token_id),
+                "score": float(prob),
+                "sequence": sequence,
+            }
+        )
+
+RESULT = {"fill_mask_candidates": candidates}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    json_path = output_path / "fill_mask_candidates.json"
+    with json_path.open("w", encoding="utf-8") as file:
+        json.dump(RESULT["fill_mask_candidates"], file, ensure_ascii=False, indent=2)

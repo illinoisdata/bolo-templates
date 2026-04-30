@@ -1,0 +1,47 @@
+{% set question = "What is Night of the Living Dead?" %}
+{% set context = "Night of the Living Dead is a 1968 American independent horror film , directed by George A." %}
+{% set max_length = 64 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/khhuang__SEP__zerofec-daqa-t5-base" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+formatted_input = f"{question} \n {context}"
+inputs = tokenizer(formatted_input, return_tensors="pt")
+input_ids = inputs.input_ids.to(device)
+attention_mask = inputs.attention_mask.to(device)
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        max_length=max_length,
+        num_beams=num_beams,
+    )
+
+generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"answer": generated_texts}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "answer.json")
+    with open(output_path, "w", encoding="utf-8") as writer:
+        json.dump(RESULT["answer"], writer, ensure_ascii=False, indent=2)

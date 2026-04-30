@@ -1,0 +1,47 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set prompt = "Explain how to cook a simple pasta dish for a beginner." %}
+{% set max_new_tokens = 256 %}
+{% set temperature = 0.7 %}
+{% set top_p = 0.9 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/xiuyul__SEP__mamba-2.8b-zephyr" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoTokenizer, LlamaForCausalLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = LlamaForCausalLM.from_pretrained(repo_id).to(device)
+model.eval()
+pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    generated_tokens = model.generate(
+        **inputs,
+        do_sample=True,
+        max_new_tokens=max_new_tokens,
+        temperature=temperature,
+        top_p=top_p,
+        pad_token_id=pad_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+        use_cache=True,
+    )
+
+generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    result_path = output_path / "generated_text.txt"
+    result_path.write_text(RESULT["generated_text"], encoding="utf-8")

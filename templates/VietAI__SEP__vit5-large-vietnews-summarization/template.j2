@@ -1,0 +1,61 @@
+{% set device = device %}
+{% set repo_id = repo_id %}
+{% set input_text = "vietnews: VietAI là tổ chức phi lợi nhuận với sứ mệnh ươm mầm tài năng về trí tuệ nhân tạo và xây dựng một cộng đồng các chuyên gia trong lĩnh vực trí tuệ nhân tạo đẳng cấp quốc tế tại Việt Nam." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/VietAI__SEP__vit5-large-vietnews-summarization" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import tokenizers.models as _models
+_orig_unigram = _models.Unigram
+
+def _fix_unigram(vocab, unk_id=0, byte_fallback=False):
+    if isinstance(vocab, dict):
+        vocab_items = list(vocab.items())
+    else:
+        vocab_items = vocab
+    return _orig_unigram(vocab_items, unk_id=unk_id, byte_fallback=byte_fallback)
+
+_models.Unigram = _fix_unigram
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+torch_device = torch.device(device)
+model = model.to(torch_device)
+
+inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+)
+inputs = {name: tensor.to(torch_device) for name, tensor in inputs.items()}
+
+generated_tokens = model.generate(
+    input_ids=inputs["input_ids"],
+    attention_mask=inputs["attention_mask"],
+    max_length=256,
+    num_beams=4,
+    early_stopping=True,
+    no_repeat_ngram_size=3,
+    length_penalty=2.0,
+)
+summaries = tokenizer.batch_decode(
+    generated_tokens,
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=True,
+)
+
+RESULT = {"summaries": summaries}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    output_file = Path(output_dir) / "summaries.txt"
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write("\n".join(RESULT["summaries"]))

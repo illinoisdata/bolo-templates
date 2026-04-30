@@ -1,0 +1,66 @@
+{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/UBC-NLP__SEP__AraT5v2-base-1024") %}
+{% set input_text = "عاصمة ألمانيا هي <extra_id_0>" %}
+{% set max_length = 64 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+input_text = "{{ input_text }}"
+max_length = {{ max_length }}
+
+import os
+import torch
+import sentencepiece as spm
+from huggingface_hub import hf_hub_download
+from transformers import AutoModelForSeq2SeqLM
+
+spiece_model_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+sp_processor = spm.SentencePieceProcessor(model_file=spiece_model_path)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+input_ids_list = sp_processor.encode(input_text, out_type=int)
+input_ids = torch.tensor([input_ids_list], dtype=torch.long, device=device)
+attention_mask = torch.ones_like(input_ids)
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        max_length=max_length,
+    )
+
+
+def _decode_with_extra_ids(ids):
+    piece_size = sp_processor.get_piece_size()
+    chunks = []
+    buffer = []
+    for token_id in ids:
+        if 0 <= token_id < piece_size:
+            buffer.append(sp_processor.id_to_piece(token_id))
+        else:
+            if buffer:
+                chunks.append(sp_processor.decode_pieces(buffer))
+                buffer = []
+            extra_index = token_id - piece_size
+            if extra_index >= 0:
+                chunks.append(f"<extra_id_{extra_index}>")
+            else:
+                chunks.append(str(token_id))
+    if buffer:
+        chunks.append(sp_processor.decode_pieces(buffer))
+    return "".join(chunks)
+
+
+generated_ids_list = generated_ids[0].tolist()
+decoded_text = _decode_with_extra_ids(generated_ids_list)
+for token in ("</s>", "<pad>"):
+    decoded_text = decoded_text.replace(token, "")
+decoded_text = decoded_text.strip()
+
+RESULT = {"generated_text": decoded_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "generated_text.txt")
+    with open(output_path, "w", encoding="utf-8") as out_file:
+        out_file.write(RESULT["generated_text"])

@@ -1,0 +1,34 @@
+{% set repo_id = "Helsinki-NLP/opus-mt-tc-big-en-bg" %}
+{% set device = "cuda:0" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-tc-big-en-bg" %}
+{% set src_text = ["2001 is the year when the 21st century begins.", "This is Copacabana!"] %}
+{% set num_beams = 4 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+src_text = {{ src_text }}
+num_beams = {{ num_beams }}
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(src_text, return_tensors="pt", padding=True)
+inputs = inputs.to(device)
+
+translated_tokens = model.generate(**inputs, num_beams=num_beams)
+
+translations = tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "translations.txt")
+    with open(output_path, "w", encoding="utf-8") as f:
+        for line in RESULT["translations"]:
+            f.write(line + "\n")

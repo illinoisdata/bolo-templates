@@ -1,0 +1,42 @@
+{% set prompt = prompt | default("translate English to French: The house is wonderful.") %}
+{% set max_length = max_length | default(256) %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
+{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__t5-v1_1-xl") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = """{{ prompt }}"""
+max_length = {{ max_length }}
+num_return_sequences = {{ num_return_sequences }}
+output_dir = "{{ output_dir }}"
+import os
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+model_inputs = tokenizer(prompt, return_tensors="pt")
+model_inputs = {key: value.to(device) for key, value in model_inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **model_inputs,
+        max_length=max_length,
+        num_return_sequences=num_return_sequences,
+    )
+
+decoded_outputs = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"generated_text": decoded_outputs}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "generated_text.txt")
+    with open(output_path, "w", encoding="utf-8") as file:
+        output_value = RESULT["generated_text"]
+        if isinstance(output_value, list):
+            file.write("\n".join(output_value))
+        else:
+            file.write(output_value)

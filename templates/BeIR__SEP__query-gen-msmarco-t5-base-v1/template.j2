@@ -1,0 +1,50 @@
+{% set repo_id = "BeIR/query-gen-msmarco-t5-base-v1" %}
+{% set device = "cuda:0" %}
+{% set paragraph = "Python is an interpreted, high-level and general-purpose programming language. Python\'s design philosophy emphasizes code readability with its notable use of significant whitespace. Its language constructs and object-oriented approach aim to help programmers write clear, logical code for small and large-scale projects." %}
+{% set max_length = 64 %}
+{% set num_return_sequences = 3 %}
+{% set top_p = 0.95 %}
+{% set do_sample = true %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/BeIR__SEP__query-gen-msmarco-t5-base-v1" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+paragraph = """{{ paragraph }}"""
+max_length = {{ max_length }}
+num_return_sequences = {{ num_return_sequences }}
+top_p = {{ top_p }}
+do_sample = {{ do_sample }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+device_obj = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device_obj)
+
+inputs = tokenizer(paragraph, return_tensors="pt")
+input_ids = inputs["input_ids"].to(device_obj)
+attention_mask = inputs["attention_mask"].to(device_obj)
+
+generated_ids = model.generate(
+    input_ids=input_ids,
+    attention_mask=attention_mask,
+    max_length=max_length,
+    do_sample=do_sample,
+    top_p=top_p,
+    num_return_sequences=num_return_sequences,
+)
+
+generated_queries = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"generated_queries": generated_queries}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    text_path = output_path / "generated_queries.txt"
+    text_path.write_text("\n".join(generated_queries), encoding="utf-8")

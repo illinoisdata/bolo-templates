@@ -1,0 +1,10 @@
+import pkgutil
+import transformers
+
+modules = [finder.name for finder in pkgutil.iter_modules(transformers.models.__path__)]
+print(modules)
+
+RESULT = {"module_count": len(modules)}
+
+if __name__ == "__main__":
+    pass

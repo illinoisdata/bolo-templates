@@ -1,0 +1,52 @@
+{% set repo_id = "bmd1905/vietnamese-correction-v2" %}
+{% set device = "cuda:0" %}
+{% set text_samples = [
+    "côn viec kin doanh thì rất kho khan nên toi quyết dinh chuyển sang nghề khac",
+    "toi dang là sinh diên nam hai ở truong đạ hoc khoa jọc tự nhiên , trogn năm ke tiep toi sẽ chọn chuyen nganh về trí tue nhana tạo",
+    "Tôi đang học AI ở trun tam AI viet nam",
+    "Nhưng sức huỷ divt của cơn bão mitch vẫn chưa thấm vào đâu lsovớithảm hoạ tại Bangladesh ăm 1970",
+    "Lần này anh Phươngqyết xếp hàng mua bằng được 1 chiếc",
+    "một số chuyen gia tài chính ngâSn hànG của Việt Nam cũng chung quan điểmnày",
+    "Cac so liệu cho thay ngươi dân viet nam đang sống trong 1 cuôc sóng không duojc nhu mong đọi",
+    "Nefn kinh té thé giới đang đúng trươc nguyen co của mọt cuoc suy thoai",
+    "Khong phai tất ca nhưng gi chung ta thấy dideu là sụ that",
+    "chinh phủ luôn cố găng het suc để naggna cao chat luong nền giáo duc cua nuoc nhà",
+    "nèn kinh te thé giới đang đứng trươc nguy co của mọt cuoc suy thoai",
+    "kinh tế viet nam dang dứng truoc 1 thoi ky đổi mơi chưa tung có tienf lệ trong lịch sử"
+] %}
+{% set max_length = 512 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/bmd1905__SEP__vietnamese-correction-v2" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_samples = {{ text_samples | tojson }}
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+import os
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(
+    text_samples,
+    return_tensors="pt",
+    padding=True,
+    truncation=True,
+    max_length=max_length,
+)
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+generated_tokens = model.generate(**inputs, max_length=max_length)
+corrected_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"corrected_texts": corrected_texts}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "corrected_texts.txt")
+    with open(output_path, "w", encoding="utf-8") as file:
+        for text in RESULT["corrected_texts"]:
+            file.write(text + "\n")

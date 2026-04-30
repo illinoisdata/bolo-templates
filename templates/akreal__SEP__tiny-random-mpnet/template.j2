@@ -1,0 +1,52 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set text_input = "The quick brown fox jumps over the lazy dog." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/akreal__SEP__tiny-random-mpnet" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+
+import numpy as np
+import torch
+from pathlib import Path
+from transformers import AutoModel, AutoTokenizer
+
+device = torch.device(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+vocab_size = model.config.vocab_size or tokenizer.vocab_size or 1
+bos_token_id = tokenizer.bos_token_id or tokenizer.cls_token_id or tokenizer.pad_token_id or 0
+eos_token_id = tokenizer.eos_token_id or tokenizer.sep_token_id or tokenizer.pad_token_id or 0
+sanitized_ids = [ord(char) % vocab_size for char in text_input]
+if not sanitized_ids:
+    sanitized_ids = [tokenizer.pad_token_id or 0]
+input_ids = torch.tensor(
+    [[bos_token_id] + sanitized_ids + [eos_token_id]],
+    dtype=torch.long,
+)
+attention_mask = torch.ones_like(input_ids)
+token_type_ids = torch.zeros_like(input_ids)
+model = model.to(device)
+model.eval()
+inputs = {
+    "input_ids": input_ids.to(device),
+    "attention_mask": attention_mask.to(device),
+    "token_type_ids": token_type_ids.to(device),
+}
+with torch.no_grad():
+    outputs = model(**inputs)
+last_hidden_state = outputs.last_hidden_state.cpu()
+pooler_output = getattr(outputs, "pooler_output", None)
+if pooler_output is not None:
+    pooler_output = pooler_output.cpu()
+RESULT = {"last_hidden_state": last_hidden_state}
+if pooler_output is not None:
+    RESULT["pooler_output"] = pooler_output
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    np.save(output_path / "last_hidden_state.npy", RESULT["last_hidden_state"].cpu().numpy())
+    if "pooler_output" in RESULT:
+        np.save(output_path / "pooler_output.npy", RESULT["pooler_output"].cpu().numpy())

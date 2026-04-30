@@ -1,0 +1,99 @@
+{% set instruction = "Given a web search query, retrieve relevant passages that answer the query" %}
+{% set queries = ["What is the capital of China?", "Explain gravity"] %}
+{% set documents = ["The capital of China is Beijing.", "Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun."] %}
+{% set max_length = 8192 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qwen__SEP__Qwen3-Reranker-4B" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+instruction = {{ instruction | tojson }}
+queries = {{ queries | tojson }}
+documents = {{ documents | tojson }}
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+tokenizer.padding_side = "left"
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+model = AutoModelForCausalLM.from_pretrained(repo_id).to(torch_device)
+model.eval()
+
+prefix = (
+    "<|im_start|>system\n"
+    "Judge whether the Document meets the requirements based on the Query and the Instruct provided. Note that the answer can only be \"yes\" or \"no\".<|im_end|>\n"
+    "<|im_start|>user\n"
+)
+suffix = (
+    "<|im_end|>\n"
+    "<|im_start|>assistant\n"
+    "<think>\n\n</think>\n\n"
+)
+prefix_tokens = tokenizer.encode(prefix, add_special_tokens=False)
+suffix_tokens = tokenizer.encode(suffix, add_special_tokens=False)
+max_input_length = max(1, max_length - len(prefix_tokens) - len(suffix_tokens))
+
+def format_instruction(instruction_value, query, doc):
+    active_instruction = instruction_value if instruction_value is not None else (
+        "Given a web search query, retrieve relevant passages that answer the query"
+    )
+    return (
+        "<Instruct>: {instruction}\n<Query>: {query}\n<Document>: {doc}".format(
+            instruction=active_instruction, query=query, doc=doc
+        )
+    )
+
+
+def process_inputs(pairs):
+    inputs = tokenizer(
+        pairs,
+        padding=False,
+        truncation="longest_first",
+        return_attention_mask=False,
+        max_length=max_input_length,
+    )
+    for i, ele in enumerate(inputs["input_ids"]):
+        inputs["input_ids"][i] = prefix_tokens + ele + suffix_tokens
+    padded = tokenizer.pad(
+        inputs,
+        padding=True,
+        return_tensors="pt",
+        max_length=max_length,
+    )
+    return {key: value.to(torch_device) for key, value in padded.items()}
+
+
+@torch.no_grad()
+def compute_scores(inputs):
+    logits = model(**inputs).logits[:, -1, :]
+    true_vector = logits[:, token_true_id]
+    false_vector = logits[:, token_false_id]
+    stacked = torch.stack([false_vector, true_vector], dim=1)
+    normalized = torch.nn.functional.log_softmax(stacked, dim=1)
+    return normalized[:, 1].exp().tolist()
+
+
+token_true_id = tokenizer("yes", add_special_tokens=False).input_ids[0]
+token_false_id = tokenizer("no", add_special_tokens=False).input_ids[0]
+
+pairs = [format_instruction(instruction, query, doc) for query, doc in zip(queries, documents)]
+inputs = process_inputs(pairs)
+scores = compute_scores(inputs)
+
+RESULT = {"scores": scores}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "scores.json").write_text(
+        json.dumps(RESULT["scores"], ensure_ascii=False, indent=2)
+    )

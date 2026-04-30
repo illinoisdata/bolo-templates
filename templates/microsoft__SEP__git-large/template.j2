@@ -1,0 +1,54 @@
+{% set repo_id = "microsoft/git-large" %}
+{% set device = "cuda:0" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set max_length = 20 %}
+{% set num_beams = 1 %}
+{% set num_return_sequences = 1 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__git-large" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+num_return_sequences = {{ num_return_sequences }}
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+import torch
+from transformers import AutoProcessor, AutoModelForCausalLM
+from PIL import Image
+import requests
+from io import BytesIO
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = AutoModelForCausalLM.from_pretrained(repo_id).to(device)
+
+# Load image from URL or local path
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(BytesIO(requests.get(image_path).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = processor(images=image, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+generated_ids = model.generate(
+    pixel_values=inputs["pixel_values"],
+    max_length=max_length,
+    num_beams=num_beams,
+    num_return_sequences=num_return_sequences,
+    eos_token_id=processor.tokenizer.eos_token_id,
+)
+
+captions = processor.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"captions": captions}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = Path(output_dir) / "captions.txt"
+    with open(output_file, "w", encoding="utf-8") as f:
+        for caption in RESULT["captions"]:
+            f.write(caption + "\n")

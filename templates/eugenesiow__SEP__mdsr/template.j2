@@ -1,0 +1,12 @@
+{% set repo_id = "eugenesiow/mdsr" %}
+repo_id = "{{ repo_id }}"
+
+import huggingface_hub
+
+def main():
+    api = huggingface_hub.HfApi()
+    files = api.list_repo_files(repo_id)
+    print(files)
+
+if __name__ == "__main__":
+    main()

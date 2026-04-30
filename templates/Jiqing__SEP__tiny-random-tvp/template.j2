@@ -1,0 +1,7 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+import inspect
+from transformers.models import tvp
+print("tvp classes", [name for name, obj in inspect.getmembers(tvp.modeling_tvp, inspect.isclass) if obj.__module__ == tvp.modeling_tvp.__name__])

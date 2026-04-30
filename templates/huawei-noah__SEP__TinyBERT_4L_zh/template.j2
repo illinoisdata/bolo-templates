@@ -1,0 +1,72 @@
+{% set text_input = "今天天气[MASK]" %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/huawei-noah__SEP__TinyBERT_4L_zh" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import BertConfig, BertForMaskedLM, BertTokenizer
+
+device = torch.device(device)
+
+# Load tokenizer, config & model
+tokenizer = BertTokenizer.from_pretrained(repo_id)
+config = BertConfig.from_pretrained(repo_id)
+model = BertForMaskedLM.from_pretrained(repo_id, config=config).to(device)
+model.eval()
+
+# Pre-process input
+encoded_inputs = tokenizer(text_input, return_tensors="pt")
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+# Run inference
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+# Post-process & build RESULT dict
+input_ids = encoded_inputs["input_ids"]
+mask_token_id = tokenizer.mask_token_id
+logits = outputs.logits
+probabilities = torch.softmax(logits, dim=-1)
+predictions = []
+if mask_token_id is not None:
+    mask_positions = torch.nonzero(input_ids == mask_token_id, as_tuple=False)
+    vocab_size = probabilities.shape[-1]
+    per_mask_k = min(top_k, vocab_size)
+    for batch_index, sequence_index in mask_positions:
+        candidate_scores, candidate_indices = torch.topk(
+            probabilities[batch_index, sequence_index], k=per_mask_k
+        )
+        candidate_tokens = tokenizer.convert_ids_to_tokens(candidate_indices.tolist())
+        candidate_token_ids = candidate_indices.tolist()
+        score_values = candidate_scores.tolist()
+        candidates = [
+            {
+                "token": token,
+                "token_id": token_id,
+                "score": float(score),
+            }
+            for token, token_id, score in zip(candidate_tokens, candidate_token_ids, score_values)
+        ]
+        predictions.append(
+            {
+                "mask_index": int(sequence_index.item()),
+                "mask_token": tokenizer.mask_token,
+                "candidates": candidates,
+            }
+        )
+
+RESULT = {"predictions": predictions}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    save_path = output_path / "predictions.json"
+    with save_path.open("w", encoding="utf-8") as fwrite:
+        json.dump(RESULT["predictions"], fwrite, ensure_ascii=False, indent=2)

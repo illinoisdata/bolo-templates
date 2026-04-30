@@ -1,0 +1,40 @@
+{% set input_text = "The recent summit brought together leaders from across the globe to address climate policy and economic recovery." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Yooniii__SEP__Article_summarizer" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+preprocessed_text = input_text.strip()
+inputs = tokenizer(
+    preprocessed_text,
+    return_tensors="pt",
+    truncation=True,
+    max_length=1024,
+    padding="longest",
+).to(device)
+
+generation_kwargs = dict(
+    max_length=142,
+    min_length=56,
+    num_beams=4,
+    no_repeat_ngram_size=3,
+    early_stopping=True,
+    length_penalty=2.0,
+)
+
+generated_tokens = model.generate(**inputs, **generation_kwargs).cpu()
+summary = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0].strip()
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

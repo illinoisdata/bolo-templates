@@ -1,0 +1,61 @@
+{% set sequences = ["PRTEINO", "SEQWENCE"] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Rostlab__SEP__prot_t5_xl_half_uniref50-enc" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sequences = {{ sequences }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import re
+
+import torch
+from transformers import AutoTokenizer, T5EncoderModel
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = T5EncoderModel.from_pretrained(repo_id, torch_dtype=torch.float16)
+model = model.to(device)
+model.eval()
+
+amino_acid_cleaner = re.compile(r"[UZOB]")
+processed_sequences = [
+    " ".join(list(amino_acid_cleaner.sub("X", sequence.upper())))
+    for sequence in sequences
+]
+
+tokenized_inputs = tokenizer(
+    processed_sequences,
+    padding="longest",
+    return_tensors="pt",
+    add_special_tokens=True,
+)
+input_ids = tokenized_inputs["input_ids"].to(device)
+attention_mask = tokenized_inputs["attention_mask"].to(device)
+
+with torch.no_grad():
+    model_outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+
+last_hidden_state = model_outputs.last_hidden_state
+special_token_ids = set(tokenizer.all_special_ids)
+special_token_mask = torch.zeros_like(input_ids, dtype=torch.bool)
+for special_id in special_token_ids:
+    special_token_mask |= input_ids == special_id
+
+valid_token_mask = attention_mask.bool() & ~special_token_mask
+valid_token_mask = valid_token_mask.to(last_hidden_state.dtype)
+masked_hidden_state = last_hidden_state * valid_token_mask.unsqueeze(-1)
+valid_token_counts = valid_token_mask.sum(dim=1, keepdim=True).clamp(min=1)
+per_protein_embedding = masked_hidden_state.sum(dim=1) / valid_token_counts
+
+per_residue_embeddings = last_hidden_state.cpu()
+per_protein_embeddings = per_protein_embedding.cpu()
+
+RESULT = {
+    "per_residue_embeddings": per_residue_embeddings,
+    "per_protein_embeddings": per_protein_embeddings,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    torch.save(RESULT["per_residue_embeddings"], output_path / "per_residue_embeddings.pt")
+    torch.save(RESULT["per_protein_embeddings"], output_path / "per_protein_embeddings.pt")

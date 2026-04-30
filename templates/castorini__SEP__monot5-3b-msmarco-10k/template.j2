@@ -1,0 +1,38 @@
+{% set query = "What does MonoT5 use for passage reranking?" %}
+{% set passage = "MonoT5 is a reranker built on T5 trained on MS MARCO for high-quality passage ranking." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/castorini__SEP__monot5-3b-msmarco-10k" %}
+{% set max_new_tokens = 16 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query = """{{ query }}"""
+passage = """{{ passage }}"""
+output_dir = "{{ output_dir }}"
+max_new_tokens = {{ max_new_tokens }}
+
+import pathlib
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+input_text = f"Query: {query}\nPassage: {passage}"
+encoded_inputs = tokenizer(
+    input_text,
+    padding=True,
+    truncation=True,
+    return_tensors="pt",
+)
+encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
+
+generated_tokens = model.generate(**encoded_inputs, max_new_tokens=max_new_tokens)
+generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = pathlib.Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

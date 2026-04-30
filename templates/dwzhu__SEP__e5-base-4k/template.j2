@@ -1,0 +1,63 @@
+{% set repo_id = 'dwzhu/e5-base-4k' %}
+{% set device = 'cuda:0' %}
+{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/dwzhu__SEP__e5-base-4k' %}
+{% set input_texts = ['query: how much protein should a female eat', 'query: summit define', 'passage: As a general guideline, the CDC\'s average requirement of protein for women ages 19 to 70 is 46 grams per day. But, as you can see from this chart, you\'ll need to increase that if you\'re expecting or training for a marathon. Check out the chart below to see how much protein you should be eating each day.', 'passage: Definition of summit for English Language Learners. : 1  the highest point of a mountain : the top of a mountain. : 2  the highest level. : 3  a meeting or series of meetings between the leaders of two or more governments.'] %}
+{% set max_length = 4096 %}
+{% set max_original_positions = 512 %}
+{% set encode_max_length = 4096 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+input_texts = {{ input_texts }}
+max_length = {{ max_length }}
+max_original_positions = {{ max_original_positions }}
+encode_max_length = {{ encode_max_length }}
+
+from transformers import AutoTokenizer, AutoModel
+import torch
+import torch.nn.functional as F
+import numpy as np
+import os
+
+def average_pool(last_hidden_states: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+    last_hidden = last_hidden_states.masked_fill(~attention_mask[..., None].bool(), 0.0)
+    return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
+
+def get_position_ids(input_ids: torch.Tensor, max_original_positions: int = 512, encode_max_length: int = 4096) -> torch.Tensor:
+    position_ids = list(range(input_ids.size(1)))
+    factor = max(encode_max_length // max_original_positions, 1)
+    if input_ids.size(1) <= max_original_positions:
+        position_ids = [pid * factor for pid in position_ids]
+    position_ids = torch.tensor(position_ids, dtype=torch.long)
+    position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
+    return position_ids
+
+# Load tokenizer and model
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+# Pre-process input
+
+batch_dict = tokenizer(input_texts, max_length=max_length, padding=True, truncation=True, return_tensors="pt")
+batch_dict["position_ids"] = get_position_ids(batch_dict["input_ids"], max_original_positions, encode_max_length)
+for k, v in batch_dict.items():
+    batch_dict[k] = v.to(device)
+
+# Run inference
+
+with torch.no_grad():
+    outputs = model(**batch_dict)
+    embeddings = average_pool(outputs.last_hidden_state, batch_dict["attention_mask"])
+    embeddings = F.normalize(embeddings, p=2, dim=1)
+
+# Post-process & build RESULT dict
+
+RESULT = {"embeddings": embeddings}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    np.save(os.path.join(output_dir, "embeddings.npy"), RESULT["embeddings"].cpu().numpy())

@@ -1,0 +1,8 @@
+{% set repo_id = "HadrianSecurity/subwiz" %}
+repo_id = "{{ repo_id }}"
+
+from huggingface_hub import hf_hub_download
+
+path = hf_hub_download(repo_id=repo_id, filename="model.py")
+with open(path, "r") as f:
+    RESULT = {"model_py": f.read()}

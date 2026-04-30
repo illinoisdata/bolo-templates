@@ -1,0 +1,44 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set question = "What is Night of the Living Dead?" %}
+{% set answer = "a 1968 american independent horror film" %}
+{% set max_length = 64 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/khhuang__SEP__zerofec-qa2claim-t5-base" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+answer = "{{ answer }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+formatted_input = f"{answer}\n{question}"
+encoded_inputs = tokenizer(formatted_input, return_tensors="pt")
+input_ids = encoded_inputs.input_ids.to(device)
+attention_mask = encoded_inputs.attention_mask.to(device)
+
+generated_ids = model.generate(
+    input_ids=input_ids,
+    attention_mask=attention_mask,
+    max_length=max_length,
+    num_beams=num_beams,
+)
+generated_claims = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+generated_claim = generated_claims[0]
+RESULT = {"generated_claim": generated_claim}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    claim_path = output_path / "generated_claim.txt"
+    claim_path.write_text(RESULT["generated_claim"], encoding="utf-8")

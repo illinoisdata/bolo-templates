@@ -1,0 +1,33 @@
+{% set repo_id = "google/bert_uncased_L-10_H-768_A-12" %}
+{% set device = "cuda:0" %}
+{% set text_input = "The quick brown fox jumps over the lazy dog." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-10_H-768_A-12" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+
+import numpy as np
+import torch
+from pathlib import Path
+from transformers import AutoModel, AutoTokenizer
+
+device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+encoded_inputs = tokenizer(text_input, return_tensors="pt", truncation=True, padding=True)
+encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+with torch.no_grad():
+    model_output = model(**encoded_inputs)
+last_hidden_state = model_output.last_hidden_state
+last_hidden_state_cpu = last_hidden_state.detach().cpu()
+RESULT = {"last_hidden_state": last_hidden_state_cpu}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    np.save(output_path / "last_hidden_state.npy", RESULT["last_hidden_state"].numpy())

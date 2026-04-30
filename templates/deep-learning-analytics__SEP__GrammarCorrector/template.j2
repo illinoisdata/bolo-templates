@@ -1,0 +1,56 @@
+{% set text_input = "He are moving here." %}
+{% set num_return_sequences = 1 %}
+{% set max_length = 64 %}
+{% set num_beams = 4 %}
+{% set temperature = 1.5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/deep-learning-analytics__SEP__GrammarCorrector" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+num_return_sequences = {{ num_return_sequences }}
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+temperature = {{ temperature }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+torch_device = torch.device(device)
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+encoded_input = tokenizer(
+    text_input,
+    truncation=True,
+    padding="longest",
+    return_tensors="pt",
+)
+encoded_input = {key: tensor.to(torch_device) for key, tensor in encoded_input.items()}
+
+generated_outputs = model.generate(
+    **encoded_input,
+    max_length=max_length,
+    num_beams=num_beams,
+    num_return_sequences=num_return_sequences,
+    temperature=temperature,
+)
+
+decoded_outputs = tokenizer.batch_decode(
+    generated_outputs,
+    skip_special_tokens=True,
+)
+
+RESULT = {"corrected_texts": decoded_outputs}
+
+if __name__ == "__main__":
+    save_path = Path(output_dir)
+    save_path.mkdir(parents=True, exist_ok=True)
+    (save_path / "corrected_texts.txt").write_text(
+        "\n".join(RESULT["corrected_texts"]),
+        encoding="utf-8",
+    )

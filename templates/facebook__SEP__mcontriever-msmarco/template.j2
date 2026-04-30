@@ -1,0 +1,44 @@
+{% set text_inputs = ["What makes Contriever well-suited for dense retrieval?", "Describe how mContriever represents queries and passages."] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mcontriever-msmarco" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_inputs = {{ text_inputs }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+
+encoded_inputs = tokenizer(
+    text_inputs,
+    padding=True,
+    truncation=True,
+    return_tensors="pt",
+)
+encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+
+outputs = model(**encoded_inputs)
+last_hidden_state = outputs.last_hidden_state
+attention_mask = encoded_inputs["attention_mask"].unsqueeze(-1)
+
+pooled = (last_hidden_state * attention_mask).sum(dim=1)
+mask_sum = attention_mask.sum(dim=1).clamp(min=1)
+mean_pooled = pooled / mask_sum
+normalized_embeddings = F.normalize(mean_pooled, p=2, dim=1, eps=1e-12)
+embeddings = normalized_embeddings.detach().cpu().numpy()
+
+RESULT = {
+    "query_embeddings": embeddings,
+}
+
+if __name__ == "__main__":
+    target_dir = Path(output_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    np.save(target_dir / "query_embeddings.npy", RESULT["query_embeddings"])

@@ -1,0 +1,61 @@
+{% set input_texts = [
+  "福井舞所屬哪家唱片公司？",
+  "23歲時出道、血型A型的福井舞是出身於京都的日本女創作歌手，所屬唱片公司為J-more。2004年，與WADAGAKI、SHINO組合地下音樂隊Poplar，發表了兩張專輯，天照和夢死物語。在2006年時退出，2007年10月加入了Avex獨立發展。"
+] %}
+{% set max_length = 512 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Mike0307__SEP__text2vec-base-chinese-rag" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_texts = {{ input_texts }}
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoModel, AutoTokenizer
+import json
+import os
+import torch
+
+inference_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(inference_device)
+model.eval()
+
+def mean_pooling(last_hidden_state: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+    mask = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
+    pooled = torch.sum(last_hidden_state * mask, dim=1) / torch.clamp(mask.sum(dim=1), min=1e-9)
+    return pooled
+
+encoded_inputs = tokenizer(
+    input_texts,
+    padding=True,
+    truncation=True,
+    return_tensors="pt",
+    max_length=max_length,
+)
+encoded_inputs = {key: value.to(inference_device) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    model_output = model(**encoded_inputs)
+
+last_hidden_state = model_output.last_hidden_state
+attention_mask = encoded_inputs["attention_mask"]
+embeddings = mean_pooling(last_hidden_state, attention_mask)
+
+cosine_similarity = torch.cosine_similarity(embeddings[0], embeddings[1], dim=0).item()
+embedding_vectors = embeddings.cpu().tolist()
+
+RESULT = {
+    "embedding_vectors": embedding_vectors,
+    "cosine_similarity": cosine_similarity,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    embeddings_path = os.path.join(output_dir, "embeddings.json")
+    with open(embeddings_path, "w", encoding="utf-8") as embeddings_file:
+        json.dump(RESULT["embedding_vectors"], embeddings_file, ensure_ascii=False, indent=2)
+    similarity_path = os.path.join(output_dir, "cosine_similarity.txt")
+    with open(similarity_path, "w", encoding="utf-8") as similarity_file:
+        similarity_file.write(str(RESULT["cosine_similarity"]))

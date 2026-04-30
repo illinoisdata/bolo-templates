@@ -1,0 +1,48 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set text = "Hello, my dog is cute" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+from transformers import AutoTokenizer, pipeline
+
+# Determine device index for pipeline
+device_int = 0 if device.startswith("cuda") else -1
+
+# Load tokenizer and pipelines
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+token_classifier = pipeline(
+    "token-classification",
+    model=repo_id,
+    tokenizer=tokenizer,
+    device=device_int,
+)
+sequence_classifier = pipeline(
+    "text-classification",
+    model=repo_id,
+    tokenizer=tokenizer,
+    device=device_int,
+)
+
+# Inference
+token_results = token_classifier(text)
+sequence_results = sequence_classifier(text)
+
+# Convert any numpy floats to Python floats for JSON serialization
+for r in token_results:
+    r['score'] = float(r['score'])
+for r in sequence_results:
+    r['score'] = float(r['score'])
+
+RESULT = {
+    "token_results": token_results,
+    "sequence_results": sequence_results,
+}
+
+if __name__ == "__main__":
+    import json
+    with open("result.json", "w") as f:
+        json.dump(RESULT, f)

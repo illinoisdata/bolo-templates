@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("tiedeman/opus-mt-he-en") %}
+{% set device = device | default("cuda:0") %}
+{% set src_text = src_text | default("זה מבחן תרגום") %}
+{% set num_beams = num_beams | default(6) %}
+{% set max_length = max_length | default(512) %}
+{% set output_dir = output_dir | default("./") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+src_text = "{{ src_text }}"
+num_beams = {{ num_beams }}
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+import os
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(src_text, return_tensors="pt", padding=True).to(device)
+
+generated_tokens = model.generate(**inputs, num_beams=num_beams, max_length=max_length)
+translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"translation_text": translation}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "translation.txt")
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(RESULT["translation_text"])

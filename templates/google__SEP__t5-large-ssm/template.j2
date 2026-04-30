@@ -1,0 +1,31 @@
+{% set prompt = "question: What is the capital of France?" %}
+{% set max_new_tokens = 64 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__t5-large-ssm" %}
+{% set output_filename = "answer.txt" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+output_filename = "{{ output_filename }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(prompt, return_tensors="pt").to(device)
+
+generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+answer = tokenizer.decode(generated_ids[0], skip_special_tokens=True).strip()
+
+RESULT = {"answer": answer}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    output_path = Path(output_dir) / output_filename
+    output_path.write_text(RESULT["answer"], encoding="utf-8")

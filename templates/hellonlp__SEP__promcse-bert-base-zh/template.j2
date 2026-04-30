@@ -1,0 +1,58 @@
+{% set input_sentence = "武汉是一个美丽的城市。" %}
+{% set candidate_sentences = ["你好吗", "你怎么样", "我吃了一个苹果", "你过得好吗", "你还好吗", "你现在好吗", "你吃饭了吗"] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hellonlp__SEP__promcse-bert-base-zh" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_sentence = "{{ input_sentence }}"
+candidate_sentences = {{ candidate_sentences }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from torch.nn.functional import cosine_similarity
+from transformers import AutoModel, AutoTokenizer
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model = model.to(torch_device)
+model.eval()
+
+def _encode_texts(texts: list[str]) -> torch.Tensor:
+    inputs = tokenizer(
+        texts,
+        padding=True,
+        truncation=True,
+        max_length=128,
+        return_tensors="pt",
+    )
+    inputs = {key: value.to(torch_device) for key, value in inputs.items()}
+    with torch.no_grad():
+        outputs = model(**inputs)
+    return outputs.pooler_output
+
+query_embedding = _encode_texts([input_sentence])[0]
+candidate_embeddings = _encode_texts(candidate_sentences)
+similarity_scores = cosine_similarity(
+    query_embedding.unsqueeze(0), candidate_embeddings, dim=1
+)
+
+RESULT = {
+    "similarities": [
+        {"sentence": sentence, "score": float(score)}
+        for sentence, score in zip(candidate_sentences, similarity_scores)
+    ]
+}
+
+if __name__ == "__main__":
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    output_path = destination / "similarities.json"
+    output_path.write_text(
+        json.dumps(RESULT["similarities"], ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )

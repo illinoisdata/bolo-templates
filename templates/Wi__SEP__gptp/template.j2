@@ -1,0 +1,78 @@
+{% set prompt = "Hello! How are you today?" %}
+{% set max_new_tokens = 16 %}
+{% set num_return_sequences = 1 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Wi__SEP__gptp" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+num_return_sequences = {{ num_return_sequences }}
+output_dir = "{{ output_dir }}"
+
+import os
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained("kyryl0s/gpt2-uk-xxs")
+_original_torch_load = torch.load
+
+def _torch_load(*args, **kwargs):
+    kwargs["weights_only"] = False
+    loaded = _original_torch_load(*args, **kwargs)
+    if isinstance(loaded, dict):
+        return loaded
+    state_dict = getattr(loaded, "state_dict", None)
+    if callable(state_dict):
+        return state_dict()
+    getstate = getattr(loaded, "__getstate__", None)
+    if callable(getstate):
+        state = getstate()
+        if isinstance(state, dict):
+            return state
+    return loaded
+
+torch.load = _torch_load
+try:
+    model = AutoModelForCausalLM.from_pretrained(repo_id)
+finally:
+    torch.load = _original_torch_load
+
+model.to(device)
+
+inputs = tokenizer(prompt, return_tensors="pt")
+input_ids = inputs["input_ids"].to(device)
+attention_mask = inputs.get("attention_mask")
+if attention_mask is not None:
+    attention_mask = attention_mask.to(device)
+
+available_new_tokens = model.config.n_positions - input_ids.size(1)
+if available_new_tokens <= 0:
+    raise ValueError("Prompt already fills the model's context window.")
+effective_new_tokens = min(max_new_tokens, available_new_tokens)
+
+generate_kwargs = {
+    "input_ids": input_ids,
+    "max_new_tokens": effective_new_tokens,
+    "num_return_sequences": num_return_sequences,
+    "pad_token_id": tokenizer.eos_token_id,
+    "do_sample": False,
+}
+if attention_mask is not None:
+    generate_kwargs["attention_mask"] = attention_mask
+
+generated_ids = model.generate(**generate_kwargs)
+generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"generated_texts": generated_texts}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "generated_texts.txt")
+    with open(output_path, "w", encoding="utf-8") as f:
+        for text in RESULT["generated_texts"]:
+            f.write(text)
+            f.write("\n")

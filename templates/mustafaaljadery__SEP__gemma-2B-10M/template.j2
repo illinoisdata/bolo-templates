@@ -1,0 +1,47 @@
+{% set prompt_text = "Write a concise summary of how advances in AI can benefit society." %}
+{% set max_new_tokens = 256 %}
+{% set temperature = 0.8 %}
+{% set top_p = 0.95 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/mustafaaljadery__SEP__gemma-2B-10M" %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+prompt_text = {{ prompt_text | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+output_dir = {{ output_dir | tojson }}
+
+import torch
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+torch_device = torch.device(device)
+model = AutoModelForCausalLM.from_pretrained(repo_id).to(torch_device)
+model.eval()
+
+inputs = tokenizer(prompt_text, return_tensors="pt")
+input_ids = inputs["input_ids"].to(torch_device)
+attention_mask = inputs["attention_mask"].to(torch_device)
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        max_new_tokens=max_new_tokens,
+        temperature=temperature,
+        top_p=top_p,
+        do_sample=True,
+        pad_token_id=tokenizer.eos_token_id,
+        use_cache=True,
+    )
+
+generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    out_path = Path(output_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+    (out_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

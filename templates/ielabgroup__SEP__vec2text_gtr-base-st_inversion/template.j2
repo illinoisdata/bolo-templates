@@ -1,0 +1,77 @@
+{% set prompt = "Summarize the potential research applications of text inversion models." %}
+{% set max_length = 64 %}
+{% set num_beams = 4 %}
+{% set output_path = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ielabgroup__SEP__vec2text_gtr-base-st_inversion" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = """{{ prompt }}"""
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_path = "{{ output_path }}"
+
+import json
+import torch
+from pathlib import Path
+from huggingface_hub import hf_hub_download
+from transformers import AutoConfig, AutoModelForSeq2SeqLM, AutoTokenizer
+
+base_config = AutoConfig.from_pretrained("t5-base")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_path, "r", encoding="utf-8") as config_file:
+    repo_config = json.load(config_file)
+repo_config.setdefault("model_type", base_config.model_type)
+for key, value in repo_config.items():
+    setattr(base_config, key, value)
+config = base_config
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+decoder_start = getattr(config, "decoder_start_token_id", None)
+bos_token_id = getattr(config, "bos_token_id", None)
+resolver_token_id = (
+    decoder_start
+    or bos_token_id
+    or tokenizer.cls_token_id
+    or getattr(tokenizer, "bos_token_id", None)
+    or tokenizer.pad_token_id
+)
+resolver_token_id = resolver_token_id if resolver_token_id is not None else 0
+if decoder_start is None:
+    config.decoder_start_token_id = resolver_token_id
+if bos_token_id is None:
+    setattr(config, "bos_token_id", resolver_token_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, config=config)
+
+if getattr(model.config, "decoder_start_token_id", None) is None:
+    model.config.decoder_start_token_id = resolver_token_id
+if getattr(model.config, "bos_token_id", None) is None:
+    setattr(model.config, "bos_token_id", resolver_token_id)
+generation_config = model.generation_config
+if getattr(generation_config, "decoder_start_token_id", None) is None:
+    generation_config.decoder_start_token_id = resolver_token_id
+if getattr(generation_config, "bos_token_id", None) is None:
+    setattr(generation_config, "bos_token_id", resolver_token_id)
+model.generation_config = generation_config
+
+torch_device = torch.device(device)
+model = model.to(torch_device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {name: tensor.to(torch_device) for name, tensor in inputs.items()}
+
+with torch.no_grad():
+    generated_tokens = model.generate(
+        **inputs,
+        max_length=max_length,
+        num_beams=num_beams,
+    )
+
+generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_dir = Path(output_path)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    text_output = "\n".join(RESULT["generated_text"])
+    (output_dir / "generated_text.txt").write_text(text_output, encoding="utf-8")

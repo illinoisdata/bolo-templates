@@ -1,0 +1,54 @@
+{% set repo_id = "google-t5/t5-3b" %}
+{% set device = "cuda:0" %}
+{% set prefix = "summarize: " %}
+{% set text = "My friends are cool but they eat too many carbs." %}
+{% set max_length = 200 %}
+{% set min_length = 30 %}
+{% set length_penalty = 2.0 %}
+{% set no_repeat_ngram_size = 3 %}
+{% set num_beams = 4 %}
+{% set early_stopping = True %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google-t5__SEP__t5-3b" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prefix = "{{ prefix }}"
+text = "{{ text }}"
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+length_penalty = {{ length_penalty }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+num_beams = {{ num_beams }}
+early_stopping = {{ early_stopping }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+input_text = prefix + text
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+outputs = model.generate(
+    **inputs,
+    max_length=max_length,
+    min_length=min_length,
+    length_penalty=length_penalty,
+    no_repeat_ngram_size=no_repeat_ngram_size,
+    num_beams=num_beams,
+    early_stopping=early_stopping,
+)
+
+generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    import os
+
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "generated_text.txt"), "w") as f:
+        f.write(RESULT["generated_text"])

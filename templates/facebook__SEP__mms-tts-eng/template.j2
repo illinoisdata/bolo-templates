@@ -1,0 +1,36 @@
+{% set text = "The quick brown fox jumps over the lazy dog." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mms-tts-eng" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from scipy.io import wavfile
+from transformers import AutoTokenizer, VitsModel
+
+model = VitsModel.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+encoded_inputs = tokenizer(text, return_tensors="pt")
+encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
+
+with torch.inference_mode():
+    model_output = model(**encoded_inputs)
+waveform_tensor = model_output.waveform
+waveform = waveform_tensor.squeeze(0).cpu().float().numpy()
+
+RESULT = {
+    "waveform": waveform,
+    "sampling_rate": model.config.sampling_rate,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    wavfile.write(str(output_path / "tts_output.wav"), RESULT["sampling_rate"], RESULT["waveform"])

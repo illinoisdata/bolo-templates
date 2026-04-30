@@ -1,0 +1,49 @@
+{% set device = device %}
+{% set repo_id = repo_id %}
+{% set tokenizer_repo = "Salesforce/codet5-base" %}
+{% set input_text = "Repair the following buggy Python function:\n\ndef add_numbers(a, b):\n    return a - b" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/MickyMike__SEP__VulRepair" %}
+{% set max_length = 256 %}
+{% set num_beams = 4 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+tokenizer_repo = "{{ tokenizer_repo }}"
+input_text = """{{ input_text }}"""
+output_dir = "{{ output_dir }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+
+from pathlib import Path
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers.tokenization_utils_base import PreTrainedTokenizerBase
+
+_original_add_tokens = PreTrainedTokenizerBase.add_tokens
+
+def _safe_add_tokens(self, tokens):
+    return 0
+
+PreTrainedTokenizerBase.add_tokens = _safe_add_tokens
+
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_repo)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+generated_ids = model.generate(
+    **inputs,
+    max_length=max_length,
+    num_beams=num_beams,
+    early_stopping=True,
+)
+
+generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    save_path = Path(output_dir)
+    save_path.mkdir(parents=True, exist_ok=True)
+    (save_path / "generated_text.txt").write_text(generated_text)

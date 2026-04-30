@@ -1,0 +1,50 @@
+{% set repo_id = "DDDSSS/translation_en-zh" %}
+{% set device = "cuda:0" %}
+{% set texts = ["Hello, world!", "How are you?"] %}
+{% set max_length = 512 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/DDDSSS__SEP__translation_en-zh" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+texts = {{ texts | tojson }}
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import torch
+import os
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+torch_device = torch.device(device)
+model = model.to(torch_device)
+
+# Pre-process input
+encoded_inputs = tokenizer(
+    texts,
+    padding=True,
+    truncation=True,
+    max_length=max_length,
+    return_tensors="pt",
+)
+encoded_inputs = {key: value.to(torch_device) for key, value in encoded_inputs.items()}
+
+# Run inference
+generated_ids = model.generate(
+    **encoded_inputs,
+    max_length=max_length,
+    num_beams=num_beams,
+)
+
+# Post-process and build RESULT dict
+translations = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "translations.txt"), "w", encoding="utf-8") as file:
+        for line in RESULT["translations"]:
+            file.write(line + "\n")

@@ -1,0 +1,38 @@
+{% set repo_id = "akreal/tiny-random-mbart" %}
+{% set device = "cuda:0" %}
+{% set text_input = "Hello, world!" %}
+{% set src_lang = "en_XX" %}
+{% set tgt_lang = "fr_XX" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/akreal__SEP__tiny-random-mbart" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+src_lang = "{{ src_lang }}"
+tgt_lang = "{{ tgt_lang }}"
+output_dir = "{{ output_dir }}"
+from pathlib import Path
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+# Load tokenizer and model onto the target device
+tokenizer = AutoTokenizer.from_pretrained(repo_id, src_lang=src_lang, tgt_lang=tgt_lang)
+tokenizer.src_lang = src_lang
+tokenizer.tgt_lang = tgt_lang
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+# Pre-process the input text
+encoded_inputs = tokenizer(text_input, return_tensors="pt")
+encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
+forced_bos_token_id = tokenizer.lang_code_to_id[tgt_lang]
+
+# Run inference
+with torch.no_grad():
+    generated_tokens = model.generate(**encoded_inputs, forced_bos_token_id=forced_bos_token_id)
+
+# Post-process decoded translations
+translation = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    Path(output_dir, "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

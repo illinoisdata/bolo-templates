@@ -1,0 +1,40 @@
+{% set input_text = "吾輩は猫である。" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/bandainamco-mirai__SEP__distilbert-base-japanese" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+    max_length=512,
+    padding=True,
+)
+encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+last_hidden_state = outputs.last_hidden_state
+cls_embedding = last_hidden_state[:, 0, :].squeeze(0).cpu()
+RESULT = {"cls_embedding": cls_embedding.tolist()}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    for key, value in RESULT.items():
+        path = os.path.join(output_dir, f"{key}.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(value, f, ensure_ascii=False)

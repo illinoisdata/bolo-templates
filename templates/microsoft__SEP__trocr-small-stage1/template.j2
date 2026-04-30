@@ -1,0 +1,39 @@
+{% set repo_id = "microsoft/trocr-small-stage1" %}
+{% set device = "cuda:0" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+from PIL import Image
+import requests
+import torch
+
+processor = TrOCRProcessor.from_pretrained(repo_id)
+model = VisionEncoderDecoderModel.from_pretrained(repo_id)
+model.to(device)
+
+# Load input image, handling both local paths and URLs
+if image_path.startswith("http"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+# Preprocess image and move tensors to device
+pixel_values = processor(image, return_tensors="pt").pixel_values.to(device)
+
+# Generate predictions
+generated_ids = model.generate(pixel_values)
+
+# Decode the generated tokens to text
+transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+# Build RESULT dict
+RESULT = {"transcription": transcription}
+
+if __name__ == "__main__":
+    # Save the transcription to a text file
+    with open("transcription.txt", "w") as f:
+        f.write(RESULT["transcription"])

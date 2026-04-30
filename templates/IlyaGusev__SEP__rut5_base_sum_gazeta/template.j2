@@ -1,0 +1,59 @@
+{% set repo_id = "IlyaGusev/rut5_base_sum_gazeta" %}
+{% set device = "cuda:0" %}
+{% set article_text = """
+Высота башни составляет 324 метра (1063 фута), примерно такая же высота, как у 81-этажного здания, и самое высокое сооружение в Париже. Его основание квадратно, размером 125 метров (410 футов) с любой стороны. Во время строительства Эйфелева башня превзошла монумент Вашингтона, став самым высоким искусственным сооружением в мире, и этот титул она удерживала в течение 41 года до завершения строительство здания Крайслер в Нью-Йорке в 1930 году. Это первое сооружение которое достигло высоты 300 метров. Из-за добавления вещательной антенны на вершине башни в 1957 году она сейчас выше здания Крайслер на 5,2 метра (17 футов). За исключением передатчиков, Эйфелева башня является второй самой высокой отдельно стоящей структурой во Франции после виадука Мийо.
+""" %}
+{% set max_source_length = 600 %}
+{% set max_target_length = 200 %}
+{% set num_beams = 5 %}
+{% set no_repeat_ngram_size = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/IlyaGusev__SEP__rut5_base_sum_gazeta" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+article_text = """{{ article_text }}"""
+max_source_length = {{ max_source_length }}
+max_target_length = {{ max_target_length }}
+num_beams = {{ num_beams }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+
+device_obj = torch.device(device)
+model = model.to(device_obj)
+
+# Pre-process input
+encoded_inputs = tokenizer(
+    article_text,
+    max_length=max_source_length,
+    padding="max_length",
+    truncation=True,
+    return_tensors="pt",
+    add_special_tokens=True,
+)
+encoded_inputs = {key: value.to(device_obj) for key, value in encoded_inputs.items()}
+
+# Run inference
+generated_ids = model.generate(
+    **encoded_inputs,
+    max_length=max_target_length,
+    num_beams=num_beams,
+    no_repeat_ngram_size=no_repeat_ngram_size,
+)
+summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+# Post-process & RESULT dict
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    summary_path = output_path / "summary.txt"
+    summary_path.write_text(RESULT["summary"], encoding="utf-8")

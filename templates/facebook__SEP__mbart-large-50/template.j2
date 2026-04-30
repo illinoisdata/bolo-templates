@@ -1,0 +1,38 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set src_text = "UN Chief Says There Is No Military Solution in Syria" %}
+{% set src_lang = "en_XX" %}
+{% set tgt_lang = "ro_RO" %}
+{% set max_length = 200 %}
+{% set num_beams = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mbart-large-50" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+src_text = "{{ src_text }}"
+src_lang = "{{ src_lang }}"
+tgt_lang = "{{ tgt_lang }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+tokenizer.src_lang = src_lang
+tokenizer.tgt_lang = tgt_lang
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(src_text, return_tensors="pt").to(device)
+forced_bos_token_id = tokenizer.lang_code_to_id[tgt_lang]
+generated_tokens = model.generate(**inputs, forced_bos_token_id=forced_bos_token_id, max_length=max_length, num_beams=num_beams)
+translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "translation.txt"), "w", encoding="utf-8") as f:
+        f.write(translation)

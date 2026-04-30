@@ -1,0 +1,63 @@
+{% set text_input = "This is a sample text for multi-label classification inference." %}
+{% set threshold = 0.5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/fazahmz__SEP__nps-tag-classifier" %}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+text_input = {{ text_input | tojson }}
+threshold = {{ threshold }}
+output_dir = {{ output_dir | tojson }}
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+# Load tokenizer and model to the desired device.
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSequenceClassification.from_pretrained(repo_id)
+model = model.to(device)
+
+# Prepare inputs.
+max_length = tokenizer.model_max_length if tokenizer.model_max_length is not None else 512
+encoded_input = tokenizer(
+    text_input,
+    truncation=True,
+    padding="max_length",
+    max_length=max_length,
+    return_tensors="pt",
+)
+encoded_input = {key: tensor.to(device) for key, tensor in encoded_input.items()}
+
+# Run inference.
+with torch.no_grad():
+    outputs = model(**encoded_input)
+    logits = outputs.logits
+
+# Post-processing outputs.
+probabilities = torch.sigmoid(logits)
+logits_list = logits.squeeze(0).cpu().tolist()
+probabilities_list = probabilities.squeeze(0).cpu().tolist()
+raw_id2label = getattr(model.config, "id2label", None) or {}
+id2label = {}
+for key, value in raw_id2label.items():
+    id2label[int(key)] = value
+predicted_indices = [idx for idx, prob in enumerate(probabilities_list) if prob >= threshold]
+predicted_labels = [id2label.get(idx, str(idx)) for idx in predicted_indices]
+label_probabilities = {
+    id2label.get(idx, str(idx)): probabilities_list[idx]
+    for idx in range(len(probabilities_list))
+}
+
+RESULT = {
+    "logits": logits_list,
+    "probabilities": probabilities_list,
+    "predicted_labels": predicted_labels,
+    "label_probabilities": label_probabilities,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    with (output_path / "results.json").open("w", encoding="utf-8") as result_file:
+        json.dump(RESULT, result_file, ensure_ascii=False, indent=2)

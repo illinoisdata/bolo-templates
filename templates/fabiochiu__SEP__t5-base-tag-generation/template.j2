@@ -1,0 +1,34 @@
+{% set text = "Python is a high-level, interpreted, general-purpose programming language. Its design philosophy emphasizes code readability with the use of significant indentation. Python is dynamically-typed and garbage-collected." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/fabiochiu__SEP__t5-base-tag-generation" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = """{{ text }}"""
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import json
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+generated_ids = model.generate(**inputs, num_beams=8, do_sample=True, min_length=10, max_length=64)
+
+decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+raw_tags = [tag.strip() for tag in decoded.strip().split(",") if tag.strip()]
+unique_tags = list(dict.fromkeys(raw_tags))
+
+RESULT = {"tags": unique_tags}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    tags_path = output_path / "tags.json"
+    with tags_path.open("w", encoding="utf-8") as tags_file:
+        json.dump(RESULT["tags"], tags_file, ensure_ascii=False, indent=2)

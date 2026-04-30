@@ -1,0 +1,55 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set text_inputs = (text_inputs | default(["How to use ColBERT for indexing long documents?"])) %}
+{% set output_dir = (output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/jinaai__SEP__jina-colbert-v1-en")) %}
+{% set max_length = (max_length | default(128)) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_inputs = {{ text_inputs }}
+output_dir = "{{ output_dir }}"
+max_length = {{ max_length }}
+
+from pathlib import Path
+
+import numpy as np
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+
+tokenized_inputs = tokenizer(
+    text_inputs,
+    padding=True,
+    truncation=True,
+    max_length=max_length,
+    return_tensors="pt",
+)
+
+tokenized_inputs = {k: v.to(device) for k, v in tokenized_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**tokenized_inputs)
+
+last_hidden_state = outputs.last_hidden_state
+attention_mask = tokenized_inputs["attention_mask"]
+mask = attention_mask.unsqueeze(-1).type_as(last_hidden_state)
+sum_embeddings = (last_hidden_state * mask).sum(dim=1)
+lengths = mask.sum(dim=1).clamp_min(1e-9)
+mean_embeddings = sum_embeddings / lengths
+
+embeddings_np = mean_embeddings.cpu().numpy()
+
+RESULT = {"text_embeddings": embeddings_np}
+
+
+if __name__ == "__main__":
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    embeddings_path = out_dir / "text_embeddings.npy"
+    np.save(embeddings_path, RESULT["text_embeddings"])

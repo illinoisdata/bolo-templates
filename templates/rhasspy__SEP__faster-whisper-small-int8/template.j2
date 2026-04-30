@@ -1,0 +1,12 @@
+{% set repo_id = "rhasspy/faster-whisper-small-int8" %}
+
+repo_id = "{{ repo_id }}"
+
+import huggingface_hub as hf
+
+files = hf.list_repo_files(repo_id)
+
+RESULT = {"files": files}
+
+if __name__ == "__main__":
+    pass

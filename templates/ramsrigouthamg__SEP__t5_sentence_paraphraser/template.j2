@@ -1,0 +1,44 @@
+{% set input_text = "paraphrase: The quick brown fox jumps over the lazy dog." %}
+{% set max_new_tokens = 64 %}
+{% set num_beams = 4 %}
+{% set early_stopping = True %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ramsrigouthamg__SEP__t5_sentence_paraphraser" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
+early_stopping = {{ early_stopping }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+device_obj = torch.device(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device_obj)
+model.eval()
+
+encoded_inputs = tokenizer(input_text, return_tensors="pt")
+encoded_inputs = {key: value.to(device_obj) for key, value in encoded_inputs.items()}
+with torch.no_grad():
+    generated_tokens = model.generate(
+        **encoded_inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+        early_stopping=early_stopping,
+    )
+
+paraphrased_text = tokenizer.decode(
+    generated_tokens[0],
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=True,
+)
+RESULT = {"paraphrased_text": paraphrased_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    text_file = output_path / "paraphrased_text.txt"
+    text_file.write_text(RESULT["paraphrased_text"], encoding="utf-8")

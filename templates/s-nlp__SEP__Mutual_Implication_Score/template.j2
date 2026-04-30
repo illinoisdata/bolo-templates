@@ -1,0 +1,63 @@
+{% set repo_id = "s-nlp/Mutual_Implication_Score" %}
+{% set device = "cuda:0" %}
+{% set source_texts = ["I want to leave this room", "Hello world, my name is Nick"] %}
+{% set paraphrases = ["I want to go out of this room", "Hello world, my surname is Petrov"] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/s-nlp__SEP__Mutual_Implication_Score" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_texts = {{ source_texts }}
+paraphrases = {{ paraphrases }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSequenceClassification.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+# forward direction
+encoded_forward = tokenizer(
+    source_texts,
+    paraphrases,
+    padding=True,
+    truncation=True,
+    return_tensors="pt",
+)
+for k, v in encoded_forward.items():
+    encoded_forward[k] = v.to(device)
+with torch.no_grad():
+    outputs_forward = model(**encoded_forward)
+    logits_forward = outputs_forward.logits
+    probs_forward = torch.softmax(logits_forward, dim=-1)
+
+# reverse direction
+encoded_reverse = tokenizer(
+    paraphrases,
+    source_texts,
+    padding=True,
+    truncation=True,
+    return_tensors="pt",
+)
+for k, v in encoded_reverse.items():
+    encoded_reverse[k] = v.to(device)
+with torch.no_grad():
+    outputs_reverse = model(**encoded_reverse)
+    logits_reverse = outputs_reverse.logits
+    probs_reverse = torch.softmax(logits_reverse, dim=-1)
+
+entailment_id = model.config.label2id["entailment"]
+p_forward = probs_forward[:, entailment_id]
+p_reverse = probs_reverse[:, entailment_id]
+scores = ((p_forward + p_reverse) / 2).tolist()
+
+RESULT = {"scores": scores}
+
+if __name__ == "__main__":
+    import os, json
+
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "scores.json"), "w") as f:
+        json.dump(RESULT["scores"], f)

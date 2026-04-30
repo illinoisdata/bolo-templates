@@ -1,0 +1,99 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set instruction = "Retrieve images or text relevant to the user's query." %}
+{% set query_text = "A woman playing with her dog on a beach at sunset." %}
+{% set image1 = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set documents = [
+    {"text": "A woman shares a joyful moment with her golden retriever on a sun-drenched beach at sunset, as the dog offers its paw in a heartwarming display of companionship and trust."},
+    {"image": image1},
+    {"text": "A woman shares a joyful moment with her golden retriever on a sun-drenched beach at sunset, as the dog offers its paw in a heartwarming display of companionship and trust.", "image": image1}
+] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qwen__SEP__Qwen3-VL-Reranker-2B" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+instruction = "{{ instruction }}"
+query_text = "{{ query_text }}"
+image1 = "{{ image1 }}"
+documents = {{ documents | tojson }}
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+from typing import Any, Mapping, Sequence
+from transformers import AutoProcessor, pipeline
+from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLForConditionalGeneration
+from PIL import Image
+import requests
+import torch
+import re
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = Qwen3VLForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.bfloat16)
+model.to(device)
+
+if device.startswith("cuda"):
+    device_id = int(device.split(":")[1])
+else:
+    device_id = -1
+
+loaded_documents = []
+for doc in documents:
+    item = {}
+    if "text" in doc:
+        item["text"] = doc["text"]
+    if "image" in doc:
+        img = doc["image"]
+        if isinstance(img, str) and img.startswith(("http://", "https://")):
+            image = Image.open(requests.get(img, stream=True).raw)
+        else:
+            image = Image.open(img)
+        item["image"] = image
+    loaded_documents.append(item)
+
+reranker = pipeline("any-to-any", model=model, processor=processor, device=device_id)
+
+raw_outputs = []
+for doc in loaded_documents:
+    prompt = instruction + "\nQuery: " + query_text + "\n"
+    if "text" in doc:
+        prompt += doc["text"] + "\n"
+    inputs = {"text": prompt}
+    if "image" in doc:
+        inputs["image"] = doc["image"]
+    output = reranker(inputs)
+    raw_outputs.append(output)
+
+# Extract generated sequences
+raw_sequences = []
+float_pattern = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
+for output in raw_outputs:
+    if isinstance(output, Mapping):
+        seq = output.get("generated_text", output)
+        raw_sequences.append(seq)
+    elif isinstance(output, Sequence) and not isinstance(output, (str, bytes)):
+        for element in output:
+            if isinstance(element, Mapping):
+                raw_sequences.append(element.get("generated_text", element))
+            else:
+                raw_sequences.append(element)
+    else:
+        raw_sequences.append(output)
+
+scores = []
+for sequence in raw_sequences:
+    text = sequence if isinstance(sequence, str) else str(sequence)
+    match = float_pattern.search(text)
+    if match:
+        scores.append(float(match.group()))
+    else:
+        scores.append(text)
+
+RESULT = {"scores": scores}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = Path(output_dir) / "scores.json"
+    with open(output_path, "w") as f:
+        import json
+        json.dump(RESULT["scores"], f)

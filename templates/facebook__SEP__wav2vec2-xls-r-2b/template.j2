@@ -1,0 +1,64 @@
+{% set audio_path = '/u/yli77/projects/ML-code-generation/data/audio.wav' %}
+{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__wav2vec2-xls-r-2b' %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+output_dir = "{{ output_dir }}"
+
+import io
+from pathlib import Path
+
+import numpy as np
+import requests
+import soundfile as sf
+import torch
+import torchaudio.functional as F
+from transformers import AutoFeatureExtractor, AutoModelForPreTraining
+
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+model.eval()
+
+def _read_audio(path_or_url):
+    is_url = isinstance(path_or_url, str) and path_or_url.startswith(("http://", "https://"))
+    if is_url:
+        response = requests.get(path_or_url, timeout=20)
+        response.raise_for_status()
+        buffer = io.BytesIO(response.content)
+        speech, sampling_rate = sf.read(buffer, dtype="float32")
+    else:
+        speech, sampling_rate = sf.read(path_or_url, dtype="float32")
+    if speech.ndim > 1:
+        speech = np.mean(speech, axis=1)
+    speech = speech.astype(np.float32)
+    expected_sr = feature_extractor.sampling_rate
+    if sampling_rate != expected_sr:
+        speech_tensor = torch.from_numpy(speech)
+        speech_tensor = F.resample(speech_tensor, sampling_rate, expected_sr)
+        speech = speech_tensor.numpy()
+        sampling_rate = expected_sr
+    return speech, sampling_rate
+
+speech_array, sample_rate = _read_audio(audio_path)
+inputs = feature_extractor(speech_array, sampling_rate=sample_rate, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.inference_mode():
+    outputs = model(**inputs)
+
+RESULT = {}
+for key, value in outputs.items():
+    if isinstance(value, torch.Tensor):
+        RESULT[key] = value.detach().cpu()
+    else:
+        RESULT[key] = value
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    for key, value in RESULT.items():
+        if isinstance(value, torch.Tensor):
+            torch.save(value, output_path / f"{key}.pt")
+        else:
+            with open(output_path / f"{key}.txt", "w", encoding="utf-8") as target_file:
+                target_file.write(str(value))

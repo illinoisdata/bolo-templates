@@ -1,0 +1,68 @@
+{% set article_text = "Это пример текста новости, на основе которого модель должна сгенерировать краткий заголовок." %}
+{% set max_input_length = 256 %}
+{% set max_output_length = 64 %}
+{% set num_beams = 10 %}
+{% set top_p = 0.95 %}
+{% set no_repeat_ngram_size = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/IlyaGusev__SEP__rubert_telegram_headlines" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+article_text = "{{ article_text }}"
+max_input_length = {{ max_input_length }}
+max_output_length = {{ max_output_length }}
+num_beams = {{ num_beams }}
+top_p = {{ top_p }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    do_lower_case=False,
+    do_basic_tokenize=False,
+    strip_accents=False,
+)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+
+torch_device = torch.device(device)
+model = model.to(torch_device)
+
+input_tensors = tokenizer(
+    article_text,
+    add_special_tokens=True,
+    max_length=max_input_length,
+    padding="max_length",
+    truncation=True,
+    return_tensors="pt",
+)
+input_tensors = {name: tensor.to(torch_device) for name, tensor in input_tensors.items()}
+
+generated_ids = model.generate(
+    **input_tensors,
+    max_length=max_output_length,
+    num_beams=num_beams,
+    top_p=top_p,
+    no_repeat_ngram_size=no_repeat_ngram_size,
+)
+
+headline = tokenizer.decode(
+    generated_ids[0],
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=True,
+)
+
+RESULT = {"headline": headline}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    (Path(output_dir) / "headline.txt").write_text(
+        RESULT["headline"],
+        encoding="utf-8",
+    )

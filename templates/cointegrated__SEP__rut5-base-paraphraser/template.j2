@@ -1,0 +1,50 @@
+{% set prompt = "Каждый охотник желает знать, где сидит фазан." %}
+{% set num_beams = 5 %}
+{% set encoder_no_repeat_ngram_size = 4 %}
+{% set do_sample = False %}
+{% set length_factor = 1.5 %}
+{% set length_offset = 10 %}
+{% set max_length_cap = 256 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/cointegrated__SEP__rut5-base-paraphraser" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+num_beams = {{ num_beams }}
+encoder_no_repeat_ngram_size = {{ encoder_no_repeat_ngram_size }}
+do_sample = {{ do_sample }}
+length_factor = {{ length_factor }}
+length_offset = {{ length_offset }}
+max_length_cap = {{ max_length_cap }}
+output_dir = "{{ output_dir }}"
+
+import os
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt", padding=True).to(device)
+computed_max_length = int(inputs.input_ids.shape[1] * length_factor + length_offset)
+max_length = min(computed_max_length, max_length_cap)
+
+generated_ids = model.generate(
+    **inputs,
+    num_beams=num_beams,
+    encoder_no_repeat_ngram_size=encoder_no_repeat_ngram_size,
+    max_length=max_length,
+    do_sample=do_sample,
+)
+
+paraphrase = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"paraphrase": paraphrase}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "paraphrase.txt")
+    with open(output_path, "w", encoding="utf-8") as writer:
+        writer.write(RESULT["paraphrase"])

@@ -1,0 +1,67 @@
+{% set audio_file = '/u/yli77/projects/ML-code-generation/data/audio.wav' %}
+{% set repo_id = 'facebook/mms-300m' %}
+{% set device = 'cuda:0' %}
+{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mms-300m' %}
+
+audio_file = '{{ audio_file }}'
+repo_id = '{{ repo_id }}'
+device = '{{ device }}'
+output_dir = '{{ output_dir }}'
+
+import torch
+import requests
+import io
+import soundfile as sf
+import numpy as np
+from torchaudio.transforms import Resample
+from transformers import AutoFeatureExtractor, Wav2Vec2ForPreTraining
+
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+model = Wav2Vec2ForPreTraining.from_pretrained(repo_id).to(device)
+
+if audio_file.startswith('http://') or audio_file.startswith('https://'):
+    response = requests.get(audio_file)
+    audio_bytes = io.BytesIO(response.content)
+    waveform, sampling_rate = sf.read(audio_bytes)
+else:
+    waveform, sampling_rate = sf.read(audio_file)
+
+if waveform.ndim > 1:
+    waveform = waveform.mean(axis=1)
+
+if sampling_rate != feature_extractor.sampling_rate:
+    waveform = torch.from_numpy(waveform).float().unsqueeze(0)
+    resampler = Resample(sampling_rate, feature_extractor.sampling_rate)
+    waveform = resampler(waveform)
+    waveform = waveform.squeeze().numpy()
+    sampling_rate = feature_extractor.sampling_rate
+
+inputs = feature_extractor(waveform, sampling_rate=feature_extractor.sampling_rate, return_tensors='pt', padding=True)
+input_values = inputs['input_values'].to(device)
+
+with torch.no_grad():
+    outputs = model(input_values, return_dict=True)
+
+desired_outputs = {
+    'projected_states': getattr(outputs, 'projected_states', None),
+    'projected_quantized_states': getattr(outputs, 'projected_quantized_states', None),
+    'codevector_perplexity': getattr(outputs, 'codevector_perplexity', None),
+    'contrastive_loss': getattr(outputs, 'contrastive_loss', None),
+    'diversity_loss': getattr(outputs, 'diversity_loss', None),
+    'loss': getattr(outputs, 'loss', None),
+}
+processed_outputs = {}
+for name, blob in desired_outputs.items():
+    if blob is None:
+        continue
+    if isinstance(blob, torch.Tensor):
+        processed_outputs[name] = blob.cpu().numpy()
+    else:
+        processed_outputs[name] = blob
+RESULT = processed_outputs
+
+if __name__ == '__main__':
+    import os
+    os.makedirs(output_dir, exist_ok=True)
+    for key, value in RESULT.items():
+        np.save(os.path.join(output_dir, f'{key}.npy'), value)

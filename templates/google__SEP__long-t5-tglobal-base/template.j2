@@ -1,0 +1,32 @@
+{% set input_text = "Summarize the following text about climate change mitigation in a few concise sentences." %}
+{% set max_new_tokens = 128 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__long-t5-tglobal-base" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+preprocessed_inputs = tokenizer(input_text, return_tensors="pt")
+preprocessed_inputs = preprocessed_inputs.to(device)
+
+generated_ids = model.generate(**preprocessed_inputs, max_new_tokens=max_new_tokens)
+
+generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+generated_text = generated_texts[0].strip()
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "generated_text.txt")
+    with open(output_path, "w", encoding="utf-8") as output_file:
+        output_file.write(RESULT["generated_text"])

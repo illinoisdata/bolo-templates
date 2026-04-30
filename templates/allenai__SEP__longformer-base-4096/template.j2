@@ -1,0 +1,62 @@
+{% set repo_id = "allenai/longformer-base-4096" %}
+{% set device = "cuda:0" %}
+{% set text = "Longformer excels at modeling <mask> documents." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allenai__SEP__longformer-base-4096" %}
+{% set top_k = 5 %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+text = {{ text | tojson }}
+output_dir = {{ output_dir | tojson }}
+top_k = {{ top_k }}
+
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+import json
+import os
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id)
+torch_device = torch.device(device)
+model = model.to(torch_device)
+model.eval()
+
+encoded = tokenizer(text, return_tensors="pt")
+encoded = {key: value.to(torch_device) for key, value in encoded.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded)
+
+input_ids = encoded["input_ids"]
+logits = outputs.logits
+mask_token_id = tokenizer.mask_token_id
+mask_locations = torch.where(input_ids == mask_token_id)
+batch_indices = mask_locations[0]
+sequence_indices = mask_locations[1]
+
+mask_predictions = []
+for batch_idx, seq_idx in zip(batch_indices.tolist(), sequence_indices.tolist()):
+    mask_logits = logits[batch_idx, seq_idx]
+    probs = torch.softmax(mask_logits, dim=-1)
+    normalized_top_k = min(top_k, probs.size(-1))
+    top_values, top_indices = torch.topk(probs, k=normalized_top_k)
+    token_ids = top_indices.tolist()
+    tokens = tokenizer.convert_ids_to_tokens(token_ids)
+    scores = top_values.tolist()
+    mask_predictions.append(
+        {
+            "sample_index": batch_idx,
+            "mask_index": seq_idx,
+            "token_ids": token_ids,
+            "tokens": tokens,
+            "scores": scores,
+        }
+    )
+
+RESULT = {"mask_predictions": mask_predictions}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "mask_predictions.json")
+    with open(output_path, "w", encoding="utf-8") as writer:
+        json.dump(RESULT["mask_predictions"], writer, ensure_ascii=False, indent=2)

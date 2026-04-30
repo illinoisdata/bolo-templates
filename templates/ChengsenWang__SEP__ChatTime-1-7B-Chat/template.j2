@@ -1,0 +1,41 @@
+{% set prompt = "Forecast the next 24 steps of the time series based on historical context and describe the expected trend." %}
+{% set max_new_tokens = 256 %}
+{% set temperature = 0.2 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ChengsenWang__SEP__ChatTime-1-7B-Chat" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+model_kwargs = {"torch_dtype": torch.bfloat16} if "cuda" in device else {}
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForCausalLM.from_pretrained(repo_id, **model_kwargs)
+model.to(device)
+
+tokenized = tokenizer(prompt, return_tensors="pt")
+input_ids = tokenized["input_ids"].to(device)
+attention_mask = tokenized["attention_mask"].to(device)
+
+generated_tokens = model.generate(
+    input_ids=input_ids,
+    attention_mask=attention_mask,
+    max_new_tokens=int(max_new_tokens),
+    temperature=float(temperature),
+)
+
+generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

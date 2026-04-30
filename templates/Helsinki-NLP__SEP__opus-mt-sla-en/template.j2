@@ -1,0 +1,32 @@
+{% set source_text = "Pozdravljen svet!" %}
+{% set max_new_tokens = 100 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-sla-en" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = "{{ source_text }}"
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import MarianMTModel, MarianTokenizer
+
+torch_device = torch.device(device)
+
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
+model = MarianMTModel.from_pretrained(repo_id).to(torch_device)
+
+encoded_input = tokenizer(source_text, return_tensors="pt", padding=True).to(torch_device)
+
+generated_tokens = model.generate(**encoded_input, max_new_tokens=max_new_tokens)
+
+translated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"translation": translated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, "translation.txt")
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(translated_text)

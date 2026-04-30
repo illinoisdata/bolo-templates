@@ -1,0 +1,44 @@
+{% set repo_id = "echarlaix/t5-small-openvino" %}
+{% set device = "cuda:0" %}
+{% set text = "He never went out without a book under his arm, and he often came back with two." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/echarlaix__SEP__t5-small-openvino" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer, pipeline
+from optimum.intel.openvino import OVModelForSeq2SeqLM
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = OVModelForSeq2SeqLM.from_pretrained(repo_id, use_cache=False)
+
+# Move model to the correct OpenVINO runtime device
+device_lower = device.lower()
+if device_lower.startswith("cuda"):
+    ov_device = "CPU"
+elif device_lower.startswith("gpu"):
+    ov_device = "GPU"
+elif device_lower == "cpu":
+    ov_device = "CPU"
+else:
+    ov_device = device
+model.to(ov_device)
+
+# Pre-process input (no pre-processing needed for pipeline)
+# Run inference
+translation_pipe = pipeline("translation_en_to_fr", model=model, tokenizer=tokenizer, device=-1)
+result = translation_pipe(text)
+
+# Post-process & build RESULT dict
+RESULT = {"translation": result}
+
+if __name__ == "__main__":
+    import os
+    import json
+
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "translation.json"), "w") as f:
+        json.dump(RESULT, f)

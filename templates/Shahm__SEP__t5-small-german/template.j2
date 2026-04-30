@@ -1,0 +1,47 @@
+{% set input_text = "Dies ist ein deutscher Beispielsatz mit mehreren Informationen, die ein kompaktes, aussagekräftiges Summary verdienen." %}
+{% set max_length = 200 %}
+{% set min_length = 30 %}
+{% set num_beams = 4 %}
+{% set prefix = "summarize: " %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Shahm__SEP__t5-small-german" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = """{{ input_text }}"""
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+num_beams = {{ num_beams }}
+prefix = "{{ prefix }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+# Load model and tokenizer
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+# Pre-process input
+prefixed_input = f"{prefix}{input_text.strip()}"
+inputs = tokenizer(prefixed_input, return_tensors="pt", truncation=True, padding="longest").to(device)
+
+# Run inference
+generated_ids = model.generate(
+    **inputs,
+    max_length=max_length,
+    min_length=min_length,
+    num_beams=num_beams,
+    early_stopping=True,
+)
+
+# Post-process outputs
+summary = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    summary_path = os.path.join(output_dir, "summary.txt")
+    with open(summary_path, "w", encoding="utf-8") as fp:
+        fp.write(RESULT["summary"])

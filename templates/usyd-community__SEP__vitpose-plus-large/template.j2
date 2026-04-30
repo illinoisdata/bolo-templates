@@ -1,0 +1,9 @@
+{% set repo_id = repo_id %}
+repo_id = "{{ repo_id }}"
+import inspect
+from transformers import image_utils
+print(image_utils.__name__)
+print(image_utils.__file__)
+print("has_inv", hasattr(image_utils, "inv"))
+source = inspect.getsource(image_utils)
+print(source[:500])

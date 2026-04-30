@@ -1,0 +1,51 @@
+{% set input_text = "他叫汤姆去拿外衣。" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/LTP__SEP__base1" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = """{{ input_text }}"""
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoModelForTokenClassification, AutoTokenizer, ElectraConfig
+
+output_path = Path(output_dir)
+
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_file, "r", encoding="utf-8") as handle:
+    raw_config = json.load(handle)
+backbone_config = raw_config["model"]["backbone"]["config"]
+model_config = ElectraConfig(**backbone_config)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForTokenClassification.from_pretrained(repo_id, config=model_config)
+model.eval()
+model.to(device)
+encoded_inputs = tokenizer(input_text, return_tensors="pt", truncation=True, padding=True)
+encoded_inputs = encoded_inputs.to(device)
+with torch.no_grad():
+    model_outputs = model(**encoded_inputs)
+logits = model_outputs.logits[0]
+prediction_ids = logits.argmax(dim=-1).tolist()
+input_ids = encoded_inputs["input_ids"][0].tolist()
+tokens = tokenizer.convert_ids_to_tokens(input_ids)
+label_map = getattr(model.config, "id2label", {}) or {}
+special_tokens = set(tokenizer.all_special_tokens)
+cleaned_predictions = []
+for token, label_id in zip(tokens, prediction_ids):
+    if token in special_tokens:
+        continue
+    label_key = label_id if label_id in label_map else str(label_id)
+    label = label_map.get(label_key, str(label_id))
+    cleaned_predictions.append({"token": token, "label": label})
+
+RESULT = {"token_classification": cleaned_predictions}
+
+if __name__ == "__main__":
+    output_path.mkdir(parents=True, exist_ok=True)
+    result_file = output_path / "token_classification.json"
+    result_file.write_text(json.dumps(RESULT["token_classification"], ensure_ascii=False, indent=2), encoding="utf-8")

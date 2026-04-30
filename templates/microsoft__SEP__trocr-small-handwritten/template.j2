@@ -1,0 +1,41 @@
+{% set repo_id = "microsoft/trocr-small-handwritten" %}
+{% set device = "cuda:0" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__trocr-small-handwritten" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from PIL import Image
+import requests
+from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+
+# Load processor and model
+processor = TrOCRProcessor.from_pretrained(repo_id)
+model = VisionEncoderDecoderModel.from_pretrained(repo_id)
+model.to(device)
+
+# Pre-process input
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = processor(images=image, return_tensors="pt")
+pixel_values = inputs.pixel_values.to(device)
+
+# Run inference
+generated_ids = model.generate(pixel_values)
+
+# Post-process & build RESULT dict
+generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "generated_text.txt"), "w") as f:
+        f.write(RESULT["generated_text"])

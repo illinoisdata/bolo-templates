@@ -1,0 +1,38 @@
+{% set input_text = "The capital of France is [MASK]." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__unilm-base-cased" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+import json
+from pathlib import Path
+import torch
+from transformers import BertForMaskedLM, BertTokenizer
+
+tokenizer = BertTokenizer.from_pretrained(repo_id)
+model = BertForMaskedLM.from_pretrained(repo_id).to(device)
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+outputs = model(**inputs)
+mask_token_index = torch.where(inputs["input_ids"][0] == tokenizer.mask_token_id)[0][0]
+mask_token_logits = outputs.logits[0, mask_token_index, :]
+num_candidates = min(5, mask_token_logits.size(-1))
+topk_scores, topk_indices = torch.topk(mask_token_logits, k=num_candidates)
+base_ids = inputs["input_ids"][0].detach().cpu()
+predictions = []
+for score, token_id in zip(topk_scores, topk_indices):
+    candidate_ids = base_ids.clone()
+    candidate_ids[mask_token_index] = token_id
+    decoded = tokenizer.decode(candidate_ids.tolist(), skip_special_tokens=True)
+    predictions.append({
+        "token": tokenizer.convert_ids_to_tokens(token_id.item()),
+        "score": score.item(),
+        "sequence": decoded,
+    })
+
+RESULT = {"fill_mask": predictions}
+
+if __name__ == "__main__":
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "fill_mask_results.json").write_text(json.dumps(RESULT["fill_mask"], indent=2))

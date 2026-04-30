@@ -1,0 +1,36 @@
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-en-fi") %}
+{% set device = device | default("cuda:0") %}
+{% set src_text = src_text | default(["Russia is big.", "Touch wood!"]) %}
+{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-tc-big-en-fi") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+src_text = {{ src_text }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import MarianTokenizer, MarianMTModel
+
+# Load tokenizer and model
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
+model = MarianMTModel.from_pretrained(repo_id).to(device)
+
+# Pre-process input
+tokenized = tokenizer(src_text, return_tensors="pt", padding=True).to(device)
+
+# Run inference
+generated_ids = model.generate(**tokenized)
+
+# Post-process output
+translations = [tokenizer.decode(t, skip_special_tokens=True) for t in generated_ids]
+
+# Build result dict
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "translations.txt")
+    with open(output_path, "w", encoding="utf-8") as f:
+        for t in RESULT["translations"]:
+            f.write(t + "\n")

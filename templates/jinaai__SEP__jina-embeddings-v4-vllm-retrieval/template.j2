@@ -1,0 +1,50 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set text_prompt = "Provide a concise, factual summary of the following input sentence." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/jinaai__SEP__jina-embeddings-v4-vllm-retrieval" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_prompt = "{{ text_prompt }}"
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoModel, AutoProcessor
+
+target_device = torch.device(device)
+processor = AutoProcessor.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model = model.to(target_device)
+model.eval()
+
+processed_inputs = processor(
+    text=text_prompt,
+    return_tensors="pt",
+    padding=True,
+    truncation=True,
+)
+processed_inputs = {
+    key: value.to(target_device) if isinstance(value, torch.Tensor) else value
+    for key, value in processed_inputs.items()
+}
+
+with torch.inference_mode():
+    outputs = model(**processed_inputs, output_hidden_states=True, return_dict=True)
+
+last_hidden_state = outputs.last_hidden_state
+attention_mask = processed_inputs.get("attention_mask")
+if attention_mask is None:
+    attention_mask = torch.ones(last_hidden_state.shape[:2], device=last_hidden_state.device)
+attention_mask = attention_mask.to(dtype=last_hidden_state.dtype)
+
+weighted_hidden = last_hidden_state * attention_mask.unsqueeze(-1)
+sum_hidden = weighted_hidden.sum(dim=1)
+valid_tokens = attention_mask.sum(dim=1, keepdim=True).clamp(min=1)
+pooled_embedding = (sum_hidden / valid_tokens).squeeze(0)
+RESULT = {"pooled_embedding": pooled_embedding.cpu()}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    torch.save(RESULT["pooled_embedding"], output_path / "pooled_embedding.pt")

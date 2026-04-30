@@ -1,0 +1,51 @@
+{% set text_input = "Красивый городской пейзаж летом" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ai-forever__SEP__ruclip-vit-base-patch32-384" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import requests
+import torch
+from PIL import Image
+from transformers import CLIPProcessor, CLIPModel
+
+processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+model = CLIPModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+if image_path.startswith(("http://", "https://")):
+    with requests.get(image_path, stream=True) as response:
+        response.raise_for_status()
+        response.raw.decode_content = True
+        image = Image.open(response.raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = processor(text=[text_input], images=image, return_tensors="pt", padding=True).to(device)
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits_per_image_tensor = outputs.logits_per_image
+logits_per_text_tensor = outputs.logits_per_text
+similarity_score = float(logits_per_image_tensor.squeeze().item())
+logits_per_image = logits_per_image_tensor.detach().cpu().tolist()
+logits_per_text = logits_per_text_tensor.detach().cpu().tolist()
+
+RESULT = {
+    "similarity_score": similarity_score,
+    "logits_per_image": logits_per_image,
+    "logits_per_text": logits_per_text,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    result_path = os.path.join(output_dir, "result.json")
+    with open(result_path, "w", encoding="utf-8") as result_file:
+        json.dump(RESULT, result_file, ensure_ascii=False, indent=2)

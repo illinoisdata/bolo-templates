@@ -1,0 +1,49 @@
+{% set text_prompt = "Hello, I am sampling from Bark. Please describe the sun." %}
+{% set do_sample = true %}
+{% set temperature = 1.0 %}
+{% set top_k = 50 %}
+{% set top_p = 0.95 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/suno__SEP__bark-small" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_prompt = """{{ text_prompt }}"""
+do_sample = {{ "True" if do_sample else "False" }}
+temperature = {{ temperature }}
+top_k = {{ top_k }}
+top_p = {{ top_p }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import numpy as np
+import scipy.io.wavfile as wavfile
+from transformers import AutoModel, AutoProcessor
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+
+inputs = processor(text=[text_prompt], return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+speech_values = model.generate(
+    **inputs,
+    do_sample=do_sample,
+    temperature=temperature,
+    top_k=top_k,
+    top_p=top_p,
+)
+
+speech_array = np.asarray(speech_values.cpu().numpy().squeeze())
+sampling_rate = getattr(model.generation_config, "sample_rate", None)
+if sampling_rate is None:
+    sampling_rate = getattr(model.config, "sample_rate", 24000)
+
+RESULT = {
+    "audio": speech_array,
+    "sampling_rate": sampling_rate,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    wavfile.write(output_path / "speech.wav", sampling_rate, RESULT["audio"])

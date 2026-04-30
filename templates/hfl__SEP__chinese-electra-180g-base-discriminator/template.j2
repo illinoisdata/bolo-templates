@@ -1,0 +1,48 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set input_text = "今天天气很好。我今天心情不错。" %}
+{% set max_length = 128 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hfl__SEP__chinese-electra-180g-base-discriminator" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForPreTraining, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoding = tokenizer(
+    input_text,
+    return_tensors="pt",
+    padding=True,
+    truncation=True,
+    max_length=max_length,
+)
+input_tensors = {key: tensor.to(device) for key, tensor in encoding.items()}
+
+with torch.no_grad():
+    model_outputs = model(**input_tensors)
+
+logits = model_outputs.logits
+probabilities = torch.sigmoid(logits)
+
+result_logits = logits.cpu()
+result_probabilities = probabilities.cpu()
+
+RESULT = {
+    "replaced_token_logits": result_logits,
+    "replaced_token_probabilities": result_probabilities,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    torch.save(RESULT["replaced_token_logits"], output_path / "replaced_token_logits.pt")
+    torch.save(RESULT["replaced_token_probabilities"], output_path / "replaced_token_probabilities.pt")

@@ -1,0 +1,46 @@
+{% set image_path = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
+{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/bczhou__SEP__TinyLLaVA-2.0B-SigLIP' %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+
+from io import BytesIO
+from pathlib import Path
+
+import numpy as np
+import requests
+import torch
+from PIL import Image
+from transformers import AutoModel
+
+device = torch.device(device)
+
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+image_source = image_path
+if image_source.startswith("http://") or image_source.startswith("https://"):
+    response = requests.get(image_source)
+    response.raise_for_status()
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(Path(image_source)).convert("RGB")
+
+image = image.resize((384, 384), Image.BILINEAR)
+image_array = np.array(image).astype(np.float32) / 255.0
+mean = np.array([0.5, 0.5, 0.5], dtype=np.float32)
+std = np.array([0.5, 0.5, 0.5], dtype=np.float32)
+image_array = (image_array - mean) / std
+pixel_values = torch.from_numpy(image_array).permute(2, 0, 1).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    outputs = model(pixel_values=pixel_values)
+    pooled_image_embedding = outputs.last_hidden_state[:, 0, :].cpu().to(torch.float32).numpy()
+
+RESULT = {"pooled_image_embedding": pooled_image_embedding}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    np.save(Path(output_dir) / "pooled_image_embedding.npy", RESULT["pooled_image_embedding"])

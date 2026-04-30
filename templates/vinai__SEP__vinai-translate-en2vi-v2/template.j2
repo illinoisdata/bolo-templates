@@ -1,0 +1,50 @@
+{% set repo_id = "vinai/vinai-translate-en2vi-v2" %}
+{% set device = "cuda:0" %}
+{% set input_text = "VinAI Translate provides advanced translation from English to Vietnamese." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/vinai__SEP__vinai-translate-en2vi-v2" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+device = torch.device(device)
+output_dir = Path(output_dir)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+tokenizer.src_lang = "en_XX"
+target_language_code = "vi_VN"
+forced_bos_token_id = tokenizer.lang_code_to_id[target_language_code]
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+raw_model_max_length = tokenizer.model_max_length
+if raw_model_max_length is None or raw_model_max_length <= 0:
+    model_max_length = 1024
+else:
+    model_max_length = min(raw_model_max_length, 1024)
+encoded_inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+    max_length=model_max_length,
+)
+encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
+
+generated_tokens = model.generate(
+    **encoded_inputs,
+    forced_bos_token_id=forced_bos_token_id,
+    max_length=model_max_length,
+)
+translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

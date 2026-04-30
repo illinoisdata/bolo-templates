@@ -1,0 +1,52 @@
+{% set text_input = "Привет, как у тебя дела?" %}
+{% set max_length = 128 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/DeepPavlov__SEP__distilrubert-base-cased-conversational" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    text_input,
+    return_tensors="pt",
+    truncation=True,
+    padding=True,
+    max_length=max_length,
+)
+tokens = tokenizer.convert_ids_to_tokens(encoded_inputs["input_ids"][0])
+encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+last_hidden_state = outputs.last_hidden_state
+pooled_embedding = last_hidden_state.mean(dim=1)[0].cpu().tolist()
+
+RESULT = {
+    "tokens": tokens,
+    "pooled_embedding": pooled_embedding,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    tokens_path = output_path / "tokens.txt"
+    with tokens_path.open("w", encoding="utf-8") as file:
+        file.write("\n".join(RESULT["tokens"]))
+    embedding_path = output_path / "pooled_embedding.json"
+    with embedding_path.open("w", encoding="utf-8") as file:
+        json.dump(RESULT["pooled_embedding"], file, ensure_ascii=False)

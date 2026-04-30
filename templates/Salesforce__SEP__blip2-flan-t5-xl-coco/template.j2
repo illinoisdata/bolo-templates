@@ -1,0 +1,5 @@
+from transformers.models.blip_2 import modeling_blip_2
+import inspect
+from textwrap import shorten
+inspector = inspect.getsource(modeling_blip_2.Blip2ForConditionalGeneration.generate)
+print(inspector)

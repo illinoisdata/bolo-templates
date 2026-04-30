@@ -1,0 +1,35 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set instruction_text = "Definition: return the currency of the given country. Now complete the following example - Input: India. Output:" %}
+{% set max_length = 64 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allenai__SEP__tk-instruct-3b-def-pos" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+instruction_text = "{{ instruction_text }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+model_kwargs = {}
+if "cuda" in device:
+    model_kwargs["torch_dtype"] = torch.bfloat16
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, **model_kwargs).to(device)
+
+inputs = tokenizer(instruction_text, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+generated_tokens = model.generate(**inputs, max_length=max_length)
+generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

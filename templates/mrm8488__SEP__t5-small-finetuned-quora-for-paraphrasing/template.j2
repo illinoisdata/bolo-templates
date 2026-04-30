@@ -1,0 +1,56 @@
+{% set repo_id = "mrm8488/t5-small-finetuned-quora-for-paraphrasing" %}
+{% set device = "cuda:0" %}
+{% set input_text = "paraphrase: What is the best framework for dealing with a huge text dataset?" %}
+{% set num_return_sequences = 5 %}
+{% set num_beams = 5 %}
+{% set max_length = 128 %}
+{% set no_repeat_ngram_size = 2 %}
+{% set repetition_penalty = 3.5 %}
+{% set length_penalty = 1.0 %}
+{% set early_stopping = True %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/mrm8488__SEP__t5-small-finetuned-quora-for-paraphrasing" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+num_return_sequences = {{ num_return_sequences }}
+num_beams = {{ num_beams }}
+max_length = {{ max_length }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+repetition_penalty = {{ repetition_penalty }}
+length_penalty = {{ length_penalty }}
+early_stopping = {{ early_stopping }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+
+input_ids = tokenizer.encode(input_text, return_tensors="pt", add_special_tokens=True)
+input_ids = input_ids.to(device)
+
+generated_ids = model.generate(
+    input_ids=input_ids,
+    num_return_sequences=num_return_sequences,
+    num_beams=num_beams,
+    max_length=max_length,
+    no_repeat_ngram_size=no_repeat_ngram_size,
+    repetition_penalty=repetition_penalty,
+    length_penalty=length_penalty,
+    early_stopping=early_stopping,
+)
+
+paraphrases = tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+
+RESULT = {"paraphrases": paraphrases}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "paraphrases.txt")
+    with open(output_path, "w", encoding="utf-8") as f:
+        for seq in RESULT["paraphrases"]:
+            f.write(seq + "\n")

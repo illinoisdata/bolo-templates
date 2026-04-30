@@ -1,0 +1,42 @@
+{% set text = "summarize: A dataset of scientific paper abstracts is used to automatically generate concise, informative paper titles." %}
+{% set max_length = 64 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/deep-learning-analytics__SEP__automatic-title-generation" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoded_inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=max_length)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+generated_ids = model.generate(
+    **encoded_inputs,
+    max_length=max_length,
+    num_beams=num_beams,
+    early_stopping=True,
+)
+
+generated_text = tokenizer.batch_decode(
+    generated_ids,
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=True,
+)[0]
+
+RESULT = {"generated_title": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_title.txt").write_text(RESULT["generated_title"], encoding="utf-8")

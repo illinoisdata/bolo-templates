@@ -1,0 +1,32 @@
+{% set repo_id = "Helsinki-NLP/opus-mt-fr-de" %}
+{% set device = "cuda:0" %}
+{% set input_text = "Ceci est un exemple de phrase en français." %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(torch.device(device))
+model.eval()
+
+# Pre-process input
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = inputs.to(torch.device(device))
+
+# Inference
+generated_tokens = model.generate(**inputs)
+
+# Post-process
+output_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"translation_text": output_text}
+
+if __name__ == "__main__":
+    with open("translation_text.txt", "w", encoding="utf-8") as f:
+        f.write(RESULT["translation_text"])

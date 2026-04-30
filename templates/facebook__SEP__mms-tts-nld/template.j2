@@ -1,0 +1,37 @@
+{% set text_input = "Deze tekst dient als voorbeeld voor Nederlandse tekst naar spraak." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mms-tts-nld" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+
+import numpy as np
+import torch
+from pathlib import Path
+from scipy.io import wavfile
+from transformers import AutoTokenizer, VitsModel
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = VitsModel.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+inputs = tokenizer(text_input, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+waveform = outputs.waveform
+waveform_tensor = waveform.squeeze(0).cpu()
+waveform_array = waveform_tensor.numpy()
+sampling_rate = int(model.config.sampling_rate)
+
+RESULT = {"waveform": waveform_array, "sampling_rate": sampling_rate}
+
+if __name__ == "__main__":
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    normalized_waveform = np.clip(RESULT["waveform"], -1.0, 1.0)
+    scaled_waveform = np.int16(normalized_waveform * 32767)
+    wavfile.write(out_dir / "tts_output.wav", sampling_rate, scaled_waveform)

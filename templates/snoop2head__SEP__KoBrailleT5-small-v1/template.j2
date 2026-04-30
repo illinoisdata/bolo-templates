@@ -1,0 +1,32 @@
+{% set input_text = "Please translate this sample sentence into Braille." %}
+{% set max_length = 128 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/snoop2head__SEP__KoBrailleT5-small-v1" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoded_inputs = tokenizer(input_text, return_tensors="pt", padding=True)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+generated_tokens = model.generate(**encoded_inputs, max_length=max_length, num_beams=num_beams)
+
+decoded_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+RESULT = {"generated_text": decoded_text}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    output_path = Path(output_dir) / "generated_text.txt"
+    with open(output_path, "w", encoding="utf-8") as output_file:
+        for line in decoded_text:
+            output_file.write(f"{line}\n")

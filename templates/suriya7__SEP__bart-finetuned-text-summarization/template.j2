@@ -1,0 +1,38 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set text_input = "Now, there is no doubt that one of the most important aspects of any Pixel phone is its camera. And there might be good news for all camera lovers. Rumours have suggested that the Pixel 9 could come with a telephoto lens, improving its photography capabilities even further. Google will likely continue to focus on using AI to enhance its camera performance, in order to make sure that Pixel phones remain top contenders in the world of mobile photography." %}
+{% set max_input_length = 1024 %}
+{% set max_new_tokens = 142 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/suriya7__SEP__bart-finetuned-text-summarization" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = """{{ text_input }}"""
+max_input_length = {{ max_input_length }}
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+model.eval()
+
+prepared_inputs = tokenizer(text_input, return_tensors="pt", truncation=True, max_length=max_input_length)
+prepared_inputs = {key: tensor.to(torch_device) for key, tensor in prepared_inputs.items()}
+
+with torch.no_grad():
+    summary_ids = model.generate(**prepared_inputs, max_new_tokens=max_new_tokens)
+
+summary_text = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+
+RESULT = {"summary": summary_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    summary_path = os.path.join(output_dir, "summary.txt")
+    with open(summary_path, "w", encoding="utf-8") as output_file:
+        output_file.write(RESULT["summary"])

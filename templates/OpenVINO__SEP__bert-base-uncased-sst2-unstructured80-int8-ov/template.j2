@@ -1,0 +1,59 @@
+{% set input_text = "The movie was absolutely wonderful and the performances were brilliant." %}
+{% set top_k = 2 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/OpenVINO__SEP__bert-base-uncased-sst2-unstructured80-int8-ov" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSequenceClassification.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    input_text,
+    truncation=True,
+    padding=True,
+    return_tensors="pt",
+)
+encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+logits = outputs.logits
+probabilities = torch.softmax(logits, dim=-1)
+logits = logits.cpu()
+probabilities = probabilities.cpu()
+num_labels = logits.size(-1)
+topk = min(max(1, top_k), num_labels)
+scores, indices = torch.topk(probabilities, k=topk, dim=-1)
+label_mapping = model.config.id2label
+top_k_predictions = []
+for score, index in zip(scores[0], indices[0]):
+    idx_value = int(index.item())
+    label = label_mapping.get(str(idx_value), label_mapping.get(idx_value, str(idx_value)))
+    top_k_predictions.append(
+        {"label": label, "score": score.item()}
+    )
+
+RESULT = {
+    "logits": logits.tolist(),
+    "probabilities": probabilities.tolist(),
+    "top_k_predictions": top_k_predictions,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    result_path = os.path.join(output_dir, "result.json")
+    with open(result_path, "w", encoding="utf-8") as result_file:
+        json.dump(RESULT, result_file, ensure_ascii=False, indent=2)

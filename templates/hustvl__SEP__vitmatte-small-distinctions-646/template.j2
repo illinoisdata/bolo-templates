@@ -1,0 +1,50 @@
+{% set repo_id = "hustvl/vitmatte-small-distinctions-646" %}
+{% set device = "cuda:0" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set trimap_path = "/u/yli77/projects/ML-code-generation/data/image2.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hustvl__SEP__vitmatte-small-distinctions-646" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+trimap_path = "{{ trimap_path }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import requests
+from PIL import Image
+import torch
+import numpy as np
+from transformers import AutoImageProcessor, VitMatteForImageMatting
+
+processor = AutoImageProcessor.from_pretrained(repo_id)
+model = VitMatteForImageMatting.from_pretrained(repo_id).to(device)
+
+def _load_pil_image(path: str) -> Image.Image:
+    if path.startswith("http://") or path.startswith("https://"):
+        return Image.open(requests.get(path, stream=True).raw)
+    return Image.open(path)
+
+image = _load_pil_image(image_path).convert("RGB")
+trimap_source = _load_pil_image(trimap_path).convert("L")
+trimap_source = trimap_source.resize(image.size, resample=Image.BILINEAR)
+trimap_array = np.array(trimap_source)
+trimap_mask = np.full_like(trimap_array, fill_value=128, dtype=np.uint8)
+trimap_mask[trimap_array > 200] = 255
+trimap_mask[trimap_array < 50] = 0
+trimap = Image.fromarray(trimap_mask, mode="L")
+
+inputs = processor(image, trimaps=trimap, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+alphas = outputs.alphas.squeeze().cpu().numpy()
+
+RESULT = {"alphas": alphas}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    alpha_img = Image.fromarray((alphas * 255).round().astype(np.uint8))
+    alpha_img.save(os.path.join(output_dir, "alphas.png"))

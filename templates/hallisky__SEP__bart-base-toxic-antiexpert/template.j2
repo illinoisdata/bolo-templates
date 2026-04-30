@@ -1,0 +1,41 @@
+{% set repo_id = "hallisky/bart-base-toxic-antiexpert" %}
+{% set device = "cuda:0" %}
+{% set prompt = "The discussion reinforced how essential accountability and transparency are when confronting toxic behavior." %}
+{% set max_new_tokens = 64 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hallisky__SEP__bart-base-toxic-antiexpert" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+tokenized_inputs = tokenizer(prompt, return_tensors="pt", truncation=True, padding=False)
+tokenized_inputs = {key: value.to(device) for key, value in tokenized_inputs.items()}
+
+generated_tokens = model.generate(
+    **tokenized_inputs,
+    max_new_tokens=max_new_tokens,
+    num_beams=num_beams,
+    early_stopping=True,
+)
+
+generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_text.txt").write_text(
+        RESULT["generated_text"],
+        encoding="utf-8",
+    )

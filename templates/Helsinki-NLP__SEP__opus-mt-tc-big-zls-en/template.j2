@@ -1,0 +1,46 @@
+{% set source_texts = ["Да не би случайно Том да остави Мери да кара колата?", "Какво е времето днес?"] %}
+{% set max_length = 128 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-tc-big-zls-en" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_texts = {{ source_texts }}
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+
+inputs = tokenizer(
+    source_texts,
+    return_tensors="pt",
+    padding=True,
+    truncation=True,
+    max_length=max_length,
+).to(torch_device)
+
+generated_ids = model.generate(
+    **inputs,
+    num_beams=num_beams,
+    max_length=max_length,
+)
+
+translations = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    translations_file = output_path / "translations.txt"
+    with translations_file.open("w", encoding="utf-8") as handle:
+        for line in translations:
+            handle.write(f"{line}\n")

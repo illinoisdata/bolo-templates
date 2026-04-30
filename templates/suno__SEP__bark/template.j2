@@ -1,0 +1,42 @@
+{% set text_prompt = "Hello, my name is Suno. Bark is speaking to demonstrate text-to-audio inference." %}
+{% set do_sample = true %}
+{% set temperature = 1.0 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/suno__SEP__bark" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_prompt = "{{ text_prompt }}"
+do_sample = {{ "True" if do_sample else "False" }}
+temperature = {{ temperature }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoModel, AutoProcessor
+from scipy.io.wavfile import write as write_wav
+
+torch_device = torch.device(device)
+processor = AutoProcessor.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(torch_device)
+
+inputs = processor(text=[text_prompt], return_tensors="pt")
+inputs = {key: value.to(torch_device) for key, value in inputs.items()}
+
+generation_kwargs = {"do_sample": do_sample, "temperature": temperature}
+speech_values = model.generate(**inputs, **generation_kwargs)
+
+speech_tensor = speech_values.cpu().float().squeeze()
+audio_array = speech_tensor.numpy()
+
+sampling_rate_value = getattr(model.generation_config, "sample_rate", None)
+if sampling_rate_value is None:
+    sampling_rate_value = getattr(model.config, "sample_rate", 24000)
+sampling_rate = int(sampling_rate_value)
+
+output_path = Path(output_dir)
+
+RESULT = {"sampling_rate": sampling_rate, "audio": audio_array}
+
+if __name__ == "__main__":
+    output_path.mkdir(parents=True, exist_ok=True)
+    write_wav(output_path / "speech.wav", sampling_rate, audio_array)

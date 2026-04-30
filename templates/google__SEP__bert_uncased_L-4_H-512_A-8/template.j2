@@ -1,0 +1,38 @@
+{% set input_text = "The quick brown fox jumps over the lazy dog." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-4_H-512_A-8" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import numpy as np
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+
+encoded_inputs = tokenizer(input_text, return_tensors="pt")
+input_ids_for_tokens = encoded_inputs["input_ids"][0].tolist()
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+outputs = model(**encoded_inputs)
+last_hidden_state = outputs.last_hidden_state.detach()
+tokens = tokenizer.convert_ids_to_tokens(input_ids_for_tokens)
+
+RESULT = {
+    "last_hidden_state": last_hidden_state,
+    "tokens": tokens,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    np.save(
+        os.path.join(output_dir, "last_hidden_state.npy"),
+        RESULT["last_hidden_state"].cpu().numpy(),
+    )
+    tokens_path = os.path.join(output_dir, "tokens.txt")
+    with open(tokens_path, "w", encoding="utf-8") as token_file:
+        for token in RESULT["tokens"]:
+            token_file.write(token)
+            token_file.write("\n")

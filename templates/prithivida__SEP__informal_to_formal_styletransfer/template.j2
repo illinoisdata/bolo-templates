@@ -1,0 +1,28 @@
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/prithivida__SEP__informal_to_formal_styletransfer" %}
+{% set informal_input = "hey, can u send me the notes quickly? i'm swamped rn." %}
+{% set max_new_tokens = 128 %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+informal_input = "{{ informal_input }}"
+output_dir = "{{ output_dir }}"
+max_new_tokens = {{ max_new_tokens }}
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+model_inputs = tokenizer(informal_input, return_tensors="pt")
+model_inputs = {key: value.to(device) for key, value in model_inputs.items()}
+
+generated_tokens = model.generate(**model_inputs, max_new_tokens=max_new_tokens)
+formal_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+RESULT = {"formal_text": formal_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "formal_text.txt").write_text(formal_text, encoding="utf-8")

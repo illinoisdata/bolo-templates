@@ -1,0 +1,9 @@
+{% set repo_id = "piddnad/ddcolor_modelscope" %}
+
+repo_id = "{{ repo_id }}"
+
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_path, "r", encoding="utf-8") as config_file:
+    print(config_file.read())

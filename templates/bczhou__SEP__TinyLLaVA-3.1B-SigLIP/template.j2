@@ -1,0 +1,41 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/bczhou__SEP__TinyLLaVA-3.1B-SigLIP" %}
+{% set processor_id = "google/siglip-so400m-patch14-384" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+processor_id = "{{ processor_id }}"
+from pathlib import Path
+from urllib.parse import urlparse
+
+import requests
+import torch
+from PIL import Image
+from transformers import AutoImageProcessor, AutoModel
+
+image_processor = AutoImageProcessor.from_pretrained(processor_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+parsed_image_path = urlparse(image_path)
+if parsed_image_path.scheme in ("http", "https"):
+    with requests.get(image_path, stream=True) as response:
+        response.raise_for_status()
+        image = Image.open(response.raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = image_processor(images=image, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.inference_mode():
+    model_outputs = model(**inputs)
+
+embedding = model_outputs.last_hidden_state[:, 0, :].cpu()
+RESULT = {"image_embedding": embedding}
+
+if __name__ == "__main__":
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    torch.save(RESULT["image_embedding"], destination / "image_embedding.pt")

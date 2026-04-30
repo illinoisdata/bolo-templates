@@ -1,0 +1,10 @@
+{% set output_dir = '/tmp' %}
+
+repo_id = '{{ repo_id }}'
+device = '{{ device }}'
+
+import inspect
+from transformers import TimeSeriesTransformerForPrediction
+
+print('signature:', inspect.signature(TimeSeriesTransformerForPrediction.forward))
+print('forward kwdefaults:', TimeSeriesTransformerForPrediction.forward.__kwdefaults__)

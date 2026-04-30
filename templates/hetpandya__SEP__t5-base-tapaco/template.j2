@@ -1,0 +1,56 @@
+{% set prefix = "paraphrase: " %}
+{% set sentence = "The house will be cleaned by me every Saturday." %}
+{% set n_predictions = 5 %}
+{% set top_k = 120 %}
+{% set max_length = 256 %}
+{% set top_p = 0.98 %}
+{% set early_stopping = True %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hetpandya__SEP__t5-base-tapaco" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prefix = "{{ prefix }}"
+sentence = "{{ sentence }}"
+n_predictions = {{ n_predictions }}
+top_k = {{ top_k }}
+max_length = {{ max_length }}
+top_p = {{ top_p }}
+early_stopping = {{ early_stopping }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(prefix + sentence, return_tensors="pt", padding=True)
+input_ids = inputs.input_ids.to(device)
+attention_mask = inputs.attention_mask.to(device)
+
+model_outputs = model.generate(
+    input_ids=input_ids,
+    attention_mask=attention_mask,
+    do_sample=True,
+    num_return_sequences=n_predictions,
+    max_length=max_length,
+    top_k=top_k,
+    top_p=top_p,
+    early_stopping=early_stopping,
+)
+
+outputs = []
+for output in model_outputs:
+    gen = tokenizer.decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+    if gen.lower() != sentence.lower() and gen not in outputs:
+        outputs.append(gen)
+
+RESULT = {"paraphrases": outputs}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "paraphrases.txt")
+    with open(output_path, "w") as f:
+        for sent in RESULT["paraphrases"]:
+            f.write(sent + "\n")

@@ -1,0 +1,10 @@
+{% set repo_id = "microsoft/cocolm-base" %}
+
+repo_id = "{{ repo_id }}"
+
+import os
+from huggingface_hub import snapshot_download
+
+cache_path = snapshot_download(repo_id, local_dir=None, local_dir_use_symlinks=False)
+print(cache_path)
+print(os.listdir(cache_path))

@@ -1,0 +1,41 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set max_length = 64 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__trocr-large-str" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from io import BytesIO
+from pathlib import Path
+
+import requests
+import torch
+from PIL import Image
+from transformers import AutoProcessor, VisionEncoderDecoderModel
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = VisionEncoderDecoderModel.from_pretrained(repo_id)
+torch_device = torch.device(device)
+model = model.to(torch_device)
+model.eval()
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    response = requests.get(image_path, stream=True)
+    response.raise_for_status()
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(Path(image_path)).convert("RGB")
+pixel_values = processor(images=image, return_tensors="pt").pixel_values.to(torch_device)
+with torch.no_grad():
+    generated_ids = model.generate(pixel_values, max_length=max_length, num_beams=num_beams)
+generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir) / "generated_text.txt"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(RESULT["generated_text"], encoding="utf-8")

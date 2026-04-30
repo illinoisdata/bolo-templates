@@ -1,0 +1,55 @@
+{% set situation_narrative = "Cosmo had a really fun time participating in the EMNLP conference at Abu Dhabi." %}
+{% set role_instruction = "You are Cosmo and you are talking to a friend." %}
+{% set conversation_history = ["Hey, how was your trip to Abu Dhabi?"] %}
+{% set max_new_tokens = 128 %}
+{% set temperature = 1.0 %}
+{% set top_p = 0.95 %}
+{% set do_sample = true %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allenai__SEP__cosmo-xl" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+situation_narrative = "{{ situation_narrative }}"
+role_instruction = "{{ role_instruction }}"
+conversation_history = {{ conversation_history | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+do_sample = {{ do_sample }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+turn_delimiter = " <turn> "
+input_text = turn_delimiter.join(conversation_history)
+if role_instruction != "":
+    input_text = f"{role_instruction} <sep> {input_text}"
+if situation_narrative != "":
+    input_text = f"{situation_narrative} <sep> {input_text}"
+
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+outputs = model.generate(
+    **inputs,
+    max_new_tokens=max_new_tokens,
+    temperature=temperature,
+    top_p=top_p,
+    do_sample=do_sample,
+)
+response = tokenizer.decode(
+    outputs[0],
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=False,
+)
+
+RESULT = {"response": response}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    response_path = output_path / "response.txt"
+    response_path.write_text(response, encoding="utf-8")

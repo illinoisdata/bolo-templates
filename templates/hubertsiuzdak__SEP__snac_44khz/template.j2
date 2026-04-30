@@ -1,0 +1,62 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set audio_path = audio_path | default('/u/yli77/projects/ML-code-generation/data/audio.wav') %}
+{% set output_dir = output_dir | default('/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hubertsiuzdak__SEP__snac_44khz') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+output_dir = "{{ output_dir }}"
+
+import io
+from pathlib import Path
+
+import numpy as np
+import requests
+import soundfile as sf
+import torch
+import torchaudio.functional as F
+from snac import SNAC
+
+model = SNAC.from_pretrained(repo_id).eval().to(device)
+
+target_sample_rate = 44100
+
+if audio_path.lower().startswith(("http://", "https://")):
+    response = requests.get(audio_path, stream=True)
+    response.raise_for_status()
+    audio_buffer = io.BytesIO(response.content)
+    audio_array, sample_rate = sf.read(audio_buffer, dtype="float32")
+else:
+    audio_array, sample_rate = sf.read(audio_path, dtype="float32")
+
+if audio_array.ndim > 1:
+    audio_array = audio_array.mean(axis=1)
+
+audio_array = np.ascontiguousarray(audio_array, dtype=np.float32)
+audio_tensor = torch.from_numpy(audio_array)
+
+if sample_rate != target_sample_rate:
+    audio_tensor = F.resample(audio_tensor.unsqueeze(0), sample_rate, target_sample_rate).squeeze(0)
+    sample_rate = target_sample_rate
+
+audio_tensor = audio_tensor.unsqueeze(0).unsqueeze(0).to(device)
+
+with torch.inference_mode():
+    reconstructed_audio, codes = model(audio_tensor)
+
+reconstructed_audio = reconstructed_audio.detach().cpu()
+codes = [code.detach().cpu() for code in codes]
+
+RESULT = {"reconstructed_audio": reconstructed_audio, "codes": codes}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    reconstructed = RESULT["reconstructed_audio"].squeeze().numpy()
+    sf.write(output_path / "reconstructed_audio.wav", reconstructed, target_sample_rate)
+
+    npz_payload = {
+        f"level_{idx}": code.numpy() for idx, code in enumerate(RESULT["codes"])
+    }
+    np.savez(output_path / "codes.npz", **npz_payload)

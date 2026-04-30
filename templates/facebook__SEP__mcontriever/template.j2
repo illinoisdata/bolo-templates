@@ -1,0 +1,34 @@
+{% set texts = ["How does Contriever encode a sentence?", "Retrieve dense embeddings for similarity search."] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mcontriever" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+texts = {{ texts }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import numpy as np
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded = tokenizer(texts, padding=True, truncation=True, return_tensors="pt")
+encoded = {k: v.to(device) for k, v in encoded.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded)
+
+pooled_output = outputs.pooler_output
+if pooled_output is None:
+    pooled_output = outputs.last_hidden_state.mean(dim=1)
+
+embeddings = pooled_output.detach().cpu().numpy()
+
+RESULT = {"embeddings": embeddings}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    np.save(Path(output_dir) / "embeddings.npy", RESULT["embeddings"])

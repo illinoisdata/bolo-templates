@@ -1,0 +1,39 @@
+{% set text = "The quick brown fox jumps over the lazy dog." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/TurkuNLP__SEP__eccobert-base-cased-v1" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoModelForPreTraining, AutoTokenizer
+import os
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+outputs = model(**inputs)
+prediction_logits = outputs.prediction_logits.detach().cpu()
+token_ids = prediction_logits.argmax(dim=-1)[0].tolist()
+predicted_tokens = tokenizer.convert_ids_to_tokens(token_ids)
+
+seq_logits = outputs.seq_relationship_logits.detach().cpu()
+next_sentence_probabilities = torch.softmax(seq_logits, dim=-1)[0].tolist()
+
+RESULT = {
+    "predicted_tokens": predicted_tokens,
+    "next_sentence_probabilities": next_sentence_probabilities,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    tokens_path = os.path.join(output_dir, "predicted_tokens.txt")
+    with open(tokens_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(RESULT["predicted_tokens"]))
+    probs_path = os.path.join(output_dir, "next_sentence_probabilities.txt")
+    with open(probs_path, "w", encoding="utf-8") as f:
+        f.write(",".join(str(p) for p in RESULT["next_sentence_probabilities"]))

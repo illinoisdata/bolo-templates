@@ -1,0 +1,54 @@
+{% set input_text = "DialogLED is a long-dialogue understanding and summarization model inspired by LED; it needs a concise overview of its capabilities." %}
+{% set max_new_tokens = 128 %}
+{% set min_length = 64 %}
+{% set max_length = 128 %}
+{% set num_beams = 6 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/MingZhong__SEP__DialogLED-base-16384" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = """{{ input_text }}"""
+max_new_tokens = {{ max_new_tokens }}
+min_length = {{ min_length }}
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import os
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+    padding="longest",
+    max_length=16384,
+)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+generated_ids = model.generate(
+    **inputs,
+    max_new_tokens=max_new_tokens,
+    min_length=min_length,
+    max_length=max_length,
+    num_beams=num_beams,
+    early_stopping=True,
+    no_repeat_ngram_size=3,
+)
+
+summaries = tokenizer.batch_decode(
+    generated_ids,
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=True,
+)
+
+RESULT = {"summaries": summaries}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    summary_path = os.path.join(output_dir, "summaries.txt")
+    with open(summary_path, "w", encoding="utf-8") as fw:
+        fw.write("\n".join(summaries))

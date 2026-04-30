@@ -1,0 +1,16 @@
+{% set repo_id = "jose-h-solorzano/audio-denoiser-512-32-v1" %}
+{% set device = "cpu" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+import audio_denoiser, pathlib
+print("audio_denoiser module:", audio_denoiser)
+print("module file:", audio_denoiser.__file__)
+try:
+    source = pathlib.Path(audio_denoiser.__file__).read_text()
+    print("source snippet:")
+    print(source[:1000])
+except Exception as exc:
+    print("failed to read source", exc)
+RESULT = {"inspect": "done"}
+if __name__ == "__main__":
+    pass

@@ -1,0 +1,35 @@
+{% set text_input = "Ẹ̀kúnrẹ́rẹ́ ìtàn kan nípa ìrìn àjò ayé Yoruba" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mms-tts-yor" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from scipy.io import wavfile
+from transformers import AutoTokenizer, VitsModel
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = VitsModel.from_pretrained(repo_id).to(torch_device)
+model.eval()
+
+model_inputs = tokenizer(text_input, return_tensors="pt")
+model_inputs = {key: value.to(torch_device) for key, value in model_inputs.items()}
+
+with torch.no_grad():
+    model_output = model(**model_inputs)
+
+waveform = model_output.waveform
+waveform = waveform.squeeze(0).cpu().numpy()
+
+RESULT = {"waveform": waveform}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    wavfile.write(str(output_path / "tts_output.wav"), model.config.sampling_rate, RESULT["waveform"])

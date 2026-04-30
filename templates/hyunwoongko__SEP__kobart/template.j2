@@ -1,0 +1,42 @@
+{% set prompt = "한국어로 간단한 인사말을 생성해 주세요." %}
+{% set max_new_tokens = 64 %}
+{% set num_beams = 4 %}
+{% set temperature = 1.0 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hyunwoongko__SEP__kobart" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
+temperature = {{ temperature }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(prompt, return_tensors="pt")
+input_ids = inputs["input_ids"].to(device)
+attention_mask = inputs["attention_mask"].to(device)
+
+with torch.no_grad():
+    generated_tokens = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+        temperature=temperature,
+        early_stopping=True,
+    )
+
+generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    result_file = output_path / "generated_text.txt"
+    result_file.write_text(RESULT["generated_text"], encoding="utf-8")

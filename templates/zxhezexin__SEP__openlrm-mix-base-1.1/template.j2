@@ -1,0 +1,11 @@
+{% set repo_id = "zxhezexin/openlrm-mix-base-1.1" %}
+
+repo_id = "{{ repo_id }}"
+
+import json
+from huggingface_hub import HfApi
+
+api = HfApi()
+info = api.model_info(repo_id)
+paths = [s.rfilename for s in info.siblings]
+print(json.dumps(paths, indent=2))

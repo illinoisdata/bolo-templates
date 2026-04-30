@@ -1,0 +1,79 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "BAAI/seggpt-vit-large" %}
+{% set image = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set prompt_image = "/u/yli77/projects/ML-code-generation/data/image2.jpeg" %}
+{% set prompt_mask = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
+{% set num_labels = 1 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/BAAI__SEP__seggpt-vit-large" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image = "{{ image }}"
+prompt_image = "{{ prompt_image }}"
+prompt_mask = "{{ prompt_mask }}"
+num_labels = {{ num_labels }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+import numpy as np
+from transformers import SegGptImageProcessor, SegGptForImageSegmentation
+from PIL import Image
+import requests
+from io import BytesIO
+
+processor = SegGptImageProcessor.from_pretrained(repo_id)
+model = SegGptForImageSegmentation.from_pretrained(repo_id).to(device)
+model.eval()
+
+# Load main image
+if image.startswith("http"):
+    response = requests.get(image)
+    image_input = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image_input = Image.open(image).convert("RGB")
+
+# Load prompt image
+if prompt_image.startswith("http"):
+    response = requests.get(prompt_image)
+    prompt_image_input = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    prompt_image_input = Image.open(prompt_image).convert("RGB")
+
+# Load prompt mask
+if prompt_mask.startswith("http"):
+    response = requests.get(prompt_mask)
+    prompt_mask_input = Image.open(BytesIO(response.content)).convert("L")
+else:
+    prompt_mask_input = Image.open(prompt_mask).convert("L")
+
+# Convert prompt mask to binary mask
+prompt_mask_np = np.array(prompt_mask_input)
+prompt_mask_input = (prompt_mask_np > 128).astype(np.uint8)
+
+inputs = processor(
+    images=image_input,
+    prompt_images=prompt_image_input,
+    prompt_masks=prompt_mask_input,
+    num_labels=num_labels,
+    return_tensors="pt"
+)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+target_sizes = [image_input.size[::-1]]
+masks = processor.post_process_semantic_segmentation(outputs, target_sizes, num_labels=num_labels)
+mask = masks[0]
+if isinstance(mask, torch.Tensor):
+    mask = mask.cpu().numpy()
+mask = mask.astype(np.uint8)
+
+RESULT = {"mask": mask}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    mask_array = RESULT["mask"]
+    mask_image = Image.fromarray(mask_array)
+    mask_image.save(os.path.join(output_dir, "mask.png"))

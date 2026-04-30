@@ -1,0 +1,50 @@
+{% set masked_text = "The capital of France is [MASK]." %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-6_H-512_A-8" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+masked_text = "{{ masked_text }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id)
+model.to(device)
+
+encoded_inputs = tokenizer(masked_text, return_tensors="pt")
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+with torch.inference_mode():
+    outputs = model(**encoded_inputs)
+
+logits = outputs.logits
+input_ids = encoded_inputs["input_ids"]
+mask_token_positions = (input_ids == tokenizer.mask_token_id).nonzero(as_tuple=False).cpu().tolist()
+
+predictions = []
+for batch_index, sequence_index in mask_token_positions:
+    token_logits = logits[batch_index, sequence_index]
+    topk = token_logits.topk(top_k, dim=-1)
+    token_ids = topk.indices.tolist()
+    scores = [float(score) for score in topk.values.tolist()]
+    tokens = tokenizer.convert_ids_to_tokens(token_ids)
+    predictions.append({
+        "mask_position": sequence_index,
+        "tokens": tokens,
+        "scores": scores,
+    })
+
+RESULT = {"predictions": predictions}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    result_path = os.path.join(output_dir, "predictions.json")
+    with open(result_path, "w") as file:
+        json.dump(RESULT, file, indent=2)

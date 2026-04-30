@@ -1,0 +1,33 @@
+{% set source_text = "Maschinelles Lernen ist großartig, nicht wahr?" %}
+{% set max_length = 128 %}
+{% set num_beams = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allenai__SEP__wmt19-de-en-6-6-big" %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+source_text = {{ source_text | tojson }}
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = {{ output_dir | tojson }}
+
+from pathlib import Path
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+
+inputs = tokenizer(source_text, return_tensors="pt", padding=True)
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+decoded = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+translation = decoded[0]
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

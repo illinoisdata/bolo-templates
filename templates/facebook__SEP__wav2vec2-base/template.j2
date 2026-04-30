@@ -1,0 +1,50 @@
+{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set target_sampling_rate = 16000 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__wav2vec2-base" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+target_sampling_rate = {{ target_sampling_rate }}
+output_dir = "{{ output_dir }}"
+
+import io
+import os
+
+import numpy as np
+import requests
+import soundfile as sf
+import torch
+import torchaudio.functional as F
+from transformers import AutoFeatureExtractor, AutoModelForPreTraining
+
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+
+
+def _load_audio(source):
+    is_remote = isinstance(source, str) and (source.startswith("http://") or source.startswith("https://"))
+    if is_remote:
+        response = requests.get(source)
+        response.raise_for_status()
+        fileobj = io.BytesIO(response.content)
+        waveform, sample_rate = sf.read(fileobj, dtype="float32")
+    else:
+        waveform, sample_rate = sf.read(source, dtype="float32")
+    if waveform.ndim > 1:
+        waveform = waveform.mean(axis=1)
+    waveform_tensor = torch.from_numpy(waveform).float()
+    if sample_rate != target_sampling_rate:
+        waveform_tensor = F.resample(waveform_tensor, sample_rate, target_sampling_rate)
+    return waveform_tensor, target_sampling_rate
+
+waveform_tensor, sampling_rate = _load_audio(audio_path)
+inputs = feature_extractor([waveform_tensor.numpy()], sampling_rate=sampling_rate, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+RESULT = {"outputs": outputs}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    torch.save(RESULT["outputs"], os.path.join(output_dir, "outputs.pt"))

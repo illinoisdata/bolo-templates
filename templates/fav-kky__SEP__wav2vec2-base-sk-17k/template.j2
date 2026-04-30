@@ -1,0 +1,59 @@
+{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/fav-kky__SEP__wav2vec2-base-sk-17k" %}
+
+audio_path = "{{ audio_path }}"
+output_dir = "{{ output_dir }}"
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+
+import io
+import os
+from pathlib import Path
+
+import numpy as np
+import requests
+import soundfile as sf
+import torch
+from torchaudio.transforms import Resample
+from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2Model
+
+feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(repo_id)
+model = Wav2Vec2Model.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+def _load_audio_input(path: str):
+    if path.startswith("http://") or path.startswith("https://"):
+        response = requests.get(path)
+        response.raise_for_status()
+        buffer = io.BytesIO(response.content)
+        speech_array, sampling_rate = sf.read(buffer)
+    else:
+        speech_array, sampling_rate = sf.read(path)
+    if speech_array.ndim > 1:
+        speech_array = speech_array.mean(axis=1)
+    if sampling_rate != 16000:
+        speech_tensor = torch.from_numpy(speech_array).float()
+        speech_tensor = Resample(orig_freq=sampling_rate, new_freq=16000)(speech_tensor)
+        speech_array = speech_tensor.numpy()
+        sampling_rate = 16000
+    return speech_array, sampling_rate
+
+speech_array, sampling_rate = _load_audio_input(audio_path)
+inputs = feature_extractor(
+    speech_array,
+    sampling_rate=sampling_rate,
+    return_tensors="pt",
+)
+input_values = inputs["input_values"].to(device)
+
+with torch.no_grad():
+    outputs = model(input_values)
+last_hidden_state = outputs.last_hidden_state.detach().cpu()
+
+RESULT = {"last_hidden_state": last_hidden_state}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    save_path = Path(output_dir) / "last_hidden_state.npy"
+    np.save(str(save_path), RESULT["last_hidden_state"].numpy())

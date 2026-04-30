@@ -1,0 +1,52 @@
+{% set input_text = """현대자동차는 18일(현지 시간) 이탈리아 레이크 코모에서 개최된 '현대 리유니온' 행사에서 '포니 쿠페 콘셉트' 복원 모델을 세계에 첫 공개했습니다. 이 프로젝트는 현대차의 창업자인 정주영 선대 회장의 수출보국 정신과 포니 쿠페를 통한 글로벌 브랜드 정립에 대한 끊임없는 열정과 도전 정신을 재조명하기 위한 것입니다. 현대차에 따르면, 이번 현대 리유니온 행사는 회사의 역사를 다시 돌아보며 변하지 않는 미래 지향적인 비전과 방향성을 공유하는 브랜드 유산 행사입니다.""" %}
+{% set max_length = 256 %}
+{% set min_length = 32 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/KETI-AIR-Downstream__SEP__long-ke-t5-base-summarization" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = """{{ input_text }}"""
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+
+inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+    padding="longest",
+)
+inputs = {key: value.to(torch_device) for key, value in inputs.items()}
+
+generated_ids = model.generate(
+    **inputs,
+    max_length=max_length,
+    min_length=min_length,
+    num_beams=num_beams,
+)
+
+generated_summary = tokenizer.batch_decode(
+    generated_ids,
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=True,
+)[0]
+
+RESULT = {"summary": generated_summary}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_summary.txt").write_text(
+        RESULT["summary"], encoding="utf-8"
+    )

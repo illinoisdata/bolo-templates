@@ -1,0 +1,10 @@
+{% set repo_id = "Audiogen/agc-discrete" %}
+{% set device = "cpu" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+import pkgutil
+import transformers
+modules = sorted(name for _, name, _ in pkgutil.iter_modules(transformers.models.__path__))
+RESULT = {"model_modules": modules}
+if __name__ == "__main__":
+    pass

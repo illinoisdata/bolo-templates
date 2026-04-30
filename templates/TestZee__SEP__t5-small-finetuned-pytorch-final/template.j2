@@ -1,0 +1,56 @@
+{% set repo_id = "TestZee/t5-small-finetuned-pytorch-final" %}
+{% set device = "cuda:0" %}
+{% set text_input = "The Apollo missions not only placed humans on the Moon but also taught the world resilience and innovation." %}
+{% set generation_prefix = "summarize: " %}
+{% set max_length = 200 %}
+{% set min_length = 30 %}
+{% set num_beams = 4 %}
+{% set length_penalty = 2.0 %}
+{% set no_repeat_ngram_size = 3 %}
+{% set early_stopping = true %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/TestZee__SEP__t5-small-finetuned-pytorch-final" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = """{{ text_input }}"""
+generation_prefix = "{{ generation_prefix }}"
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+num_beams = {{ num_beams }}
+length_penalty = {{ length_penalty }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+early_stopping = {{ early_stopping }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+prefixed_text = f"{generation_prefix}{text_input}"
+inputs = tokenizer(prefixed_text, return_tensors="pt", truncation=True, max_length=512).to(device)
+
+generate_kwargs = {
+    "max_length": max_length,
+    "min_length": min_length,
+    "num_beams": num_beams,
+    "length_penalty": length_penalty,
+    "no_repeat_ngram_size": no_repeat_ngram_size,
+    "early_stopping": early_stopping,
+    "pad_token_id": tokenizer.pad_token_id,
+}
+with torch.no_grad():
+    generated_tokens = model.generate(**inputs, **generate_kwargs)
+
+generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+summary = generated_text[0].strip()
+
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

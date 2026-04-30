@@ -1,0 +1,48 @@
+{% set answer = "ZhangCheng" %}
+{% set context = "ZhangCheng fine-tuned T5 on SQuAD dataset for question generation." %}
+{% set max_length = 64 %}
+{% set num_beams = 4 %}
+{% set output_dir = "./output" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+answer = """{{ answer }}"""
+context = """{{ context }}"""
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import os
+from typing import Dict
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+input_text = f"<answer> {answer} <context> {context}"
+encoding = tokenizer(input_text, return_tensors="pt")
+encoding = {k: v.to(device) for k, v in encoding.items()}
+outputs = model.generate(**encoding, max_length=max_length, num_beams=num_beams)
+question = tokenizer.decode(
+    outputs[0],
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=True,
+)
+
+RESULT: Dict[str, str] = {
+    "question": question,
+    "answer": answer,
+    "context": context,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    for key, value in RESULT.items():
+        file_path = os.path.join(output_dir, f"{key}.txt")
+        with open(file_path, "w", encoding="utf-8") as writer:
+            writer.write(value)

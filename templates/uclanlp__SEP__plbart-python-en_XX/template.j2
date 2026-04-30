@@ -1,0 +1,29 @@
+{% set source_text = "def greet():\n    print('Hello from PLBART translation!')" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/uclanlp__SEP__plbart-python-en_XX" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = """{{ source_text }}"""
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+inputs = tokenizer(source_text, return_tensors="pt", truncation=True)
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_length=256)
+translations = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "translation.json")
+    with open(output_path, "w", encoding="utf-8") as output_file:
+        json.dump(RESULT, output_file, ensure_ascii=False, indent=2)

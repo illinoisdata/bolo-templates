@@ -1,0 +1,55 @@
+{% set instruction = "Instruction: given a dialog context, you need to response empathically." %}
+{% set knowledge = "" %}
+{% set dialog = ["Does money buy happiness?", "It is a question. Money buys you a lot of things, but not enough to buy happiness.", "What is the best way to buy happiness ?"] %}
+{% set max_length = 128 %}
+{% set min_length = 8 %}
+{% set top_p = 0.9 %}
+{% set do_sample = true %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__GODEL-v1_1-base-seq2seq" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+instruction = "{{ instruction }}"
+knowledge = "{{ knowledge }}"
+dialog = {{ dialog }}
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+top_p = {{ top_p }}
+do_sample = {{ do_sample }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+if hasattr(model, "eval"):
+    model.eval()
+
+dialog_context = " EOS ".join(dialog)
+knowledge_segment = f"[KNOWLEDGE] {knowledge}" if knowledge else ""
+segments = [instruction, f"[CONTEXT] {dialog_context}"]
+if knowledge_segment:
+    segments.append(knowledge_segment)
+query = " ".join(segment for segment in segments if segment)
+input_ids = tokenizer(query, return_tensors="pt").input_ids.to(device)
+
+with torch.inference_mode():
+    generated = model.generate(
+        input_ids,
+        max_length=max_length,
+        min_length=min_length,
+        top_p=top_p,
+        do_sample=do_sample,
+    )
+response = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+RESULT = {"response": response}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "response.txt").write_text(response, encoding="utf-8")

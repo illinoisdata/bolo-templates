@@ -1,0 +1,5 @@
+repo_id = "{{ repo_id }}"
+from huggingface_hub import hf_hub_download
+from pathlib import Path
+path = hf_hub_download(repo_id=repo_id, filename="config.json")
+print(Path(path).read_text())

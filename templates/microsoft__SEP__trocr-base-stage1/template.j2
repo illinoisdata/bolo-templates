@@ -1,0 +1,9 @@
+{% set repo_id = "microsoft/trocr-base-stage1" %}
+
+repo_id = "{{ repo_id }}"
+
+import torch
+from transformers import VisionEncoderDecoderModel
+
+model = VisionEncoderDecoderModel.from_pretrained(repo_id)
+print(model.decoder)

@@ -1,0 +1,40 @@
+{% set repo_id = "prajjwal1/bert-tiny" %}
+{% set device = "cuda:0" %}
+{% set texts = ["Hello, world!"] %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+texts = {{ texts }}
+
+import os
+import torch
+from transformers import BertTokenizer, BertModel
+
+# Load tokenizer and model
+tokenizer = BertTokenizer.from_pretrained(repo_id, use_fast=False)
+model = BertModel.from_pretrained(repo_id).to(device)
+
+# Preprocess input
+inputs = tokenizer(texts, return_tensors="pt", padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+# Run inference
+with torch.no_grad():
+    outputs = model(**inputs)
+
+# Post-process outputs
+last_hidden_state = outputs.last_hidden_state
+pooler_output = getattr(outputs, "pooler_output", None)
+
+# Build result dict
+RESULT = {
+    "last_hidden_state": last_hidden_state,
+    "pooler_output": pooler_output,
+}
+
+if __name__ == "__main__":
+    output_dir = os.getenv("OUTPUT_DIR", ".")
+    os.makedirs(output_dir, exist_ok=True)
+    torch.save(RESULT["last_hidden_state"], os.path.join(output_dir, "last_hidden_state.pt"))
+    if RESULT["pooler_output"] is not None:
+        torch.save(RESULT["pooler_output"], os.path.join(output_dir, "pooler_output.pt"))

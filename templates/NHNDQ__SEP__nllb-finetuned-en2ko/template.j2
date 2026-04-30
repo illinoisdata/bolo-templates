@@ -1,0 +1,38 @@
+{% set text_input = "The quick brown fox jumps over the lazy dog." %}
+{% set target_language = "kor_Hang" %}
+{% set source_language = "eng_Latn" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/NHNDQ__SEP__nllb-finetuned-en2ko" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+target_language = "{{ target_language }}"
+source_language = "{{ source_language }}"
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+
+tokenizer.src_lang = source_language
+
+inputs = tokenizer(text_input, return_tensors="pt", padding=True)
+inputs = {name: tensor.to(torch_device) for name, tensor in inputs.items()}
+
+forced_bos_token_id = tokenizer.lang_code_to_id[target_language]
+generated_tokens = model.generate(**inputs, forced_bos_token_id=forced_bos_token_id, max_new_tokens=256)
+
+decoded = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+translation = decoded[0]
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    translation_path = Path(output_dir) / "translation.txt"
+    translation_path.write_text(RESULT["translation"], encoding="utf-8")

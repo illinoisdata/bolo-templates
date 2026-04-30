@@ -1,0 +1,43 @@
+{% set text = "Dies ist ein Beispieltext auf Deutsch für die Inferenz mit ELECTRA." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/dbmdz__SEP__electra-base-german-europeana-cased-discriminator" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+output_dir = "{{ output_dir }}"
+import os
+
+import numpy as np
+import torch
+from transformers import AutoModelForPreTraining, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(
+    text,
+    return_tensors="pt",
+    truncation=True,
+    max_length=tokenizer.model_max_length,
+)
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+
+discriminator_predictions = logits.argmax(dim=-1)
+
+RESULT = {
+    "logits": logits.detach().cpu().numpy(),
+    "discriminator_predictions": discriminator_predictions.detach().cpu().numpy(),
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    np.save(os.path.join(output_dir, "logits.npy"), RESULT["logits"])
+    np.save(
+        os.path.join(output_dir, "discriminator_predictions.npy"),
+        RESULT["discriminator_predictions"],
+    )

@@ -1,0 +1,130 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set aa_sequence = "PRTEINO" %}
+{% set translation_prefix_aa = "<AA2fold>" %}
+{% set translation_prefix_fold = "<fold2AA>" %}
+{% set generation_min_length = 16 %}
+{% set generation_max_length = 512 %}
+{% set aa2fold_do_sample = True %}
+{% set aa2fold_num_beams = 3 %}
+{% set aa2fold_top_p = 0.95 %}
+{% set aa2fold_temperature = 1.2 %}
+{% set aa2fold_top_k = 6 %}
+{% set aa2fold_repetition_penalty = 1.2 %}
+{% set fold2aa_do_sample = True %}
+{% set fold2aa_num_beams = 1 %}
+{% set fold2aa_top_p = 0.9 %}
+{% set fold2aa_temperature = 1.1 %}
+{% set fold2aa_top_k = 6 %}
+{% set fold2aa_repetition_penalty = 1.2 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Rostlab__SEP__ProstT5" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+aa_sequence = "{{ aa_sequence }}"
+translation_prefix_aa = "{{ translation_prefix_aa }}"
+translation_prefix_fold = "{{ translation_prefix_fold }}"
+generation_min_length = {{ generation_min_length }}
+generation_max_length = {{ generation_max_length }}
+aa2fold_do_sample = {{ aa2fold_do_sample }}
+aa2fold_num_beams = {{ aa2fold_num_beams }}
+aa2fold_top_p = {{ aa2fold_top_p }}
+aa2fold_temperature = {{ aa2fold_temperature }}
+aa2fold_top_k = {{ aa2fold_top_k }}
+aa2fold_repetition_penalty = {{ aa2fold_repetition_penalty }}
+fold2aa_do_sample = {{ fold2aa_do_sample }}
+fold2aa_num_beams = {{ fold2aa_num_beams }}
+fold2aa_top_p = {{ fold2aa_top_p }}
+fold2aa_temperature = {{ fold2aa_temperature }}
+fold2aa_top_k = {{ fold2aa_top_k }}
+fold2aa_repetition_penalty = {{ fold2aa_repetition_penalty }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, do_lower_case=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+if "cuda" in device:
+    model.half()
+else:
+    model.full()
+
+input_sequences = [f"{translation_prefix_aa} {aa_sequence}"]
+encoded_inputs = tokenizer(
+    input_sequences,
+    add_special_tokens=True,
+    padding="longest",
+    return_tensors="pt",
+)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+aa2fold_generate_kwargs = {
+    "do_sample": aa2fold_do_sample,
+    "top_p": aa2fold_top_p,
+    "temperature": aa2fold_temperature,
+    "top_k": aa2fold_top_k,
+    "repetition_penalty": aa2fold_repetition_penalty,
+}
+with torch.no_grad():
+    translations = model.generate(
+        encoded_inputs["input_ids"],
+        attention_mask=encoded_inputs["attention_mask"],
+        min_length=generation_min_length,
+        max_length=generation_max_length,
+        num_beams=aa2fold_num_beams,
+        num_return_sequences=1,
+        **aa2fold_generate_kwargs,
+    )
+decoded_translations = tokenizer.batch_decode(translations, skip_special_tokens=True)
+structure_sequences = ["".join(decoded.split()) for decoded in decoded_translations]
+
+backtranslation_inputs = [f"{translation_prefix_fold} {decoded}" for decoded in decoded_translations]
+encoded_backtranslation = tokenizer(
+    backtranslation_inputs,
+    add_special_tokens=True,
+    padding="longest",
+    return_tensors="pt",
+)
+encoded_backtranslation = {key: value.to(device) for key, value in encoded_backtranslation.items()}
+fold2aa_generate_kwargs = {
+    "do_sample": fold2aa_do_sample,
+    "top_p": fold2aa_top_p,
+    "temperature": fold2aa_temperature,
+    "top_k": fold2aa_top_k,
+    "repetition_penalty": fold2aa_repetition_penalty,
+}
+with torch.no_grad():
+    backtranslations = model.generate(
+        encoded_backtranslation["input_ids"],
+        attention_mask=encoded_backtranslation["attention_mask"],
+        min_length=generation_min_length,
+        max_length=generation_max_length,
+        num_beams=fold2aa_num_beams,
+        num_return_sequences=1,
+        **fold2aa_generate_kwargs,
+    )
+decoded_backtranslations = tokenizer.batch_decode(backtranslations, skip_special_tokens=True)
+amino_acid_sequences = ["".join(decoded.split()) for decoded in decoded_backtranslations]
+
+RESULT = {
+    "decoded_translations": decoded_translations,
+    "structure_sequences": structure_sequences,
+    "decoded_backtranslations": decoded_backtranslations,
+    "amino_acid_sequences": amino_acid_sequences,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    with (output_path / "decoded_translations.json").open("w", encoding="utf-8") as fp:
+        json.dump(RESULT["decoded_translations"], fp, ensure_ascii=False, indent=2)
+    with (output_path / "structure_sequences.json").open("w", encoding="utf-8") as fp:
+        json.dump(RESULT["structure_sequences"], fp, ensure_ascii=False, indent=2)
+    with (output_path / "decoded_backtranslations.json").open("w", encoding="utf-8") as fp:
+        json.dump(RESULT["decoded_backtranslations"], fp, ensure_ascii=False, indent=2)
+    with (output_path / "amino_acid_sequences.json").open("w", encoding="utf-8") as fp:
+        json.dump(RESULT["amino_acid_sequences"], fp, ensure_ascii=False, indent=2)

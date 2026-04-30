@@ -1,0 +1,115 @@
+{% set text_query = "a cinematic drone shot of a coastline" %}
+{% set video_path = "/u/yli77/projects/ML-code-generation/data/video.avi" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Searchium-ai__SEP__clip4clip-webvid150k" %}
+{% set max_video_frames = 16 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_query = "{{ text_query }}"
+video_path = "{{ video_path }}"
+output_dir = "{{ output_dir }}"
+max_video_frames = {{ max_video_frames }}
+
+import os
+import tempfile
+from pathlib import Path
+
+import cv2
+import requests
+import numpy as np
+import torch
+from PIL import Image
+from transformers import AutoModel, AutoProcessor
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+
+def _is_remote_resource(location: str) -> bool:
+    return location.startswith(("http://", "https://"))
+
+
+def _download_to_temp(location: str) -> str:
+    response = requests.get(location, stream=True)
+    response.raise_for_status()
+    suffix = Path(location).suffix or ".mp4"
+    tmp_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+    with tmp_file as handle:
+        for chunk in response.iter_content(chunk_size=8192):
+            handle.write(chunk)
+    return tmp_file.name
+
+
+def _extract_video_frames(video_file: str, max_frames: int) -> list[Image.Image]:
+    capture = cv2.VideoCapture(video_file)
+    if not capture.isOpened():
+        raise ValueError("Unable to open the video file for frame extraction.")
+    frames = []
+    try:
+        while len(frames) < max_frames:
+            success, frame = capture.read()
+            if not success:
+                break
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frames.append(Image.fromarray(rgb_frame))
+    finally:
+        capture.release()
+    if not frames:
+        raise ValueError("No frames were decoded from the video file.")
+    return frames
+
+
+frames: list[Image.Image]
+temp_video = None
+try:
+    resolved_video_path = video_path
+    if _is_remote_resource(video_path):
+        temp_video = _download_to_temp(video_path)
+        resolved_video_path = temp_video
+    frames = _extract_video_frames(resolved_video_path, max_video_frames)
+finally:
+    if temp_video is not None:
+        os.remove(temp_video)
+
+text_inputs = processor(text=text_query, return_tensors="pt", padding=True, truncation=True)
+image_inputs = processor(images=frames, return_tensors="pt")
+text_inputs = {k: v.to(device) for k, v in text_inputs.items()}
+image_inputs = {k: v.to(device) for k, v in image_inputs.items()}
+
+with torch.no_grad():
+    text_outputs = model.text_model(**text_inputs)
+    text_pool = (
+        text_outputs.pooler_output
+        if text_outputs.pooler_output is not None
+        else text_outputs.last_hidden_state[:, 0, :]
+    )
+    text_features = model.text_projection(text_pool)
+    image_outputs = model.vision_model(**image_inputs)
+    image_pool = (
+        image_outputs.pooler_output
+        if image_outputs.pooler_output is not None
+        else image_outputs.last_hidden_state[:, 0, :]
+    )
+    image_features = model.visual_projection(image_pool)
+
+text_embedding_tensor = text_features / text_features.norm(dim=-1, keepdim=True)
+video_embedding_tensor = image_features.mean(dim=0, keepdim=True)
+video_embedding_tensor = video_embedding_tensor / video_embedding_tensor.norm(dim=-1, keepdim=True)
+text_embedding_vector = text_embedding_tensor.squeeze(0)
+video_embedding_vector = video_embedding_tensor.squeeze(0)
+similarity_score = float(torch.matmul(text_embedding_vector, video_embedding_vector))
+
+RESULT = {
+    "text_embedding": text_embedding_vector.cpu().tolist(),
+    "video_embedding": video_embedding_vector.cpu().tolist(),
+    "text_video_similarity": similarity_score,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    np.save(output_path / "text_embedding.npy", np.array(RESULT["text_embedding"], dtype=np.float32))
+    np.save(output_path / "video_embedding.npy", np.array(RESULT["video_embedding"], dtype=np.float32))
+    (output_path / "similarity.txt").write_text(str(RESULT["text_video_similarity"]), encoding="utf-8")

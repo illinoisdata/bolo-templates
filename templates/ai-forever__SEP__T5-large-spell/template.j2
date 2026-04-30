@@ -1,0 +1,32 @@
+{% set prefix = "grammar: " %}
+{% set text = "If you bought something goregous, you well be very happy." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ai-forever__SEP__T5-large-spell" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prefix = "{{ prefix }}"
+text = "{{ text }}"
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+import os
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+input_text = prefix + text
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+generated_ids = model.generate(**inputs)
+decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+result_text = decoded[0]
+
+RESULT = {"generated_text": result_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    out_path = os.path.join(output_dir, "generated_text.txt")
+    with open(out_path, "w") as f:
+        f.write(RESULT["generated_text"])

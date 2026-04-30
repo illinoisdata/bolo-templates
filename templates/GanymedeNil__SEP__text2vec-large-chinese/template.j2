@@ -1,0 +1,51 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set reference_sentence = "今天天气很好，阳光明媚。" %}
+{% set comparison_sentence = "今天空气清新，适合户外散步。" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+reference_sentence = "{{ reference_sentence }}"
+comparison_sentence = "{{ comparison_sentence }}"
+
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModel.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+encoded_inputs = tokenizer(
+    [reference_sentence, comparison_sentence],
+    padding=True,
+    truncation=True,
+    return_tensors="pt",
+)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    model_outputs = model(**encoded_inputs)
+    hidden_states = model_outputs.last_hidden_state
+    attention_mask = encoded_inputs["attention_mask"].unsqueeze(-1).type_as(hidden_states)
+    pooled_states = (hidden_states * attention_mask).sum(dim=1)
+    mask_sum = attention_mask.sum(dim=1).clamp(min=1e-9)
+    sentence_embeddings = pooled_states / mask_sum
+    similarity_tensor = torch.nn.functional.cosine_similarity(sentence_embeddings[0], sentence_embeddings[1], dim=0)
+sentence_embeddings = sentence_embeddings.cpu()
+sentence_embeddings_list = sentence_embeddings.tolist()
+cosine_similarity = similarity_tensor.item()
+
+RESULT = {
+    "sentence_embeddings": sentence_embeddings_list,
+    "cosine_similarity": cosine_similarity,
+}
+
+if __name__ == "__main__":
+    from pathlib import Path
+    import json
+
+    output_dir = Path("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/GanymedeNil__SEP__text2vec-large-chinese")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "sentence_similarity.json").write_text(
+        json.dumps(RESULT, ensure_ascii=False, indent=2)
+    )

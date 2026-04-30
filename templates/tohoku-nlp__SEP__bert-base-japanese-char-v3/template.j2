@@ -1,0 +1,68 @@
+{% set text_input = "東北大学で[MASK]の研究をしています。" %}
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/tohoku-nlp__SEP__bert-base-japanese-char-v3" %}
+{% set top_k = 5 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+text_input = "{{ text_input }}"
+top_k = {{ top_k }}
+
+import json
+import os
+
+import torch
+from transformers import AutoModelForPreTraining, AutoTokenizer, pipeline
+
+
+torch_device = torch.device(device)
+
+if torch_device.type == "cpu":
+    pipeline_device = -1
+else:
+    pipeline_device = torch_device.index if torch_device.index is not None else 0
+
+
+class MaskedLMAdapter(torch.nn.Module):
+    def __init__(self, base_model: torch.nn.Module):
+        super().__init__()
+        self.base_model = base_model
+        self.config = base_model.config
+
+    def forward(self, *args, **kwargs):
+        outputs = self.base_model(*args, **kwargs)
+        logits = getattr(outputs, "logits", None)
+        if logits is None:
+            logits = outputs.prediction_logits
+        return {"logits": logits}
+
+    @property
+    def device(self):
+        return next(self.base_model.parameters()).device
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+base_model = AutoModelForPreTraining.from_pretrained(repo_id)
+wrapped_model = MaskedLMAdapter(base_model).to(torch_device)
+wrapped_model.eval()
+
+fill_mask_pipeline = pipeline(
+    "fill-mask",
+    model=wrapped_model,
+    tokenizer=tokenizer,
+    device=pipeline_device,
+    top_k=top_k,
+)
+
+predictions = fill_mask_pipeline(text_input)
+
+RESULT = {"fill_mask": predictions}
+
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "fill_mask_results.json")
+    with open(output_path, "w", encoding="utf-8") as output_file:
+        json.dump(RESULT["fill_mask"], output_file, ensure_ascii=False, indent=2)

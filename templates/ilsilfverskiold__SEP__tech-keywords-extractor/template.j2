@@ -1,0 +1,56 @@
+{% set text_input = "If a task raises an exception, or a worker process dies, Celery will by default lose the job. So if you happen to reboot or redeploy, any running jobs with be lost to the sands of time." %}
+{% set max_length = 128 %}
+{% set min_length = 12 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ilsilfverskiold__SEP__tech-keywords-extractor" %}
+{% set result_filename = "keywords.txt" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = """{{ text_input }}"""
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+result_filename = "{{ result_filename }}"
+
+import os
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+inference_device = torch.device(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(inference_device)
+
+inputs = tokenizer(
+    text_input,
+    return_tensors="pt",
+    truncation=True,
+)
+inputs = {key: value.to(inference_device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    generated_tokens = model.generate(
+        **inputs,
+        max_length=max_length,
+        min_length=min_length,
+        num_beams=num_beams,
+        no_repeat_ngram_size=3,
+        early_stopping=True,
+    )
+
+decoded = tokenizer.batch_decode(
+    generated_tokens,
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=True,
+)
+keywords = decoded[0].strip()
+
+RESULT = {"keywords": keywords}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, result_filename)
+    with open(output_path, "w", encoding="utf-8") as handle:
+        handle.write(RESULT["keywords"])

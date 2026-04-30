@@ -1,0 +1,12 @@
+{% set dummy = '' %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+
+import pkgutil
+import transformers
+
+print("transformers module:", transformers.__file__)
+print([
+    module.name
+    for module in pkgutil.iter_modules(transformers.models.__path__)
+])

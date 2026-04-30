@@ -1,0 +1,59 @@
+{% set article_text = """Высота башни составляет 324 метра (1063 фута), примерно такая же высота, как у 81-этажного здания, и самое высокое сооружение в Париже. Его основание квадратно, размером 125 метров (410 футов) с любой стороны. Во время строительства Эйфелевa башня превзошла монумент Вашингтона, став самым высоким искусственным сооружением в мире, и этот титул она удерживала в течение 41 года до завершения строительства здания Крайслер в Нью-Йорке в 1930 году. Это первое сооружение которое достигло высоты 300 метров. Из-за добавления вещательной антенны на вершине башни в 1957 году она сейчас выше здания Крайслер на 5,2 метра (17 футов). За исключением передатчиков, Эйфелева башня является второй самой высокой отдельно стоящей структурой во Франции после виадука Мийо.<s>""" %}
+{% set max_source_length = 600 %}
+{% set target_max_length = 200 %}
+{% set num_beams = 5 %}
+{% set no_repeat_ngram_size = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/IlyaGusev__SEP__rugpt3medium_sum_gazeta" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+article_text = """{{ article_text }}"""
+max_source_length = {{ max_source_length }}
+target_max_length = {{ target_max_length }}
+num_beams = {{ num_beams }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForCausalLM.from_pretrained(repo_id).to(device)
+
+sep_token_id = getattr(tokenizer, "sep_token_id", None)
+if sep_token_id is None:
+    sep_token_id = tokenizer.eos_token_id
+
+encoded_inputs = tokenizer(
+    article_text,
+    max_length=max_source_length,
+    add_special_tokens=False,
+    truncation=True,
+    padding=False,
+)["input_ids"]
+
+source_ids = encoded_inputs + [sep_token_id]
+input_ids_tensor = torch.tensor([source_ids], dtype=torch.long, device=device)
+
+generated_sequences = model.generate(
+    input_ids=input_ids_tensor,
+    max_new_tokens=target_max_length,
+    num_beams=num_beams,
+    no_repeat_ngram_size=no_repeat_ngram_size,
+    eos_token_id=tokenizer.eos_token_id,
+    pad_token_id=tokenizer.eos_token_id,
+)
+
+source_length = input_ids_tensor.shape[1]
+summary_ids = generated_sequences[0][source_length:]
+summary_text = tokenizer.decode(summary_ids, skip_special_tokens=True).strip()
+
+RESULT = {"summary": summary_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

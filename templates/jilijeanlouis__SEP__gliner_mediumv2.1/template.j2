@@ -1,0 +1,63 @@
+{% set text = "This example uses GLiNER token classification inference." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/jilijeanlouis__SEP__gliner_mediumv2.1" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import json
+
+import torch
+from transformers import AutoConfig, AutoModelForTokenClassification, AutoTokenizer
+
+tokenizer_repo = "microsoft/deberta-v3-base"
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_repo)
+config = AutoConfig.from_pretrained(tokenizer_repo)
+model = AutoModelForTokenClassification.from_pretrained(repo_id, config=config)
+model.to(device)
+model.eval()
+
+tokenized = tokenizer(
+    text,
+    truncation=True,
+    max_length=384,
+    return_tensors="pt",
+    padding=False,
+)
+inputs = {key: value.to(device) for key, value in tokenized.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+prediction_ids = logits.argmax(dim=-1)[0].cpu().tolist()
+probabilities = torch.softmax(logits, dim=-1)[0].cpu()
+
+input_ids = tokenized["input_ids"][0].tolist()
+attention_mask = tokenized["attention_mask"][0].tolist()
+tokens = tokenizer.convert_ids_to_tokens(input_ids)
+
+id2label = dict(getattr(model.config, "id2label", {}))
+
+token_classification = []
+for idx, (token, label_id, mask_value) in enumerate(zip(tokens, prediction_ids, attention_mask)):
+    if mask_value == 0:
+        continue
+    label = id2label.get(label_id, str(label_id))
+    score = probabilities[idx, label_id].item()
+    token_classification.append(
+        {
+            "token": token,
+            "label": label,
+            "score": score,
+        }
+    )
+
+RESULT = {"token_classification": token_classification}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "token_classification.json")
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(RESULT["token_classification"], f, ensure_ascii=False, indent=2)

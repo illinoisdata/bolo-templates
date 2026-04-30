@@ -1,0 +1,31 @@
+{% set text_input = "summarize: Generate a concise summary in English for this Indic languages news article." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/rahular__SEP__varta-t5" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = """{{ text_input }}"""
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+
+inputs = tokenizer(text_input, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(**inputs)
+
+decoded_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": decoded_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "generated_text.txt")
+    with open(output_path, "w", encoding="utf-8") as writer:
+        writer.write(decoded_text)

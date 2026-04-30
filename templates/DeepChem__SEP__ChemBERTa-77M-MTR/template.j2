@@ -1,0 +1,37 @@
+{% set input_smiles = "CCO" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/DeepChem__SEP__ChemBERTa-77M-MTR" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_smiles = "{{ input_smiles }}"
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSequenceClassification.from_pretrained(repo_id)
+model.to(device)
+
+encoded_inputs = tokenizer(input_smiles, truncation=True, padding=True, return_tensors="pt")
+encoded_inputs = {key: tensor.to(device) for key, tensor in encoded_inputs.items()}
+
+outputs = model(**encoded_inputs)
+logits = outputs.logits[0].detach().cpu().tolist()
+id2label = getattr(model.config, "id2label", {})
+per_label_scores = (
+    {id2label.get(str(index), str(index)): value for index, value in enumerate(logits)}
+    if id2label
+    else {str(index): value for index, value in enumerate(logits)}
+)
+
+RESULT = {"regression_per_label": per_label_scores}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    target_file = output_path / "regression_per_label.json"
+    with target_file.open("w", encoding="utf-8") as f:
+        json.dump(RESULT["regression_per_label"], f, indent=2)

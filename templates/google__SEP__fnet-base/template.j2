@@ -1,0 +1,59 @@
+{% set fill_mask_text = "Hello I'm a [MASK] model." %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__fnet-base" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+fill_mask_text = "{{ fill_mask_text }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+
+encoded_input = tokenizer(fill_mask_text, return_tensors="pt")
+encoded_input = {key: value.to(device) for key, value in encoded_input.items()}
+
+with torch.no_grad():
+    inference_output = model(**encoded_input)
+
+logits = inference_output.logits
+input_ids = encoded_input["input_ids"]
+mask_token_id = tokenizer.mask_token_id
+mask_positions = (input_ids[0] == mask_token_id).nonzero(as_tuple=True)[0]
+
+predictions = []
+for mask_index in mask_positions:
+    position_logits = logits[0, mask_index]
+    scores = torch.softmax(position_logits, dim=-1)
+    topk_scores, topk_indices = torch.topk(scores, top_k, dim=-1)
+    for score, token_id in zip(topk_scores.tolist(), topk_indices.tolist()):
+        filled_ids = input_ids[0].clone()
+        filled_ids[mask_index] = token_id
+        filled_ids_cpu = filled_ids.cpu()
+        sequence = tokenizer.decode(filled_ids_cpu, skip_special_tokens=True)
+        token_str = tokenizer.convert_ids_to_tokens(token_id)
+        predictions.append(
+            {
+                "mask_index": int(mask_index.item()),
+                "token_id": int(token_id),
+                "token_str": token_str,
+                "score": float(score),
+                "sequence": sequence,
+            }
+        )
+
+RESULT = {"fill_mask_predictions": predictions}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "fill_mask_predictions.json").write_text(
+        json.dumps(RESULT["fill_mask_predictions"], indent=2)
+    )

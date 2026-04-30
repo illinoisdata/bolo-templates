@@ -1,0 +1,43 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set input_sequence = input_sequence | default("MKTAYIAKQRQISFVKSHFSRQ") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
+{% set temperature = temperature | default(1.0) %}
+{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/airkingbd__SEP__dplm_3b") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_sequence = {{ input_sequence | tojson }}
+max_new_tokens = {{ max_new_tokens | int }}
+num_return_sequences = {{ num_return_sequences | int }}
+temperature = {{ temperature | float }}
+output_dir = {{ output_dir | tojson }}
+
+import os
+import torch
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(input_sequence, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+predicted_ids = logits.argmax(dim=-1)
+predicted_sequence = tokenizer.batch_decode(predicted_ids, skip_special_tokens=True)
+RESULT = {"predicted_sequence": predicted_sequence}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "predicted_sequence.txt")
+    with open(output_path, "w", encoding="utf-8") as writer:
+        for sequence in RESULT["predicted_sequence"]:
+            writer.write(sequence + "\n")

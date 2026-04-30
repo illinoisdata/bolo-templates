@@ -1,0 +1,68 @@
+{% set repo_id = "vblagoje/bart_lfqa" %}
+{% set device = "cuda:0" %}
+{% set question = "Why does water heated to room temperature feel colder than the air around it?" %}
+{% set documents = ["when the skin is completely wet. The body continuously loses water by...", "at greater pressures. There is an ambiguity, however, as to the meaning of the terms 'heating' and 'cooling'...", "are not in a relation of thermal equilibrium, heat will flow from the hotter to the colder, by whatever pathway...", "air condition and moving along a line of constant enthalpy toward a state of higher humidity. A simple example ...", "Thermal contact conductance In physics, thermal contact conductance is the study of heat conduction between solid ..."] %}
+{% set min_length = 64 %}
+{% set max_length = 256 %}
+{% set do_sample = false %}
+{% set early_stopping = true %}
+{% set num_beams = 8 %}
+{% set temperature = 1.0 %}
+{% set top_k = none %}
+{% set top_p = none %}
+{% set no_repeat_ngram_size = 3 %}
+{% set num_return_sequences = 1 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+documents = {{ documents|tojson }}
+min_length = {{ min_length }}
+max_length = {{ max_length }}
+do_sample = {{ do_sample }}
+early_stopping = {{ early_stopping }}
+num_beams = {{ num_beams }}
+temperature = {{ temperature }}
+top_k = {{ top_k }}
+top_p = {{ top_p }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+num_return_sequences = {{ num_return_sequences }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from pathlib import Path
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+
+conditioned_doc = "<P> " + " <P> ".join(documents)
+input_text = f"question: {question} context: {conditioned_doc}"
+model_input = tokenizer(input_text, truncation=True, padding=True, return_tensors="pt")
+
+generated_ids = model.generate(
+    input_ids=model_input["input_ids"].to(device),
+    attention_mask=model_input["attention_mask"].to(device),
+    min_length=min_length,
+    max_length=max_length,
+    do_sample=do_sample,
+    early_stopping=early_stopping,
+    num_beams=num_beams,
+    temperature=temperature,
+    top_k=top_k,
+    top_p=top_p,
+    eos_token_id=tokenizer.eos_token_id,
+    no_repeat_ngram_size=no_repeat_ngram_size,
+    num_return_sequences=num_return_sequences,
+)
+
+answers = tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+RESULT = {"answers": answers}
+
+if __name__ == "__main__":
+    output_dir = Path("output")
+    output_dir.mkdir(exist_ok=True)
+    answers_file = output_dir / "answers.txt"
+    with open(answers_file, "w", encoding="utf-8") as f:
+        for ans in RESULT["answers"]:
+            f.write(ans + "\n")

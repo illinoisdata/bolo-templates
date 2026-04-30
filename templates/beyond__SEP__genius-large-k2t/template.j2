@@ -1,0 +1,33 @@
+{% set repo_id = "beyond/genius-large-k2t" %}
+{% set device = "cuda:0" %}
+{% set sketch = "machine learning data science my future work" %}
+{% set max_length = 100 %}
+{% set num_beams = 2 %}
+{% set do_sample = true %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/beyond__SEP__genius-large-k2t" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sketch = "{{ sketch }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+do_sample = {{ do_sample }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+import os
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoded_input = tokenizer(sketch, return_tensors="pt").to(device)
+generated_ids = model.generate(**encoded_input, max_length=max_length, num_beams=num_beams, do_sample=do_sample)
+generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "generated_text.txt"), "w", encoding="utf-8") as f:
+        f.write(RESULT["generated_text"])

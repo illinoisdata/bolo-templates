@@ -1,0 +1,71 @@
+{% set texts = ["The quick brown fox jumps over the lazy dog.", "A short sentence for embedding."] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qdrant__SEP__bge-small-en-v1.5-onnx-Q" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+texts = {{ texts }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import json
+
+import numpy as np
+import onnxruntime as ort
+from huggingface_hub import hf_hub_download, list_repo_files
+from transformers import AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+repo_files = list_repo_files(repo_id)
+onnx_files = [path for path in repo_files if path.lower().endswith(".onnx")]
+onnx_filename = onnx_files[0]
+onnx_path = hf_hub_download(repo_id=repo_id, filename=onnx_filename)
+
+use_cuda = any(token in device.lower() for token in ("cuda", "gpu"))
+available_providers = ort.get_available_providers()
+if use_cuda and "CUDAExecutionProvider" in available_providers:
+    providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+else:
+    providers = ["CPUExecutionProvider"]
+
+session = ort.InferenceSession(onnx_path, providers=providers)
+encoded_inputs = tokenizer(texts, padding=True, truncation=True, return_tensors="np")
+ort_inputs = {}
+for input_meta in session.get_inputs():
+    array = encoded_inputs.get(input_meta.name)
+    if array is None:
+        continue
+    if array.dtype != np.int64:
+        array = array.astype(np.int64)
+    ort_inputs[input_meta.name] = array
+
+ort_outputs = session.run(None, ort_inputs)
+output_names = [output.name for output in session.get_outputs()]
+output_dict = dict(zip(output_names, ort_outputs))
+
+pooler_output = None
+for name, array in output_dict.items():
+    if "pooler" in name.lower() or name.lower().endswith("pooler_output"):
+        pooler_output = array
+        break
+
+if pooler_output is None:
+    last_hidden = output_dict.get("last_hidden_state")
+    if last_hidden is None:
+        last_hidden = ort_outputs[0]
+    pooler_output = last_hidden[:, 0, :]
+
+norms = np.linalg.norm(pooler_output, axis=1, keepdims=True)
+normalized_embeddings = pooler_output / np.maximum(norms, 1e-12)
+similarity_matrix = normalized_embeddings @ normalized_embeddings.T
+
+RESULT = {
+    "embeddings": normalized_embeddings,
+    "similarity_matrix": similarity_matrix,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    np.save(output_path / "embeddings.npy", RESULT["embeddings"])
+    (output_path / "similarity_matrix.json").write_text(
+        json.dumps(RESULT["similarity_matrix"].tolist())
+    )

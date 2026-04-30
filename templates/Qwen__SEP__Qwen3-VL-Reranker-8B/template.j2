@@ -1,0 +1,7 @@
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+
+from pathlib import Path
+import transformers.models.qwen3_vl as qwen_module
+
+print(Path(qwen_module.__file__).read_text())

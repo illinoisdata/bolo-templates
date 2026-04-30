@@ -1,0 +1,47 @@
+{% set repo_id = "MingZhong/unieval-fact" %}
+{% set device = "cuda:0" %}
+{% set input_text = "Claim: The Eiffel Tower is located in Paris. Context: The Eiffel Tower is a wrought-iron lattice tower on the Champ de Mars in Paris, France." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/MingZhong__SEP__unieval-fact" %}
+{% set max_new_tokens = 32 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+max_new_tokens = {{ max_new_tokens }}
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import os
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+torch_device = torch.device(device)
+model.to(torch_device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+)
+encoded_inputs = {k: v.to(torch_device) for k, v in encoded_inputs.items()}
+
+generated_tokens = model.generate(
+    **encoded_inputs,
+    max_new_tokens=max_new_tokens,
+)
+
+decoded_outputs = tokenizer.batch_decode(
+    generated_tokens,
+    skip_special_tokens=True,
+)
+evaluated_text = decoded_outputs[0] if decoded_outputs else ""
+
+RESULT = {"evaluated_text": evaluated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, "evaluated_text.txt")
+    with open(output_file, "w", encoding="utf-8") as out_f:
+        out_f.write(RESULT["evaluated_text"])

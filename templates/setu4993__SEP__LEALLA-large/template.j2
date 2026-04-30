@@ -1,0 +1,55 @@
+{% set repo_id = "setu4993/LEALLA-large" %}
+{% set device = "cuda:0" %}
+{% set sentences_a = ["dog", "Puppies are nice.", "I enjoy taking long walks along the beach with my dog."] %}
+{% set sentences_b = ["cane", "I cuccioli sono carini.", "Mi piace fare lunghe passeggiate lungo la spiaggia con il mio cane."] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/setu4993__SEP__LEALLA-large" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sentences_a = {{ sentences_a | tojson }}
+sentences_b = {{ sentences_b | tojson }}
+output_dir = "{{ output_dir }}"
+
+import os
+
+import numpy as np
+import torch
+from torch.nn.functional import normalize
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+tokenized_inputs_a = tokenizer(sentences_a, return_tensors="pt", padding=True, truncation=True)
+tokenized_inputs_b = tokenizer(sentences_b, return_tensors="pt", padding=True, truncation=True)
+
+tokenized_inputs_a = {key: tensor.to(device) for key, tensor in tokenized_inputs_a.items()}
+tokenized_inputs_b = {key: tensor.to(device) for key, tensor in tokenized_inputs_b.items()}
+
+with torch.no_grad():
+    outputs_a = model(**tokenized_inputs_a)
+    outputs_b = model(**tokenized_inputs_b)
+
+embeddings_a = outputs_a.pooler_output
+embeddings_b = outputs_b.pooler_output
+
+normalized_embeddings_a = normalize(embeddings_a, p=2, dim=1)
+normalized_embeddings_b = normalize(embeddings_b, p=2, dim=1)
+similarity_matrix = torch.matmul(normalized_embeddings_a, normalized_embeddings_b.transpose(0, 1))
+
+embeddings_a = embeddings_a.detach().cpu()
+embeddings_b = embeddings_b.detach().cpu()
+similarity_matrix = similarity_matrix.detach().cpu()
+
+RESULT = {
+    "embeddings_a": embeddings_a,
+    "embeddings_b": embeddings_b,
+    "similarity": similarity_matrix,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    np.save(os.path.join(output_dir, "embeddings_a.npy"), RESULT["embeddings_a"].numpy())
+    np.save(os.path.join(output_dir, "embeddings_b.npy"), RESULT["embeddings_b"].numpy())
+    np.save(os.path.join(output_dir, "similarity.npy"), RESULT["similarity"].numpy())

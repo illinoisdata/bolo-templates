@@ -1,0 +1,48 @@
+{% set input_text = "Researchers recently unveiled a novel distillation workflow that compresses large language models into faster, more efficient summarizers while retaining high quality outputs." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/sshleifer__SEP__distilbart-xsum-6-6" %}
+{% set max_output_length = 62 %}
+{% set num_beams = 6 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = """{{ input_text }}"""
+output_dir = "{{ output_dir }}"
+max_output_length = {{ max_output_length }}
+num_beams = {{ num_beams }}
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoded_inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+    padding="longest",
+)
+encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **encoded_inputs,
+        max_length=max_output_length,
+        num_beams=num_beams,
+        early_stopping=True,
+    )
+
+summary = tokenizer.decode(
+    generated_ids[0],
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=True,
+)
+
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "summary.txt")
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(RESULT["summary"])

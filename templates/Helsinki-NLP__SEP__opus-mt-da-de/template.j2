@@ -1,0 +1,37 @@
+{% set input_text = "Dette er en test på dansk for maskinoversættelse til tysk." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-da-de" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
+
+torch_device = torch.device(device)
+
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(torch_device)
+model.eval()
+
+input_texts = [input_text]
+inputs = tokenizer(input_texts, return_tensors="pt", padding=True, truncation=True)
+inputs = {key: value.to(torch_device) for key, value in inputs.items()}
+
+generated_ids = model.generate(**inputs)
+translations = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    translation_file = output_path / "translations.json"
+    translation_file.write_text(
+        json.dumps(RESULT, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )

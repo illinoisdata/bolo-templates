@@ -1,0 +1,26 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/mt5-base" %}
+{% set text = "translate English to German: Hello, world!" %}
+
+device = "{{ device }}"
+repo_id = "{{ repo_id }}"
+text = "{{ text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(text, return_tensors="pt").to(device)
+outputs = model.generate(**inputs)
+generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    import os
+    output_dir = os.getenv("OUTPUT_DIR", ".")
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "generated_text.txt"), "w", encoding="utf-8") as f:
+        f.write(RESULT["generated_text"])

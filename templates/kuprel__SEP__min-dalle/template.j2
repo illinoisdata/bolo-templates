@@ -1,0 +1,58 @@
+{% set prompt = "A serene digital painting of a futuristic city skyline at sunset" %}
+{% set grid_size = 4 %}
+{% set temperature = 1.0 %}
+{% set top_k = 256 %}
+{% set supercondition_factor = 32 %}
+{% set seed = -1 %}
+{% set is_seamless = False %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/kuprel__SEP__min-dalle" %}
+{% set device = device %}
+{% set repo_id = repo_id %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+grid_size = {{ grid_size }}
+temperature = {{ temperature }}
+top_k = {{ top_k }}
+supercondition_factor = {{ supercondition_factor }}
+seed = {{ seed }}
+is_seamless = {{ "True" if is_seamless else "False" }}
+output_dir = "{{ output_dir }}"
+models_root_dir = "./" + repo_id.replace("/", "_") + "_models"
+
+from pathlib import Path
+
+import torch
+from min_dalle import MinDalle
+
+min_dalle_device = "cuda" if device.startswith("cuda") else "cpu"
+models_root_path = Path(models_root_dir)
+models_root_path.mkdir(parents=True, exist_ok=True)
+
+model = MinDalle(
+    models_root=str(models_root_path),
+    dtype=torch.float32,
+    device=min_dalle_device,
+    is_mega=True,
+    is_reusable=True,
+)
+
+image = model.generate_image(
+    text=prompt,
+    seed=seed,
+    grid_size=grid_size,
+    is_seamless=is_seamless,
+    temperature=temperature,
+    top_k=top_k,
+    supercondition_factor=supercondition_factor,
+    is_verbose=False,
+)
+
+RESULT = {"image": image}
+
+if __name__ == "__main__":
+    output_dir_path = Path(output_dir)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
+    image_path = output_dir_path / "generated.png"
+    RESULT["image"].save(image_path)

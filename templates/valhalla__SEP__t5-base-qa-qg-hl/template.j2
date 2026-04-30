@@ -1,0 +1,32 @@
+{% set prompt = "generate question:  42  is the answer to life, the universe and everything. " %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/valhalla__SEP__t5-base-qa-qg-hl" %}
+{% set max_new_tokens = 64 %}
+
+repo_id = "{{ repo_id }}"
+prompt = "{{ prompt }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+max_new_tokens = {{ max_new_tokens }}
+
+import os
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+tokenized_inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in tokenized_inputs.items()}
+
+generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    text_path = os.path.join(output_dir, "generated_text.txt")
+    with open(text_path, "w", encoding="utf-8") as f:
+        f.write(RESULT["generated_text"])

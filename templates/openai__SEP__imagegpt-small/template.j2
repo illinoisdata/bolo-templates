@@ -1,0 +1,64 @@
+{% set batch_size = 8 %}
+{% set temperature = 1.0 %}
+{% set top_k = 40 %}
+{% set do_sample = True %}
+{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/openai__SEP__imagegpt-small' %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+batch_size = {{ batch_size }}
+temperature = {{ temperature }}
+top_k = {{ top_k }}
+do_sample = {{ do_sample }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+import numpy as np
+from PIL import Image
+from transformers import ImageGPTImageProcessor, ImageGPTForCausalImageModeling
+
+# Load processor and model
+processor = ImageGPTImageProcessor.from_pretrained(repo_id)
+model = ImageGPTForCausalImageModeling.from_pretrained(repo_id)
+model.to(device)
+
+# Preprocess input for unconditional image generation
+context = torch.full((batch_size, 1), model.config.vocab_size - 1)
+context = context.to(device)
+
+# Generate images
+output = model.generate(
+    input_ids=context,
+    max_length=model.config.n_positions + 1,
+    temperature=temperature,
+    do_sample=do_sample,
+    top_k=top_k,
+)
+
+# Post-process outputs
+clusters = processor.clusters
+if hasattr(clusters, "cpu"):
+    clusters = clusters.cpu().numpy()
+size = processor.size
+if hasattr(size, "height"):
+    height = size.height
+    width = size.width
+elif isinstance(size, dict):
+    height = size.get("height")
+    width = size.get("width")
+else:
+    height = width = size
+samples = output[:, 1:].cpu().numpy()
+samples_img = [
+    np.reshape(np.rint(127.5 * (clusters[s] + 1.0)), (height, width, 3)).astype(np.uint8)
+    for s in samples
+]
+images = [Image.fromarray(img) for img in samples_img]
+
+RESULT = {"images": images}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    for idx, image in enumerate(RESULT["images"]):
+        image.save(os.path.join(output_dir, f"{idx}.png"))

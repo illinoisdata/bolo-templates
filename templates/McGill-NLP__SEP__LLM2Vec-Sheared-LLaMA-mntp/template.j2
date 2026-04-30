@@ -1,0 +1,78 @@
+{% set text_left = "How much protein should a female eat" %}
+{% set text_right = "Definition of summit for English Language Learners." %}
+{% set max_length = 256 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/McGill-NLP__SEP__LLM2Vec-Sheared-LLaMA-mntp" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_left = "{{ text_left }}"
+text_right = "{{ text_right }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import json
+
+import torch
+from transformers import AutoConfig, AutoModel, AutoTokenizer
+from peft import PeftModel
+
+config = AutoConfig.from_pretrained(repo_id)
+base_model_id = config._name_or_path
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(base_model_id).to(device)
+model = PeftModel.from_pretrained(model, repo_id).to(device)
+model.eval()
+
+texts = [text_left, text_right]
+encoded_inputs = tokenizer(
+    texts,
+    padding=True,
+    truncation=True,
+    max_length=max_length,
+    return_tensors="pt",
+)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    model_outputs = model(**encoded_inputs)
+    last_hidden_state = model_outputs.last_hidden_state
+
+attention_mask = encoded_inputs["attention_mask"]
+mask = attention_mask.unsqueeze(-1).to(dtype=last_hidden_state.dtype)
+sum_hidden = (last_hidden_state * mask).sum(dim=1)
+denominator = mask.sum(dim=1).clamp(min=1e-9)
+pooled_embeddings = sum_hidden / denominator
+normalized_embeddings = torch.nn.functional.normalize(pooled_embeddings, dim=1)
+similarity_matrix = torch.matmul(
+    normalized_embeddings, normalized_embeddings.transpose(0, 1)
+)
+similarity_matrix_list = similarity_matrix.cpu().tolist()
+cosine_similarity_between_first_two = (
+    float(similarity_matrix_list[0][1])
+    if len(similarity_matrix_list) > 1
+    else float(similarity_matrix_list[0][0])
+)
+RESULT = {
+    "cosine_similarity_between_first_two": cosine_similarity_between_first_two,
+    "pairwise_similarity_matrix": similarity_matrix_list,
+    "embeddings": pooled_embeddings.cpu().tolist(),
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "cosine_similarity_between_first_two.txt").write_text(
+        str(RESULT["cosine_similarity_between_first_two"])
+    )
+    with (
+        output_path / "pairwise_similarity_matrix.json"
+    ).open("w", encoding="utf-8") as matrix_file:
+        json.dump(
+            RESULT["pairwise_similarity_matrix"],
+            matrix_file,
+            ensure_ascii=False,
+            indent=2,
+        )
+    with (output_path / "embeddings.json").open("w", encoding="utf-8") as embeddings_file:
+        json.dump(RESULT["embeddings"], embeddings_file, ensure_ascii=False, indent=2)

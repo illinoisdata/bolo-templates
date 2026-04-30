@@ -1,0 +1,32 @@
+{% set repo_id = "jxm/gtr__nq__32__correct" %}
+{% set base_model = "t5-base" %}
+{% set device = "cuda:0" %}
+{% set text = "This is a smple text with som errrors." %}
+{% set max_new_tokens = 32 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/jxm__SEP__gtr__nq__32__correct" %}
+
+repo_id = "{{ repo_id }}"
+base_model = "{{ base_model }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoConfig, AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+
+config = AutoConfig.from_pretrained(base_model)
+tokenizer = AutoTokenizer.from_pretrained(base_model)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, config=config).to(device)
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+output_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+corrected_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"corrected_text": corrected_text}
+
+if __name__ == "__main__":
+    with open(f"{output_dir}/corrected_text.txt", "w") as f:
+        f.write(RESULT["corrected_text"])

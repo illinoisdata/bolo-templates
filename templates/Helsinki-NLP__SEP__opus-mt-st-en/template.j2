@@ -1,0 +1,33 @@
+{% set repo_id = "Helsinki-NLP/opus-mt-st-en" %}
+{% set device = "cuda:0" %}
+{% set input_texts = ["This is a test."] %}
+{% set max_length = 512 %}
+{% set num_beams = 6 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-st-en" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_texts = {{ input_texts }}
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import os
+import json
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(input_texts, return_tensors="pt", padding=True).to(device)
+generated_ids = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+translations = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    file_path = os.path.join(output_dir, "translations.json")
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(RESULT["translations"], f, ensure_ascii=False, indent=2)

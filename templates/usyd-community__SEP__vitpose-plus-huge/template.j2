@@ -1,0 +1,77 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set boxes = [] %}
+{% set threshold = 0.3 %}
+{% set dataset_index = 0 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+boxes = {{ boxes }}
+threshold = {{ threshold }}
+dataset_index = {{ dataset_index }}
+
+from PIL import Image
+import requests
+import torch
+from transformers import AutoProcessor, VitPoseForPoseEstimation
+import builtins
+import numpy.linalg as _linalg
+import scipy.ndimage as _ndimage
+
+# Monkey-patch missing functions for transformers preprocessing
+builtins.inv = _linalg.inv
+builtins.affine_transform = _ndimage.affine_transform
+
+# Initialize device and load model & processor
+device = torch.device(device)
+processor = AutoProcessor.from_pretrained(repo_id)
+model = VitPoseForPoseEstimation.from_pretrained(repo_id).to(device)
+
+# Load image from local path or URL
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw)
+else:
+    image = Image.open(image_path)
+
+# Default to full image bounding box if no boxes provided
+if not boxes:
+    boxes = [[[0, 0, image.width, image.height]]]
+
+# Pre-process input and run inference
+inputs = processor(images=image, boxes=boxes, return_tensors="pt").to(device)
+dataset_index_tensor = torch.full(
+    (inputs["pixel_values"].shape[0],),
+    dataset_index,
+    dtype=torch.long,
+    device=device,
+)
+with torch.no_grad():
+    outputs = model(**inputs, dataset_index=dataset_index_tensor)
+
+# Post-process pose estimation results
+pose_results = processor.post_process_pose_estimation(outputs, boxes=boxes, threshold=threshold)
+pose_result = pose_results[0]
+
+# Build the RESULT dict
+RESULT = {"poses": pose_result}
+
+if __name__ == "__main__":
+    import os
+    import json
+
+    output_dir = os.environ.get("OUTPUT_DIR", ".")
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Convert Tensors to lists for JSON serialization
+    serializable_poses = []
+    for person_pose in RESULT["poses"]:
+        serializable_poses.append({
+            "keypoints": person_pose["keypoints"].tolist(),
+            "labels": person_pose["labels"].tolist(),
+            "scores": person_pose["scores"].tolist(),
+        })
+
+    with open(os.path.join(output_dir, "result.json"), "w") as f:
+        json.dump(serializable_poses, f)

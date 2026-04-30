@@ -1,0 +1,53 @@
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ibm-granite__SEP__granite-embedding-107m-multilingual" %}
+{% set query_texts = ["Who made the song My achy breaky heart?", "summit define"] %}
+{% set passage_texts = ["Achy Breaky Heart is a country song written by Don Von Tress. Originally titled Don't Tell My Heart and performed by The Marcy Brothers in 1991.", "Definition of summit: the highest point of a mountain, the highest level, or a meeting of governments."] %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query_texts = {{ query_texts }}
+passage_texts = {{ passage_texts }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import json
+
+import torch
+from torch.nn import functional as F
+from transformers import AutoModel, AutoTokenizer
+
+model = AutoModel.from_pretrained(repo_id)
+model.eval()
+model.to(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+queries_tokenized = tokenizer(query_texts, padding=True, truncation=True, return_tensors="pt")
+passages_tokenized = tokenizer(passage_texts, padding=True, truncation=True, return_tensors="pt")
+
+queries_tokenized = {k: v.to(device) for k, v in queries_tokenized.items()}
+passages_tokenized = {k: v.to(device) for k, v in passages_tokenized.items()}
+
+with torch.no_grad():
+    query_outputs = model(**queries_tokenized)
+    passage_outputs = model(**passages_tokenized)
+
+query_embeddings = F.normalize(query_outputs.last_hidden_state[:, 0], dim=1)
+passage_embeddings = F.normalize(passage_outputs.last_hidden_state[:, 0], dim=1)
+similarity_scores = torch.matmul(query_embeddings, passage_embeddings.T)
+
+query_embeddings_cpu = query_embeddings.cpu()
+passage_embeddings_cpu = passage_embeddings.cpu()
+similarity_scores_cpu = similarity_scores.cpu()
+
+RESULT = {
+    "query_embeddings": query_embeddings_cpu.tolist(),
+    "passage_embeddings": passage_embeddings_cpu.tolist(),
+    "similarity": similarity_scores_cpu.tolist(),
+}
+
+if __name__ == "__main__":
+    out_path = Path(output_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+    (out_path / "query_embeddings.json").write_text(json.dumps(RESULT["query_embeddings"], indent=2))
+    (out_path / "passage_embeddings.json").write_text(json.dumps(RESULT["passage_embeddings"], indent=2))
+    (out_path / "similarity.json").write_text(json.dumps(RESULT["similarity"], indent=2))

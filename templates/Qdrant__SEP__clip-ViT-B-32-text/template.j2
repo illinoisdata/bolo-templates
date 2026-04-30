@@ -1,0 +1,73 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set text_inputs = ["A photo of a cat.", "A dog in the park."] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qdrant__SEP__clip-ViT-B-32-text" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_inputs = {{ text_inputs | tojson }}
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import numpy as np
+import onnxruntime
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+
+
+prepared_texts: list[str]
+if isinstance(text_inputs, str):
+    prepared_texts = [text_inputs]
+else:
+    prepared_texts = list(text_inputs)
+
+onnx_path = hf_hub_download(repo_id=repo_id, filename="model.onnx")
+
+available_providers = onnxruntime.get_available_providers()
+providers = ["CPUExecutionProvider"]
+if device.lower().startswith("cuda") and "CUDAExecutionProvider" in available_providers:
+    providers = ["CUDAExecutionProvider"]
+session = onnxruntime.InferenceSession(onnx_path, providers=providers)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+encoded_inputs = tokenizer(
+    prepared_texts,
+    padding=True,
+    truncation=True,
+    return_tensors="np",
+)
+
+input_feed = {}
+for ort_input in session.get_inputs():
+    name = ort_input.name
+    if name in encoded_inputs:
+        array = encoded_inputs[name]
+        if array.dtype != np.int64 and array.dtype.kind == "i":
+            array = array.astype(np.int64)
+        input_feed[name] = array
+
+outputs = session.run(None, input_feed)
+if outputs:
+    logits = outputs[0]
+else:
+    logits = np.empty((len(prepared_texts), 0))
+
+if logits.ndim == 3:
+    text_embeddings = logits[:, 0, :]
+elif logits.ndim == 2:
+    text_embeddings = logits
+else:
+    text_embeddings = logits.reshape(len(prepared_texts), -1)
+norms = np.linalg.norm(text_embeddings, axis=-1, keepdims=True)
+norms = np.where(norms == 0, 1e-12, norms)
+normalized_embeddings = (text_embeddings / norms).tolist()
+
+RESULT = {"sentence_embeddings": normalized_embeddings}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    embeddings_path = os.path.join(output_dir, "sentence_embeddings.json")
+    with open(embeddings_path, "w", encoding="utf-8") as writer:
+        json.dump(RESULT["sentence_embeddings"], writer)

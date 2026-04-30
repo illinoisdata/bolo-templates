@@ -1,0 +1,29 @@
+{% set text = "The quick brown fox jumps over the lazy dog." %}
+{% set target_lang = "fr" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-en-ROMANCE" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+target_lang = {{ target_lang | tojson }}
+output_dir = {{ output_dir | tojson }}
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import os
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+input_text = f">>{target_lang}<< {text}"
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+
+outputs = model.generate(**inputs)
+translation = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    translation_path = os.path.join(output_dir, "translation.txt")
+    with open(translation_path, "w", encoding="utf-8") as fh:
+        fh.write(RESULT["translation"])

@@ -1,0 +1,29 @@
+{% set text = "Este es un texto en español que queremos traducir al gallego." %}
+{% set output_dir = "/tmp/translation_output" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded = tokenizer(text, return_tensors="pt", padding=True, truncation=True)
+encoded = {key: value.to(device) for key, value in encoded.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(**encoded)
+
+translation = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "translation.txt").write_text(translation, encoding="utf-8")

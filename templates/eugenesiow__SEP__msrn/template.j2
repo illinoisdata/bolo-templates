@@ -1,0 +1,58 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/eugenesiow__SEP__msrn" %}
+{% set scale = 4 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+scale = {{ scale }}
+
+import io
+from pathlib import Path
+
+import requests
+import torch
+from PIL import Image
+from super_image import ImageLoader, MsrnModel
+
+target_device = torch.device(device)
+
+model = MsrnModel.from_pretrained(repo_id, scale=scale)
+model = model.to(target_device)
+model = model.eval()
+
+if image_path.startswith(("http://", "https://")):
+    with requests.get(image_path) as response:
+        response.raise_for_status()
+        image = Image.open(io.BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = ImageLoader.load_image(image)
+
+
+def _move_to_device(payload, dst_device):
+    if hasattr(payload, "to"):
+        return payload.to(dst_device)
+    if isinstance(payload, dict):
+        return {key: _move_to_device(value, dst_device) for key, value in payload.items()}
+    if isinstance(payload, (list, tuple)):
+        payload_type = type(payload)
+        return payload_type(_move_to_device(item, dst_device) for item in payload)
+    return payload
+
+inputs = _move_to_device(inputs, target_device)
+
+with torch.no_grad():
+    predictions = model(inputs)
+
+predictions = _move_to_device(predictions, torch.device("cpu"))
+
+RESULT = {"super_resolved_image": predictions}
+
+if __name__ == "__main__":
+    output_dir_path = Path(output_dir)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
+    destination = output_dir_path / "super_resolved_image.png"
+    ImageLoader.save_image(RESULT["super_resolved_image"], destination)

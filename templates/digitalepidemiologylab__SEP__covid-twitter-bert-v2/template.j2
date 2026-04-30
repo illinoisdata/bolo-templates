@@ -1,0 +1,59 @@
+{% set input_sentence = "In places with a lot of people, it's a good idea to wear a [MASK]." %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/digitalepidemiologylab__SEP__covid-twitter-bert-v2" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_sentence = "{{ input_sentence }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id)
+torch_device = torch.device(device)
+model.to(torch_device)
+model.eval()
+
+encoded_input = tokenizer(input_sentence, return_tensors="pt")
+encoded_input = {key: tensor.to(torch_device) for key, tensor in encoded_input.items()}
+input_ids = encoded_input["input_ids"]
+mask_positions = torch.where(input_ids[0] == tokenizer.mask_token_id)[0]
+mask_position = mask_positions[0].item()
+
+with torch.no_grad():
+    outputs = model(**encoded_input)
+logits = outputs.logits
+mask_token_logits = logits[0, mask_position, :]
+softmaxed = torch.softmax(mask_token_logits, dim=-1)
+topk = torch.topk(mask_token_logits, k=top_k, dim=-1)
+topk_indices = topk.indices
+topk_token_ids = topk_indices.cpu().tolist()
+topk_scores = softmaxed[topk_indices].cpu().tolist()
+
+results = []
+base_input_ids = input_ids[0]
+for token_id, score in zip(topk_token_ids, topk_scores):
+    filled_ids = base_input_ids.clone()
+    filled_ids[mask_position] = token_id
+    sequence = tokenizer.decode(filled_ids, skip_special_tokens=False)
+    results.append(
+        {
+            "sequence": sequence,
+            "score": score,
+            "token": token_id,
+            "token_str": tokenizer.convert_ids_to_tokens(token_id),
+        }
+    )
+
+RESULT = {"fill_mask": results}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "fill_mask.json")
+    with open(output_path, "w", encoding="utf-8") as output_file:
+        json.dump(RESULT["fill_mask"], output_file, ensure_ascii=False, indent=4)

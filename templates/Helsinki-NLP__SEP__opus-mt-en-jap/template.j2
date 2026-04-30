@@ -1,0 +1,52 @@
+{% set repo_id = "Helsinki-NLP/opus-mt-en-jap" %}
+{% set device = "cuda:0" %}
+{% set input_text = "This is a short English sentence to translate into Japanese." %}
+{% set max_input_length = 128 %}
+{% set max_new_tokens = 128 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-en-jap" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_input_length = {{ max_input_length }}
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
+
+target_device = torch.device(device)
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(target_device)
+
+texts_to_translate = [input_text]
+preprocessed_inputs = tokenizer(
+    texts_to_translate,
+    return_tensors="pt",
+    padding=True,
+    truncation=True,
+    max_length=max_input_length,
+)
+preprocessed_inputs = {key: value.to(target_device) for key, value in preprocessed_inputs.items()}
+
+generated_tokens = model.generate(
+    **preprocessed_inputs,
+    num_beams=num_beams,
+    max_new_tokens=max_new_tokens,
+)
+
+translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    translations_path = output_path / "translations.txt"
+    with translations_path.open("w", encoding="utf-8") as writer:
+        for translation in RESULT["translations"]:
+            writer.write(f"{translation}\n")

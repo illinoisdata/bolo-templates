@@ -1,0 +1,66 @@
+{% set input_text = "Will this approach work for generating diverse paraphrases?" %}
+{% set lexical = 0.3 %}
+{% set syntactic = 0.5 %}
+{% set semantic = 0.8 %}
+{% set max_length = 120 %}
+{% set num_beams = 4 %}
+{% set num_return_sequences = 1 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ibm-research__SEP__qcpg-sentences" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+lexical = {{ lexical }}
+syntactic = {{ syntactic }}
+semantic = {{ semantic }}
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+num_return_sequences = {{ num_return_sequences }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+control_ranges = {
+    "lex": (0, 100),
+    "syn": (0, 80),
+    "sem": (0, 95),
+}
+range_key_map = {
+    "semantic_sim": "sem",
+    "lexical_div": "lex",
+    "syntactic_div": "syn",
+}
+control_names = ["semantic_sim", "lexical_div", "syntactic_div"]
+input_values = [semantic, lexical, syntactic]
+control_tokens = []
+for name, value in zip(control_names, input_values):
+    raw_value = int(5 * round(value * 100 / 5))
+    key = range_key_map[name]
+    min_val, max_val = control_ranges[key]
+    clamped = max(min(raw_value, max_val), min_val)
+    token = f"COND_{name.upper()}_{clamped}"
+    control_tokens.append(token)
+
+controlled_text = f"{' '.join(control_tokens)} {input_text}"
+inputs = tokenizer(controlled_text, return_tensors="pt").to(device)
+generated_tokens = model.generate(
+    **inputs,
+    max_length=max_length,
+    num_beams=num_beams,
+    num_return_sequences=num_return_sequences,
+    early_stopping=True,
+)
+generated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"generated_texts": generated_texts}
+
+if __name__ == "__main__":
+    path = Path(output_dir)
+    path.mkdir(parents=True, exist_ok=True)
+    (path / "generated_texts.txt").write_text(
+        "\n".join(RESULT["generated_texts"]), encoding="utf-8"
+    )

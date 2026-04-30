@@ -1,0 +1,29 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set input_text = "Convert this text to grapheme-to-phoneme output" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/charsiu__SEP__g2p_multilingual_byT5_tiny_16_layers_100" %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_text = {{ input_text | tojson }}
+output_dir = {{ output_dir | tojson }}
+
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(input_text, return_tensors="pt").to(device)
+
+generated_ids = model.generate(**inputs)
+generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"predicted_text": generated_text}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    (Path(output_dir) / "predicted_text.txt").write_text(
+        RESULT["predicted_text"], encoding="utf-8"
+    )

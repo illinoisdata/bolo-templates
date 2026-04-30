@@ -1,0 +1,76 @@
+{% set repo_id = "usyd-community/vitpose-base-simple" %}
+{% set device = "cuda:0" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set pose_score_threshold = 0.3 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/usyd-community__SEP__vitpose-base-simple" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+pose_score_threshold = {{ pose_score_threshold }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import json
+from typing import List, Dict
+
+import numpy as np
+import requests
+import torch
+from PIL import Image
+from transformers import AutoProcessor
+from transformers.models.vitpose import VitPoseForPoseEstimation
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = VitPoseForPoseEstimation.from_pretrained(repo_id).to(device)
+model.eval()
+
+width, height = image.size
+full_box = np.array([[0.0, 0.0, float(width), float(height)]], dtype=np.float32)
+inputs = processor(image, boxes=[full_box], return_tensors="pt").to(device)
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+pose_results = processor.post_process_pose_estimation(
+    outputs, boxes=[full_box], threshold=pose_score_threshold
+)
+image_pose_result = pose_results[0]
+pose_estimations: List[Dict[str, object]] = []
+
+for person_pose in image_pose_result:
+    keypoints_tensor = person_pose["keypoints"]
+    scores_tensor = person_pose["scores"]
+    labels_tensor = person_pose["labels"]
+    box_tensor = person_pose.get("box")
+
+    keypoint_names = []
+    for label in labels_tensor:
+        label_idx = int(label.item())
+        name = model.config.id2label.get(str(label_idx), str(label_idx))
+        keypoint_names.append(name)
+
+    pose_dict: Dict[str, object] = {
+        "keypoints": keypoints_tensor.tolist(),
+        "scores": scores_tensor.tolist(),
+        "keypoint_names": keypoint_names,
+    }
+
+    if box_tensor is not None:
+        pose_dict["box"] = box_tensor.tolist()
+
+    pose_estimations.append(pose_dict)
+
+RESULT = {"pose_estimations": pose_estimations}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "pose_estimations.json").write_text(
+        json.dumps(RESULT["pose_estimations"], indent=2)
+    )

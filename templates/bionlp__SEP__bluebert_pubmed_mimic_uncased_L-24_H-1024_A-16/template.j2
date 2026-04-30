@@ -1,0 +1,30 @@
+{% set text_inputs = ["The patient has a history of asthma and is currently stable."] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/bionlp__SEP__bluebert_pubmed_mimic_uncased_L-24_H-1024_A-16" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_inputs = {{ text_inputs | tojson }}
+output_dir = "{{ output_dir }}"
+
+import os
+
+import numpy as np
+import torch
+from transformers import BertModel, BertTokenizer
+
+# Using the slow BERT tokenizer to avoid fast-tokenizer dependencies
+tokenizer = BertTokenizer.from_pretrained(repo_id)
+model = BertModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded_inputs = tokenizer(text_inputs, return_tensors="pt", padding=True, truncation=True)
+encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+last_hidden_state = outputs.last_hidden_state.detach().cpu()
+RESULT = {"last_hidden_state": last_hidden_state}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    np.save(os.path.join(output_dir, "last_hidden_state.npy"), RESULT["last_hidden_state"].numpy())

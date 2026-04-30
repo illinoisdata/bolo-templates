@@ -1,0 +1,50 @@
+{% set text_input = "The quick brown fox jumps over the lazy dog." %}
+{% set max_length = 64 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-4_H-768_A-12" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+import os
+
+import numpy as np
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+encoded_inputs = tokenizer(
+    text_input,
+    return_tensors="pt",
+    truncation=True,
+    max_length=max_length,
+    padding="max_length",
+)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+last_hidden_state = outputs.last_hidden_state.cpu()
+pooler_output = outputs.pooler_output
+if pooler_output is not None:
+    pooler_output = pooler_output.cpu()
+
+RESULT = {
+    "last_hidden_state": last_hidden_state,
+    "pooler_output": pooler_output,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    np.save(
+        os.path.join(output_dir, "last_hidden_state.npy"),
+        RESULT["last_hidden_state"].numpy(),
+    )
+    if RESULT["pooler_output"] is not None:
+        np.save(
+            os.path.join(output_dir, "pooler_output.npy"),
+            RESULT["pooler_output"].numpy(),
+        )

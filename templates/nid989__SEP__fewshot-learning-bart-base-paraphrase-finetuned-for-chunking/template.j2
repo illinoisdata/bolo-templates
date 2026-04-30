@@ -1,0 +1,50 @@
+{% set input_text = "Chunk the following sentence using paraphrasing: The quick brown fox jumps over the lazy dog." %}
+{% set max_length = 128 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/nid989__SEP__fewshot-learning-bart-base-paraphrase-finetuned-for-chunking" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+    max_length=max_length,
+)
+encoded_inputs = {
+    key: value.to(device)
+    for key, value in encoded_inputs.items()
+}
+
+generated_tokens = model.generate(
+    **encoded_inputs,
+    max_length=max_length,
+    num_beams=num_beams,
+    early_stopping=True,
+    no_repeat_ngram_size=3,
+)
+
+paraphrase = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+
+RESULT = {"paraphrase": paraphrase}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    result_file = output_path / "paraphrase.txt"
+    result_file.write_text(RESULT["paraphrase"], encoding="utf-8")

@@ -1,0 +1,50 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set context = context | default([1,2,3,4,5,6,7,8,9,10]) %}
+{% set prediction_length = prediction_length | default(64) %}
+{% set num_samples = num_samples | default(20) %}
+{% set temperature = temperature | default(1.0) %}
+{% set top_k = top_k | default(50) %}
+{% set top_p = top_p | default(1.0) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+context = {{ context }}
+prediction_length = {{ prediction_length }}
+num_samples = {{ num_samples }}
+temperature = {{ temperature }}
+top_k = {{ top_k }}
+top_p = {{ top_p }}
+
+from chronos import ChronosPipeline
+import torch
+import numpy as np
+
+# Load the Chronos time-series forecasting pipeline
+pipeline = ChronosPipeline.from_pretrained(repo_id)
+# Move model to the specified device
+pipeline.model = pipeline.model.to(device)
+
+# Pre-process input
+if not isinstance(context, torch.Tensor):
+    context = torch.tensor(context)
+else:
+    context = context.cpu()
+
+# Run inference
+data = pipeline.predict(
+    context,
+    prediction_length=prediction_length,
+    num_samples=num_samples,
+    temperature=temperature,
+    top_k=top_k,
+    top_p=top_p,
+)
+
+# Post-process & build RESULT dict
+forecast = data.cpu().numpy()
+RESULT = {"forecast": forecast}
+
+if __name__ == "__main__":
+    # Save forecast to disk
+    np.save("forecast.npy", RESULT["forecast"])

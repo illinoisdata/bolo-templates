@@ -1,0 +1,7 @@
+repo_id = "{{ repo_id }}"
+from huggingface_hub import hf_hub_download
+import json
+
+config_path = hf_hub_download(repo_id, "preprocessor_config.json")
+with open(config_path, "r", encoding="utf-8") as reader:
+    print(reader.read())

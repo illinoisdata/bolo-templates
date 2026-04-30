@@ -1,0 +1,54 @@
+{% set repo_id = "tohoku-nlp/bert-large-japanese-v2" %}
+{% set device = "cuda:0" %}
+{% set text_input = "東北大学で[MASK]の研究をしています。" %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/tohoku-nlp__SEP__bert-large-japanese-v2" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded = tokenizer(text_input, return_tensors="pt")
+inputs = {key: val.to(device) for key, val in encoded.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+logits = outputs.logits
+
+mask_token_id = tokenizer.mask_token_id
+mask_positions = (inputs["input_ids"] == mask_token_id).nonzero(as_tuple=False)
+
+mask_predictions = []
+for batch_index, sequence_index in mask_positions.tolist():
+    mask_logits = logits[batch_index, sequence_index]
+    mask_probs = torch.softmax(mask_logits, dim=-1)
+    topk_values, topk_indices = torch.topk(mask_probs, k=top_k, dim=-1)
+    tokens = tokenizer.convert_ids_to_tokens(topk_indices.tolist())
+    mask_predictions.append(
+        {
+            "mask_index": int(sequence_index),
+            "tokens": tokens,
+            "scores": topk_values.tolist(),
+        }
+    )
+
+RESULT = {"mask_predictions": mask_predictions}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    for name, payload in RESULT.items():
+        file_path = output_path / f"{name}.json"
+        with file_path.open("w", encoding="utf-8") as file_obj:
+            json.dump(payload, file_obj, ensure_ascii=False, indent=2)

@@ -1,0 +1,45 @@
+{% set text_input = "(CNN) -- South Korea launched an investigation Tuesday into reports of toxic chemicals being dumped at a former U.S. military base, the Defense Ministry said. The tests follow allegations of American soldiers burying chemicals on Korean soil. The first tests are being carried out by a joint military, government and civilian task force at the site of what was Camp Mercer, west of Seoul. \"Soil and underground water will be taken in the areas where toxic chemicals were allegedly buried,\" said the statement from the South Korean Defense Ministry. Once testing is finished, the government will decide on how to test more than 80 other sites -- all former bases. The alarm was raised this month when a U.S. veteran alleged barrels of the toxic herbicide Agent Orange were buried at an American base in South Korea in the late 1970s. Two of his fellow soldiers corroborated his story about Camp Carroll, about 185 miles (300 kilometers) southeast of the capital, Seoul. \"We've been working very closely with the Korean government since we had the initial claims,\" said Lt. Gen. John Johnson, who is heading the Camp Carroll Task Force. \"If we get evidence that there is a risk to health, we are going to fix it.\" A joint U.S.- South Korean investigation is being conducted at Camp Carroll to test the validity of allegations. The U.S. military sprayed Agent Orange from planes onto jungles in Vietnam to kill vegetation in an effort to expose guerrilla fighters. Exposure to the chemical has been blamed for a wide variety of ailments, including certain forms of cancer and nerve disorders. It has also been linked to birth defects, according to the Department of Veterans Affairs. Journalist Yoonjung Seo contributed to this report." %}
+{% set max_length = 142 %}
+{% set min_length = 56 %}
+{% set length_penalty = 2.0 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ainize__SEP__bart-base-cnn" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = """{{ text_input }}"""
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+length_penalty = {{ length_penalty }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoded_inputs = tokenizer(text_input, return_tensors="pt")
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+generated_ids = model.generate(
+    **encoded_inputs,
+    bos_token_id=model.config.bos_token_id,
+    eos_token_id=model.config.eos_token_id,
+    length_penalty=length_penalty,
+    max_length=max_length,
+    min_length=min_length,
+    num_beams=num_beams,
+    early_stopping=True,
+)
+
+summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

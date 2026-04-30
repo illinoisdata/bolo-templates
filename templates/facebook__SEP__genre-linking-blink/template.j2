@@ -1,0 +1,31 @@
+{% set text_input = "Einstein was a [START_ENT] German [END_ENT] physicist." %}
+{% set num_beams = 5 %}
+{% set num_return_sequences = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__genre-linking-blink" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+num_beams = {{ num_beams }}
+num_return_sequences = {{ num_return_sequences }}
+output_dir = "{{ output_dir }}"
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import os
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+inputs = tokenizer([text_input], return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+generated_tokens = model.generate(
+    **inputs,
+    num_beams=num_beams,
+    num_return_sequences=num_return_sequences,
+)
+decoded_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+RESULT = {"generated_texts": decoded_texts}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, "generated_texts.txt")
+    with open(output_file, "w", encoding="utf-8") as f:
+        for text in RESULT["generated_texts"]:
+            f.write(text + "\n")

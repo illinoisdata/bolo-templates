@@ -1,0 +1,46 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set input_text = "هذا نص عربي تجريبي" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/aubmindlab__SEP__araelectra-base-discriminator" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForPreTraining, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+model.eval()
+
+raw_inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {name: tensor.to(device) for name, tensor in raw_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+probabilities = torch.sigmoid(logits)
+predictions = torch.round(probabilities)
+
+tokens = tokenizer.convert_ids_to_tokens(raw_inputs["input_ids"][0])
+real_probabilities = probabilities.squeeze().to("cpu").tolist()
+prediction_values = [int(value) for value in predictions.squeeze().to("cpu").tolist()]
+
+RESULT = {
+    "tokens": tokens,
+    "real_probabilities": real_probabilities,
+    "predictions": prediction_values,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "tokens.txt").write_text("\n".join(RESULT["tokens"]), encoding="utf-8")
+    (output_path / "predictions.json").write_text(json.dumps(RESULT["predictions"], ensure_ascii=False, indent=2), encoding="utf-8")
+    (output_path / "real_probabilities.json").write_text(json.dumps(RESULT["real_probabilities"], ensure_ascii=False, indent=2), encoding="utf-8")

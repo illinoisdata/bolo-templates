@@ -1,0 +1,77 @@
+{% set text_inputs = ["The quick brown fox jumps over the lazy dog.", "A fast brown fox leaps over a sleepy dog."] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qdrant__SEP__paraphrase-multilingual-MiniLM-L12-v2-onnx-Q" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_inputs = {{ text_inputs|tojson }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import json
+import torch
+import torch.nn.functional as F
+import onnxruntime as ort
+from huggingface_hub import hf_hub_download, list_repo_files
+from transformers import AutoTokenizer
+
+def mean_pooling(last_hidden_state, attention_mask):
+    input_mask_expanded = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
+    sum_embeddings = torch.sum(last_hidden_state * input_mask_expanded, dim=1)
+    sum_mask = torch.clamp(input_mask_expanded.sum(dim=1), min=1e-9)
+    return sum_embeddings / sum_mask
+
+# Prepare ONNX model session
+onnx_files = [file for file in list_repo_files(repo_id) if file.endswith(".onnx")]
+if not onnx_files:
+    raise FileNotFoundError("No ONNX model files found in the repository.")
+model_candidate = next((file for file in onnx_files if "model" in file.lower()), onnx_files[0])
+onnx_path = hf_hub_download(repo_id, model_candidate)
+providers = ["CUDAExecutionProvider"] if device.startswith("cuda") else ["CPUExecutionProvider"]
+session = ort.InferenceSession(onnx_path, providers=providers)
+
+# Load tokenizer
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+
+# Tokenize inputs on CPU
+tokenized_inputs = tokenizer(text_inputs, padding=True, truncation=True, return_tensors="pt")
+numpy_inputs = {key: tensor.cpu().numpy() for key, tensor in tokenized_inputs.items()}
+
+# Filter inputs to what the session expects
+session_input_names = {inp.name for inp in session.get_inputs()}
+onnx_inputs = {name: numpy_inputs[name] for name in session_input_names if name in numpy_inputs}
+attention_mask_np = numpy_inputs.get("attention_mask")
+
+# Run inference
+onnx_outputs = session.run(None, onnx_inputs)
+last_hidden_state = torch.from_numpy(onnx_outputs[0])
+
+attention_mask_tensor = (
+    torch.from_numpy(attention_mask_np)
+    if attention_mask_np is not None
+    else torch.ones(last_hidden_state.size()[:2], dtype=torch.long)
+)
+
+embeddings = mean_pooling(last_hidden_state, attention_mask_tensor)
+
+# Normalize embeddings and compute pairwise similarity
+normalized_embeddings = F.normalize(embeddings, p=2, dim=1)
+if embeddings.size(0) >= 2:
+    pairwise_cosine_similarity = F.cosine_similarity(
+        normalized_embeddings[0], normalized_embeddings[1], dim=0
+    ).item()
+else:
+    pairwise_cosine_similarity = None
+
+sentence_embeddings = embeddings.tolist()
+
+RESULT = {
+    "sentence_embeddings": sentence_embeddings,
+    "pairwise_cosine_similarity": pairwise_cosine_similarity,
+}
+
+if __name__ == "__main__":
+    output_root = Path(output_dir)
+    output_root.mkdir(parents=True, exist_ok=True)
+    (output_root / "sentence_embeddings.json").write_text(json.dumps(RESULT["sentence_embeddings"]))
+    (output_root / "pairwise_cosine_similarity.txt").write_text(
+        str(RESULT["pairwise_cosine_similarity"])
+    )

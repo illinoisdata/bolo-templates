@@ -1,0 +1,53 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
+{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/rhasspy__SEP__faster-whisper-tiny-int8") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+output_dir = "{{ output_dir }}"
+
+import io
+from pathlib import Path
+
+import requests
+import soundfile as sf
+import torch
+import torchaudio.functional as F
+from faster_whisper import WhisperModel
+
+device_obj = torch.device(device)
+model_kwargs = {"device": device_obj.type, "compute_type": "int8"}
+if device_obj.index is not None:
+    model_kwargs["device_index"] = device_obj.index
+model = WhisperModel(repo_id, **model_kwargs)
+
+def _load_audio(path: str):
+    if path.startswith(("http://", "https://")):
+        response = requests.get(path)
+        response.raise_for_status()
+        buffer = io.BytesIO(response.content)
+        data, sample_rate = sf.read(buffer)
+    else:
+        data, sample_rate = sf.read(path)
+    return data, sample_rate
+
+raw_audio, original_sample_rate = _load_audio(audio_path)
+if raw_audio.ndim > 1:
+    raw_audio = raw_audio.mean(axis=1)
+
+audio_tensor = torch.from_numpy(raw_audio.astype("float32"))
+target_sampling_rate = 16000
+if original_sample_rate != target_sampling_rate:
+    audio_tensor = F.resample(audio_tensor, orig_freq=original_sample_rate, new_freq=target_sampling_rate)
+
+segments, _ = model.transcribe(audio_tensor.numpy())
+transcription = " ".join(segment.text.strip() for segment in segments).strip()
+
+RESULT = {"transcription": transcription}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "transcription.txt").write_text(RESULT["transcription"], encoding="utf-8")

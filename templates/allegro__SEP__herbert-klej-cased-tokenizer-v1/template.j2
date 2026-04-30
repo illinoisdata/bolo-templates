@@ -1,0 +1,34 @@
+{% set input_text = "Kto ma lepszą sztukę, ma lepszy rząd – to jasne." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allegro__SEP__herbert-klej-cased-tokenizer-v1" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = """{{ input_text }}"""
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer
+import json
+import os
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+encoded_input = tokenizer(input_text)
+tokens = tokenizer.convert_ids_to_tokens(encoded_input["input_ids"])
+
+RESULT = {
+    "input_ids": encoded_input["input_ids"],
+    "attention_mask": encoded_input["attention_mask"],
+    "tokens": tokens,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    input_ids_path = os.path.join(output_dir, "input_ids.json")
+    with open(input_ids_path, "w", encoding="utf-8") as f:
+        json.dump(RESULT["input_ids"], f)
+    attention_path = os.path.join(output_dir, "attention_mask.json")
+    with open(attention_path, "w", encoding="utf-8") as f:
+        json.dump(RESULT["attention_mask"], f)
+    tokens_path = os.path.join(output_dir, "tokens.txt")
+    with open(tokens_path, "w", encoding="utf-8") as f:
+        for token in RESULT["tokens"]:
+            f.write(f"{token}\n")

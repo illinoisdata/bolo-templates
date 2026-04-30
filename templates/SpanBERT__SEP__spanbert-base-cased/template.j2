@@ -1,0 +1,56 @@
+{% set input_text = "SpanBERT spans the [MASK] between entity mentions." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/SpanBERT__SEP__spanbert-base-cased" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded_inputs = tokenizer(input_text, return_tensors="pt")
+input_ids_reference = encoded_inputs["input_ids"]
+encoded_for_model = {k: v.to(device) for k, v in encoded_inputs.items()}
+
+with torch.no_grad():
+    model_outputs = model(**encoded_for_model)
+logits = model_outputs.logits
+
+mask_token_id = tokenizer.mask_token_id
+filled_ids = input_ids_reference.clone()
+logits_cpu = logits.detach().cpu()
+predictions = []
+for batch_index in range(input_ids_reference.shape[0]):
+    sample_predictions = []
+    sample_mask_positions = (input_ids_reference[batch_index] == mask_token_id).nonzero(as_tuple=False)
+    for mask_position in sample_mask_positions:
+        position = mask_position.item()
+        logits_at_position = logits_cpu[batch_index, position]
+        predicted_token_id = int(torch.argmax(logits_at_position))
+        sample_predictions.append(tokenizer.decode(predicted_token_id).strip())
+        filled_ids[batch_index, position] = predicted_token_id
+    predictions.append(sample_predictions)
+filled_texts = tokenizer.batch_decode(filled_ids, skip_special_tokens=True)
+
+RESULT = {
+    "mask_predictions": predictions,
+    "filled_texts": filled_texts,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    predictions_path = output_path / "mask_predictions.json"
+    filled_path = output_path / "filled_texts.json"
+    with predictions_path.open("w", encoding="utf-8") as f:
+        json.dump(RESULT["mask_predictions"], f, ensure_ascii=False, indent=2)
+    with filled_path.open("w", encoding="utf-8") as f:
+        json.dump(RESULT["filled_texts"], f, ensure_ascii=False, indent=2)

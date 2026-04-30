@@ -1,0 +1,74 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set target_sample_rate = 16000 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__wav2vec2-large-lv60" %}
+{% set projected_states_filename = "projected_states.npy" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+target_sample_rate = {{ target_sample_rate }}
+output_dir = "{{ output_dir }}"
+projected_states_filename = "{{ projected_states_filename }}"
+
+import io
+import os
+from pathlib import Path
+
+import numpy as np
+import requests
+import soundfile as sf
+from scipy.signal import resample
+import torch
+from transformers import AutoModelForPreTraining, AutoProcessor
+
+def _is_url(source: str) -> bool:
+    lower_source = source.lower()
+    return lower_source.startswith("http://") or lower_source.startswith("https://")
+
+def _load_audio(source_path: str, target_rate: int) -> np.ndarray:
+    if _is_url(source_path):
+        response = requests.get(source_path)
+        response.raise_for_status()
+        audio_stream = io.BytesIO(response.content)
+        data, sampling_rate = sf.read(audio_stream)
+    else:
+        data, sampling_rate = sf.read(source_path)
+    data = np.asarray(data)
+    if data.ndim > 1:
+        data = data.mean(axis=1)
+    if sampling_rate != target_rate:
+        num_samples = int(round(len(data) * target_rate / sampling_rate))
+        num_samples = max(num_samples, 1)
+        data = resample(data, num_samples)
+    return data.astype(np.float32)
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+model.eval()
+
+speech_array = _load_audio(audio_path, target_sample_rate)
+inputs = processor(
+    speech_array,
+    sampling_rate=target_sample_rate,
+    return_tensors="pt",
+    padding="longest",
+)
+input_values = inputs["input_values"].to(device)
+attention_mask = inputs.get("attention_mask")
+if attention_mask is not None:
+    attention_mask = attention_mask.to(device)
+
+with torch.no_grad():
+    model_inputs = {"input_values": input_values}
+    if attention_mask is not None:
+        model_inputs["attention_mask"] = attention_mask
+    outputs = model(**model_inputs)
+
+projected_states = outputs.projected_states.detach().cpu().numpy()
+RESULT = {"projected_states": projected_states}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = Path(output_dir) / projected_states_filename
+    np.save(output_path, RESULT["projected_states"])

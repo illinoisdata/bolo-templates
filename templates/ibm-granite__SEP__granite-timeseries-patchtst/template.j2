@@ -1,0 +1,48 @@
+{% set historical_values = [[0.0] * 7] * 512 %}
+{% set forecast_horizon = 96 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ibm-granite__SEP__granite-timeseries-patchtst" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+historical_values = {{ historical_values }}
+forecast_horizon = {{ forecast_horizon }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import numpy as np
+import torch
+from transformers.models.patchtst import PatchTSTForPrediction
+
+torch_device = torch.device(device)
+model = PatchTSTForPrediction.from_pretrained(repo_id).to(torch_device)
+model.eval()
+
+past_values = (
+    torch.tensor(historical_values, dtype=torch.float32, device=torch_device)
+    .unsqueeze(0)
+)
+past_mask = torch.ones(
+    past_values.shape[:-1], dtype=torch.bool, device=torch_device
+)
+
+with torch.no_grad():
+    outputs = model(
+        past_values=past_values,
+        past_mask=past_mask,
+        prediction_length=forecast_horizon,
+    )
+
+forecast_tensor = outputs[0] if isinstance(outputs, (tuple, list)) else outputs
+if hasattr(forecast_tensor, "detach"):
+    forecast_tensor = forecast_tensor.detach()
+if isinstance(forecast_tensor, torch.Tensor):
+    forecast_array = forecast_tensor.cpu().numpy()
+else:
+    forecast_array = np.asarray(forecast_tensor)
+RESULT = {"forecast": forecast_array}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    np.save(output_path / "forecast.npy", RESULT["forecast"])

@@ -1,0 +1,50 @@
+{% set repo_id = "google/pegasus-pubmed" %}
+{% set device = "cuda:0" %}
+{% set text = "In this paper, we introduce Pegasus, a model for abstractive summarization that uses a gap-sentences generation pre-training objective." %}
+{% set max_length = 256 %}
+{% set min_length = 32 %}
+{% set num_beams = 8 %}
+{% set length_penalty = 0.8 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__pegasus-pubmed" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+num_beams = {{ num_beams }}
+length_penalty = {{ length_penalty }}
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+# Pre-process input
+inputs = tokenizer(text, return_tensors="pt", truncation=True).to(device)
+
+# Run inference
+torch_device = device
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_length=max_length,
+        min_length=min_length,
+        num_beams=num_beams,
+        length_penalty=length_penalty,
+    )
+
+# Post-process output
+summary_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"summary_text": summary_text}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    output_path = Path(output_dir) / "summary.txt"
+    output_path.write_text(RESULT["summary_text"], encoding="utf-8")

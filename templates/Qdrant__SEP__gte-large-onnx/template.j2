@@ -1,0 +1,60 @@
+{% set text_a = "A sentence describing how generative embeddings capture semantic similarity." %}
+{% set text_b = "Another sentence that shares the same semantic topic as the first one." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qdrant__SEP__gte-large-onnx" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_a = """{{ text_a }}"""
+text_b = """{{ text_b }}"""
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import numpy as np
+import onnxruntime as ort
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+onnx_path = hf_hub_download(repo_id=repo_id, filename="model.onnx")
+
+available_providers = ort.get_available_providers()
+if device.startswith("cuda") and "CUDAExecutionProvider" in available_providers:
+    providers = ["CUDAExecutionProvider"]
+else:
+    providers = ["CPUExecutionProvider"]
+session = ort.InferenceSession(onnx_path, providers=providers)
+
+encoded_inputs = tokenizer([text_a, text_b], padding=True, truncation=True, return_tensors="np")
+onnx_inputs = {
+    key: value.astype(np.int64) if value.dtype != np.int64 else value
+    for key, value in encoded_inputs.items()
+}
+
+outputs = session.run(None, onnx_inputs)
+last_hidden_state = outputs[0]
+attention_mask = onnx_inputs["attention_mask"]
+
+mask = attention_mask[..., None]
+masked_embeddings = last_hidden_state * mask
+sum_embeddings = masked_embeddings.sum(axis=1)
+mask_sums = np.maximum(mask.sum(axis=1), 1e-9)
+sentence_embeddings = sum_embeddings / mask_sums
+
+norms = np.linalg.norm(sentence_embeddings, axis=1)
+similarity = float(
+    np.dot(sentence_embeddings[0], sentence_embeddings[1])
+    / (norms[0] * norms[1] + 1e-9)
+)
+
+RESULT = {
+    "embeddings": sentence_embeddings.tolist(),
+    "similarity": similarity,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    result_path = os.path.join(output_dir, "result.json")
+    with open(result_path, "w", encoding="utf-8") as result_file:
+        json.dump(RESULT, result_file, indent=2)

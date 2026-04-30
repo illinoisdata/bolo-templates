@@ -1,0 +1,35 @@
+{% set repo_id = "google/mt5-small" %}
+{% set device = "cuda:0" %}
+{% set input_text = "translate English to German: The house is wonderful." %}
+{% set max_length = 128 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__mt5-small" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoded_inputs = tokenizer(input_text, return_tensors="pt")
+encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+
+generated_tokens = model.generate(**encoded_inputs, max_length=max_length, num_beams=num_beams)
+
+generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

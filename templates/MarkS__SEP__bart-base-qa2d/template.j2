@@ -1,0 +1,35 @@
+{% set input_text = "question: what day is it today? answer: Tuesday" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/MarkS__SEP__bart-base-qa2d" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = """{{ input_text }}"""
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+
+tokenized = tokenizer(input_text, return_tensors="pt")
+generation_inputs = {
+    "input_ids": tokenized["input_ids"].to(torch_device)
+}
+if "attention_mask" in tokenized:
+    generation_inputs["attention_mask"] = tokenized["attention_mask"].to(torch_device)
+
+generated_ids = model.generate(**generation_inputs)
+
+decoded_statements = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"declarative_statements": decoded_statements}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "declarative_statements.txt")
+    with open(output_path, "w", encoding="utf-8") as out_file:
+        out_file.write("\n".join(RESULT["declarative_statements"]))

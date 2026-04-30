@@ -1,0 +1,36 @@
+{% set text_input = "作为电子extra0的平台，京东绝对是领先者。" %}
+{% set max_length = 128 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/uer__SEP__t5-base-chinese-cluecorpussmall" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+
+tokenized_inputs = tokenizer(text_input, return_tensors="pt")
+inputs = {
+    name: tensor.to(device)
+    for name, tensor in tokenized_inputs.items()
+    if name != "token_type_ids"
+}
+
+generated_tokens = model.generate(**inputs, max_length=max_length)
+generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = Path(output_dir) / "generated_text.txt"
+    with output_path.open("w", encoding="utf-8") as writer:
+        writer.write(RESULT["generated_text"])

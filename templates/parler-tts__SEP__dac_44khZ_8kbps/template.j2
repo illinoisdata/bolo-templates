@@ -1,0 +1,22 @@
+{% set repo_id = "parler-tts/dac_44khZ_8kbps" %}
+repo_id = "{{ repo_id }}"
+import inspect
+import os
+import transformers
+from transformers.models import dac as dac_module
+
+print("DAC module file:", dac_module.__file__)
+print("Classes available:", [name for name in dir(dac_module) if name.endswith("Model") or name.endswith("Processor") or name.endswith("FeatureExtractor")])
+if hasattr(dac_module, "DACModel"):
+    print("DACModel forward signature:", inspect.signature(dac_module.DACModel.forward))
+if hasattr(dac_module, "DACProcessor"):
+    print("DACProcessor found")
+if hasattr(dac_module, "DACFeatureExtractor"):
+    print("DACFeatureExtractor found")
+
+RESULT = {"status": "inspection"}
+
+if __name__ == "__main__":
+    output_path = os.path.join(".", "inspection.txt")
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write("inspection complete")

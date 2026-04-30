@@ -1,0 +1,35 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set input_text = "这是一段用于SimBERT的测试文本。" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/WangZeJun__SEP__simbert-base-chinese" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import BertModel, BertTokenizer
+
+tokenizer = BertTokenizer.from_pretrained(repo_id)
+model = BertModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(input_text, return_tensors="pt", truncation=True, padding=True).to(device)
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+sentence_embedding = outputs.pooler_output.detach().cpu().tolist()
+
+RESULT = {"sentence_embedding": sentence_embedding}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "sentence_embedding.json").write_text(
+        json.dumps(RESULT["sentence_embedding"], ensure_ascii=False), encoding="utf-8"
+    )

@@ -1,0 +1,64 @@
+{% set input_sentence = "Dracula is a novel by Bram Stoker featuring Count Dracula as the protagonist." %}
+{% set prompt_template = "segment sentence: {}" %}
+{% set sep_token = "[sep]" %}
+{% set max_new_tokens = 256 %}
+{% set length_penalty = 0 %}
+{% set min_length = 10 %}
+{% set no_repeat_ngram_size = 0 %}
+{% set num_beams = 1 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/sihaochen__SEP__SegmenT5-large" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_sentence = {{ input_sentence | tojson }}
+prompt_template = {{ prompt_template | tojson }}
+sep_token = {{ sep_token | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+length_penalty = {{ length_penalty }}
+min_length = {{ min_length }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+num_beams = {{ num_beams }}
+output_dir = {{ output_dir | tojson }}
+
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+output_path = Path(output_dir)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+prompt = prompt_template.format(input_sentence)
+encoding = tokenizer(
+    prompt,
+    return_tensors="pt",
+    padding="max_length",
+    max_length=512,
+    truncation=True,
+)
+encoding = encoding.to(device)
+
+generation_kwargs = {
+    "max_new_tokens": max_new_tokens,
+    "length_penalty": length_penalty,
+    "min_length": min_length,
+    "no_repeat_ngram_size": no_repeat_ngram_size,
+    "num_beams": num_beams,
+}
+
+generated_ids = model.generate(**encoding, **generation_kwargs)
+decoded_output = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+propositions = [
+    segment.strip()
+    for segment in decoded_output[0].split(sep_token)
+    if segment.strip()
+]
+
+RESULT = {"propositions": propositions}
+
+if __name__ == "__main__":
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "propositions.txt").write_text(
+        "\n".join(RESULT["propositions"]),
+        encoding="utf-8",
+    )

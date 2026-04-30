@@ -1,0 +1,7 @@
+{% set repo_value = repo_id %}
+
+repo_id = "{{ repo_value }}"
+
+from huggingface_hub import hf_hub_download
+
+hf_hub_download(repo_id, "vocab.txt")

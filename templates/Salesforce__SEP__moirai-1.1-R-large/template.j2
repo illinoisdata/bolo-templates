@@ -1,0 +1,14 @@
+{% set dummy = 0 %}
+
+dummy = {{ dummy }}
+
+import pkgutil
+import os
+import inspect
+import transformers
+
+transformers_dir = os.path.dirname(transformers.__file__)
+model_dir = os.path.join(transformers_dir, "models")
+print("model_dir:", model_dir)
+print("contains:", sorted(os.listdir(model_dir))[:20])
+print("modules with moirai:", [name for _, name, _ in pkgutil.iter_modules([model_dir]) if "moirai" in name.lower()])

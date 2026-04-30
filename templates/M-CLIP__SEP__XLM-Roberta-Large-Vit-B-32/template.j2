@@ -1,0 +1,13 @@
+{% set placeholder = "" %}
+placeholder = "{{ placeholder }}"
+
+import torch
+import inspect
+from transformers.modeling_utils import check_and_set_device_map
+from transformers.utils import logging
+
+# Monkey patch default device just as in final script
+torch._C._get_default_device = lambda: torch.device("cpu")
+
+print("default device approximately", torch._C._get_default_device())
+print(inspect.getsource(check_and_set_device_map))

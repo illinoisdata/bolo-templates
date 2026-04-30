@@ -1,0 +1,78 @@
+{% set input_audio = '/u/yli77/projects/ML-code-generation/data/audio.wav' %}
+{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__unispeech-sat-large-sv' %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_audio = "{{ input_audio }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import tempfile
+from pathlib import Path
+from urllib.parse import urlparse
+
+import numpy as np
+import requests
+import soundfile as sf
+import torch
+from scipy.signal import resample
+from transformers import AutoFeatureExtractor, UniSpeechSatForXVector
+
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+model = UniSpeechSatForXVector.from_pretrained(repo_id).to(device)
+model.eval()
+
+
+def _is_url(path: str) -> bool:
+    parsed = urlparse(path)
+    return parsed.scheme in {"http", "https"}
+
+
+def _read_audio(path: str):
+    source_path = path
+    temp_path = None
+    if _is_url(path):
+        with requests.get(path, stream=True) as response:
+            response.raise_for_status()
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        temp_file.write(chunk)
+                temp_path = temp_file.name
+        source_path = temp_path
+    try:
+        array, sampling_rate = sf.read(source_path)
+    finally:
+        if temp_path is not None and os.path.exists(temp_path):
+            os.remove(temp_path)
+    if array.ndim > 1:
+        array = np.mean(array, axis=1)
+    array = array.astype(np.float32)
+    return array, sampling_rate
+
+
+def _prepare_audio(audio_path: str):
+    array, sampling_rate = _read_audio(audio_path)
+    target_sr = feature_extractor.sampling_rate
+    if sampling_rate != target_sr:
+        target_length = int(round(len(array) * target_sr / sampling_rate))
+        array = resample(array, target_length)
+        sampling_rate = target_sr
+    return array, sampling_rate
+
+processed_audio, processed_sr = _prepare_audio(input_audio)
+inputs = feature_extractor(processed_audio, sampling_rate=processed_sr, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    embeddings = outputs.embeddings
+    normalized_embeddings = torch.nn.functional.normalize(embeddings, dim=-1)
+
+speaker_embedding = normalized_embeddings.squeeze(0).cpu().numpy()
+RESULT = {"speaker_embedding": speaker_embedding}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    np.save(output_path / "speaker_embedding.npy", RESULT["speaker_embedding"])

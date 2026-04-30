@@ -1,0 +1,38 @@
+{% set input_text = "extract keyphrases from this text: Machine learning transforms vast data into actionable insights." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/snrspeaks__SEP__KeyPhraseTransformer" %}
+{% set max_length = 64 %}
+{% set num_beams = 4 %}
+{% set repetition_penalty = 1.0 %}
+{% set length_penalty = 1.0 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+repetition_penalty = {{ repetition_penalty }}
+length_penalty = {{ length_penalty }}
+
+import torch
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoded_inputs = tokenizer(input_text, return_tensors="pt", padding=True, truncation=True).to(device)
+generated_ids = model.generate(
+    **encoded_inputs,
+    max_length=max_length,
+    num_beams=num_beams,
+    repetition_penalty=repetition_penalty,
+    length_penalty=length_penalty,
+)
+generated_keyphrases = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"generated_keyphrases": generated_keyphrases}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    (Path(output_dir) / "generated_keyphrases.txt").write_text(generated_keyphrases, encoding="utf-8")

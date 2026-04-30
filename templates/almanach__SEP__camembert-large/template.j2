@@ -1,0 +1,51 @@
+{% set fill_text = "Le camembert est <mask> :)" %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/almanach__SEP__camembert-large" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+fill_text = "{{ fill_text }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+inputs = tokenizer(fill_text, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+input_ids = inputs["input_ids"]
+mask_positions = (input_ids == tokenizer.mask_token_id).nonzero(as_tuple=True)
+mask_batch_index = mask_positions[0][0].item()
+mask_token_index = mask_positions[1][0].item()
+
+mask_logits = logits[mask_batch_index, mask_token_index]
+num_candidates = min(top_k, mask_logits.size(-1))
+mask_probs = torch.softmax(mask_logits, dim=-1)
+topk_values = torch.topk(mask_logits, k=num_candidates)
+topk_token_ids = topk_values.indices
+candidate_scores = mask_probs[topk_token_ids]
+
+filled_sequences = []
+for score, token_id in zip(candidate_scores.tolist(), topk_token_ids.tolist()):
+    candidate_ids = input_ids[mask_batch_index].clone()
+    candidate_ids[mask_token_index] = token_id
+    sequence = tokenizer.decode(candidate_ids.tolist(), skip_special_tokens=False)
+    filled_sequences.append({"sequence": sequence, "score": score, "token": token_id})
+
+RESULT = {"fill_mask": filled_sequences}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    with open(output_path / "fill_mask.json", "w", encoding="utf-8") as fo:
+        json.dump(RESULT["fill_mask"], fo, ensure_ascii=False, indent=2)

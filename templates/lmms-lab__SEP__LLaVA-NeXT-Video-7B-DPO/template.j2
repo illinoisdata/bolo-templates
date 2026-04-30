@@ -1,0 +1,17 @@
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+
+import inspect
+import transformers
+
+print("modules:")
+if hasattr(transformers.models, "llava"):
+    import pkgutil
+    path = transformers.models.llava.__path__
+    print([name for _, name, _ in pkgutil.iter_modules(path)])
+
+try:
+    from transformers.models.llava import modeling_llava
+    print("dir llava:", [name for name in dir(modeling_llava) if not name.startswith("__")])
+except Exception as exc:
+    print("llava modeling import failed", exc)

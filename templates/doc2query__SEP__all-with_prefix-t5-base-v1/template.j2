@@ -1,0 +1,51 @@
+{% set prefix = "answer2question" %}
+{% set input_text = "Python is an interpreted, high-level and general-purpose programming language. Python's design philosophy emphasizes code readability with its notable use of significant whitespace. Its language constructs and object-oriented approach aim to help programmers write clear, logical code for small and large-scale projects." %}
+{% set max_input_length = 384 %}
+{% set max_output_length = 64 %}
+{% set do_sample = true %}
+{% set top_p = 0.95 %}
+{% set num_return_sequences = 5 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prefix = "{{ prefix }}"
+input_text = """{{ input_text }}"""
+max_input_length = {{ max_input_length }}
+max_output_length = {{ max_output_length }}
+do_sample = {{ do_sample }}
+top_p = {{ top_p }}
+num_return_sequences = {{ num_return_sequences }}
+
+import torch
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+text_with_prefix = f"{prefix}: {input_text}"
+inputs = tokenizer(text_with_prefix, return_tensors="pt", max_length=max_input_length, truncation=True)
+inputs = {k: tensor.to(device) for k, tensor in inputs.items()}
+
+generated_tokens = model.generate(
+    **inputs,
+    max_length=max_output_length,
+    do_sample=do_sample,
+    top_p=top_p,
+    num_return_sequences=num_return_sequences,
+)
+
+generated_queries = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"generated_queries": generated_queries}
+
+if __name__ == "__main__":
+    output_dir = Path("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/doc2query__SEP__all-with_prefix-t5-base-v1")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    queries_path = output_dir / "generated_queries.txt"
+    with queries_path.open("w", encoding="utf-8") as f:
+        for query in RESULT["generated_queries"]:
+            f.write(query)
+            f.write("\n")

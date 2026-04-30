@@ -1,0 +1,34 @@
+{% set repo_id = "facebook/mms-tts-spa" %}
+{% set device = "cuda:0" %}
+{% set text = "Hola, este es un ejemplo breve de texto en español para convertir a habla." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mms-tts-spa" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from scipy.io import wavfile
+from transformers import AutoTokenizer, VitsModel
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = VitsModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    model_outputs = model(**inputs)
+wav_tensor = model_outputs.waveform.squeeze().cpu().contiguous()
+waveform = wav_tensor.numpy()
+sampling_rate = int(model.config.sampling_rate)
+
+RESULT = {"waveform": waveform, "sampling_rate": sampling_rate}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    wavfile.write(output_path / "tts.wav", sampling_rate, RESULT["waveform"])

@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("tennessejoyce/titlewave-t5-base") %}
+{% set device = device | default("cuda:0") %}
+{% set question_body = question_body | default("Example question body.") %}
+{% set summarization_prefix = summarization_prefix | default("summarize: ") %}
+{% set max_length = max_length | default(40) %}
+{% set min_length = min_length | default(5) %}
+{% set num_beams = num_beams | default(4) %}
+{% set early_stopping = early_stopping | default(true) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(1) %}
+{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/tennessejoyce__SEP__titlewave-t5-base") %}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+question_body = {{ question_body | tojson }}
+summarization_prefix = {{ summarization_prefix | tojson }}
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+num_beams = {{ num_beams }}
+early_stopping = {{ early_stopping }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+output_dir = {{ output_dir | tojson }}
+from pathlib import Path
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+device_obj = torch.device(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device_obj)
+prompt = f"{summarization_prefix}{question_body}"
+encoded_inputs = tokenizer(prompt, return_tensors="pt", truncation=True, padding="longest")
+encoded_inputs = encoded_inputs.to(device_obj)
+generated_ids = model.generate(
+    input_ids=encoded_inputs["input_ids"],
+    attention_mask=encoded_inputs.get("attention_mask"),
+    max_length=max_length,
+    min_length=min_length,
+    num_beams=num_beams,
+    early_stopping=early_stopping,
+    no_repeat_ngram_size=no_repeat_ngram_size,
+)
+decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+RESULT = {
+    "title_suggestions": [suggestion.strip() for suggestion in decoded]
+}
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "title_suggestions.txt").write_text(
+        "\n".join(RESULT["title_suggestions"]),
+        encoding="utf-8",
+    )

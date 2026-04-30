@@ -1,0 +1,53 @@
+{% set instruction = "summarize, simplify, and contextualize: " %}
+{% set text_input = "The COVID-19 pandemic presented enormous data challenges in the United States. Policy makers, epidemiological modelers, and health researchers all require up-to-date data on the pandemic and relevant public behavior, ideally at fine spatial and temporal resolution. The COVIDcast API is our attempt to fill this need: Operational since April 2020, it provides open access to both traditional public health surveillance signals (cases, deaths, and hospitalizations) and many auxiliary indicators of COVID-19 activity, such as signals extracted from deidentified medical claims data, massive online surveys, cell phone mobility data, and internet search trends. These are available at a fine geographic resolution (mostly at the county level) and are updated daily. The COVIDcast API also tracks all revisions to historical data, allowing modelers to account for the frequent revisions and backfill that are common for many public health data sources. All of the data are available in a common format through the API and accompanying R and Python software packages. This paper describes the data sources and signals, and provides examples demonstrating that the auxiliary signals in the COVIDcast API present information relevant to tracking COVID activity, augmenting traditional public health reporting and empowering research and decision-making." %}
+{% set max_length = 512 %}
+{% set top_p = 0.9 %}
+{% set do_sample = True %}
+{% set repetition_penalty = 1.0 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/haining__SEP__scientific_abstract_simplification" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+instruction = "{{ instruction }}"
+text_input = """{{ text_input }}"""
+max_length = {{ max_length }}
+top_p = {{ top_p }}
+do_sample = {{ do_sample }}
+repetition_penalty = {{ repetition_penalty }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+prompt = instruction + text_input
+encoding = tokenizer(
+    prompt,
+    padding="max_length",
+    truncation=True,
+    max_length=max_length,
+    return_tensors="pt",
+)
+inputs = {key: value.to(device) for key, value in encoding.items()}
+
+generated_ids = model.generate(
+    **inputs,
+    max_length=max_length,
+    do_sample=do_sample,
+    top_p=top_p,
+    repetition_penalty=repetition_penalty,
+)
+decoded_outputs = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+simplified_text = decoded_outputs[0]
+
+RESULT = {"simplified_abstract": simplified_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    text_path = output_path / "simplified_abstract.txt"
+    text_path.write_text(RESULT["simplified_abstract"], encoding="utf-8")

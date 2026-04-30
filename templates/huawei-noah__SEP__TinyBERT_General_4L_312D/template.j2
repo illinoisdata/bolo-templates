@@ -1,0 +1,52 @@
+{% set mask_text = "The capital of France is [MASK]." %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/huawei-noah__SEP__TinyBERT_General_4L_312D" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+mask_text = "{{ mask_text }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+raw_inputs = tokenizer(mask_text, return_tensors="pt")
+input_ids = raw_inputs["input_ids"]
+mask_token_id = tokenizer.mask_token_id
+if mask_token_id is None:
+    raise ValueError("Tokenizer does not define a mask token, but the input relies on one.")
+mask_positions = (input_ids == mask_token_id).nonzero(as_tuple=True)
+model_inputs = {key: value.to(device) for key, value in raw_inputs.items()}
+with torch.inference_mode():
+    logits = model(**model_inputs).logits
+
+mask_predictions = []
+if mask_positions[0].numel() > 0:
+    batch_positions = mask_positions[0].tolist()
+    token_positions = mask_positions[1].tolist()
+    for batch_index, token_index in zip(batch_positions, token_positions):
+        token_logits = logits[batch_index, token_index]
+        probabilities = torch.softmax(token_logits, dim=-1)
+        top_probs, top_token_ids = probabilities.topk(top_k)
+        mask_predictions.append(
+            {
+                "mask_index": token_index,
+                "tokens": tokenizer.convert_ids_to_tokens(top_token_ids.tolist()),
+                "scores": top_probs.tolist(),
+            }
+        )
+
+RESULT = {"mask_predictions": mask_predictions}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    with (output_path / "mask_predictions.json").open("w", encoding="utf-8") as dst:
+        json.dump(RESULT, dst, indent=2, ensure_ascii=False)

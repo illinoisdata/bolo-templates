@@ -1,0 +1,56 @@
+{% set repo_id = "Qwen/Qwen2-Audio-7B" %}
+{% set device = "cuda:0" %}
+{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set prompt = "<|audio_bos|><|AUDIO|><|audio_eos|>Generate the caption in English:" %}
+{% set max_length = 256 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qwen__SEP__Qwen2-Audio-7B" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+prompt = "{{ prompt }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+from io import BytesIO
+from pathlib import Path
+from urllib.request import urlopen
+
+import librosa
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoProcessor
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    audio_stream = BytesIO(urlopen(audio_path).read())
+    audio_data, sr = librosa.load(
+        audio_stream,
+        sr=processor.feature_extractor.sampling_rate,
+    )
+else:
+    audio_data, sr = librosa.load(
+        audio_path,
+        sr=processor.feature_extractor.sampling_rate,
+    )
+
+inputs = processor(text=prompt, audios=audio_data, return_tensors="pt")
+prompt_length = inputs["input_ids"].size(1)
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+generated_ids = model.generate(**inputs, max_length=max_length)
+generated_ids = generated_ids[:, prompt_length:]
+response = processor.batch_decode(
+    generated_ids,
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=False,
+)[0]
+
+RESULT = {"generated_text": response}
+
+if __name__ == "__main__":
+    target_dir = Path(output_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    text_path = target_dir / "generated_text.txt"
+    text_path.write_text(RESULT["generated_text"], encoding="utf-8")

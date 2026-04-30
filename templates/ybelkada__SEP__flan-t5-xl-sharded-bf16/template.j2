@@ -1,0 +1,45 @@
+{% set repo_id = "ybelkada/flan-t5-xl-sharded-bf16" %}
+{% set device = "cuda:0" %}
+{% set task_prefix = "summarize: " %}
+{% set input_text = "The quick brown fox jumps over the lazy dog and then settles down for a rest while the sun sets over the meadow." %}
+{% set max_length = 256 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ybelkada__SEP__flan-t5-xl-sharded-bf16" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task_prefix = "{{ task_prefix }}"
+input_text = "{{ input_text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+device_obj = torch.device(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device_obj)
+model.eval()
+
+prompt = task_prefix + input_text
+encoded_inputs = tokenizer(prompt, return_tensors="pt", truncation=True)
+encoded_inputs = {key: value.to(device_obj) for key, value in encoded_inputs.items()}
+
+with torch.inference_mode():
+    generated_tokens = model.generate(
+        **encoded_inputs,
+        max_length=max_length,
+        num_beams=num_beams,
+        early_stopping=True,
+    )
+
+decoded_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+generated_text = decoded_texts[0] if decoded_texts else ""
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_text.txt").write_text(RESULT["generated_text"])

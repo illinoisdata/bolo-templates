@@ -1,0 +1,40 @@
+{% set source_text = "The quick brown fox jumps over the lazy dog." %}
+{% set summary_text = "A quick fox jumps over a lazy dog." %}
+{% set max_length = 128 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/MingZhong__SEP__unieval-sum" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = "{{ source_text }}"
+summary_text = "{{ summary_text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+import os
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+
+# Pre-process input texts
+inputs = tokenizer(source_text, summary_text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+# Generate evaluation scores
+outputs = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+
+# Decode generated tokens to text
+decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+evaluation = decoded[0]
+
+RESULT = {"evaluation": evaluation}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "evaluation.txt"), "w") as f:
+        f.write(RESULT["evaluation"])

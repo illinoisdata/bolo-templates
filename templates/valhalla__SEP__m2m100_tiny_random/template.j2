@@ -1,0 +1,34 @@
+{% set repo_id = "valhalla/m2m100_tiny_random" %}
+{% set device = "cuda:0" %}
+{% set text = "Hello, world!" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/valhalla__SEP__m2m100_tiny_random" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+if isinstance(text, str):
+    inputs = tokenizer(text, return_tensors="pt")
+else:
+    inputs = tokenizer(text, return_tensors="pt", padding=True)
+
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+generated_tokens = model.generate(**inputs)
+generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "generated_text.txt"), "w", encoding="utf-8") as f:
+        for line in RESULT["generated_text"]:
+            f.write(line + "\n")

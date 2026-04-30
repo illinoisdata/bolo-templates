@@ -1,0 +1,53 @@
+{% set text="After the sound and the fury, weeks of demonstrations and anguished calls for racial justice, the man whose death gave rise to an international movement, and whose last words — “I can’t breathe” — have been a rallying cry, will be laid to rest on Tuesday at a private funeral in Houston." %}
+{% set prefix="summarize: " %}
+{% set max_input_length=512 %}
+{% set max_length=150 %}
+{% set min_length=30 %}
+{% set num_beams=4 %}
+{% set length_penalty=2.0 %}
+{% set no_repeat_ngram_size=3 %}
+{% set output_dir="/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/mrm8488__SEP__t5-base-finetuned-summarize-news" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+prefix = "{{ prefix }}"
+max_input_length = {{ max_input_length }}
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+num_beams = {{ num_beams }}
+length_penalty = {{ length_penalty }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+import torch
+from transformers import AutoModelForSeq2SeqLM, T5Tokenizer
+
+tokenizer = T5Tokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+prefixed_text = f"{prefix}{text}"
+encoded = tokenizer(prefixed_text, return_tensors="pt", truncation=True, max_length=max_input_length)
+encoded = {key: tensor.to(device) for key, tensor in encoded.items()}
+
+generated = model.generate(
+    **encoded,
+    max_length=max_length,
+    min_length=min_length,
+    num_beams=num_beams,
+    length_penalty=length_penalty,
+    no_repeat_ngram_size=no_repeat_ngram_size,
+    early_stopping=True,
+)
+summary = tokenizer.decode(generated[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
+
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    summary_path = destination / "summary.txt"
+    summary_path.write_text(RESULT["summary"], encoding="utf-8")

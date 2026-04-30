@@ -1,0 +1,53 @@
+{% set document_image_path = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
+{% set text_inputs = ["LayoutLMv3", "document", "processor"] %}
+{% set boxes = [[0, 0, 500, 500], [0, 500, 500, 1000], [500, 500, 1000, 1000]] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__layoutlmv3-base" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+document_image_path = "{{ document_image_path }}"
+text_inputs = {{ text_inputs }}
+boxes = {{ boxes }}
+output_dir = "{{ output_dir }}"
+
+import numpy as np
+import requests
+import torch
+from io import BytesIO
+from pathlib import Path
+
+from PIL import Image
+from transformers import AutoModel, AutoProcessor
+
+model = AutoModel.from_pretrained(repo_id)
+processor = AutoProcessor.from_pretrained(repo_id)
+if hasattr(processor, "image_processor"):
+    processor.image_processor.apply_ocr = False
+else:
+    processor.feature_extractor.apply_ocr = False
+
+device = torch.device(device)
+model = model.to(device)
+model.eval()
+
+if document_image_path.startswith(("http://", "https://")):
+    response = requests.get(document_image_path)
+    response.raise_for_status()
+    with BytesIO(response.content) as buffer:
+        image = Image.open(buffer).convert("RGB")
+else:
+    image = Image.open(document_image_path).convert("RGB")
+
+encoding = processor(images=image, text=text_inputs, boxes=boxes, return_tensors="pt")
+encoding = {key: value.to(device) for key, value in encoding.items()}
+
+with torch.no_grad():
+    outputs = model(**encoding)
+
+last_hidden_state = outputs.last_hidden_state.detach().cpu().numpy()
+RESULT = {"last_hidden_state": last_hidden_state}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    np.save(output_path / "last_hidden_state.npy", RESULT["last_hidden_state"])

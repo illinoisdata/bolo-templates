@@ -1,0 +1,54 @@
+{% set repo_id = "nlpconnect/vit-gpt2-image-captioning" %}
+{% set device = "cuda:0" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set max_length = 16 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/nlpconnect__SEP__vit-gpt2-image-captioning" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import io
+
+import requests
+import torch
+from PIL import Image
+from transformers import AutoTokenizer, ViTImageProcessor, VisionEncoderDecoderModel
+
+def _load_image(source_path: str) -> Image.Image:
+    if source_path.lower().startswith(("http://", "https://")):
+        response = requests.get(source_path)
+        response.raise_for_status()
+        return Image.open(io.BytesIO(response.content)).convert("RGB")
+
+    return Image.open(source_path).convert("RGB")
+
+model = VisionEncoderDecoderModel.from_pretrained(repo_id)
+processor = ViTImageProcessor.from_pretrained(repo_id)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+torch_device = torch.device(device)
+model.to(torch_device)
+
+image = _load_image(image_path)
+pixel_values = processor(images=image, return_tensors="pt").pixel_values
+pixel_values = pixel_values.to(torch_device)
+
+gen_kwargs = {"max_length": max_length, "num_beams": num_beams}
+output_ids = model.generate(pixel_values=pixel_values, **gen_kwargs)
+
+captions = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
+captions = [caption.strip() for caption in captions]
+
+RESULT = {"captions": captions}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    captions_file = output_path / "captions.txt"
+    captions_file.write_text("\n".join(RESULT["captions"]), encoding="utf-8")

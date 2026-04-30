@@ -1,0 +1,53 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "setu4993/LEALLA-small" %}
+{% set sentences_1 = ["This is a sentence.", "This is another sentence."] %}
+{% set sentences_2 = ["C'est une phrase.", "C'est une autre phrase."] %}
+{% set output_dir = "./outputs" %}
+
+device = "{{ device }}"
+repo_id = "{{ repo_id }}"
+sentences_1 = {{ sentences_1 }}
+sentences_2 = {{ sentences_2 }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+import numpy as np
+import torch.nn.functional as F
+from transformers import AutoTokenizer, AutoModel
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs1 = tokenizer(sentences_1, return_tensors="pt", padding=True)
+inputs2 = tokenizer(sentences_2, return_tensors="pt", padding=True)
+inputs1 = {k: v.to(device) for k, v in inputs1.items()}
+inputs2 = {k: v.to(device) for k, v in inputs2.items()}
+
+with torch.no_grad():
+    outputs1 = model(**inputs1)
+    outputs2 = model(**inputs2)
+embeddings1 = outputs1.pooler_output
+embeddings2 = outputs2.pooler_output
+
+norm1 = F.normalize(embeddings1, p=2)
+norm2 = F.normalize(embeddings2, p=2)
+similarity_matrix = torch.matmul(norm1, norm2.transpose(0, 1))
+
+embeddings1 = embeddings1.cpu().numpy()
+embeddings2 = embeddings2.cpu().numpy()
+similarity_matrix = similarity_matrix.cpu().numpy()
+
+RESULT = {
+    "embeddings_1": embeddings1,
+    "embeddings_2": embeddings2,
+    "similarity_matrix": similarity_matrix,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    np.save(os.path.join(output_dir, "embeddings_1.npy"), RESULT["embeddings_1"])
+    np.save(os.path.join(output_dir, "embeddings_2.npy"), RESULT["embeddings_2"])
+    np.save(os.path.join(output_dir, "similarity_matrix.npy"), RESULT["similarity_matrix"])

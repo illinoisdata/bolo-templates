@@ -1,0 +1,56 @@
+{% set text_prompt = "The capital of France is [MASK]." %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-6_H-256_A-4" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_prompt = "{{ text_prompt }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(torch_device)
+model.eval()
+
+inputs = tokenizer(text_prompt, return_tensors="pt")
+inputs = {k: v.to(torch_device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+logits = outputs.logits
+
+input_ids = inputs["input_ids"]
+mask_positions = (input_ids == tokenizer.mask_token_id).nonzero(as_tuple=False)
+
+predictions = []
+if mask_positions.numel() > 0:
+    mask_positions = mask_positions.cpu()
+    for mask_pos in mask_positions:
+        sequence_index = int(mask_pos[0].item())
+        token_index = int(mask_pos[1].item())
+        mask_logits = logits[sequence_index, token_index]
+        topk = torch.topk(mask_logits, top_k)
+        topk_indices = topk.indices.cpu().tolist()
+        topk_values = topk.values.cpu().tolist()
+        predicted_tokens = tokenizer.convert_ids_to_tokens(topk_indices)
+        predictions.append({
+            "sequence_index": sequence_index,
+            "token_index": token_index,
+            "predicted_tokens": predicted_tokens,
+            "scores": topk_values,
+        })
+
+RESULT = {"predictions": predictions}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    predictions_path = output_path / "predictions.json"
+    with predictions_path.open("w", encoding="utf-8") as writer:
+        json.dump(RESULT["predictions"], writer, ensure_ascii=False, indent=2)

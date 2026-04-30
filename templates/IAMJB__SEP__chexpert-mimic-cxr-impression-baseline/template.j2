@@ -1,0 +1,53 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "IAMJB/chexpert-mimic-cxr-impression-baseline" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/IAMJB__SEP__chexpert-mimic-cxr-impression-baseline" %}
+{% set max_length = 128 %}
+{% set num_beams = 2 %}
+{% set num_return_sequences = 1 %}
+
+device = "{{ device }}"
+repo_id = "{{ repo_id }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+num_return_sequences = {{ num_return_sequences }}
+
+from transformers import BertTokenizer, ViTImageProcessor, VisionEncoderDecoderModel, GenerationConfig
+import torch
+from PIL import Image
+import requests
+import os
+
+model = VisionEncoderDecoderModel.from_pretrained(repo_id).to(device).eval()
+tokenizer = BertTokenizer.from_pretrained(repo_id)
+processor = ViTImageProcessor.from_pretrained(repo_id)
+
+if image_path.startswith("http"):
+    image = Image.open(requests.get(image_path, stream=True).raw)
+else:
+    image = Image.open(image_path)
+pixel_values = processor(image, return_tensors="pt").pixel_values.to(device)
+
+generation_config = GenerationConfig(
+    bos_token_id=model.config.decoder_start_token_id,
+    eos_token_id=model.config.eos_token_id,
+    pad_token_id=model.config.pad_token_id,
+    num_return_sequences=num_return_sequences,
+    max_length=max_length,
+    use_cache=True,
+    num_beams=num_beams,
+    decoder_start_token_id=tokenizer.cls_token_id,
+)
+generated_ids = model.generate(pixel_values, generation_config=generation_config)
+generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"generated_texts": generated_texts}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, "generated_texts.txt")
+    with open(output_file, "w") as f:
+        for text in generated_texts:
+            f.write(text + "\n")

@@ -1,0 +1,56 @@
+{% set input_texts = ["The quick brown fox jumps over the lazy dog."] %}
+{% set max_length = 64 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/diffusers__SEP__t5-nf4" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_texts = {{ input_texts }}
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import bitsandbytes as bnb
+import numpy as np
+import torch
+from transformers import T5EncoderModel, AutoTokenizer
+
+bnb_nn = getattr(bnb, "nn", None)
+bnb_linear4bit = getattr(bnb_nn, "Linear4bit", None)
+if bnb_linear4bit is not None:
+    bnb_linear4bit.reset_parameters = lambda self, *args, **kwargs: None
+
+torch_init = torch.nn.init
+_original_normal = torch_init.normal_
+
+def _normal_for_quantized(tensor, *args, **kwargs):
+    if tensor.dtype == torch.uint8:
+        return tensor
+    return _original_normal(tensor, *args, **kwargs)
+
+torch_init.normal_ = _normal_for_quantized
+
+device = torch.device(device)
+device_str = str(device)
+model = T5EncoderModel.from_pretrained(repo_id, device_map={"": device_str}, torch_dtype=torch.float16)
+model.eval()
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+with torch.inference_mode():
+    model_inputs = tokenizer(
+        input_texts,
+        padding=True,
+        truncation=True,
+        max_length=max_length,
+        return_tensors="pt",
+    )
+    model_inputs = {key: value.to(device) for key, value in model_inputs.items()}
+    outputs = model(**model_inputs)
+
+last_hidden_state = outputs.last_hidden_state.detach().cpu()
+RESULT = {"last_hidden_state": last_hidden_state}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    np.save(output_path / "last_hidden_state.npy", RESULT["last_hidden_state"].numpy())

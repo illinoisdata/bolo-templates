@@ -1,0 +1,50 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set messages = [{"role": "user", "content": "Translate the following text from Portuguese into English.\nPortuguese: Um grupo de investigadores lançou um novo modelo para tarefas relacionadas com tradução.\nEnglish:"}] %}
+{% set max_new_tokens = 256 %}
+{% set do_sample = False %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Unbabel__SEP__TowerInstruct-7B-v0.2" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+messages = {{ messages }}
+max_new_tokens = {{ max_new_tokens }}
+do_sample = {{ do_sample }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForCausalLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+prompt = ""
+for message in messages:
+    prompt += f"<|im_start|>{message['role']}\n{message['content']}<|im_end|>\n"
+prompt += "<|im_start|>assistant\n"
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+output_ids = model.generate(
+    **inputs,
+    max_new_tokens=max_new_tokens,
+    do_sample=do_sample,
+)
+
+decoded = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+if decoded.startswith(prompt):
+    generated = decoded[len(prompt):]
+else:
+    generated = decoded
+
+RESULT = {"generated_text": generated}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    path = os.path.join(output_dir, "generated_text.txt")
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(RESULT["generated_text"])

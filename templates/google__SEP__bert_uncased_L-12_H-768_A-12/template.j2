@@ -1,0 +1,37 @@
+{% set text = "The capital of France is [MASK]." %}
+{% set top_k = 5 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+top_k = {{ top_k }}
+
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+import torch
+import os
+import json
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+
+# Pre-process input
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+# Run inference
+outputs = model(**inputs)
+
+# Post-process results
+mask_token_index = torch.where(inputs["input_ids"] == tokenizer.mask_token_id)[1]
+mask_token_logits = outputs.logits[0, mask_token_index, :]
+top_k_indices = torch.topk(mask_token_logits, top_k, dim=1).indices[0].tolist()
+predicted_tokens = [tokenizer.decode([idx]).strip() for idx in top_k_indices]
+
+RESULT = {"predicted_tokens": predicted_tokens}
+
+if __name__ == "__main__":
+    output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-12_H-768_A-12"
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "predictions.json"), "w") as f:
+        json.dump(RESULT, f)

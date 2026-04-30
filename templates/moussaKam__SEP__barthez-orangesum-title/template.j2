@@ -1,0 +1,68 @@
+{% set repo_id = "moussaKam/barthez-orangesum-title" %}
+{% set device = "cuda:0" %}
+{% set text_input = "Citant les préoccupations de ses clients dénonçant des cas de censure, un fournisseur d'accès Internet de l'État de l'Idaho a décidé de bloquer Facebook et Twitter pour les clients mécontents de la politique de ces réseaux sociaux." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/moussaKam__SEP__barthez-orangesum-title" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = """{{ text_input }}"""
+output_dir = "{{ output_dir }}"
+
+from huggingface_hub import hf_hub_download
+from transformers import PreTrainedTokenizerFast, AutoModelForSeq2SeqLM
+import json
+import os
+import tempfile
+
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+with open(tokenizer_json_path, "r", encoding="utf-8") as tokenizer_file:
+    tokenizer_data = json.load(tokenizer_file)
+
+model_section = tokenizer_data.get("model", tokenizer_data)
+vocab = model_section.get("vocab")
+if isinstance(vocab, dict):
+    model_section["vocab"] = [[token, score] for token, score in vocab.items()]
+
+local_tokenizer_path = os.path.join(
+    tempfile.gettempdir(),
+    f"{repo_id.replace('/', '_')}_tokenizer.json",
+)
+with open(local_tokenizer_path, "w", encoding="utf-8") as tokenizer_file:
+    json.dump(tokenizer_data, tokenizer_file, ensure_ascii=False)
+
+tokenizer = PreTrainedTokenizerFast(
+    tokenizer_file=local_tokenizer_path,
+    bos_token="<s>",
+    eos_token="</s>",
+    pad_token="<pad>",
+    unk_token="<unk>",
+)
+tokenizer.src_lang = "fr_XX"
+tokenizer.tgt_lang = "fr_XX"
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+tokenized_inputs = tokenizer(text_input, return_tensors="pt", truncation=True)
+model_inputs = {key: tensor.to(device) for key, tensor in tokenized_inputs.items()}
+
+generated_ids = model.generate(
+    **model_inputs,
+    max_length=60,
+    min_length=10,
+    num_beams=4,
+    no_repeat_ngram_size=3,
+    length_penalty=2.0,
+    early_stopping=True,
+)
+
+decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+generated_title = decoded[0].strip()
+
+RESULT = {"generated_title": generated_title}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    result_path = os.path.join(output_dir, "generated_title.json")
+    with open(result_path, "w", encoding="utf-8") as file:
+        json.dump(RESULT, file, ensure_ascii=False, indent=2)

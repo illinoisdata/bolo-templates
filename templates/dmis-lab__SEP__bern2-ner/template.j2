@@ -1,0 +1,41 @@
+{% set input_text = "The patient was diagnosed with acute myeloid leukemia and started targeted therapy." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/dmis-lab__SEP__bern2-ner" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+from transformers import AutoModelForTokenClassification, AutoTokenizer
+
+_tokenizer = AutoTokenizer.from_pretrained(repo_id)
+_model = AutoModelForTokenClassification.from_pretrained(repo_id)
+_model.to(device)
+_model.eval()
+
+_encoding = _tokenizer(input_text, return_tensors="pt", truncation=True, padding=True)
+_encoding = {key: value.to(device) for key, value in _encoding.items()}
+
+_outputs = _model(**_encoding)
+_prediction_ids = _outputs.logits.argmax(dim=-1).squeeze().tolist()
+_input_ids = _encoding["input_ids"].squeeze().tolist()
+
+if isinstance(_prediction_ids, int):
+    _prediction_ids = [_prediction_ids]
+if isinstance(_input_ids, int):
+    _input_ids = [_input_ids]
+
+_tokens = _tokenizer.convert_ids_to_tokens(_input_ids)
+_labels = [_model.config.id2label[label_id] for label_id in _prediction_ids]
+
+RESULT = {
+    "tokens": _tokens,
+    "labels": _labels,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    result_path = os.path.join(output_dir, "ner_result.json")
+    with open(result_path, "w", encoding="utf-8") as result_file:
+        json.dump(RESULT, result_file, ensure_ascii=False, indent=2)

@@ -1,0 +1,45 @@
+{% set repo_id = "qiyuw/WSPAlign-mbert-base" %}
+{% set device = "cuda:0" %}
+{% set src_lang = "ja" %}
+{% set src_text = "私は猫が好きです。" %}
+{% set tgt_lang = "en" %}
+{% set tgt_text = "I like cats." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/qiyuw__SEP__WSPAlign-mbert-base" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+src_lang = "{{ src_lang }}"
+src_text = "{{ src_text }}"
+tgt_lang = "{{ tgt_lang }}"
+tgt_text = "{{ tgt_text }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+
+# Load tokenizer and model, move model to device
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForQuestionAnswering.from_pretrained(repo_id)
+model.to(torch.device(device))
+
+# Pre-process input
+inputs = tokenizer(text=tgt_text, text_pair=src_text, return_tensors="pt")
+inputs = {k: v.to(torch.device(device)) for k, v in inputs.items()}
+
+# Run inference
+outputs = model(**inputs)
+
+# Post-process & build RESULT dict
+start_logits = outputs.start_logits
+end_logits = outputs.end_logits
+start_index = torch.argmax(start_logits, dim=-1).item()
+end_index = torch.argmax(end_logits, dim=-1).item()
+answer_ids = inputs["input_ids"][0][start_index : end_index + 1]
+answer = tokenizer.decode(answer_ids)
+RESULT = {"answer": answer}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, f"answer_{src_lang}_{tgt_lang}.txt"), "w", encoding="utf-8") as f:
+        f.write(RESULT["answer"])

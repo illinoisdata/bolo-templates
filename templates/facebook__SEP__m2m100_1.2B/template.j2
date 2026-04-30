@@ -1,0 +1,36 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/m2m100_1.2B" %}
+{% set src_text = "जीवन एक चॉकलेट बॉक्स की तरह है।" %}
+{% set src_lang = "hi" %}
+{% set tgt_lang = "fr" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__m2m100_1.2B" %}
+
+device = "{{ device }}"
+repo_id = "{{ repo_id }}"
+src_text = "{{ src_text }}"
+src_lang = "{{ src_lang }}"
+tgt_lang = "{{ tgt_lang }}"
+output_dir = "{{ output_dir }}"
+
+import os
+from transformers import M2M100ForConditionalGeneration, M2M100Tokenizer
+
+tokenizer = M2M100Tokenizer.from_pretrained(repo_id)
+model = M2M100ForConditionalGeneration.from_pretrained(repo_id)
+model.to(device)
+
+tokenizer.src_lang = src_lang
+encoded = tokenizer(src_text, return_tensors="pt")
+encoded = encoded.to(device)
+
+forced_bos_token_id = tokenizer.get_lang_id(tgt_lang)
+generated_tokens = model.generate(**encoded, forced_bos_token_id=forced_bos_token_id)
+
+translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "translation.txt"), "w", encoding="utf-8") as f:
+        f.write(RESULT["translation"])

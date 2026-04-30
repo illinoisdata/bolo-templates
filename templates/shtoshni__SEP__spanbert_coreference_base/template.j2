@@ -1,0 +1,40 @@
+{% set text = "The quick brown fox jumps over the lazy dog." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/shtoshni__SEP__spanbert_coreference_base" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+import torch
+
+from transformers import BertModel, BertTokenizerFast
+
+tokenizer = BertTokenizerFast.from_pretrained(repo_id)
+model = BertModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+pooled_output = outputs.pooler_output
+if pooled_output is not None:
+    pooled_output = pooled_output[0].cpu().tolist()
+
+first_token_hidden_state = outputs.last_hidden_state[0, 0].cpu().tolist()
+
+RESULT = {
+    "pooled_output": pooled_output,
+    "first_token_hidden_state": first_token_hidden_state,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    result_path = os.path.join(output_dir, "result.json")
+    with open(result_path, "w", encoding="utf-8") as result_file:
+        json.dump(RESULT, result_file, ensure_ascii=False, indent=2)

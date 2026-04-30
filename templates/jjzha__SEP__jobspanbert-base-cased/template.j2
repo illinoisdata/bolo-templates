@@ -1,0 +1,52 @@
+{% set repo_id = repo_id | default("jjzha/jobspanbert-base-cased") %}
+{% set device = device | default("cuda:0") %}
+{% set mask_prompt = mask_prompt | default("JobSpanBERT specializes in extracting [MASK] from job postings.") %}
+{% set top_k = top_k | default(5) %}
+{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/jjzha__SEP__jobspanbert-base-cased") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+mask_prompt = """{{ mask_prompt }}"""
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+# Preprocess input
+tokenizer_outputs = tokenizer(mask_prompt, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in tokenizer_outputs.items()}
+
+# Run inference
+with torch.no_grad():
+    outputs = model(**inputs)
+logits = outputs.logits
+
+# Post-process logits to obtain top-k predictions at the first mask token position
+mask_token_id = tokenizer.mask_token_id
+mask_positions = torch.where(inputs["input_ids"][0] == mask_token_id)[0]
+first_mask_index = mask_positions[0]
+logits_at_mask = logits[0, first_mask_index, :]
+topk = logits_at_mask.topk(top_k)
+probabilities = torch.softmax(logits_at_mask, dim=-1)[topk.indices].cpu().tolist()
+tracked_tokens = topk.indices.tolist()
+
+top_predictions = []
+for token_id, score in zip(tracked_tokens, probabilities):
+    decoded_token = tokenizer.decode([token_id]).strip()
+    top_predictions.append({"token": decoded_token, "score": score})
+
+RESULT = {"top_predictions": top_predictions}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "result.json").write_text(json.dumps(RESULT))

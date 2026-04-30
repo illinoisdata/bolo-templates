@@ -1,0 +1,33 @@
+{% set text_input = text_input | default('Hai, ada yang bisa saya bantu?') %}
+{% set prompt_prefix = prompt_prefix | default('terjemah ke Melayu: ') %}
+{% set max_length = max_length | default(100) %}
+{% set output_dir = output_dir | default('/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/mesolitica__SEP__translation-t5-small-standard-bahasa-cased-v2') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = {{ text_input | tojson }}
+prompt_prefix = {{ prompt_prefix | tojson }}
+max_length = {{ max_length }}
+output_dir = {{ output_dir | tojson }}
+
+from pathlib import Path
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+
+prompt = f"{prompt_prefix}{text_input}"
+encoded_inputs = tokenizer(prompt, return_tensors="pt")
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    generated_tokens = model.generate(**encoded_inputs, max_length=max_length)
+
+translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    (destination / "translation.txt").write_text(translation, encoding="utf-8")

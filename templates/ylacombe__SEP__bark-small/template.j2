@@ -1,0 +1,41 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set text_prompt = "Hello, I'm Bark, generating a warm spoken greeting." %}
+{% set output_dir = "/tmp/bark_small_output" %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+text_prompt = {{ text_prompt | tojson }}
+output_dir = {{ output_dir | tojson }}
+
+from pathlib import Path
+
+import numpy as np
+import scipy.io.wavfile
+import torch
+from transformers import AutoModel, AutoProcessor
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+inputs = processor(text=[text_prompt], return_tensors="pt")
+inputs = {key: tensor.to(device) for key, tensor in inputs.items()}
+
+speech_tensors = model.generate(**inputs, do_sample=True)
+speech_array = speech_tensors.detach().cpu().numpy()
+speech_array = np.squeeze(speech_array)
+
+sampling_rate = getattr(model.generation_config, "sample_rate", None)
+if sampling_rate is None and hasattr(model.config, "sample_rate"):
+    sampling_rate = model.config.sample_rate
+if sampling_rate is None:
+    sampling_rate = 24000
+
+RESULT = {"speech": speech_array, "sampling_rate": sampling_rate}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    scipy.io.wavfile.write(output_path / "bark_speech.wav", RESULT["sampling_rate"], RESULT["speech"])

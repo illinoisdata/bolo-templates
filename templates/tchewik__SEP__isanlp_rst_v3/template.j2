@@ -1,0 +1,20 @@
+{% set output_dir = "/tmp/isanlp_debug" %}
+
+repo_id = "{{ repo_id }}"
+
+import json
+from huggingface_hub import hf_hub_download, list_repo_files
+
+files = list_repo_files(repo_id)
+config = {}
+if "config.json" in files:
+    config_path = hf_hub_download(repo_id, "config.json")
+    with open(config_path, "r") as fp:
+        config = json.load(fp)
+
+print(json.dumps({"files": files, "config": config}, indent=2))
+
+RESULT = {"files": files}
+
+if __name__ == "__main__":
+    pass

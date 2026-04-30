@@ -1,0 +1,34 @@
+{% set repo_id = "Kyle1668/ag-news-t5-large" %}
+{% set device = "cuda:0" %}
+{% set input_prompt = "summarize: Latest tech news reported that a major company is releasing an affordable, energy-efficient laptop for students this fall." %}
+{% set max_length = 128 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Kyle1668__SEP__ag-news-t5-large" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_prompt = {{ input_prompt | tojson }}
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = {{ output_dir | tojson }}
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import os
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoded_inputs = tokenizer(input_prompt, return_tensors="pt")
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+generated_ids = model.generate(**encoded_inputs, max_length=max_length, num_beams=num_beams)
+decoded_outputs = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+generated_text = decoded_outputs[0]
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "generated_text.txt")
+    with open(output_path, "w", encoding="utf-8") as output_file:
+        output_file.write(RESULT["generated_text"])

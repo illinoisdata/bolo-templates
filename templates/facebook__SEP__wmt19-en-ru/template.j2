@@ -1,0 +1,44 @@
+{% set input_text = "Machine learning is great, isn't it?" %}
+{% set max_length = 512 %}
+{% set num_beams = 5 %}
+{% set translation_file = "translation.txt" %}
+{% set generated_ids_file = "generated_ids.json" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__wmt19-en-ru" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = """{{ input_text }}"""
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+translation_file = "{{ translation_file }}"
+generated_ids_file = "{{ generated_ids_file }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import json
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+encoded_inputs = tokenizer(input_text, return_tensors="pt")
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+generated_ids = model.generate(**encoded_inputs, max_length=max_length, num_beams=num_beams, early_stopping=True)
+translation = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+generated_ids_cpu = generated_ids.cpu().tolist()
+
+RESULT = {
+    "translation": translation,
+    "generated_token_ids": generated_ids_cpu,
+}
+
+if __name__ == "__main__":
+    output_dir_path = Path(output_dir)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
+    (output_dir_path / translation_file).write_text(RESULT["translation"], encoding="utf-8")
+    (output_dir_path / generated_ids_file).write_text(json.dumps(RESULT["generated_token_ids"]), encoding="utf-8")

@@ -1,0 +1,56 @@
+{% set text_input = "今天天气很好，适合处理长文本。" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/schen__SEP__longformer-chinese-base-4096" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import AutoModelForPreTraining, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    text_input,
+    return_tensors="pt",
+    truncation=True,
+    max_length=4096,
+)
+device_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**device_inputs)
+
+prediction_token_ids = outputs.prediction_logits[0].argmax(dim=-1).cpu().tolist()
+predicted_tokens = tokenizer.convert_ids_to_tokens(prediction_token_ids)
+prediction_text = tokenizer.decode(
+    prediction_token_ids,
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=True,
+)
+next_sentence_logits = outputs.seq_relationship_logits[0].cpu().tolist()
+input_ids = encoded_inputs["input_ids"][0].tolist()
+
+RESULT = {
+    "input_ids": input_ids,
+    "predicted_tokens": predicted_tokens,
+    "prediction_text": prediction_text,
+    "next_sentence_logits": next_sentence_logits,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "input_ids.json"), "w", encoding="utf-8") as json_file:
+        json.dump(RESULT["input_ids"], json_file, ensure_ascii=False)
+    with open(os.path.join(output_dir, "predicted_tokens.json"), "w", encoding="utf-8") as json_file:
+        json.dump(RESULT["predicted_tokens"], json_file, ensure_ascii=False)
+    with open(os.path.join(output_dir, "prediction_text.txt"), "w", encoding="utf-8") as text_file:
+        text_file.write(RESULT["prediction_text"])
+    with open(os.path.join(output_dir, "next_sentence_logits.json"), "w", encoding="utf-8") as json_file:
+        json.dump(RESULT["next_sentence_logits"], json_file)

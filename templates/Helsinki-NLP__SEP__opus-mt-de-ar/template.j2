@@ -1,0 +1,29 @@
+{% set text_input = ">>ara<< Guten Morgen." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-de-ar" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+from pathlib import Path
+
+from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
+import torch
+
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+tokenized = tokenizer(text_input, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in tokenized.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, num_beams=4, max_length=tokenizer.model_max_length)
+
+translations = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+translation = translations[0].strip()
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    path = Path(output_dir)
+    path.mkdir(parents=True, exist_ok=True)
+    (path / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

@@ -1,0 +1,30 @@
+{% set repo_id = "facebook/blenderbot-3B" %}
+{% set device = "cuda:0" %}
+{% set prompt_text = "Hello! How are you doing today?" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__blenderbot-3B" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt_text = "{{ prompt_text }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded_inputs = tokenizer(prompt_text, return_tensors="pt")
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+generated_tokens = model.generate(**encoded_inputs, max_new_tokens=60, num_beams=10, length_penalty=0.65, no_repeat_ngram_size=3, early_stopping=True)
+generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    generated_path = os.path.join(output_dir, "generated_response.txt")
+    with open(generated_path, "w", encoding="utf-8") as handle:
+        handle.write(RESULT["generated_text"])

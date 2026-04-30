@@ -1,0 +1,30 @@
+{% set text_prompt = "Describe a prosthetic intervention for a patient with lower limb amputation." %}
+{% set max_length = 128 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Rostlab__SEP__ProstT5_fp16" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_prompt = "{{ text_prompt }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoded_inputs = tokenizer(text_prompt, return_tensors="pt")
+encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+
+generated_ids = model.generate(**encoded_inputs, max_length=max_length)
+
+generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+result_text = generated_texts[0] if generated_texts else ""
+
+RESULT = {"generated_text": result_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_text.txt").write_text(result_text)

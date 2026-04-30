@@ -1,0 +1,41 @@
+{% set prompt = "Hello, my name is" %}
+{% set max_new_tokens = 50 %}
+{% set temperature = 1.0 %}
+{% set do_sample = false %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/sgugger__SEP__rwkv-430M-pile" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+do_sample = {{ do_sample }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+import os
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForCausalLM.from_pretrained(repo_id)
+model.to(device)
+
+encoded_input = tokenizer(prompt, return_tensors="pt")
+encoded_input = {k: v.to(device) for k, v in encoded_input.items()}
+
+output_ids = model.generate(
+    **encoded_input,
+    max_new_tokens=max_new_tokens,
+    temperature=temperature,
+    do_sample=do_sample,
+)
+
+generated_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "generated_text.txt")
+    with open(output_path, "w") as f:
+        f.write(RESULT["generated_text"])

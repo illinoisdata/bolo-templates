@@ -1,0 +1,32 @@
+{% set source_text = ">>zh<< Hello world, this is a translation test." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-de-ZH" %}
+{% set max_new_tokens = 128 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = "{{ source_text }}"
+output_dir = "{{ output_dir }}"
+max_new_tokens = {{ max_new_tokens }}
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
+
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+encoded_inputs = tokenizer(source_text, return_tensors="pt")
+encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+
+generated_tokens = model.generate(**encoded_inputs, max_new_tokens=max_new_tokens)
+translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0].strip()
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

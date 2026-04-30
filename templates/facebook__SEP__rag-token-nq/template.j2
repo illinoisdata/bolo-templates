@@ -1,0 +1,63 @@
+{% set question_text = "who holds the record in 100m freestyle" %}
+{% set use_dummy_retriever = true %}
+{% set retriever_index_name = "exact" %}
+{% set num_return_sequences = 1 %}
+{% set max_length = 50 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__rag-token-nq" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question_text = "{{ question_text | replace('"', '\\"') }}"
+use_dummy_retriever = {{ "True" if use_dummy_retriever else "False" }}
+retriever_index_name = "{{ retriever_index_name }}"
+num_return_sequences = {{ num_return_sequences }}
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+import numpy as np
+import torch
+from pathlib import Path
+from transformers import RagRetriever, RagTokenForGeneration, RagTokenizer
+
+_original_numpy_array = np.array
+
+def _patched_numpy_array(*args, **kwargs):
+    try:
+        return _original_numpy_array(*args, **kwargs)
+    except ValueError as error:
+        if kwargs.get("copy") is False and "Unable to avoid copy while creating an array as requested" in str(error):
+            kwargs.pop("copy", None)
+            return _original_numpy_array(*args, **kwargs)
+        raise
+
+np.array = _patched_numpy_array
+
+inference_device = torch.device(device)
+
+tokenizer = RagTokenizer.from_pretrained(repo_id)
+retriever = RagRetriever.from_pretrained(
+    repo_id,
+    index_name=retriever_index_name,
+    use_dummy_dataset=use_dummy_retriever,
+)
+model = RagTokenForGeneration.from_pretrained(repo_id, retriever=retriever)
+model = model.to(inference_device)
+model.eval()
+
+encoded_inputs = tokenizer(question_text, return_tensors="pt")
+encoded_inputs.pop("token_type_ids", None)
+encoded_inputs = {name: tensor.to(inference_device) for name, tensor in encoded_inputs.items()}
+
+generated_tokens = model.generate(
+    **encoded_inputs,
+    max_length=max_length,
+    num_return_sequences=num_return_sequences,
+)
+
+decoded_answers = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+RESULT = {"answers": decoded_answers}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    answers_path = output_path / "answers.txt"
+    answers_path.write_text("\n".join(RESULT["answers"]), encoding="utf-8")

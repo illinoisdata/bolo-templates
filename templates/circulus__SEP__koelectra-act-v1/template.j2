@@ -1,0 +1,63 @@
+{% set input_text = "오늘은 어떤 감정을 느끼고 계신가요? 저희가 함께 살펴보겠습니다." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/circulus__SEP__koelectra-act-v1" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+device = torch.device(device)
+
+model = AutoModelForSequenceClassification.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+encoded_input = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+    padding=True,
+)
+encoded_input = {key: value.to(device) for key, value in encoded_input.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_input)
+
+logits_tensor = outputs.logits
+scores_tensor = torch.sigmoid(logits_tensor)
+
+logits_list = logits_tensor.detach().cpu().tolist()
+scores_list = scores_tensor.detach().cpu().tolist()
+
+id2label = model.config.id2label or {}
+label_keys = sorted(id2label.keys(), key=int)
+label_names = [id2label[key] for key in label_keys]
+
+batch_scores = scores_list[0] if scores_list else []
+predictions = [
+    {"label": label, "score": float(score)}
+    for label, score in zip(label_names, batch_scores)
+]
+
+RESULT = {
+    "logits": logits_list,
+    "scores": scores_list,
+    "predictions": predictions,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    predictions_path = output_path / "predictions.json"
+    predictions_path.write_text(json.dumps(predictions, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    scores_payload = {"logits": logits_list, "scores": scores_list}
+    scores_path = output_path / "scores.json"
+    scores_path.write_text(json.dumps(scores_payload, ensure_ascii=False, indent=2), encoding="utf-8")

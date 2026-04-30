@@ -1,0 +1,40 @@
+{% set text_input = "Bone scan: Negative for distant metastasis." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/UFNLP__SEP__gatortron-base" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = """{{ text_input }}"""
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+# Pre-process input text
+encoded_input = tokenizer(text_input, truncation=True, padding=True, max_length=512, return_tensors="pt")
+encoded_input = {key: value.to(device) for key, value in encoded_input.items()}
+
+# Run inference
+with torch.no_grad():
+    outputs = model(**encoded_input)
+
+# Post-process outputs
+last_hidden_state = outputs.last_hidden_state.cpu()
+pooler_output = outputs.pooler_output.cpu() if outputs.pooler_output is not None else None
+
+RESULT = {
+    "last_hidden_state": last_hidden_state,
+    "pooler_output": pooler_output,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    torch.save(RESULT["last_hidden_state"], os.path.join(output_dir, "last_hidden_state.pt"))
+    if RESULT["pooler_output"] is not None:
+        torch.save(RESULT["pooler_output"], os.path.join(output_dir, "pooler_output.pt"))

@@ -1,0 +1,44 @@
+{% set image_path = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
+{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ydshieh__SEP__vit-gpt2-coco-en' %}
+{% set max_length = 16 %}
+{% set num_beams = 4 %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+
+import os
+import requests
+from PIL import Image
+import torch
+from transformers import ViTImageProcessor, AutoTokenizer, VisionEncoderDecoderModel
+
+image_processor = ViTImageProcessor.from_pretrained(repo_id)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = VisionEncoderDecoderModel.from_pretrained(repo_id)
+torch_device = torch.device(device)
+model.to(torch_device)
+model.eval()
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+pixel_values = image_processor(images=image, return_tensors="pt").pixel_values.to(torch_device)
+with torch.no_grad():
+    output_ids = model.generate(pixel_values, max_length=max_length, num_beams=num_beams, return_dict_in_generate=True).sequences
+
+captions = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
+captions = [caption.strip() for caption in captions]
+
+RESULT = {"captions": captions}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    captions_path = os.path.join(output_dir, "captions.txt")
+    with open(captions_path, "w", encoding="utf-8") as captions_file:
+        for caption in RESULT["captions"]:
+            captions_file.write(f"{caption}\n")

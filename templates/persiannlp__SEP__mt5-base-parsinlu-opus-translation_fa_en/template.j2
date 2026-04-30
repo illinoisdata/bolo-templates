@@ -1,0 +1,35 @@
+{% set input_text = "ستایش خدای را که پروردگار جهانیان است." %}
+{% set generator_kwargs = {"num_beams": 4, "max_length": 128} %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/persiannlp__SEP__mt5-base-parsinlu-opus-translation_fa_en" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+generator_kwargs = {{ generator_kwargs }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+tokenizer_inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    padding=True,
+    truncation=True,
+)
+tokenizer_inputs = {key: tensor.to(device) for key, tensor in tokenizer_inputs.items()}
+
+generated_tokens = model.generate(**tokenizer_inputs, **generator_kwargs)
+translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    translation_file = output_path / "translations.txt"
+    translation_file.write_text("\n".join(RESULT["translations"]), encoding="utf-8")

@@ -1,0 +1,62 @@
+{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__unispeech-sat-base" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+output_dir = "{{ output_dir }}"
+from io import BytesIO
+from pathlib import Path
+from urllib.parse import urlparse
+
+import numpy as np
+import requests
+import soundfile as sf
+import torch
+from torchaudio.functional import resample
+from transformers import AutoFeatureExtractor, AutoModelForPreTraining
+
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+model.eval()
+
+def _is_url(path: str) -> bool:
+    parsed = urlparse(path)
+    return parsed.scheme in {"http", "https"}
+
+
+def _load_waveform(path: str) -> tuple[np.ndarray, int]:
+    if _is_url(path):
+        response = requests.get(path)
+        response.raise_for_status()
+        waveform, sampling_rate = sf.read(BytesIO(response.content), dtype="float32")
+    else:
+        waveform, sampling_rate = sf.read(path, dtype="float32")
+    if waveform.ndim > 1:
+        waveform = waveform.mean(axis=1)
+    return waveform, sampling_rate
+
+
+waveform, sampling_rate = _load_waveform(audio_path)
+target_sampling_rate = feature_extractor.sampling_rate
+if sampling_rate != target_sampling_rate:
+    waveform_tensor = torch.from_numpy(waveform).float()
+    waveform_tensor = resample(waveform_tensor, sampling_rate, target_sampling_rate)
+    waveform = waveform_tensor.numpy()
+    sampling_rate = target_sampling_rate
+
+inputs = feature_extractor(waveform, sampling_rate=sampling_rate, return_tensors="pt")
+inputs = {key: tensor.to(device) for key, tensor in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits_array = outputs.logits.detach().cpu().numpy()
+
+RESULT = {
+    "logits": logits_array,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    np.save(output_path / "logits.npy", RESULT["logits"])

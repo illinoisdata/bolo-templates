@@ -1,0 +1,30 @@
+{% set repo_id = "google/flan-t5-small" %}
+{% set device = "cuda:0" %}
+{% set text_prompt = "translate English to German: How old are you?" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__flan-t5-small" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_prompt = "{{ text_prompt }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+inputs = tokenizer(text_prompt, return_tensors="pt").to(device)
+outputs = model.generate(**inputs)
+generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    text_file = output_path / "generated_text.txt"
+    with text_file.open("w", encoding="utf-8") as f:
+        f.write(RESULT["generated_text"])

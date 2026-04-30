@@ -1,0 +1,67 @@
+{% set repo_id = "csebuetnlp/mT5_m2m_crossSum_enhanced" %}
+{% set device = "cuda:0" %}
+{% set article_text = "This article describes how videos claiming vaccines are dangerous are being removed. The policy includes terminating accounts that spread misinformation, and tech giants have been criticized for not doing more to counter false health information on their sites." %}
+{% set target_language = "english" %}
+{% set max_input_length = 512 %}
+{% set max_summary_length = 84 %}
+{% set beam_size = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/csebuetnlp__SEP__mT5_m2m_crossSum_enhanced" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+article_text = "{{ article_text }}"
+target_language = "{{ target_language }}"
+max_input_length = {{ max_input_length }}
+max_summary_length = {{ max_summary_length }}
+beam_size = {{ beam_size }}
+output_dir = "{{ output_dir }}"
+
+import os
+import re
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+
+WHITESPACE_HANDLER = lambda text: re.sub(r"\s+", " ", re.sub(r"\n+", " ", text.strip()))
+processed_article = WHITESPACE_HANDLER(article_text)
+
+tokenized_inputs = tokenizer(
+    processed_article,
+    return_tensors="pt",
+    padding="max_length",
+    truncation=True,
+    max_length=max_input_length,
+)
+input_ids = tokenized_inputs["input_ids"].to(device)
+attention_mask = tokenized_inputs["attention_mask"].to(device)
+
+def get_lang_id(lang: str) -> int:
+    lang_token = model.config.task_specific_params["langid_map"][lang][1]
+    return tokenizer.convert_tokens_to_ids(lang_token)
+
+decoder_start_token_id = get_lang_id(target_language)
+output_ids = model.generate(
+    input_ids=input_ids,
+    attention_mask=attention_mask,
+    decoder_start_token_id=decoder_start_token_id,
+    max_length=max_summary_length,
+    no_repeat_ngram_size=2,
+    num_beams=beam_size,
+)[0]
+
+summary = tokenizer.decode(
+    output_ids,
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=False,
+)
+
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    summary_path = os.path.join(output_dir, "summary.txt")
+    with open(summary_path, "w", encoding="utf-8") as buffer:
+        buffer.write(RESULT["summary"])

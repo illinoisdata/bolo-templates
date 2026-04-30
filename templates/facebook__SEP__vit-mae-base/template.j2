@@ -1,0 +1,66 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__vit-mae-base" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from urllib.parse import urlparse
+
+import numpy as np
+import requests
+import torch
+from PIL import Image
+from transformers import AutoImageProcessor, AutoModelForPreTraining
+
+runtime_device = torch.device(device)
+
+processor = AutoImageProcessor.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id)
+model.to(runtime_device)
+model.eval()
+
+parsed_image_url = urlparse(image_path)
+if parsed_image_url.scheme in {"http", "https"}:
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = processor(images=image, return_tensors="pt")
+inputs = {name: tensor.to(runtime_device) for name, tensor in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+loss_tensor = getattr(outputs, "loss", None)
+loss_value = loss_tensor.detach().cpu().item() if loss_tensor is not None else None
+
+logits_tensor = getattr(outputs, "logits", None)
+logits_tensor = logits_tensor.detach().cpu() if logits_tensor is not None else None
+
+mask_tensor = getattr(outputs, "mask", None)
+mask_tensor = mask_tensor.detach().cpu() if mask_tensor is not None else None
+
+ids_restore_tensor = getattr(outputs, "ids_restore", None)
+ids_restore_tensor = ids_restore_tensor.detach().cpu() if ids_restore_tensor is not None else None
+
+RESULT = {
+    "loss": loss_value,
+    "logits": logits_tensor,
+    "mask": mask_tensor,
+    "ids_restore": ids_restore_tensor,
+}
+
+if __name__ == "__main__":
+    result_path = Path(output_dir)
+    result_path.mkdir(parents=True, exist_ok=True)
+    if RESULT["loss"] is not None:
+        (result_path / "loss.txt").write_text(str(RESULT["loss"]))
+    if RESULT["logits"] is not None:
+        np.save(result_path / "logits.npy", RESULT["logits"].numpy())
+    if RESULT["mask"] is not None:
+        np.save(result_path / "mask.npy", RESULT["mask"].numpy())
+    if RESULT["ids_restore"] is not None:
+        np.save(result_path / "ids_restore.npy", RESULT["ids_restore"].numpy())

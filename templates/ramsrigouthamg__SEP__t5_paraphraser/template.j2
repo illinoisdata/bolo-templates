@@ -1,0 +1,63 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set prompt = "Which course should I take to get started in data science?" %}
+{% set prefix = "paraphrase: " %}
+{% set max_length = 256 %}
+{% set num_return_sequences = 5 %}
+{% set top_k = 120 %}
+{% set top_p = 0.98 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ramsrigouthamg__SEP__t5_paraphraser" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+prefix = "{{ prefix }}"
+max_length = {{ max_length }}
+num_return_sequences = {{ num_return_sequences }}
+top_k = {{ top_k }}
+top_p = {{ top_p }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = model.to(torch.device(device))
+model.eval()
+
+input_sequence = (prefix + prompt).strip()
+encoding = tokenizer(input_sequence, return_tensors="pt")
+input_ids = encoding["input_ids"].to(torch.device(device))
+attention_mask = encoding["attention_mask"].to(torch.device(device))
+with torch.no_grad():
+    outputs = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        do_sample=True,
+        max_length=max_length,
+        top_k=top_k,
+        top_p=top_p,
+        num_return_sequences=num_return_sequences,
+        early_stopping=True,
+    )
+
+generated_texts = tokenizer.batch_decode(outputs, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+paraphrases = []
+for text in generated_texts:
+    normalized = text.strip()
+    if not normalized:
+        continue
+    if normalized.lower() == prompt.lower():
+        continue
+    if normalized in paraphrases:
+        continue
+    paraphrases.append(normalized)
+
+RESULT = {"paraphrases": paraphrases}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    file_path = Path(output_dir) / "paraphrases.txt"
+    file_path.write_text("\n".join(RESULT["paraphrases"]))

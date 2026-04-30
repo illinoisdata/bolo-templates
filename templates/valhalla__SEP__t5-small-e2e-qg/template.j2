@@ -1,0 +1,25 @@
+{% set input_text = "Python is developed by Guido Van Rossum and released in 1991." %}{% set num_beams = 4 %}{% set max_new_tokens = 64 %}{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/valhalla__SEP__t5-small-e2e-qg" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+num_beams = {{ num_beams }}
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device=torch.device(device))
+model.eval()
+encoded_inputs = tokenizer(input_text, return_tensors="pt")
+prepared_inputs = {key: value.to(device=torch.device(device)) for key, value in encoded_inputs.items()}
+generated_ids = model.generate(**prepared_inputs, num_beams=num_beams, max_new_tokens=max_new_tokens)
+generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

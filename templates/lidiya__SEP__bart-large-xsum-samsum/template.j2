@@ -1,0 +1,62 @@
+{% set conversation = """Hannah: Hey, do you have Betty's number?
+Amanda: Lemme check
+Amanda: Sorry, can't find it.
+Amanda: Ask Larry
+Amanda: He called her last time we were at the park together
+Hannah: I don't know him well
+Amanda: Don't be shy, he's very nice
+Hannah: If you say so..
+Hannah: I'd rather you texted him
+Amanda: Just text him 🙂
+Hannah: Urgh.. Alright
+Hannah: Bye
+Amanda: Bye bye""" %}
+{% set max_length = 60 %}
+{% set min_length = 11 %}
+{% set num_beams = 6 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/lidiya__SEP__bart-large-xsum-samsum" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+conversation = """{{ conversation }}"""
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(conversation, return_tensors="pt", truncation=True)
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+generated_tokens = model.generate(
+    **inputs,
+    max_length=max_length,
+    min_length=min_length,
+    num_beams=num_beams,
+    no_repeat_ngram_size=3,
+    early_stopping=True,
+)
+decoded_summaries = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+decoded_summaries = [summary.strip() for summary in decoded_summaries]
+RESULT = {
+    "summary": decoded_summaries[0] if len(decoded_summaries) == 1 else decoded_summaries,
+}
+
+if __name__ == "__main__":
+    target_dir = Path(output_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    summary_value = RESULT["summary"]
+    summary_file = target_dir / "summary.txt"
+    with summary_file.open("w", encoding="utf-8") as summary_handle:
+        if isinstance(summary_value, list):
+            summary_handle.write("\n".join(summary_value))
+        else:
+            summary_handle.write(summary_value)

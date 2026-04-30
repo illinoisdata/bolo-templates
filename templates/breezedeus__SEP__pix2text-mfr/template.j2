@@ -1,0 +1,40 @@
+{% set image_path = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
+{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/breezedeus__SEP__pix2text-mfr' %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+from pathlib import Path
+from io import BytesIO
+import requests
+from PIL import Image
+from transformers import TrOCRProcessor
+from optimum.onnxruntime import ORTModelForVision2Seq
+
+# Always use CPU provider for ONNX Runtime to avoid GPU CUDNN issues
+provider = "CPUExecutionProvider"
+
+processor = TrOCRProcessor.from_pretrained(repo_id)
+model = ORTModelForVision2Seq.from_pretrained(repo_id, provider=provider, use_cache=False)
+
+def _load_image(path: str) -> Image.Image:
+    if path.startswith(("http://", "https://")):
+        response = requests.get(path)
+        response.raise_for_status()
+        return Image.open(BytesIO(response.content)).convert("RGB")
+    return Image.open(path).convert("RGB")
+
+image = _load_image(image_path)
+pixel_values = processor(images=image, return_tensors="pt").pixel_values
+
+outputs = model.generate(pixel_values=pixel_values)
+generated_text = processor.batch_decode(outputs, skip_special_tokens=True)
+predicted_text = generated_text[0] if generated_text else ""
+
+RESULT = {"predicted_text": predicted_text}
+
+if __name__ == "__main__":
+    out_path = Path(output_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+    text_path = out_path / "predicted_text.txt"
+    text_path.write_text(RESULT["predicted_text"], encoding="utf-8")

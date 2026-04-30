@@ -1,0 +1,25 @@
+{% set repo_id = "flax-community/spanish-t5-small" %}
+{% set device = "cuda:0" %}
+{% set text = "Érase un vez un" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(text, return_tensors="pt").to(device)
+output_ids = model.generate(**inputs)
+generated_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    from pathlib import Path
+    output_dir = Path('.')
+    output_path = output_dir / "generated_text.txt"
+    output_path.write_text(RESULT["generated_text"], encoding="utf-8")

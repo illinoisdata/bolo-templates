@@ -1,0 +1,44 @@
+{% set repo_id = "Salesforce/blip-itm-large-coco" %}
+{% set device = "cuda:0" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set question = "A person holding a cat while sitting on a couch." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Salesforce__SEP__blip-itm-large-coco" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+question = "{{ question }}"
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import requests
+import torch
+from PIL import Image
+from transformers import BlipProcessor, BlipForImageTextRetrieval
+
+target_device = torch.device(device)
+
+processor = BlipProcessor.from_pretrained(repo_id)
+model = BlipForImageTextRetrieval.from_pretrained(repo_id).to(target_device)
+model.eval()
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    raw_image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    raw_image = Image.open(image_path).convert("RGB")
+
+inputs = processor(raw_image, question, return_tensors="pt").to(target_device)
+
+itm_scores = model(**inputs)[0].detach().cpu().tolist()
+cosine_scores = model(**inputs, use_itm_head=False)[0].detach().cpu().tolist()
+
+RESULT = {"itm_scores": itm_scores, "cosine_scores": cosine_scores}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    for key, value in RESULT.items():
+        file_path = output_path / f"{key}.json"
+        with file_path.open("w", encoding="utf-8") as f:
+            json.dump(value, f)

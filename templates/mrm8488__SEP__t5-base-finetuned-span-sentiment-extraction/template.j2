@@ -1,0 +1,27 @@
+{% set prompt = "question: positive context: On the monday, so i wont be able to be with you! i love you" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/mrm8488__SEP__t5-base-finetuned-span-sentiment-extraction" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = """{{ prompt }}"""
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoded_inputs = tokenizer(prompt, return_tensors="pt", truncation=True)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+generated_ids = model.generate(**encoded_inputs, num_beams=4, max_length=80)
+predicted_span = tokenizer.decode(generated_ids[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
+
+RESULT = {"predicted_span": predicted_span}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "predicted_span.txt").write_text(RESULT["predicted_span"], encoding="utf-8")

@@ -1,0 +1,5 @@
+import inspect
+from transformers import AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained("deepset/tapas-large-nq-hn-reader")
+print(inspect.signature(tokenizer.convert_logits_to_predictions))

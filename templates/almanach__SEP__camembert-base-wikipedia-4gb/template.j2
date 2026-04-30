@@ -1,0 +1,36 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set text = "Le camembert est un fromage de <mask>!" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+from transformers import pipeline
+import torch
+import json
+
+# Determine pipeline device (int for GPU ordinal, -1 for CPU)
+if device.startswith("cuda"):
+    device_index = int(device.split(":")[1])
+else:
+    device_index = -1
+
+# Load fill-mask pipeline
+fill_mask = pipeline(
+    "fill-mask",
+    model=repo_id,
+    tokenizer=repo_id,
+    device=device_index,
+)
+
+# Pre-process & inference
+results = fill_mask(text)
+
+# Post-process & build RESULT dict
+RESULT = {"results": results}
+
+if __name__ == "__main__":
+    # Save results to disk as JSON
+    with open("results.json", "w") as f:
+        json.dump(RESULT, f)

@@ -1,0 +1,45 @@
+{% set repo_id = "ylacombe/vits-vctk-with-discriminator" %}
+{% set device = "cuda:0" %}
+{% set text = "Hello, world!" %}
+{% set speaker_id = 0 %}
+{% set speaking_rate = 1.0 %}
+{% set sampling_rate = 22050 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ylacombe__SEP__vits-vctk-with-discriminator" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+speaker_id = {{ speaker_id }}
+speaking_rate = {{ speaking_rate }}
+sampling_rate = {{ sampling_rate }}
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+import torch
+from transformers import AutoTokenizer
+from transformers.models.vits.modeling_vits import VitsModel
+import numpy as np
+import soundfile as sf
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id, phonemize=False)
+model = VitsModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+# Pre-process input
+tokens = tokenizer([text], return_tensors="pt")
+input_ids = tokens.input_ids.to(device)
+attention_mask = tokens.attention_mask.to(device) if "attention_mask" in tokens else None
+
+# Run inference
+outputs = model(input_ids=input_ids, attention_mask=attention_mask, speaker_id=speaker_id, speaking_rate=speaking_rate)
+
+# Post-process output
+waveform = outputs.waveform[0].detach().cpu().numpy()
+
+RESULT = {"waveform": waveform}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    sf.write(Path(output_dir) / "waveform.wav", RESULT["waveform"], sampling_rate)

@@ -1,0 +1,38 @@
+{% set repo_id = "persiannlp/mt5-large-parsinlu-translation_en_fa" %}
+{% set device = "cuda:0" %}
+{% set input_string = "Praise be to Allah, the Cherisher and Sustainer of the worlds;" %}
+{% set max_length = 100 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/persiannlp__SEP__mt5-large-parsinlu-translation_en_fa" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_string = "{{ input_string }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import os
+import json
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+# Pre-process input
+inputs = tokenizer(input_string, return_tensors="pt").to(device)
+
+# Run inference
+generated_ids = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+
+# Post-process & build RESULT dict
+translations = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, "translations.txt")
+    with open(output_file, "w", encoding="utf-8") as f:
+        for line in RESULT["translations"]:
+            f.write(line + "\n")

@@ -1,0 +1,57 @@
+{% set repo_id = "alan-turing-institute/mt5-large-finetuned-mnli-xtreme-xnli" %}
+{% set device = "cuda:0" %}
+{% set sequence_to_classify = "¿A quién vas a votar en 2020?" %}
+{% set candidate_labels = ["Europa", "salud pública", "política"] %}
+{% set hypothesis_template = "Este ejemplo es {}." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/alan-turing-institute__SEP__mt5-large-finetuned-mnli-xtreme-xnli" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sequence_to_classify = "{{ sequence_to_classify }}"
+candidate_labels = {{ candidate_labels }}
+hypothesis_template = "{{ hypothesis_template }}"
+output_dir = "{{ output_dir }}"
+from transformers import MT5ForConditionalGeneration, T5Tokenizer
+import json
+import os
+import torch
+from torch.nn.functional import softmax
+tokenizer = T5Tokenizer.from_pretrained(repo_id, use_fast=False)
+model = MT5ForConditionalGeneration.from_pretrained(repo_id).to(device)
+model.eval()
+task_prefix = "xnli: premise: "
+label_tokens = ["▁0", "▁1", "▁2"]
+label_token_ids = tokenizer.convert_tokens_to_ids(label_tokens)
+def make_xnli_sequence(label: str) -> str:
+    return f"{task_prefix}{sequence_to_classify} hypothesis: {hypothesis_template.format(label)}"
+candidate_sequences = [make_xnli_sequence(label) for label in candidate_labels]
+encoded_inputs = tokenizer(candidate_sequences, return_tensors="pt", padding=True)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+generated = model.generate(
+    **encoded_inputs,
+    output_scores=True,
+    return_dict_in_generate=True,
+    num_beams=1,
+)
+scores = generated.scores[0]
+scores = scores[:, label_token_ids]
+entailment_scores = scores[:, 0]
+contradiction_scores = scores[:, 2]
+entail_vs_contra_scores = torch.stack([entailment_scores, contradiction_scores], dim=1)
+entail_vs_contra_probas = softmax(entail_vs_contra_scores, dim=1)
+entailment_probabilities = softmax(entailment_scores, dim=0)
+label_entailment_probabilities = dict(
+    zip(candidate_labels, entailment_probabilities.tolist())
+)
+RESULT = {
+    "label_entailment_probabilities": label_entailment_probabilities,
+    "entailment_vs_contradiction_probabilities": entail_vs_contra_probas.detach().cpu().tolist(),
+    "generated_sequences": generated.sequences.detach().cpu().tolist(),
+}
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "label_entailment_probabilities.json"), "w", encoding="utf-8") as fp:
+        json.dump(RESULT["label_entailment_probabilities"], fp, ensure_ascii=False)
+    with open(os.path.join(output_dir, "entailment_vs_contradiction_probabilities.json"), "w", encoding="utf-8") as fp:
+        json.dump(RESULT["entailment_vs_contradiction_probabilities"], fp)
+    with open(os.path.join(output_dir, "generated_sequences.json"), "w", encoding="utf-8") as fp:
+        json.dump(RESULT["generated_sequences"], fp)

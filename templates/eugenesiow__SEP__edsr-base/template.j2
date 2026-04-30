@@ -1,0 +1,16 @@
+{% set repo_id = "eugenesiow/edsr-base" %}
+{% set device = "cuda:0" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+
+import os
+import transformers
+
+models_dir = os.path.join(os.path.dirname(transformers.__file__), "models")
+models = sorted(os.listdir(models_dir)) if os.path.isdir(models_dir) else []
+
+RESULT = {"models": models}
+
+if __name__ == "__main__":
+    pass

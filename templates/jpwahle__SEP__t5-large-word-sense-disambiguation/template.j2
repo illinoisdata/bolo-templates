@@ -1,0 +1,37 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set text_prompt = 'question: which description describes the word "java" best in the following context? descriptions: [ "A drink consisting of an infusion of ground coffee beans" , "a platform-independent programming language" , "an island in Indonesia to the south of Borneo" ] context: I like to drink \'java\' in the morning.' %}
+{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/jpwahle__SEP__t5-large-word-sense-disambiguation' %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_prompt = """{{ text_prompt }}"""
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(text_prompt, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+generated_tokens = model.generate(**inputs)
+generated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+if len(generated_texts) == 1:
+    generated_text = generated_texts[0]
+else:
+    generated_text = generated_texts
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    serialized = RESULT["generated_text"]
+    if isinstance(serialized, list):
+        serialized = "\n".join(serialized)
+    output_file = output_path / "generated_text.txt"
+    output_file.write_text(serialized, encoding="utf-8")

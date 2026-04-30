@@ -1,0 +1,14 @@
+{% set device = device %}
+{% set repo_id = repo_id %}
+
+repo_id = "{{ repo_id }}"
+
+from huggingface_hub import list_repo_files
+
+files = list_repo_files(repo_id)
+print(files)
+
+RESULT = {}
+
+if __name__ == "__main__":
+    pass

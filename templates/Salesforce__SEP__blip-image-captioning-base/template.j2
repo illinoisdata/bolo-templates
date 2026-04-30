@@ -1,0 +1,49 @@
+{% set repo_id = "Salesforce/blip-image-captioning-base" %}
+{% set device = "cuda:0" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set prompt_text = "a photography of" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Salesforce__SEP__blip-image-captioning-base" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+prompt_text = "{{ prompt_text }}"
+output_dir = "{{ output_dir }}"
+
+from transformers import BlipProcessor, BlipForConditionalGeneration
+from PIL import Image
+import requests
+import os
+
+# Load processor and model
+processor = BlipProcessor.from_pretrained(repo_id)
+model = BlipForConditionalGeneration.from_pretrained(repo_id)
+model.to(device)
+
+# Pre-process input image
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+# Conditional image captioning
+inputs_cond = processor(image, prompt_text, return_tensors="pt").to(device)
+cond_ids = model.generate(**inputs_cond)
+cond_caption = processor.decode(cond_ids[0], skip_special_tokens=True)
+
+# Unconditional image captioning
+inputs_uncond = processor(image, return_tensors="pt").to(device)
+uncond_ids = model.generate(**inputs_uncond)
+uncond_caption = processor.decode(uncond_ids[0], skip_special_tokens=True)
+
+RESULT = {
+    "conditional_caption": cond_caption,
+    "unconditional_caption": uncond_caption,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "conditional_caption.txt"), "w") as f:
+        f.write(RESULT["conditional_caption"])
+    with open(os.path.join(output_dir, "unconditional_caption.txt"), "w") as f:
+        f.write(RESULT["unconditional_caption"])

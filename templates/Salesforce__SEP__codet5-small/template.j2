@@ -1,0 +1,46 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set prompt = "def greet(user): print(f\"hello <extra_id_0>!\")" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Salesforce__SEP__codet5-small" %}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+prompt = {{ prompt | tojson }}
+output_dir = {{ output_dir | tojson }}
+
+import torch
+from pathlib import Path
+from transformers import RobertaTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+
+device = torch.device(device)
+
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+tokenizer = RobertaTokenizer(
+    vocab_file=vocab_path,
+    merges_file=merges_path,
+    bos_token="<s>",
+    eos_token="</s>",
+    unk_token="<unk>",
+    pad_token="<pad>",
+    cls_token="<s>",
+    sep_token="</s>",
+    mask_token="<mask>",
+)
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+input_tokens = tokenizer(prompt, return_tensors="pt")
+input_tokens = {key: value.to(device) for key, value in input_tokens.items()}
+
+generated_ids = model.generate(**input_tokens, max_new_tokens=128)
+
+generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+generated_text = generated_texts[0]
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

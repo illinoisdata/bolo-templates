@@ -1,0 +1,44 @@
+{% set repo_id = "Helsinki-NLP/opus-mt-en-ar" %}
+{% set device = "cuda:0" %}
+{% set source_text = "Hello, how are you today?" %}
+{% set target_lang = "ara" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-en-ar" %}
+{% set max_length = 128 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = """{{ source_text }}"""
+target_lang = "{{ target_lang }}"
+output_dir = "{{ output_dir }}"
+max_length = {{ max_length }}
+
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
+
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+stripped_source_text = source_text.strip()
+if target_lang:
+    prefixed_text = f">>{target_lang}<< {stripped_source_text}"
+else:
+    prefixed_text = stripped_source_text
+
+encoded_inputs = tokenizer(
+    prefixed_text,
+    return_tensors="pt",
+    padding=True,
+    truncation=True,
+    max_length=max_length,
+)
+encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
+generated_tokens = model.generate(**encoded_inputs, max_length=max_length)
+translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    translation_path = output_path / "translation.txt"
+    translation_path.write_text(translation, encoding="utf-8")

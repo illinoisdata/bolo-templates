@@ -1,0 +1,11 @@
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+
+import transformers
+from pathlib import Path
+
+root = Path(transformers.__file__).resolve().parent
+matches = sorted(str(path.relative_to(root)) for path in root.rglob("*time*series*"))
+print("Found time series modules:")
+for match in matches:
+    print(match)

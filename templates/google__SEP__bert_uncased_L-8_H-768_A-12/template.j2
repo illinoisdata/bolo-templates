@@ -1,0 +1,45 @@
+{% set repo_id = "google/bert_uncased_L-8_H-768_A-12" %}
+{% set device = "cuda:0" %}
+{% set text = "Hello, I'm a [MASK] model." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-8_H-768_A-12" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import json
+import torch
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id)
+model.to(device)
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+mask_token_index = (inputs["input_ids"] == tokenizer.mask_token_id)[0].nonzero(as_tuple=True)[0]
+mask_token_logits = logits[0, mask_token_index, :]
+
+top_k = 5
+top_tokens = torch.topk(mask_token_logits, top_k, dim=1).indices[0].tolist()
+
+predictions = []
+for token in top_tokens:
+    token_str = tokenizer.decode([token]).strip()
+    score = torch.softmax(mask_token_logits, dim=1)[0, token].item()
+    sequence = text.replace(tokenizer.mask_token, token_str)
+    predictions.append({"token": token, "score": score, "token_str": token_str, "sequence": sequence})
+
+RESULT = {"predictions": predictions}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "predictions.json"), "w") as f:
+        json.dump(RESULT["predictions"], f)

@@ -1,0 +1,43 @@
+{% set input_strings = ["Le 0ctobre 1894, [START] Dreyfvs [END] est arrêté à Paris, accusé d'espionnage pour l'Allemagne — un événement qui déchira la société française pendant des années."] %}
+{% set max_new_tokens = 64 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/impresso-project__SEP__nel-mgenre-multilingual" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_strings = {{ input_strings }}
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import json
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+if isinstance(input_strings, str):
+    input_strings = [input_strings]
+
+encoded_inputs = tokenizer(
+    input_strings,
+    return_tensors="pt",
+    padding=True,
+    truncation=True,
+)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+generated_ids = model.generate(
+    **encoded_inputs,
+    max_new_tokens=max_new_tokens,
+)
+
+generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"generated_texts": generated_texts}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_texts.json").write_text(
+        json.dumps(RESULT["generated_texts"], ensure_ascii=False, indent=2)
+    )

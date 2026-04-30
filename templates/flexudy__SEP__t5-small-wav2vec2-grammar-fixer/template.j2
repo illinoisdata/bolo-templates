@@ -1,0 +1,62 @@
+{% set repo_id = "flexudy/t5-small-wav2vec2-grammar-fixer" %}
+{% set device = "cuda:0" %}
+{% set input_text = "WHEN ARE YOU COMING TOMORROW I AM ASKING BECAUSE OF THE MONEY YOU OWE ME PLEASE GIVE IT TO ME I AM WAITING YOU HAVE BEEN AVOIDING ME SINCE TWO THOUSAND AND THREE" %}
+{% set prefix = "fix: { " %}
+{% set suffix = " } </s>" %}
+{% set max_length = 256 %}
+{% set num_beams = 4 %}
+{% set repetition_penalty = 1.0 %}
+{% set length_penalty = 1.0 %}
+{% set early_stopping = True %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/flexudy__SEP__t5-small-wav2vec2-grammar-fixer" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+prefix = "{{ prefix }}"
+suffix = "{{ suffix }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+repetition_penalty = {{ repetition_penalty }}
+length_penalty = {{ length_penalty }}
+early_stopping = {{ early_stopping }}
+output_dir = "{{ output_dir }}"
+
+from transformers import T5Tokenizer, T5ForConditionalGeneration
+import torch
+import os
+
+tokenizer = T5Tokenizer.from_pretrained(repo_id)
+model = T5ForConditionalGeneration.from_pretrained(repo_id).to(device)
+
+model_input = prefix + input_text + suffix
+input_ids = tokenizer.encode(
+    model_input,
+    return_tensors="pt",
+    max_length=max_length,
+    truncation=True,
+    add_special_tokens=True,
+).to(device)
+
+outputs = model.generate(
+    input_ids=input_ids,
+    max_length=max_length,
+    num_beams=num_beams,
+    repetition_penalty=repetition_penalty,
+    length_penalty=length_penalty,
+    early_stopping=early_stopping,
+)
+
+generated_text = tokenizer.decode(
+    outputs[0],
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=True,
+)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "generated_text.txt")
+    with open(output_path, "w") as f:
+        f.write(RESULT["generated_text"])

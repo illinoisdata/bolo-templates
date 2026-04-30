@@ -1,0 +1,61 @@
+{% set prompt = "The capital of France is [MASK]." %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-8_H-256_A-4" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded_inputs = tokenizer(prompt, return_tensors="pt")
+encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+logits = outputs.logits
+mask_token_id = tokenizer.mask_token_id
+mask_positions = torch.nonzero(encoded_inputs["input_ids"] == mask_token_id, as_tuple=False)
+
+fill_mask_predictions = []
+if mask_positions.numel() > 0:
+    for batch_index, token_index in mask_positions:
+        batch_index = int(batch_index.item())
+        token_index = int(token_index.item())
+        mask_logits = logits[batch_index, token_index]
+        mask_probs = torch.softmax(mask_logits, dim=-1)
+        topk = torch.topk(mask_logits, k=top_k, dim=-1)
+        topk_ids = topk.indices
+        topk_scores = mask_probs[topk_ids]
+        token_ids = topk_ids.cpu().tolist()
+        scores = topk_scores.cpu().tolist()
+        candidates = []
+        for token_id, score in zip(token_ids, scores):
+            token_string = tokenizer.decode([token_id]).strip()
+            candidates.append({
+                "token_id": token_id,
+                "token": token_string,
+                "score": float(score),
+            })
+        fill_mask_predictions.append({
+            "mask_index": token_index,
+            "candidates": candidates,
+        })
+
+RESULT = {"fill_mask": fill_mask_predictions}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "fill_mask.json")
+    with open(output_path, "w") as output_file:
+        json.dump(RESULT["fill_mask"], output_file, indent=2)

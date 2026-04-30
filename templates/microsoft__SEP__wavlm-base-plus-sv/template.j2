@@ -1,0 +1,67 @@
+{% set repo_id = "microsoft/wavlm-base-plus-sv" %}
+{% set device = "cuda:0" %}
+{% set audio_filepath = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_filepath = "{{ audio_filepath }}"
+
+from transformers import AutoFeatureExtractor, WavLMForXVector
+import torch
+import numpy as np
+import requests
+from io import BytesIO
+import torchaudio
+import soundfile as sf
+
+# Load feature extractor and model
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+model = WavLMForXVector.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+# Load audio
+if audio_filepath.startswith("http"):
+    response = requests.get(audio_filepath)
+    audio_np, sr = sf.read(BytesIO(response.content))
+else:
+    audio_np, sr = sf.read(audio_filepath)
+audio = torch.tensor(audio_np)
+
+# Prepare audio tensor for resampling (channel-first)
+if audio.ndim > 1:
+    audio = audio.T
+else:
+    audio = audio.unsqueeze(0)
+
+# Ensure float32 for resampling
+audio = audio.to(torch.float32)
+
+# Resample if needed
+target_sr = feature_extractor.sampling_rate
+if sr != target_sr:
+    resampler = torchaudio.transforms.Resample(sr, target_sr)
+    audio = resampler(audio)
+    sr = target_sr
+
+# Convert to 1D numpy array
+audio = audio.squeeze(0).cpu().numpy()
+
+# Prepare inputs
+inputs = feature_extractor([audio], sampling_rate=sr, padding=True, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+# Run inference
+with torch.no_grad():
+    outputs = model(**inputs)
+    embeddings = outputs.embeddings
+    embeddings = torch.nn.functional.normalize(embeddings, dim=-1).cpu()
+
+# Post-process result
+RESULT = {"embeddings": embeddings}
+
+if __name__ == "__main__":
+    import os
+    output_dir = os.getenv("OUTPUT_DIR", ".")
+    os.makedirs(output_dir, exist_ok=True)
+    np.save(os.path.join(output_dir, "embeddings.npy"), RESULT["embeddings"].numpy())

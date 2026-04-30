@@ -1,0 +1,39 @@
+{% set text_input = "The head of the United Nations says there is no military solution in Syria" %}
+{% set src_lang = "en_XX" %}
+{% set target_lang = "hi_IN" %}
+{% set max_new_tokens = 128 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mbart-large-50-one-to-many-mmt" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = """{{ text_input }}"""
+src_lang = "{{ src_lang }}"
+target_lang = "{{ target_lang }}"
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, src_lang=src_lang)
+
+model_inputs = tokenizer(text_input, return_tensors="pt")
+model_inputs = {name: tensor.to(device) for name, tensor in model_inputs.items()}
+
+forced_bos_token_id = tokenizer.lang_code_to_id[target_lang]
+generated_tokens = model.generate(
+    **model_inputs,
+    forced_bos_token_id=forced_bos_token_id,
+    max_new_tokens=max_new_tokens,
+)
+translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    dump_dir = Path(output_dir)
+    dump_dir.mkdir(parents=True, exist_ok=True)
+    translations_path = dump_dir / "translations.txt"
+    translations_path.write_text("\n".join(RESULT["translations"]))

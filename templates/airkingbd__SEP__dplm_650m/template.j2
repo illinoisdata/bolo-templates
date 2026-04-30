@@ -1,0 +1,43 @@
+{% set sequence = "ACDEFGHIKLMNPQRSTVWY" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/airkingbd__SEP__dplm_650m" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sequence = "{{ sequence }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+tokenizer_inputs = tokenizer(sequence, return_tensors="pt")
+input_ids = tokenizer_inputs["input_ids"].to(device)
+attention_mask = tokenizer_inputs.get("attention_mask")
+if attention_mask is not None:
+    attention_mask = attention_mask.to(device)
+
+model_inputs = {"input_ids": input_ids}
+if attention_mask is not None:
+    model_inputs["attention_mask"] = attention_mask
+
+with torch.no_grad():
+    outputs = model(**model_inputs)
+
+sequence_representation = outputs.last_hidden_state[:, 0, :].detach().cpu()
+
+RESULT = {"sequence_representation": sequence_representation}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    torch.save(
+        RESULT["sequence_representation"],
+        Path(output_dir) / "sequence_representation.pt",
+    )

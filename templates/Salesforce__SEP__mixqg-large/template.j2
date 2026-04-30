@@ -1,0 +1,39 @@
+{% set context = "In the late 17th century, Robert Boyle proved that air is necessary for combustion." %}
+{% set answer = "Robert Boyle" %}
+{% set max_length = 64 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Salesforce__SEP__mixqg-large" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+context = "{{ context }}"
+answer = "{{ answer }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import os
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+
+def format_inputs(context: str, answer: str) -> str:
+    return f"{answer}\n{context}"
+
+text = format_inputs(context, answer)
+inputs = tokenizer(text, return_tensors="pt")
+input_ids = inputs.input_ids.to(device)
+
+generated_ids = model.generate(input_ids, max_length=max_length, num_beams=num_beams)
+outputs = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+generated_question = outputs[0] if outputs else ""
+
+RESULT = {"generated_question": generated_question}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    question_path = os.path.join(output_dir, "generated_question.txt")
+    with open(question_path, "w", encoding="utf-8") as writer:
+        writer.write(generated_question)

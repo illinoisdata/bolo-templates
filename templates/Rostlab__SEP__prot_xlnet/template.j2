@@ -1,0 +1,50 @@
+{% set text_sequence = "MGDVEKGKKIFIMKCSQCHTVEKGGKHKTGPNLHGLFGRKTGQAPGYSYTAANKNKGIIWGEDTLMEYLENPKKYIPGTKMIFAGIKG" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Rostlab__SEP__prot_xlnet" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_sequence = "{{ text_sequence }}"
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSequenceClassification.from_pretrained(repo_id)
+model.to(torch_device)
+model.eval()
+
+encoded_inputs = tokenizer(text_sequence, return_tensors="pt", truncation=True)
+encoded_inputs = {key: tensor.to(torch_device) for key, tensor in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+logits = outputs.logits
+probs = torch.softmax(logits, dim=-1)
+score_tensor, pred_tensor = torch.max(probs, dim=-1)
+pred_idx = pred_tensor.item()
+raw_id2label = getattr(model.config, "id2label", None)
+if raw_id2label:
+    id2label = {int(key): value for key, value in raw_id2label.items()}
+else:
+    id2label = {}
+prediction_label = id2label.get(pred_idx, str(pred_idx))
+logits_values = logits[0].cpu().tolist() if logits.dim() == 2 else logits.cpu().tolist()
+RESULT = {
+    "label": prediction_label,
+    "score": float(score_tensor.item()),
+    "logits": logits_values,
+}
+
+if __name__ == "__main__":
+    output_dir_path = Path(output_dir)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
+    (output_dir_path / "label.txt").write_text(RESULT["label"], encoding="utf-8")
+    with (output_dir_path / "scores.json").open("w", encoding="utf-8") as outfile:
+        json.dump({"score": RESULT["score"], "logits": RESULT["logits"]}, outfile)

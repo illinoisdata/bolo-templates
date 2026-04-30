@@ -1,0 +1,42 @@
+{% set input_text = "Przykładowe zdanie po polsku do przetłumaczenia." %}
+{% set max_length = 256 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-pl-de" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = """{{ input_text }}"""
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import MarianMTModel, MarianTokenizer
+
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
+model = MarianMTModel.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+encoded_inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    padding=True,
+    truncation=True,
+    max_length=max_length,
+)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+with torch.no_grad():
+    generated_tokens = model.generate(
+        **encoded_inputs,
+        max_length=max_length,
+        num_beams=num_beams,
+    )
+translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+RESULT = {"translation": translations}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "translation.txt")
+    with open(output_path, "w", encoding="utf-8") as file:
+        for line in RESULT["translation"]:
+            file.write(f"{line}\n")

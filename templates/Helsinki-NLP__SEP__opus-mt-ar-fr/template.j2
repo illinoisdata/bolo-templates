@@ -1,0 +1,29 @@
+{% set source_text = "السلام عليكم" %}
+{% set max_length = 512 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-ar-fr" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = "{{ source_text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch.device(device))
+encoding = tokenizer(source_text, return_tensors="pt", padding=True)
+encoding = {key: tensor.to(torch.device(device)) for key, tensor in encoding.items()}
+generated_ids = model.generate(**encoding, max_length=max_length, num_beams=num_beams)
+translation = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

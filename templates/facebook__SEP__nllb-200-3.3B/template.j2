@@ -1,0 +1,5 @@
+from transformers.models import nllb
+
+print([name for name in dir(nllb.tokenization_nllb) if name.isupper()])
+
+RESULT = {}

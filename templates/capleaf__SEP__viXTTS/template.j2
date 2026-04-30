@@ -1,0 +1,11 @@
+{% set repo_id = repo_id %}
+repo_id = "{{ repo_id }}"
+from huggingface_hub import list_repo_files, hf_hub_download
+import json
+
+files = list_repo_files(repo_id)
+print(files)
+config_path = hf_hub_download(repo_id, filename="config.json")
+with open(config_path) as f:
+    data = json.load(f)
+print(json.dumps(data, indent=2))

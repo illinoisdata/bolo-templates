@@ -1,0 +1,39 @@
+{% set text_prompt = "Answer the following question: What is the capital of France?" %}
+{% set max_length = 200 %}
+{% set num_beams = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allenai__SEP__unifiedqa-v2-t5-large-1363200" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_prompt = "{{ text_prompt }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoded_inputs = tokenizer(text_prompt, return_tensors="pt")
+encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+
+generation_kwargs = {
+    "max_length": max_length,
+    "num_beams": num_beams,
+}
+
+generated_tokens = model.generate(**encoded_inputs, **generation_kwargs)
+
+generated_answer = tokenizer.decode(
+    generated_tokens[0], skip_special_tokens=True, clean_up_tokenization_spaces=True
+)
+
+RESULT = {"generated_answer": generated_answer}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir) / "generated_answer.txt"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(RESULT["generated_answer"], encoding="utf-8")

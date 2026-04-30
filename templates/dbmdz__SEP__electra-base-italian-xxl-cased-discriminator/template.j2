@@ -1,0 +1,50 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set input_text = "L'Italia è famosa per la sua arte e cultura." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/dbmdz__SEP__electra-base-italian-xxl-cased-discriminator" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForPreTraining, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+input_ids = inputs["input_ids"].squeeze(0).cpu().tolist()
+tokens = tokenizer.convert_ids_to_tokens(input_ids)
+
+with torch.no_grad():
+    outputs = model(**inputs)
+discriminator_scores = outputs.logits
+
+replaced_probabilities = torch.sigmoid(discriminator_scores)
+sequence_probabilities = replaced_probabilities.squeeze(0).cpu()
+
+token_probabilities = []
+for token, prob in zip(tokens, sequence_probabilities):
+    replaced_probability = float(prob.item())
+    token_probabilities.append(
+        {
+            "token": token,
+            "replaced_probability": replaced_probability,
+            "original_probability": float(1.0 - replaced_probability),
+        }
+    )
+
+RESULT = {"token_probabilities": token_probabilities}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "result.json").write_text(json.dumps(RESULT, ensure_ascii=False, indent=2))

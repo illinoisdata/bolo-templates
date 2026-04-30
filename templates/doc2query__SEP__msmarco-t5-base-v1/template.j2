@@ -1,0 +1,62 @@
+{% set input_text = "Python is an interpreted, high-level and general-purpose programming language. Python's design philosophy emphasizes code readability with its notable use of significant whitespace. Its language constructs and object-oriented approach aim to help programmers write clear, logical code for small and large-scale projects." %}
+{% set max_input_length = 320 %}
+{% set generation_max_length = 64 %}
+{% set num_return_sequences = 5 %}
+{% set do_sample = True %}
+{% set top_p = 0.95 %}
+{% set temperature = 1.0 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/doc2query__SEP__msmarco-t5-base-v1" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = """{{ input_text }}"""
+max_input_length = {{ max_input_length }}
+generation_max_length = {{ generation_max_length }}
+num_return_sequences = {{ num_return_sequences }}
+do_sample = {{ do_sample }}
+top_p = {{ top_p }}
+temperature = {{ temperature }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+model.eval()
+
+inputs = tokenizer(
+    input_text,
+    max_length=max_input_length,
+    truncation=True,
+    return_tensors="pt",
+)
+
+input_ids = inputs.input_ids.to(torch_device)
+attention_mask = inputs.attention_mask.to(torch_device)
+
+outputs = model.generate(
+    input_ids=input_ids,
+    attention_mask=attention_mask,
+    max_length=generation_max_length,
+    do_sample=do_sample,
+    top_p=top_p,
+    num_return_sequences=num_return_sequences,
+    temperature=temperature,
+)
+
+generated_queries = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+
+RESULT = {"generated_queries": generated_queries}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    result_file = output_path / "generated_queries.json"
+    with result_file.open("w", encoding="utf-8") as fp:
+        json.dump(RESULT["generated_queries"], fp, ensure_ascii=False, indent=2)

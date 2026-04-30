@@ -1,0 +1,33 @@
+{% set text = "The quick brown fox jumps over the lazy dog." %}
+{% set max_length = 128 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-en-tl" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoding = tokenizer(text, return_tensors="pt", padding=True)
+encoding = {key: value.to(device) for key, value in encoding.items()}
+
+generated_tokens = model.generate(**encoding, max_length=max_length, num_beams=num_beams)
+
+translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"translation": translations}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    translation_path = os.path.join(output_dir, "translation.txt")
+    with open(translation_path, "w", encoding="utf-8") as file:
+        for line in RESULT["translation"]:
+            file.write(f"{line}\n")

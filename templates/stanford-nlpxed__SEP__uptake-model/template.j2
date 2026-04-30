@@ -1,0 +1,34 @@
+{% set repo_id = "stanford-nlpxed/uptake-model" %}
+{% set device = "cuda:0" %}
+{% set input_text = "The patient is showing signs of improvement." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/stanford-nlpxed__SEP__uptake-model" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import json
+import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+model = AutoModelForSequenceClassification.from_pretrained(repo_id).to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+encoded_inputs = tokenizer(input_text, return_tensors="pt", truncation=True)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+logits = outputs.logits
+logits_cpu = logits.detach().to("cpu")
+logits_list = logits_cpu.tolist()
+
+RESULT = {"logits": logits_list}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    with open(Path(output_dir) / "result.json", "w") as f:
+        json.dump(RESULT, f)

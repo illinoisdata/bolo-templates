@@ -1,0 +1,88 @@
+{% set query = "What are the health benefits of green tea?" %}
+{% set documents = [
+    "Green tea contains antioxidants called catechins that may help reduce inflammation and protect cells from damage.",
+    "El precio del café ha aumentado un 20% este año debido a problemas en la cadena de suministro.",
+    "Studies show that drinking green tea regularly can improve brain function and boost metabolism.",
+    "Basketball is one of the most popular sports in the United States.",
+    "绿茶富含儿茶素等抗氧化剂，可以降低心脏病风险，还有助于控制体重。",
+    "Le thé vert est riche en antioxydants et peut améliorer la fonction cérébrale.",
+] %}
+{% set top_n = 3 %}
+{% set return_embeddings = false %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/jinaai__SEP__jina-reranker-v3" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query = "{{ query }}"
+documents = {{ documents }}
+top_n = {{ top_n }}
+return_embeddings = {{ return_embeddings }}
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+import torch.nn.functional as F
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForCausalLM.from_pretrained(repo_id)
+model.to(torch_device)
+model.eval()
+
+query_encoding = tokenizer(query, return_tensors="pt")
+query_ids = query_encoding.input_ids.to(torch_device)
+query_length = query_ids.shape[-1]
+
+reranked_results = []
+with torch.inference_mode():
+    for index, document in enumerate(documents):
+        doc_encoding = tokenizer(document, return_tensors="pt")
+        doc_ids = doc_encoding.input_ids.to(torch_device)
+        doc_segment = doc_ids[:, 1:] if doc_ids.shape[-1] > 1 else doc_ids
+
+        input_ids = torch.cat([query_ids, doc_segment], dim=-1)
+        attention_mask = torch.ones_like(input_ids)
+        labels = input_ids.clone()
+        labels[:, :query_length] = -100
+
+        outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+        logits = outputs.logits
+        shift_logits = logits[..., :-1, :].contiguous()
+        shift_labels = labels[..., 1:].contiguous()
+
+        loss = F.cross_entropy(
+            shift_logits.reshape(-1, shift_logits.size(-1)),
+            shift_labels.reshape(-1),
+            reduction="sum",
+            ignore_index=-100,
+        )
+        non_ignored = int((shift_labels != -100).sum().item())
+        if non_ignored == 0:
+            relevance_score = 0.0
+        else:
+            relevance_score = -(loss / non_ignored).item()
+
+        result_entry = {
+            "document": document,
+            "relevance_score": relevance_score,
+            "index": index,
+        }
+        if return_embeddings:
+            embedding = outputs.last_hidden_state[:, -1, :].detach().cpu().tolist()[0]
+            result_entry["embedding"] = embedding
+        reranked_results.append(result_entry)
+
+reranked_results.sort(key=lambda entry: entry["relevance_score"], reverse=True)
+if top_n is not None:
+    reranked_results = reranked_results[:top_n]
+
+RESULT = {"reranked_documents": reranked_results}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    result_path = os.path.join(output_dir, "rerank_results.json")
+    with open(result_path, "w", encoding="utf-8") as output_file:
+        json.dump(RESULT, output_file, ensure_ascii=False, indent=2)

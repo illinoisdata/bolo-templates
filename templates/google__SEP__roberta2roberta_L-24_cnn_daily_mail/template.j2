@@ -1,0 +1,30 @@
+{% set article_text = "(The Hollywood Reporter)\"The Rocky Horror Picture Show\" is the latest musical getting the small-screen treatment. Fox is developing a two-hour remake of the 1975 cult classic to be directed, executive-produced and choreographed by Kenneth Ortega (\"High School Musical\"). The project, tentatively titled \"The Rocky Horror Picture Show Event,\" is casting-contingent. The special will be filmed in advance and not air live, but few details beyond that are known. In addition to Ortega, Gail Berman and Lou Adler, who produced the original film, are also attached as executive producers. The special will be produced by Fox 21 Television Studios, and Berman's The Jackal Group. The special is timed to celebrate the 40th anniversary of the film, which has grossed more than $112 million and still plays in theaters across the country." %}
+{% set max_new_tokens = 200 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__roberta2roberta_L-24_cnn_daily_mail" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+article = {{ article_text | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+import torch
+from transformers import BertGenerationTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = BertGenerationTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(article, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    summary_path = Path(output_dir) / "summary.txt"
+    summary_path.write_text(summary, encoding="utf-8")

@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("philschmid/flan-t5-base-samsum") %}
+{% set device = device | default("cuda:0") %}
+{% set conversation = conversation | default("Person A: The meeting is scheduled for tomorrow at 9 AM, do you have the agenda ready?\nPerson B: I am finalizing the budget review and will share it right after lunch.\nPerson A: Great, and can you also summarize the client feedback so we can prepare priorities?\nPerson B: Sure, the feedback praised the prototype, but they want faster loading and clearer navigation.") %}
+{% set prompt_prefix = prompt_prefix | default("summarize: ") %}
+{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/philschmid__SEP__flan-t5-base-samsum") %}
+{% set output_filename = output_filename | default("summary.txt") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+conversation = """{{ conversation }}"""
+prompt_prefix = "{{ prompt_prefix }}"
+output_dir = "{{ output_dir }}"
+output_filename = "{{ output_filename }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+model.eval()
+
+input_text = f"{prompt_prefix}{conversation.strip()}"
+inputs = tokenizer(input_text, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(torch_device) for k, v in inputs.items()}
+
+generated_ids = model.generate(**inputs, max_length=200, min_length=30, num_beams=4, early_stopping=True, no_repeat_ngram_size=3, length_penalty=2.0)
+summary = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    destination = output_path / output_filename
+    destination.write_text(summary, encoding="utf-8")

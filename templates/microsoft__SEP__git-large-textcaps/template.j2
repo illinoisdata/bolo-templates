@@ -1,0 +1,43 @@
+{% set repo_id = "microsoft/git-large-textcaps" %}
+{% set device = "cuda:0" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set max_new_tokens = 128 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__git-large-textcaps" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+
+import io
+from pathlib import Path
+
+import requests
+import torch
+from PIL import Image
+from transformers import AutoModelForCausalLM, AutoProcessor
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = AutoModelForCausalLM.from_pretrained(repo_id).to(torch.device(device))
+
+if image_path.lower().startswith("http"):
+    response = requests.get(image_path)
+    response.raise_for_status()
+    image = Image.open(io.BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = processor(images=image, return_tensors="pt")
+inputs = {k: v.to(torch.device(device)) for k, v in inputs.items()}
+
+generated_tokens = model.generate(**inputs, max_new_tokens=max_new_tokens)
+generated_text = processor.batch_decode(generated_tokens, skip_special_tokens=True)[0].strip()
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    text_path = Path(output_dir) / "generated_text.txt"
+    with text_path.open("w", encoding="utf-8") as f:
+        f.write(RESULT["generated_text"])

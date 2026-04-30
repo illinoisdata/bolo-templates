@@ -1,0 +1,71 @@
+{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set output_dir = "./inference_output" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+output_dir = "{{ output_dir }}"
+
+import io
+from pathlib import Path
+from urllib.parse import urlparse
+
+import numpy as np
+import requests
+import soundfile as sf
+import torch
+import torchaudio.functional as F
+from transformers import AutoModelForPreTraining, AutoProcessor
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+model.eval()
+
+parsed_audio_path = urlparse(audio_path)
+if parsed_audio_path.scheme in {"http", "https"}:
+    streamed = requests.get(audio_path)
+    streamed.raise_for_status()
+    audio_array, sample_rate = sf.read(io.BytesIO(streamed.content), dtype="float32")
+else:
+    audio_array, sample_rate = sf.read(audio_path, dtype="float32")
+
+if audio_array.ndim > 1:
+    audio_array = np.mean(audio_array, axis=1)
+
+target_sampling_rate = processor.feature_extractor.sampling_rate
+if sample_rate != target_sampling_rate:
+    resampled = F.resample(torch.from_numpy(audio_array), sample_rate, target_sampling_rate)
+    audio_array = resampled.numpy()
+    sample_rate = target_sampling_rate
+
+inputs = processor.feature_extractor(audio_array, sampling_rate=sample_rate, return_tensors="pt")
+inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+projected_states = getattr(outputs, "projected_states", None)
+codevector_logits = getattr(outputs, "codevector_logits", None)
+sampled_targets = getattr(outputs, "sampled_targets", None)
+
+if projected_states is not None:
+    projected_states = projected_states.detach().cpu()
+if codevector_logits is not None:
+    codevector_logits = codevector_logits.detach().cpu()
+if sampled_targets is not None:
+    sampled_targets = sampled_targets.detach().cpu()
+
+result_data = {}
+if projected_states is not None:
+    result_data["projected_states"] = projected_states
+if codevector_logits is not None:
+    result_data["codevector_logits"] = codevector_logits
+if sampled_targets is not None:
+    result_data["sampled_targets"] = sampled_targets
+
+RESULT = result_data
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    for key, value in RESULT.items():
+        np.save(output_path / f"{key}.npy", value.numpy())

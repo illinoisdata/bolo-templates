@@ -1,0 +1,36 @@
+{% set repo_id = "imvladikon/het5_summarization" %}
+{% set device = "cuda:0" %}
+{% set max_length = 50 %}
+{% set num_beams = 4 %}
+{% set no_repeat_ngram_size = 2 %}
+{% set early_stopping = true %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/imvladikon__SEP__het5_summarization" %}
+{% set text %}
+צרפת ממשיכה לבעור: לאחר ארבעה ימים של עימותים אלימים בין מתפרעים לכוחות הביטחון בכל רחבי צרפת, היום (שבת) התקיימה הלוויתו של הנער האלג'יראי, נאהל בן ה-17, שנורה למוות על ידי שוטר לאחר שנחשד בגניבת רכב. לבקשת משפחתו, ההלוויה התקיימה כאירוע מצומצם שבו השתתפו בני משפחה וחברים בלבד. לאחר שארונו של נאהל הוצא מהמסגד בעיר נאנטר, אלפים קראו "לעשיית צדק עבורו".במקביל, המשטרה הצרפתית נערכת להמשך המהומות בעשרות מוקדים ברחבי המדינה, כשבמהלך הלילה נעצרו 1,300 בני אדם. משרד הפנים הצרפתי הודיע כי במהלך האירועים הוצתו 1,350 כלי רכב, ו-234 הצתות של מבנים. כמו כן, על פי הנתונים נגרם נזק ל-200 מרכזי קניות, 200 סופרמרקטים ו-250 סניפי בנק.
+{% endset %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = """{{ text.strip() }}"""
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+early_stopping = {{ early_stopping }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from pathlib import Path
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+inputs = tokenizer(text, return_tensors="pt").to(device)
+outputs = model.generate(**inputs, max_length=max_length, num_beams=num_beams, no_repeat_ngram_size=no_repeat_ngram_size, early_stopping=early_stopping)
+decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+
+RESULT = {"summary_text": decoded[0]}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "summary.txt").write_text(RESULT["summary_text"], encoding="utf-8")

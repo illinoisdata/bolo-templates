@@ -1,0 +1,49 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set max_length = 128 %}
+{% set num_beams = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/OleehyO__SEP__TexTeller" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from io import BytesIO
+from pathlib import Path
+
+import requests
+import torch
+from PIL import Image
+from torchvision import transforms as T
+from transformers import AutoTokenizer, VisionEncoderDecoderModel
+
+processor_tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = VisionEncoderDecoderModel.from_pretrained(repo_id).to(device)
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    response = requests.get(image_path)
+    response.raise_for_status()
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+transform = T.Compose([
+    T.Grayscale(num_output_channels=1),
+    T.Resize((448, 448)),
+    T.ToTensor(),
+    T.Normalize([0.5], [0.5]),
+])
+pixel_values = transform(image).unsqueeze(0).to(device)
+
+generated_ids = model.generate(pixel_values=pixel_values, max_length=max_length, num_beams=num_beams)
+decoded_outputs = processor_tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+latex_output = decoded_outputs[0] if decoded_outputs else ""
+
+RESULT = {"latex": latex_output}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "latex.txt").write_text(RESULT["latex"], encoding="utf-8")

@@ -1,0 +1,32 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set input_text = "The quick brown fox jumps over the lazy dog while keeping a watchful eye on the distant hills." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/sshleifer__SEP__tinier_bart" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = """{{ input_text }}"""
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+inputs = tokenizer(input_text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+generated_ids = model.generate(**inputs)
+summary = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    summary_path = output_path / "summary.txt"
+    summary_path.write_text(RESULT["summary"], encoding="utf-8")

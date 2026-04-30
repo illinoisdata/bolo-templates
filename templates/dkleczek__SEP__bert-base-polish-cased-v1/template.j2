@@ -1,0 +1,30 @@
+{% set repo_id = "dkleczek/bert-base-polish-cased-v1" %}
+{% set device = "cuda:0" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/dkleczek__SEP__bert-base-polish-cased-v1" %}
+{% set text = "Adam Mickiewicz wielkim polskim <mask> był." %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+text = "{{ text }}"
+
+import os
+import json
+from transformers import AutoTokenizer, pipeline
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+if device.startswith("cuda"):
+    device_id = int(device.split(":")[1])
+else:
+    device_id = -1
+nlp = pipeline("fill-mask", model=repo_id, tokenizer=tokenizer, device=device_id)
+
+input_text = text.replace("<mask>", tokenizer.mask_token)
+predictions = nlp(input_text)
+
+RESULT = {"predictions": predictions}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "predictions.json"), "w") as f:
+        json.dump(RESULT, f)

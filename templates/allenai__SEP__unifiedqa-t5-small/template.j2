@@ -1,0 +1,34 @@
+{% set repo_id = "allenai/unifiedqa-t5-small" %}
+{% set device = "cuda:0" %}
+{% set input_text = "What is the capital of France?" %}
+{% set max_length = 64 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allenai__SEP__unifiedqa-t5-small" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+generated = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+decoded_sequences = tokenizer.batch_decode(generated, skip_special_tokens=True)
+generated_text = decoded_sequences[0] if decoded_sequences else ""
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_text.txt").write_text(generated_text, encoding="utf-8")

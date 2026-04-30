@@ -1,0 +1,30 @@
+{% set src_text = "This is a test sentence for English to Korean translation." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/circulus__SEP__canvers-en2ko-v1" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+src_text = "{{ src_text }}"
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+torch_device = torch.device(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(torch_device)
+model.eval()
+
+encoded_inputs = tokenizer(src_text, return_tensors="pt", padding=True)
+inputs = {key: value.to(torch_device) for key, value in encoded_inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=256)
+translated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"translation": translated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "translation.txt").write_text(translated_text, encoding="utf-8")

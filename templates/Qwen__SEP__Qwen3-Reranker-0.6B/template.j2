@@ -1,0 +1,87 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set instruction = "Given a web search query, retrieve relevant passages that answer the query" %}
+{% set queries = ["What is the capital of China?", "Explain gravity"] %}
+{% set documents = [
+    "The capital of China is Beijing.",
+    "Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun."
+] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qwen__SEP__Qwen3-Reranker-0.6B" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+instruction = "{{ instruction }}"
+queries = [
+{% for query in queries %}
+    "{{ query }}"{% if not loop.last %},{% endif %}
+{% endfor %}
+]
+documents = [
+{% for doc in documents %}
+    "{{ doc }}"{% if not loop.last %},{% endif %}
+{% endfor %}
+]
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+from pathlib import Path
+
+import torch
+import torch.nn.functional as F
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+output_dir = Path(output_dir)
+device = torch.device(device)
+
+# Load tokenizer and model
+max_length = 8192
+tokenizer = AutoTokenizer.from_pretrained(repo_id, padding_side="left")
+model = AutoModelForCausalLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+prefix = "<|im_start|>system\nJudge whether the Document meets the requirements based on the Query and the Instruct provided. Note that the answer can only be \"yes\" or \"no\".<|im_end|>\n<|im_start|>user\n"
+suffix = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+token_true_id = tokenizer.convert_tokens_to_ids("yes")
+token_false_id = tokenizer.convert_tokens_to_ids("no")
+
+def format_instruction_sections(instruction_text: str, query: str, document: str) -> str:
+    return (
+        f"<Instruct>: {instruction_text}\n"
+        f"<Query>: {query}\n"
+        f"<Document>: {document}"
+    )
+
+pairs = [
+    prefix + format_instruction_sections(instruction, query, document) + suffix
+    for query, document in zip(queries, documents)
+]
+
+inputs = tokenizer(
+    pairs,
+    padding=True,
+    truncation="longest_first",
+    return_attention_mask=True,
+    return_tensors="pt",
+    max_length=max_length,
+)
+
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    logits = model(**inputs).logits
+
+logits = logits[:, -1, :]
+true_logits = logits[:, token_true_id]
+false_logits = logits[:, token_false_id]
+stacked_logits = torch.stack([false_logits, true_logits], dim=1)
+log_probs = F.log_softmax(stacked_logits, dim=1)
+scores = log_probs[:, 1].exp().tolist()
+
+RESULT = {"rerank_scores": scores}
+
+if __name__ == "__main__":
+    output_dir.mkdir(parents=True, exist_ok=True)
+    result_path = output_dir / "rerank_scores.json"
+    with result_path.open("w", encoding="utf-8") as writer:
+        json.dump(RESULT["rerank_scores"], writer, ensure_ascii=False, indent=2)

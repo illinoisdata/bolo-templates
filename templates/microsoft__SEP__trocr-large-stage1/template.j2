@@ -1,0 +1,50 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__trocr-large-stage1" %}
+{% set max_new_tokens = 64 %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+max_new_tokens = {{ max_new_tokens }}
+from io import BytesIO
+import os
+
+from PIL import Image
+from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+from transformers.models.trocr.modeling_trocr import TrOCRSinusoidalPositionalEmbedding
+
+processor = TrOCRProcessor.from_pretrained(repo_id)
+model = VisionEncoderDecoderModel.from_pretrained(repo_id)
+model.to(device)
+decoder_wrapper = getattr(model.decoder, "model", None)
+trocr_decoder = getattr(decoder_wrapper, "decoder", None)
+if trocr_decoder is not None and isinstance(
+    trocr_decoder.embed_positions, TrOCRSinusoidalPositionalEmbedding
+):
+    padding_idx = trocr_decoder.padding_idx
+    num_positions = model.config.decoder.max_position_embeddings + padding_idx + 1
+    embedding_dim = trocr_decoder.embed_positions.embedding_dim
+    weights = trocr_decoder.embed_positions.get_embedding(num_positions, embedding_dim, padding_idx)
+    trocr_decoder.embed_positions.weights = weights.to(device)
+model.eval()
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    import requests
+
+    response = requests.get(image_path, stream=True)
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+pixel_values = processor(image, return_tensors="pt").pixel_values.to(device)
+
+generated_ids = model.generate(pixel_values=pixel_values, max_new_tokens=max_new_tokens)
+decoded_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"generated_text": decoded_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "generated_text.txt")
+    with open(output_path, "w", encoding="utf-8") as output_file:
+        output_file.write(RESULT["generated_text"])

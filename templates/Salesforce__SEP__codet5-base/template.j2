@@ -1,0 +1,38 @@
+{% set repo_id = "Salesforce/codet5-base" %}
+{% set device = "cuda:0" %}
+{% set text = "def greet(user): print(f'hello <extra_id_0>!')" %}
+{% set max_length = 8 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_length = {{ max_length }}
+
+from transformers import AutoTokenizer, T5ForConditionalGeneration
+import torch
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True, additional_special_tokens=[])
+model = T5ForConditionalGeneration.from_pretrained(repo_id)
+model.to(device)
+
+# Pre-process input text
+inputs = tokenizer(text, return_tensors="pt").to(device)
+
+# Run inference
+generated_ids = model.generate(**inputs, max_length=max_length)
+
+# Post-process output
+generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+# Build result dict
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    from pathlib import Path
+
+    output_dir = Path("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Salesforce__SEP__codet5-base")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save generated text to file
+    (output_dir / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

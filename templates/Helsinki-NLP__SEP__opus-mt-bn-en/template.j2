@@ -1,0 +1,43 @@
+{% set text="এই পৃথিবী সুন্দর এবং শান্ত।" %}
+{% set max_length=128 %}
+{% set num_beams=4 %}
+{% set output_dir="/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-bn-en" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
+
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(torch.device(device))
+
+encoded = tokenizer(
+    text,
+    return_tensors="pt",
+    padding=True,
+    truncation=True,
+    max_length=max_length,
+)
+encoded = {k: v.to(torch.device(device)) for k, v in encoded.items()}
+
+generated_tokens = model.generate(
+    **encoded,
+    max_length=max_length,
+    num_beams=num_beams,
+)
+
+translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir) / "translation.txt"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(RESULT["translation"], encoding="utf-8")

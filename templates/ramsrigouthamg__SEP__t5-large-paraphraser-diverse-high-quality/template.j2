@@ -1,0 +1,58 @@
+{% set repo_id = "ramsrigouthamg/t5-large-paraphraser-diverse-high-quality" %}
+{% set device = "cuda:0" %}
+{% set text = "Once, a group of frogs were roaming around the forest in search of water." %}
+{% set max_length = 128 %}
+{% set num_beams = 15 %}
+{% set num_return_sequences = 3 %}
+{% set early_stopping = true %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ramsrigouthamg__SEP__t5-large-paraphraser-diverse-high-quality" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+num_return_sequences = {{ num_return_sequences }}
+early_stopping = {{ early_stopping }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+import os
+import json
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+
+inputs = tokenizer(
+    "paraphrase: " + text + " </s>",
+    max_length=max_length,
+    padding=True,
+    truncation=True,
+    return_tensors="pt",
+)
+input_ids = inputs["input_ids"].to(device)
+attention_mask = inputs["attention_mask"].to(device)
+
+model.eval()
+outputs = model.generate(
+    input_ids=input_ids,
+    attention_mask=attention_mask,
+    max_length=max_length,
+    early_stopping=early_stopping,
+    num_beams=num_beams,
+    num_return_sequences=num_return_sequences,
+)
+
+paraphrases = [
+    tokenizer.decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+    for output in outputs
+]
+
+RESULT = {"paraphrases": paraphrases}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "paraphrases.json"), "w") as f:
+        json.dump(RESULT, f)

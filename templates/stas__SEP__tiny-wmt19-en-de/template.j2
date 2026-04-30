@@ -1,0 +1,30 @@
+{% set repo_id = "stas/tiny-wmt19-en-de" %}
+{% set device = "cuda:0" %}
+{% set translation_source = "Hello, how are you?" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/stas__SEP__tiny-wmt19-en-de" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+translation_source = "{{ translation_source }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(translation_source, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+generated_ids = model.generate(**inputs)
+translation = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"translation": translation[0]}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir) / "translation.txt"
+    output_path.write_text(RESULT["translation"], encoding="utf-8")

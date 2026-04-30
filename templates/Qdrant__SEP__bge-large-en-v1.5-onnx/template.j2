@@ -1,0 +1,9 @@
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+import transformers
+print(transformers.__version__)
+print([name for name in dir(transformers) if name.startswith("ORT")])
+print(hasattr(transformers.models, "ort"))
+import inspect
+import pkgutil
+print([name for name in pkgutil.iter_modules(transformers.__path__)])

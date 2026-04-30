@@ -1,0 +1,60 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set text_input = "This is a traditional Irish dance music." %}
+{% set max_length = 1024 %}
+{% set top_p = 0.9 %}
+{% set temperature = 1.0 %}
+{% set num_return_sequences = 1 %}
+{% set output_path = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/sander-wood__SEP__text-to-music" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = """{{ text_input }}"""
+max_length = {{ max_length }}
+top_p = {{ top_p }}
+temperature = {{ temperature }}
+num_return_sequences = {{ num_return_sequences }}
+output_path = "{{ output_path }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+tokenized_inputs = tokenizer(
+    text_input,
+    truncation=True,
+    max_length=max_length,
+    return_tensors="pt",
+)
+
+input_ids = tokenized_inputs["input_ids"].to(device)
+attention_mask = tokenized_inputs.get("attention_mask")
+if attention_mask is not None:
+    attention_mask = attention_mask.to(device)
+
+generate_kwargs = {
+    "input_ids": input_ids,
+    "max_length": max_length,
+    "do_sample": True,
+    "top_p": top_p,
+    "temperature": temperature,
+    "num_return_sequences": num_return_sequences,
+    "eos_token_id": model.config.eos_token_id,
+    "decoder_start_token_id": model.config.decoder_start_token_id,
+}
+if attention_mask is not None:
+    generate_kwargs["attention_mask"] = attention_mask
+
+output_ids = model.generate(**generate_kwargs)
+decoded_outputs = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
+
+RESULT = {"generated_abc": decoded_outputs}
+
+if __name__ == "__main__":
+    output_dir = Path(output_path)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_file = output_dir / "generated_abc.txt"
+    output_file.write_text("\n\n".join(RESULT["generated_abc"]), encoding="utf-8")

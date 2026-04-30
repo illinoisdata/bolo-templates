@@ -1,0 +1,15 @@
+repo_id = "unused"
+import importlib
+modules = [
+    "transformers",
+    "transformers.onnx",
+    "transformers.models.ort",
+    "transformers.ort",
+    "transformers.onnxruntime",
+]
+for mod in modules:
+    try:
+        module = importlib.import_module(mod)
+        print(mod, hasattr(module, "ORTModel"))
+    except ImportError as error:
+        print(mod, "import error", error)

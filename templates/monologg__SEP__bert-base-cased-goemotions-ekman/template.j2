@@ -1,0 +1,43 @@
+{% set text_input = "I feel grateful for the progress I've made today." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/monologg__SEP__bert-base-cased-goemotions-ekman" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSequenceClassification.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+encoded_input = tokenizer(text_input, return_tensors="pt")
+encoded_input = {key: tensor.to(device) for key, tensor in encoded_input.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_input)
+
+logits = outputs.logits
+if logits.dim() == 0:
+    logits = logits.unsqueeze(0)
+logits = logits.squeeze(0)
+probabilities = torch.sigmoid(logits)
+
+id2label = getattr(model.config, "id2label", {}) or {}
+label_probabilities = {}
+for index, probability in enumerate(probabilities.tolist()):
+    label = id2label.get(index, str(index))
+    label_probabilities[label] = probability
+
+RESULT = {"label_probabilities": label_probabilities}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    result_file = output_path / "result.json"
+    result_file.write_text(json.dumps(RESULT, indent=2), encoding="utf-8")

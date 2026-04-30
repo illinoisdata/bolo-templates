@@ -1,0 +1,10 @@
+{% set repo_id = "dalle-mini/vqgan_imagenet_f16_16384" %}
+repo_id = "{{ repo_id }}"
+import transformers
+import pkgutil
+print("transformers version", transformers.__version__)
+print("modules:")
+print([name for _, name, _ in pkgutil.iter_modules(transformers.__path__)])
+print("transformers.models modules:")
+import transformers.models
+print([name for _, name, _ in pkgutil.iter_modules(transformers.models.__path__)])

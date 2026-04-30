@@ -1,0 +1,37 @@
+{% set text_input = "Buongiorno! Come posso aiutarti oggi?" %}
+{% set max_length = 128 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-it-fr" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
+
+text_tokenizer = MarianTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoded_inputs = text_tokenizer(
+    [text_input],
+    return_tensors="pt",
+    padding=True,
+    truncation=True,
+    max_length=max_length,
+)
+inputs = {key: tensor.to(device) for key, tensor in encoded_inputs.items()}
+
+generated_tokens = model.generate(**inputs, max_length=max_length)
+translation_texts = text_tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+translation_text = translation_texts[0] if translation_texts else ""
+
+RESULT = {"translation": translation_text, "translations": translation_texts}
+
+if __name__ == "__main__":
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    with open(destination / "translation.txt", "w", encoding="utf-8") as file:
+        file.write("\n".join(translation_texts))

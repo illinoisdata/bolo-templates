@@ -1,0 +1,55 @@
+{% set image_path = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
+{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/magic-leap-community__SEP__superpoint' %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+from urllib.parse import urlparse
+
+import requests
+import torch
+from PIL import Image
+from transformers import AutoImageProcessor, AutoModelForKeypointDetection
+
+torch_device = torch.device(device)
+
+processor = AutoImageProcessor.from_pretrained(repo_id)
+model = AutoModelForKeypointDetection.from_pretrained(repo_id).to(torch_device)
+
+def load_image(path: str) -> Image.Image:
+    parsed = urlparse(path)
+    if parsed.scheme in ("http", "https"):
+        return Image.open(requests.get(path, stream=True).raw).convert("RGB")
+    return Image.open(path).convert("RGB")
+
+image = load_image(image_path)
+inputs = processor(image, return_tensors="pt")
+inputs = {key: value.to(torch_device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+image_mask = outputs.mask[0]
+image_indices = torch.nonzero(image_mask, as_tuple=False).view(-1)
+keypoints = outputs.keypoints[0][image_indices]
+scores = outputs.scores[0][image_indices]
+descriptors = outputs.descriptors[0][image_indices]
+
+valid_keypoints = keypoints.detach().cpu().tolist()
+valid_scores = scores.detach().cpu().tolist()
+valid_descriptors = descriptors.detach().cpu().tolist()
+
+RESULT = {
+    "keypoints": valid_keypoints,
+    "scores": valid_scores,
+    "descriptors": valid_descriptors,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "results.json").write_text(json.dumps(RESULT))

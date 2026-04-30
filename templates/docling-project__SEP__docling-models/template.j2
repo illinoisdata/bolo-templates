@@ -1,0 +1,16 @@
+repo_id = "{{ repo_id }}"
+
+from huggingface_hub import hf_hub_download
+from pathlib import Path
+from safetensors.torch import load_file
+
+state_path = hf_hub_download(repo_id, filename="model_artifacts/tableformer/fast/tableformer_fast.safetensors")
+state_dict = load_file(state_path)
+penultimate = sorted(state_dict.keys())[:10]
+RESULT = {"keys": penultimate}
+
+if __name__ == "__main__":
+    output_dir = Path("/tmp")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    fp = output_dir / "state_keys.json"
+    fp.write_text(str(RESULT))

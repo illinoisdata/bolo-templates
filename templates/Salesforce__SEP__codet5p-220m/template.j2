@@ -1,0 +1,52 @@
+{% set prompt = "def print_hello_world():<extra_id_0>" %}
+{% set max_length = 64 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Salesforce__SEP__codet5p-220m" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+import os
+import transformers
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, PreTrainedTokenizer, PreTrainedTokenizerFast
+
+# Patch tokenizer __init__ to skip add_tokens to avoid format errors
+_orig_pt_init = PreTrainedTokenizer.__init__
+_orig_ptf_init = PreTrainedTokenizerFast.__init__
+
+def _patched_pt_init(self, *args, **kwargs):
+    orig_add = PreTrainedTokenizer.add_tokens
+    PreTrainedTokenizer.add_tokens = lambda self, tokens, **kwargs: None
+    try:
+        return _orig_pt_init(self, *args, **kwargs)
+    finally:
+        PreTrainedTokenizer.add_tokens = orig_add
+
+
+def _patched_ptf_init(self, *args, **kwargs):
+    orig_add_fast = PreTrainedTokenizerFast.add_tokens
+    PreTrainedTokenizerFast.add_tokens = lambda self, tokens, **kwargs: None
+    try:
+        return _orig_ptf_init(self, *args, **kwargs)
+    finally:
+        PreTrainedTokenizerFast.add_tokens = orig_add_fast
+
+transformers.PreTrainedTokenizer.__init__ = _patched_pt_init
+transformers.PreTrainedTokenizerFast.__init__ = _patched_ptf_init
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+encoded_inputs = tokenizer(prompt, return_tensors="pt")
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+generated_ids = model.generate(**encoded_inputs, max_length=max_length)
+generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    for key, value in RESULT.items():
+        file_path = os.path.join(output_dir, f"{key}.txt")
+        with open(file_path, "w", encoding="utf-8") as file:
+            file.write(value if isinstance(value, str) else str(value))

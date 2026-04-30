@@ -1,0 +1,42 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set document_image_path = '/u/yli77/projects/ML-code-generation/data/doc.jpeg' %}
+{% set max_new_tokens = 1024 %}
+{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__nougat-base' %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+document_image_path = "{{ document_image_path }}"
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+from io import BytesIO
+from pathlib import Path
+
+import requests
+from PIL import Image
+from transformers import AutoProcessor, VisionEncoderDecoderModel
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = VisionEncoderDecoderModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+def _load_image(image_path: str) -> Image.Image:
+    if image_path.startswith("http://") or image_path.startswith("https://"):
+        response = requests.get(image_path, stream=True)
+        response.raise_for_status()
+        return Image.open(BytesIO(response.content)).convert("RGB")
+    return Image.open(image_path).convert("RGB")
+
+image = _load_image(document_image_path)
+vision_inputs = processor.image_processor(images=image, return_tensors="pt", data_format="channels_first", input_channel_dim="channels_last")
+pixel_values = vision_inputs.pixel_values.to(device)
+
+generated_ids = model.generate(pixel_values, max_new_tokens=max_new_tokens)
+transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+
+RESULT = {"transcription": transcription}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    transcription_path = Path(output_dir) / "transcription.txt"
+    with open(transcription_path, "w", encoding="utf-8") as f:
+        f.write(RESULT["transcription"])

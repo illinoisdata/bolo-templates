@@ -1,0 +1,31 @@
+{% set prompt = "summarize: In a few sentences, summarize the following article about sustainable energy transitions." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/context-sbf__SEP__charm-xl" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+output_dir = "{{ output_dir }}"
+
+import os
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+# Pre-process the input prompt
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {key: tensor.to(device) for key, tensor in inputs.items()}
+
+# Run inference
+generated_ids = model.generate(**inputs, max_length=200, num_beams=4)
+
+# Post-process
+generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "generated_text.txt")
+    with open(output_path, "w", encoding="utf-8") as fout:
+        fout.write(generated_text)

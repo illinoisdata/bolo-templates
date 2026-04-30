@@ -1,0 +1,60 @@
+{% set premise = "A researcher shared the findings from the experiment." %}
+{% set hypothesis = "The experiment results were reported by the researcher." %}
+{% set max_length = 128 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/squeezebert__SEP__squeezebert-mnli" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+premise = "{{ premise }}"
+hypothesis = "{{ hypothesis }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import json
+
+import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSequenceClassification.from_pretrained(repo_id).to(device)
+
+# Pre-process inputs
+encoded_inputs = tokenizer(
+    premise,
+    hypothesis,
+    truncation=True,
+    padding="max_length",
+    max_length=max_length,
+    return_tensors="pt",
+)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+# Run model inference
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+logits = outputs.logits
+probabilities = torch.softmax(logits, dim=-1)[0].cpu()
+prediction_index = int(torch.argmax(logits, dim=-1).cpu().item())
+label_names = [model.config.id2label.get(i, str(i)) for i in range(probabilities.shape[-1])]
+label_scores = [
+    {"label": label, "score": float(score)}
+    for label, score in zip(label_names, probabilities.tolist())
+]
+
+RESULT = {
+    "mnli_text_classification": {
+        "label": label_names[prediction_index],
+        "score": float(probabilities[prediction_index]),
+        "label_scores": label_scores,
+    }
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "mnli_prediction.json").write_text(
+        json.dumps(RESULT["mnli_text_classification"], indent=2)
+    )

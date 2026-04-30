@@ -1,0 +1,7 @@
+{% set repo_id = "hustvl/vitmatte-base-composition-1k" %}
+repo_id = "{{ repo_id }}"
+
+from transformers.models.vitmatte import VitMatteImageProcessor
+import inspect
+
+print(inspect.getsource(VitMatteImageProcessor))

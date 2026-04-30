@@ -1,0 +1,54 @@
+{% set sentences = ["A cat sits by the window.", "Birds are singing in the trees."] %}
+{% set comparison_sentences = ["The feline rests near the glass.", "Woodland melodies surround the park."] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/setu4993__SEP__LEALLA-base" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sentences = {{ sentences }}
+comparison_sentences = {{ comparison_sentences }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import numpy as np
+import torch
+import torch.nn.functional as F
+from transformers import AutoModel, AutoTokenizer
+
+output_dir = Path(output_dir)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+tokenized_inputs = tokenizer(sentences, padding=True, truncation=True, return_tensors="pt")
+tokenized_comparison = tokenizer(comparison_sentences, padding=True, truncation=True, return_tensors="pt")
+
+tokenized_inputs = {key: value.to(device) for key, value in tokenized_inputs.items()}
+tokenized_comparison = {key: value.to(device) for key, value in tokenized_comparison.items()}
+
+with torch.no_grad():
+    embeddings_outputs = model(**tokenized_inputs)
+    comparison_outputs = model(**tokenized_comparison)
+
+embeddings = embeddings_outputs.pooler_output
+comparison_embeddings = comparison_outputs.pooler_output
+
+normalized_embeddings = F.normalize(embeddings, p=2, dim=-1)
+normalized_comparison = F.normalize(comparison_embeddings, p=2, dim=-1)
+similarity_matrix = torch.matmul(normalized_embeddings, normalized_comparison.transpose(0, 1))
+
+RESULT = {
+    "normalized_embeddings": normalized_embeddings,
+    "comparison_normalized_embeddings": normalized_comparison,
+    "similarity_matrix": similarity_matrix,
+}
+
+if __name__ == "__main__":
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for name, value in RESULT.items():
+        if isinstance(value, torch.Tensor):
+            np.save(output_dir / f"{name}.npy", value.cpu().numpy())
+        else:
+            with open(output_dir / f"{name}.txt", "w", encoding="utf-8") as file:
+                file.write(str(value))

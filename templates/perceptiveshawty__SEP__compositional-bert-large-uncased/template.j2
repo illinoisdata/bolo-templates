@@ -1,0 +1,46 @@
+{% set text_input = "The quick brown fox jumps over the lazy dog." %}
+{% set max_length = 128 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/perceptiveshawty__SEP__compositional-bert-large-uncased" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+import os
+
+import numpy as np
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    text_input,
+    return_tensors="pt",
+    truncation=True,
+    padding="max_length",
+    max_length=max_length,
+)
+encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+sequence_output = outputs.last_hidden_state[0].cpu()
+pooled_output = outputs.pooler_output
+if pooled_output is not None:
+    pooled_output = pooled_output[0].cpu()
+
+RESULT = {"last_hidden_state": sequence_output}
+if pooled_output is not None:
+    RESULT["pooled_output"] = pooled_output
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    for key, value in RESULT.items():
+        path = os.path.join(output_dir, f"{key}.npy")
+        np.save(path, value.numpy())

@@ -1,0 +1,65 @@
+{% set repo_id = "KBLab/megatron-bert-large-swedish-cased-110k" %}
+{% set device = "cuda:0" %}
+{% set input_text = "Sverige är ett [MASK] land." %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/KBLab__SEP__megatron-bert-large-swedish-cased-110k" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+mask_token_id = tokenizer.mask_token_id
+mask_positions = (inputs["input_ids"] == mask_token_id).nonzero(as_tuple=False)
+mask_positions_list = mask_positions.tolist()
+
+fill_mask_results = []
+for batch_index, sequence_index in mask_positions_list:
+    logits_for_position = logits[batch_index, sequence_index, :]
+    probabilities = torch.softmax(logits_for_position, dim=-1)
+    topk_probs, topk_indices = torch.topk(probabilities, top_k)
+    tokens = tokenizer.convert_ids_to_tokens(topk_indices.tolist())
+    predictions = [
+        {
+            "token": token,
+            "token_id": int(token_id),
+            "score": float(prob),
+        }
+        for token, token_id, prob in zip(tokens, topk_indices.tolist(), topk_probs.tolist())
+    ]
+    fill_mask_results.append(
+        {
+            "batch_index": int(batch_index),
+            "sequence_index": int(sequence_index),
+            "predictions": predictions,
+        }
+    )
+
+RESULT = {"fill_mask": fill_mask_results}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    result_file = output_path / "fill_mask_results.json"
+    with result_file.open("w", encoding="utf-8") as handle:
+        json.dump(RESULT, handle, ensure_ascii=False, indent=2)

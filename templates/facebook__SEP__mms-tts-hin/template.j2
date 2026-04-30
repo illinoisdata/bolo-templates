@@ -1,0 +1,35 @@
+{% set text_input = "यह एक उदाहरण हिंदी पाठ है।" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mms-tts-hin" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from scipy.io import wavfile
+from transformers import AutoTokenizer, VitsModel
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = VitsModel.from_pretrained(repo_id).to(device)
+model.eval()
+sampling_rate = model.config.sampling_rate
+
+inputs = tokenizer(text_input, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    model_output = model(**inputs)
+    waveform_tensor = model_output.waveform[0].cpu()
+
+waveform_numpy = waveform_tensor.numpy()
+
+RESULT = {"waveform": waveform_numpy}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    file_path = output_path / "waveform.wav"
+    wavfile.write(str(file_path), sampling_rate, RESULT["waveform"])

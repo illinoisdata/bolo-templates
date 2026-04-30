@@ -1,0 +1,9 @@
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+
+import json
+from huggingface_hub import HfApi
+
+api = HfApi()
+files = api.list_repo_files(repo_id)
+print(json.dumps(files, indent=2))

@@ -1,0 +1,60 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/kha-white__SEP__manga-ocr-base" %}
+{% set max_length = 300 %}
+{% set num_beams = 4 %}
+{% set no_repeat_ngram_size = 3 %}
+{% set length_penalty = 2.0 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+length_penalty = {{ length_penalty }}
+
+from io import BytesIO
+import os
+
+import requests
+from PIL import Image
+from transformers import AutoImageProcessor, AutoTokenizer, VisionEncoderDecoderModel
+
+image_processor = AutoImageProcessor.from_pretrained(repo_id)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = VisionEncoderDecoderModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+if image_path.startswith(("http://", "https://")):
+    response = requests.get(image_path)
+    response.raise_for_status()
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = image_processor(images=image, return_tensors="pt")
+pixel_values = inputs.pixel_values.to(device)
+
+generated_ids = model.generate(
+    pixel_values,
+    max_length=max_length,
+    num_beams=num_beams,
+    no_repeat_ngram_size=no_repeat_ngram_size,
+    length_penalty=length_penalty,
+    early_stopping=True,
+)
+
+decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+result_text = decoded[0].strip()
+
+RESULT = {"predicted_text": result_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "predicted_text.txt")
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(RESULT["predicted_text"])

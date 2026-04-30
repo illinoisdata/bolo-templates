@@ -1,0 +1,41 @@
+{% set source_text = ["Translate this English sentence to Korean."] %}
+{% set max_length = 128 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/circulus__SEP__canvers-en2ko-v2" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = {{ source_text }}
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+
+inputs = tokenizer(source_text, return_tensors="pt", padding=True, truncation=True)
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+generated_tokens = model.generate(
+    input_ids=inputs["input_ids"],
+    attention_mask=inputs.get("attention_mask"),
+    max_length=max_length,
+    num_beams=num_beams,
+    early_stopping=True,
+)
+
+translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    translations_path = os.path.join(output_dir, "translations.txt")
+    with open(translations_path, "w", encoding="utf-8") as out_file:
+        for translation in translations:
+            out_file.write(f"{translation}\n")

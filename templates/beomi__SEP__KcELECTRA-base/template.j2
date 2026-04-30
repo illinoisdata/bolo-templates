@@ -1,0 +1,20 @@
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForPreTraining
+
+device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+
+encoded_inputs = tokenizer("안녕하세요", return_tensors="pt")
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+outputs = model(**encoded_inputs)
+
+print(type(outputs))
+print(len(outputs))
+print(hasattr(outputs, "logits"))
+print(hasattr(outputs, "discriminator_logits"))
+print(outputs)

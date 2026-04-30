@@ -1,0 +1,33 @@
+{% set repo_id = "google/long-t5-tglobal-xl" %}
+{% set device = "cuda:0" %}
+{% set prompt = "Summarize the benefits of efficient attention mechanisms for long-context modeling." %}
+{% set max_new_tokens = 256 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__long-t5-tglobal-xl" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+
+import os
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoded_inputs = tokenizer(prompt, return_tensors="pt")
+encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+
+generated_tokens = model.generate(**encoded_inputs, max_new_tokens=max_new_tokens)
+
+decoded_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+generated_text = decoded_texts[0] if decoded_texts else ""
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    result_path = os.path.join(output_dir, "generated_text.txt")
+    with open(result_path, "w", encoding="utf-8") as f:
+        f.write(RESULT["generated_text"])

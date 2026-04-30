@@ -1,0 +1,39 @@
+{% set texts = ["这是第一句中文。", "这是第二句中文。"] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/GanymedeNil__SEP__text2vec-base-chinese" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+texts = {{ texts }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded_inputs = tokenizer(texts, padding=True, truncation=True, return_tensors="pt")
+encoded_inputs = {key: tensor.to(device) for key, tensor in encoded_inputs.items()}
+
+with torch.no_grad():
+    model_outputs = model(**encoded_inputs)
+
+attention_mask = encoded_inputs["attention_mask"]
+mask = attention_mask.unsqueeze(-1)
+masked_hidden_state = model_outputs.last_hidden_state * mask
+sum_embeddings = masked_hidden_state.sum(dim=1)
+mask_sum = mask.sum(dim=1).clamp_min(1e-9)
+pooled_embeddings = sum_embeddings / mask_sum
+sentence_embeddings = pooled_embeddings.cpu().tolist()
+
+RESULT = {"sentence_embeddings": sentence_embeddings}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    embeddings_file = output_path / "sentence_embeddings.json"
+    embeddings_file.write_text(json.dumps(RESULT["sentence_embeddings"], ensure_ascii=False), encoding="utf-8")

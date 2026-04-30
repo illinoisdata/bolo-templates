@@ -1,0 +1,58 @@
+{% set text_query = "What is the capital of France?" %}
+{% set max_new_tokens = 64 %}
+{% set num_return_sequences = 1 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/jxm__SEP__gtr__nq__32" %}
+{% set tokenizer_id = "t5-base" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_query = "{{ text_query }}"
+max_new_tokens = {{ max_new_tokens }}
+num_return_sequences = {{ num_return_sequences }}
+output_dir = "{{ output_dir }}"
+tokenizer_id = "{{ tokenizer_id }}"
+
+from pathlib import Path
+import json
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, T5Config, T5ForConditionalGeneration
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_path, "r", encoding="utf-8") as config_file:
+    config_dict = json.load(config_file)
+config_dict.setdefault("model_type", "t5")
+config = T5Config(**config_dict)
+
+model = T5ForConditionalGeneration.from_pretrained(repo_id, config=config)
+model = model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_id)
+
+encoded_inputs = tokenizer(text_query, return_tensors="pt")
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+decoder_start_token_id = getattr(config, "decoder_start_token_id", None)
+if decoder_start_token_id is None:
+    decoder_start_token_id = tokenizer.pad_token_id
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **encoded_inputs,
+        max_new_tokens=max_new_tokens,
+        num_return_sequences=num_return_sequences,
+        decoder_start_token_id=decoder_start_token_id,
+    )
+
+generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"generated_texts": generated_texts}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_texts.txt").write_text(
+        "\n".join(generated_texts), encoding="utf-8"
+    )

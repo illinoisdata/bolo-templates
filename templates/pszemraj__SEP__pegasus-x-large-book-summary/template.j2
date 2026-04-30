@@ -1,0 +1,58 @@
+{% set input_text = "Modern long-form summarization models condense extensive documents into concise overviews while respecting the core arguments and narrative flow." %}
+{% set max_length = 512 %}
+{% set min_length = 8 %}
+{% set num_beams = 2 %}
+{% set length_penalty = 0.8 %}
+{% set no_repeat_ngram_size = 3 %}
+{% set early_stopping = true %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/pszemraj__SEP__pegasus-x-large-book-summary" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = """{{ input_text }}"""
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+num_beams = {{ num_beams }}
+length_penalty = {{ length_penalty }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+early_stopping = {{ early_stopping }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+torch_device = torch.device(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+encoded_inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+    padding="longest",
+    max_length=max_length,
+)
+encoded_inputs = {name: tensor.to(torch_device) for name, tensor in encoded_inputs.items()}
+generated_ids = model.generate(
+    **encoded_inputs,
+    max_length=max_length,
+    min_length=min_length,
+    num_beams=num_beams,
+    length_penalty=length_penalty,
+    no_repeat_ngram_size=no_repeat_ngram_size,
+    early_stopping=early_stopping,
+)
+summary_candidates = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+summary_output = summary_candidates[0] if len(summary_candidates) == 1 else summary_candidates
+RESULT = {"summary": summary_output}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    stored_summary = RESULT["summary"]
+    if isinstance(stored_summary, list):
+        serialized_summary = "\n\n".join(stored_summary)
+    else:
+        serialized_summary = stored_summary
+    (output_path / "summary.txt").write_text(serialized_summary, encoding="utf-8")

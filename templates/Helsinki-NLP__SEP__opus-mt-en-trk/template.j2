@@ -1,0 +1,35 @@
+{% set repo_id = "Helsinki-NLP/opus-mt-en-trk" %}
+{% set device = "cuda:0" %}
+{% set source_sentence = "This is a short example sentence to translate." %}
+{% set target_language_token = ">>trk<<" %}
+{% set max_target_length = 128 %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_sentence = "{{ source_sentence }}"
+target_language_token = "{{ target_language_token }}"
+max_target_length = {{ max_target_length }}
+
+import torch
+from pathlib import Path
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+prefixed_input = f"{target_language_token} {source_sentence}".strip()
+tokenized = tokenizer(prefixed_input, return_tensors="pt")
+tokenized = tokenized.to(device)
+
+generated_tokens = model.generate(**tokenized, max_length=max_target_length)
+translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    output_dir = Path("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-en-trk")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_file = output_dir / "translation.txt"
+    output_file.write_text(RESULT["translation"], encoding="utf-8")

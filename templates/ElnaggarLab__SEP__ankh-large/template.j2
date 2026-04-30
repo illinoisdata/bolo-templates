@@ -1,0 +1,38 @@
+{% set text_input = "Summarize: The quick brown fox jumps over the lazy dog." %}
+{% set max_length = 256 %}
+{% set num_return_sequences = 1 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ElnaggarLab__SEP__ankh-large" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+max_length = {{ max_length }}
+num_return_sequences = {{ num_return_sequences }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+inputs = tokenizer(text_input, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_length=max_length,
+        num_return_sequences=num_return_sequences,
+        return_dict_in_generate=False,
+    )
+
+generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+RESULT = {"generated_texts": generated_texts}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_texts.txt").write_text("\n".join(generated_texts), encoding="utf-8")

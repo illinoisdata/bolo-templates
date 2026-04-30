@@ -1,0 +1,95 @@
+{% set repo_id = repo_id | default("enterprise-explorers/sd-vae-ft-mse-flax") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/enterprise-explorers__SEP__sd-vae-ft-mse-flax") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+
+import io
+from pathlib import Path
+
+import jax
+import jax.numpy as jnp
+import numpy as np
+import requests
+from PIL import Image
+from diffusers import FlaxAutoencoderKL
+from jax import device_put
+
+
+def _is_url(path: str) -> bool:
+    normalized = path.lower()
+    return normalized.startswith("http://") or normalized.startswith("https://")
+
+
+def _load_image(path: str) -> Image.Image:
+    if _is_url(path):
+        response = requests.get(path)
+        response.raise_for_status()
+        return Image.open(io.BytesIO(response.content)).convert("RGB")
+    return Image.open(path).convert("RGB")
+
+
+def _prepare_pixel_values(image: Image.Image, size: int) -> jnp.ndarray:
+    resized = image.resize((size, size), Image.LANCZOS)
+    array = np.asarray(resized, dtype=np.float32) / 127.5 - 1.0
+    array = np.transpose(array, (2, 0, 1))[None, ...]
+    return jnp.array(array)
+
+
+def _select_jax_device(device_str: str):
+    normalized = device_str.lower()
+    index = 0
+    if ":" in normalized:
+        try:
+            index = int(normalized.split(":")[-1])
+        except ValueError:
+            index = 0
+    available_devices = jax.devices()
+    if normalized.startswith(("cuda", "gpu")):
+        gpus = [dev for dev in available_devices if dev.platform == "gpu"]
+        if gpus:
+            return gpus[min(index, len(gpus) - 1)]
+    cpus = [dev for dev in available_devices if dev.platform == "cpu"]
+    return cpus[min(index, len(cpus) - 1)]
+
+
+def _to_pil_image(sample: jnp.ndarray) -> Image.Image:
+    array = np.asarray(sample, dtype=np.float32)
+    array = np.transpose(array, (1, 2, 0))
+    array = np.clip((array + 1.0) / 2.0, 0.0, 1.0)
+    array = (array * 255.0).round().astype(np.uint8)
+    return Image.fromarray(array)
+
+
+vae, params = FlaxAutoencoderKL.from_pretrained(repo_id)
+
+target_device = _select_jax_device(device)
+
+input_image = _load_image(image_path)
+pixel_values = _prepare_pixel_values(input_image, vae.config.sample_size)
+pixel_values = device_put(pixel_values, target_device)
+
+encoded = vae.apply({"params": params}, pixel_values, deterministic=True, method=FlaxAutoencoderKL.encode)
+latent_dist = encoded.latent_dist
+if hasattr(latent_dist, "mode"):
+    latents = latent_dist.mode()
+else:
+    latents = latent_dist.mean
+
+scaled_latents = latents / vae.config.scaling_factor
+decoded = vae.apply({"params": params}, scaled_latents, deterministic=True, method=FlaxAutoencoderKL.decode)
+reconstruction = decoded.sample
+
+reconstructed_image = _to_pil_image(reconstruction[0])
+
+RESULT = {"reconstruction": reconstructed_image}
+
+if __name__ == "__main__":
+    output_root = Path(output_dir)
+    output_root.mkdir(parents=True, exist_ok=True)
+    reconstruction_path = output_root / "reconstruction.png"
+    RESULT["reconstruction"].save(reconstruction_path)

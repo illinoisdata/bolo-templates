@@ -1,0 +1,44 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set prompt_text = "a photo of a cat" %}
+{% set max_length = 64 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__git-base-coco" %}
+{% set repo_id = repo_id %}
+{% set device = device %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+prompt_text = "{{ prompt_text }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+import requests
+from io import BytesIO
+from pathlib import Path
+
+import torch
+from PIL import Image
+from transformers import AutoModelForCausalLM, AutoProcessor
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = AutoModelForCausalLM.from_pretrained(repo_id).to(device)
+
+if image_path.lower().startswith(("http://", "https://")):
+    response = requests.get(image_path, timeout=30)
+    response.raise_for_status()
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processed_inputs = processor(text=prompt_text, images=image, return_tensors="pt")
+processed_inputs = {key: value.to(device) for key, value in processed_inputs.items()}
+
+generated_ids = model.generate(**processed_inputs, max_length=max_length)
+caption = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+
+RESULT = {"caption": caption}
+
+if __name__ == "__main__":
+    output_dir_path = Path(output_dir)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
+    (output_dir_path / "caption.txt").write_text(RESULT["caption"], encoding="utf-8")

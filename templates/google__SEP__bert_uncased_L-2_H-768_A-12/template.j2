@@ -1,0 +1,50 @@
+{% set fill_prompt = "The capital of France is [MASK]." %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-2_H-768_A-12" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+fill_prompt = "{{ fill_prompt }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded_inputs = tokenizer(fill_prompt, return_tensors="pt")
+encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+input_ids = encoded_inputs["input_ids"]
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+mask_positions = (input_ids[0] == tokenizer.mask_token_id).nonzero(as_tuple=True)[0]
+mask_position = mask_positions[0]
+mask_token_logits = outputs.logits[0, mask_position, :]
+probabilities = torch.softmax(mask_token_logits, dim=-1)
+values, indices = probabilities.topk(top_k)
+
+base_input_ids = input_ids[0]
+predictions = []
+for token_id, score in zip(indices.tolist(), values.tolist()):
+    sequence_ids = base_input_ids.clone()
+    sequence_ids[mask_position] = token_id
+    sequence = tokenizer.decode(sequence_ids.cpu(), skip_special_tokens=True)
+    token_str = tokenizer.decode([token_id]).strip()
+    predictions.append({"token": token_str, "score": score, "sequence": sequence})
+
+RESULT = {"predictions": predictions}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    with open(output_path / "results.json", "w", encoding="utf-8") as f:
+        json.dump(RESULT, f, ensure_ascii=False, indent=2)

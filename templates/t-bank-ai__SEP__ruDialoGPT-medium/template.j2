@@ -1,0 +1,68 @@
+{% set repo_id = "t-bank-ai/ruDialoGPT-medium" %}
+{% set device = "cuda:0" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/t-bank-ai__SEP__ruDialoGPT-medium" %}
+{% set prompt = "@@ПЕРВЫЙ@@ привет @@ВТОРОЙ@@ привет @@ПЕРВЫЙ@@ как дела? @@ВТОРОЙ@@" %}
+{% set max_new_tokens = 40 %}
+{% set temperature = 1.2 %}
+{% set top_p = 0.95 %}
+{% set top_k = 10 %}
+{% set num_return_sequences = 3 %}
+{% set do_sample = true %}
+{% set repetition_penalty = 1.2 %}
+{% set no_repeat_ngram_size = 2 %}
+{% set eos_token_id = 50256 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+top_k = {{ top_k }}
+num_return_sequences = {{ num_return_sequences }}
+do_sample = {{ "True" if do_sample else "False" }}
+repetition_penalty = {{ repetition_penalty }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+eos_token_id = {{ eos_token_id }}
+
+import torch
+from pathlib import Path
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForCausalLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.inference_mode():
+    generation_outputs = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        temperature=temperature,
+        top_p=top_p,
+        top_k=top_k,
+        num_return_sequences=num_return_sequences,
+        do_sample=do_sample,
+        repetition_penalty=repetition_penalty,
+        no_repeat_ngram_size=no_repeat_ngram_size,
+        eos_token_id=eos_token_id,
+    )
+
+generated_responses = [
+    tokenizer.decode(sample_ids, skip_special_tokens=True)
+    for sample_ids in generation_outputs
+]
+
+RESULT = {"generated_responses": generated_responses}
+
+if __name__ == "__main__":
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    destination = directory / "generated_responses.txt"
+    destination.write_text(
+        "\n\n".join(RESULT["generated_responses"]),
+        encoding="utf-8",
+    )

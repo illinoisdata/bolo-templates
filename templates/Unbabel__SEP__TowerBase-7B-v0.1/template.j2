@@ -1,0 +1,43 @@
+{% set text_prompt = "English: My name is TowerBase.\nPortuguese:" %}
+{% set max_new_tokens = 64 %}
+{% set temperature = 0.2 %}
+{% set top_p = 0.95 %}
+{% set result_file_name = "generated_text.txt" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Unbabel__SEP__TowerBase-7B-v0.1" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_prompt = """{{ text_prompt }}"""
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+result_file_name = "{{ result_file_name }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForCausalLM.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(text_prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+generated_ids = model.generate(
+    **inputs,
+    max_new_tokens=max_new_tokens,
+    temperature=temperature,
+    top_p=top_p,
+)
+
+generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    file_path = output_path / result_file_name
+    file_path.write_text(RESULT["generated_text"], encoding="utf-8")

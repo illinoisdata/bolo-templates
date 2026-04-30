@@ -1,0 +1,34 @@
+{% set question = "What is 42?" %}
+{% set context = "42 is the answer to life, the universe and everything" %}
+{% set repo_id = "MaRiOrOsSi/t5-base-finetuned-question-answering" %}
+{% set device = "cuda:0" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/MaRiOrOsSi__SEP__t5-base-finetuned-question-answering" %}
+
+question = "{{ question }}"
+context = "{{ context }}"
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+input_text = f"question: {question} context: {context}"
+inputs = tokenizer(input_text, return_tensors="pt", truncation=True, max_length=512)
+input_ids = inputs.input_ids.to(device)
+attention_mask = inputs.attention_mask.to(device)
+
+outputs = model.generate(input_ids=input_ids, attention_mask=attention_mask)
+answer = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+RESULT = {"answer": answer}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    with open(os.path.join(output_dir, "answer.txt"), "w") as f:
+        f.write(answer)

@@ -1,0 +1,40 @@
+{% set repo_id = 'kaiyuy/leandojo-lean4-retriever-byt5-small' %}
+{% set device = 'cuda:0' %}
+{% set texts = ['Example sentence to embed.', 'Another example.'] %}
+{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/kaiyuy__SEP__leandojo-lean4-retriever-byt5-small' %}
+
+repo_id = '{{ repo_id }}'
+device = '{{ device }}'
+texts = {{ texts }}
+output_dir = '{{ output_dir }}'
+
+import os
+import numpy as np
+import torch
+from transformers import AutoTokenizer, AutoModel
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded = tokenizer(texts, return_tensors='pt', padding=True, truncation=True)
+encoded = {k: v.to(device) for k, v in encoded.items()}
+
+with torch.no_grad():
+    encoder_outputs = model.encoder(**encoded)
+    last_hidden_state = encoder_outputs.last_hidden_state
+
+attention_mask = encoded.get('attention_mask', None)
+if attention_mask is not None:
+    mask = attention_mask.unsqueeze(-1)
+    sum_embeddings = (last_hidden_state * mask).sum(1)
+    embeddings = sum_embeddings / mask.sum(1)
+else:
+    embeddings = last_hidden_state.mean(1)
+embeddings = embeddings.cpu().numpy()
+
+RESULT = {'embeddings': embeddings}
+
+if __name__ == '__main__':
+    os.makedirs(output_dir, exist_ok=True)
+    np.save(os.path.join(output_dir, 'embeddings.npy'), RESULT['embeddings'])

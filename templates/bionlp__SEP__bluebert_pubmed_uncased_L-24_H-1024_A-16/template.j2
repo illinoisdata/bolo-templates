@@ -1,0 +1,76 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set input_text = "The patient was prescribed [MASK] for treatment." %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/bionlp__SEP__bluebert_pubmed_uncased_L-24_H-1024_A-16" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import BertForMaskedLM, BertTokenizer
+
+device_obj = torch.device(device)
+tokenizer = BertTokenizer.from_pretrained(repo_id)
+model = BertForMaskedLM.from_pretrained(repo_id).to(device_obj)
+model.eval()
+
+encoded_inputs = tokenizer(input_text, return_tensors="pt")
+encoded_inputs = {key: value.to(device_obj) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+logits = outputs.logits
+input_ids = encoded_inputs["input_ids"]
+mask_token_id = tokenizer.mask_token_id
+mask_positions = torch.where(input_ids == mask_token_id)
+suggestions = []
+if mask_positions[0].numel() > 0:
+    base_input_ids = input_ids.cpu()
+    for batch_index, sequence_index in zip(mask_positions[0], mask_positions[1]):
+        batch_index_int = int(batch_index)
+        sequence_index_int = int(sequence_index)
+        mask_logits = logits[batch_index_int, sequence_index_int]
+        topk_scores, topk_indices = torch.topk(mask_logits, top_k)
+        topk_probabilities = torch.softmax(topk_scores, dim=-1)
+        candidates = []
+        for score, token_id, probability in zip(topk_scores, topk_indices, topk_probabilities):
+            token_id_int = int(token_id)
+            filled_ids = base_input_ids.clone()
+            filled_ids[batch_index_int, sequence_index_int] = token_id_int
+            filled_text = tokenizer.decode(
+                filled_ids[batch_index_int].tolist(),
+                skip_special_tokens=True,
+                clean_up_tokenization_spaces=True,
+            )
+            candidates.append(
+                {
+                    "token": tokenizer.convert_ids_to_tokens(token_id_int),
+                    "token_id": token_id_int,
+                    "score": float(score),
+                    "probability": float(probability),
+                    "filled_text": filled_text,
+                }
+            )
+        suggestions.append(
+            {
+                "mask_index": sequence_index_int,
+                "batch_index": batch_index_int,
+                "candidates": candidates,
+            }
+        )
+
+RESULT = {"fill_mask_suggestions": suggestions}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "fill_mask_suggestions.json")
+    with open(output_path, "w", encoding="utf-8") as output_file:
+        json.dump(RESULT["fill_mask_suggestions"], output_file, ensure_ascii=False, indent=2)

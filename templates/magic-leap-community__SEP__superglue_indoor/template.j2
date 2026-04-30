@@ -1,0 +1,52 @@
+{% set image1_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set image2_path = "/u/yli77/projects/ML-code-generation/data/image2.jpeg" %}
+{% set matching_threshold = 0.2 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/magic-leap-community__SEP__superglue_indoor" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image1_path = "{{ image1_path }}"
+image2_path = "{{ image2_path }}"
+matching_threshold = {{ matching_threshold }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoImageProcessor, AutoModelForKeypointMatching
+import torch
+from PIL import Image
+import requests
+import os
+import json
+
+# Load processor and model
+processor = AutoImageProcessor.from_pretrained(repo_id)
+model = AutoModelForKeypointMatching.from_pretrained(repo_id).to(device)
+
+# Load input images (handle local paths and URLs)
+if image1_path.startswith("http"):  # URL
+    image1 = Image.open(requests.get(image1_path, stream=True).raw)
+else:
+    image1 = Image.open(image1_path)
+if image2_path.startswith("http"):  # URL
+    image2 = Image.open(requests.get(image2_path, stream=True).raw)
+else:
+    image2 = Image.open(image2_path)
+
+images = [image1, image2]
+inputs = processor(images, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+# Run inference
+with torch.no_grad():
+    outputs = model(**inputs)
+
+# Post-process keypoint matches
+image_sizes = [[(im.height, im.width) for im in images]]
+matches = processor.post_process_keypoint_matching(outputs, image_sizes, threshold=matching_threshold)
+
+RESULT = {"matches": matches}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    out_path = os.path.join(output_dir, "matches.json")
+    with open(out_path, "w") as f:
+        json.dump(RESULT["matches"], f, default=lambda o: o.tolist() if hasattr(o, "tolist") else o)

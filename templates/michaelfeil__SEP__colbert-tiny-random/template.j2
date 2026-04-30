@@ -1,0 +1,39 @@
+{% set query_text = "ColBERT is a dense retrieval architecture built on BERT." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/michaelfeil__SEP__colbert-tiny-random" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query_text = "{{ query_text }}"
+output_dir = "{{ output_dir }}"
+
+import numpy as np
+import torch
+from pathlib import Path
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    query_text,
+    return_tensors="pt",
+    padding=True,
+    truncation=True,
+)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    model_outputs = model(**encoded_inputs)
+
+last_hidden_state = model_outputs.last_hidden_state
+attention_mask = encoded_inputs["attention_mask"].unsqueeze(-1)
+pooled = (last_hidden_state * attention_mask).sum(dim=1)
+lengths = attention_mask.sum(dim=1)
+embedding = (pooled / lengths).squeeze(0).cpu().numpy()
+
+RESULT = {"query_embedding": embedding}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    np.save(output_path / "query_embedding.npy", RESULT["query_embedding"])

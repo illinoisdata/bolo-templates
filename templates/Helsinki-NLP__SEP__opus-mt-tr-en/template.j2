@@ -1,0 +1,49 @@
+{% set text_inputs = ["Merhaba dünya! Nasılsınız?", "Burası çok güzel bir yer."] %}
+{% set max_length = 128 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-tr-en" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_inputs = {{ text_inputs | tojson }}
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+if isinstance(text_inputs, (list, tuple)):
+    text_batch = list(text_inputs)
+else:
+    text_batch = [text_inputs]
+
+tokenized_inputs = tokenizer(
+    text_batch,
+    return_tensors="pt",
+    padding=True,
+    truncation=True,
+    max_length=max_length,
+).to(device)
+
+generated_tokens = model.generate(
+    **tokenized_inputs,
+    max_length=max_length,
+    num_beams=num_beams,
+)
+
+translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    translations_path = os.path.join(output_dir, "translations.txt")
+    with open(translations_path, "w", encoding="utf-8") as writer:
+        for translation in RESULT["translations"]:
+            writer.write(f"{translation}\n")

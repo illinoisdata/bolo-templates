@@ -1,0 +1,27 @@
+{% set prompt = "Summarize the following text about the LongT5 model, focusing on its purpose and capabilities." %}
+{% set max_new_tokens = 256 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__long-t5-local-base" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(prompt, return_tensors="pt", truncation=True).to(device)
+generated_tokens = model.generate(**inputs, max_new_tokens=max_new_tokens, early_stopping=True)
+summary = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0].strip()
+
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    summary_path = output_path / "summary.txt"
+    summary_path.write_text(RESULT["summary"], encoding="utf-8")

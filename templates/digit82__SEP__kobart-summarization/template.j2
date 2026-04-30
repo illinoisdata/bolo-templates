@@ -1,0 +1,40 @@
+{% set input_text = "A concise summary of the following text is requested." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/digit82__SEP__kobart-summarization" %}
+{% set extra_generation_kwargs = {} %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+extra_generation_kwargs = {{ extra_generation_kwargs }}
+
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+
+tokenizer_inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+    max_length=1024,
+)
+tokenizer_inputs = {key: tensor.to(device) for key, tensor in tokenizer_inputs.items()}
+
+generated_ids = model.generate(
+    **tokenizer_inputs,
+    num_beams=4,
+    max_length=128,
+    early_stopping=True,
+    **extra_generation_kwargs,
+)
+
+generated_summary = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+
+RESULT = {"summary": generated_summary}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    summary_path = Path(output_dir) / "summary.txt"
+    summary_path.write_text(RESULT["summary"], encoding="utf-8")

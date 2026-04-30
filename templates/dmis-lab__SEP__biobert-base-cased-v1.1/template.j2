@@ -1,0 +1,54 @@
+{% set text = "The patient was diagnosed with [MASK]." %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/dmis-lab__SEP__biobert-base-cased-v1.1" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import BertConfig, BertForMaskedLM, BertTokenizer
+
+config = BertConfig.from_pretrained(repo_id)
+model = BertForMaskedLM.from_pretrained(repo_id, config=config)
+model = model.to(device)
+model.eval()
+
+tokenizer = BertTokenizer.from_pretrained(repo_id, do_lower_case=False)
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+logits = outputs.logits
+
+mask_token_id = tokenizer.mask_token_id
+mask_positions = (inputs["input_ids"][0] == mask_token_id).nonzero(as_tuple=True)[0]
+
+predictions = []
+for mask_index in mask_positions:
+    mask_logits = logits[0, mask_index]
+    topk = torch.topk(mask_logits, top_k)
+    probability = torch.softmax(mask_logits, dim=-1)
+    topk_probs = probability[topk.indices]
+    token_ids = topk.indices.tolist()
+    tokens = tokenizer.convert_ids_to_tokens(token_ids)
+    predictions.append({
+        "mask_position": int(mask_index.cpu().item()),
+        "token_ids": [int(token_id) for token_id in token_ids],
+        "tokens": tokens,
+        "scores": [float(score) for score in topk_probs.tolist()],
+    })
+
+RESULT = {"fill_mask": predictions}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "fill_mask_results.json")
+    with open(output_path, "w", encoding="utf-8") as handle:
+        json.dump(RESULT, handle, ensure_ascii=False, indent=2)

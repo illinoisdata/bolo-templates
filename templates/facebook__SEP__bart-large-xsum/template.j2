@@ -1,0 +1,31 @@
+{% set repo_id = "facebook/bart-large-xsum" %}
+{% set device = "cuda:0" %}
+{% set text = "The Mona Lisa is a half-length portrait painting by the Italian artist Leonardo da Vinci that hangs in the Louvre in Paris." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__bart-large-xsum" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = inputs.to(device)
+
+with torch.no_grad():
+    generated_ids = model.generate(**inputs)
+
+summary = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+RESULT = {"summary_text": summary}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "summary.txt")
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(RESULT["summary_text"])

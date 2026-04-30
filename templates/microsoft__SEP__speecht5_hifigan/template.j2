@@ -1,0 +1,64 @@
+{% set repo_id = "microsoft/speecht5_hifigan" %}
+{% set device = "cuda:0" %}
+{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__speecht5_hifigan" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+output_dir = "{{ output_dir }}"
+
+from transformers.models.speecht5.modeling_speecht5 import SpeechT5HifiGan, SpeechT5HifiGanConfig
+from transformers.models.speecht5.feature_extraction_speecht5 import SpeechT5FeatureExtractor
+import os
+import io
+import requests
+import torch
+import soundfile as sf
+
+# Initialize device, config, model, and feature extractor
+
+device = torch.device(device)
+config = SpeechT5HifiGanConfig.from_pretrained(repo_id)
+feature_extractor = SpeechT5FeatureExtractor()
+model = SpeechT5HifiGan.from_pretrained(repo_id, config=config).to(device)
+model.eval()
+
+# Load audio input
+if audio_path.startswith("http"):
+    response = requests.get(audio_path)
+    audio_bytes = io.BytesIO(response.content)
+    speech_array, _ = sf.read(audio_bytes)
+else:
+    speech_array, _ = sf.read(audio_path)
+
+# Ensure mono float32 audio
+if speech_array.ndim > 1:
+    speech_array = speech_array[:, 0]
+speech_array = speech_array.astype("float32")
+
+# Extract mel-spectrogram features from audio targets and move to device
+inputs = feature_extractor(
+    audio_target=speech_array,
+    sampling_rate=config.sampling_rate,
+    return_tensors="pt",
+)["input_values"]
+inputs = inputs.to(device=device, dtype=torch.float32)
+
+# Run inference
+with torch.no_grad():
+    waveform = model(inputs)
+
+# Remove batch dim if necessary and convert to numpy
+if waveform.ndim == 2 and waveform.size(0) == 1:
+    waveform = waveform.squeeze(0)
+waveform = waveform.detach().cpu()
+audio = waveform.numpy()
+sampling_rate = config.sampling_rate
+
+RESULT = {"audio": audio, "sampling_rate": sampling_rate}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_audio_path = os.path.join(output_dir, "generated.wav")
+    sf.write(output_audio_path, RESULT["audio"], RESULT["sampling_rate"])

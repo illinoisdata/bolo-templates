@@ -1,0 +1,37 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set input_text = "한국어 ELECTRA 모델을 테스트하기 위한 문장입니다." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/beomi__SEP__KcELECTRA-base-v2022" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded_inputs = tokenizer(input_text, return_tensors="pt")
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+last_hidden_state = outputs.last_hidden_state.detach().cpu().tolist()
+
+RESULT = {
+    "last_hidden_state": last_hidden_state,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    result_path = os.path.join(output_dir, "result.json")
+    with open(result_path, "w", encoding="utf-8") as fp:
+        json.dump(RESULT, fp, ensure_ascii=False, indent=2)

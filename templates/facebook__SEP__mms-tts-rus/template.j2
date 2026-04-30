@@ -1,0 +1,37 @@
+{% set text = "Привет, это пример текста для синтеза речи на русском языке." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mms-tts-rus" %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+text = {{ text | tojson }}
+output_dir = {{ output_dir | tojson }}
+
+from pathlib import Path
+
+import torch
+import scipy.io.wavfile
+from transformers import VitsModel, AutoTokenizer
+
+torch_device = torch.device(device)
+model = VitsModel.from_pretrained(repo_id).to(torch_device)
+model.eval()
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+tokenized_inputs = tokenizer(text, return_tensors="pt")
+tokenized_inputs = {key: value.to(torch_device) for key, value in tokenized_inputs.items()}
+
+with torch.no_grad():
+    waveform_tensor = model(**tokenized_inputs).waveform
+
+waveform = waveform_tensor.detach().cpu().squeeze(0).numpy()
+
+RESULT = {
+    "waveform": waveform,
+    "sampling_rate": model.config.sampling_rate,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    target_file = output_path / "tts_output.wav"
+    scipy.io.wavfile.write(target_file, RESULT["sampling_rate"], RESULT["waveform"])

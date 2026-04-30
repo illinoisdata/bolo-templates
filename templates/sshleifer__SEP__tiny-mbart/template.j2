@@ -1,0 +1,29 @@
+{% set src_text = "Hello, world!" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/sshleifer__SEP__tiny-mbart" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+src_text = "{{ src_text }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import json
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(src_text, return_tensors="pt").to(device)
+
+outputs = model.generate(**inputs)
+
+generated_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "generated_text.json"), "w") as f:
+        json.dump(RESULT["generated_text"], f)

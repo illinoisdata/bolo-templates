@@ -1,0 +1,81 @@
+{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__wav2vec2-xls-r-300m" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+output_dir = "{{ output_dir }}"
+
+import io
+import json
+import os
+from pathlib import Path
+from urllib.parse import urlparse
+
+import numpy as np
+import requests
+import soundfile as sf
+import torch
+import torchaudio
+from transformers import AutoFeatureExtractor, AutoModelForPreTraining
+
+# Resolve device and output directory objects after imports
+device = torch.device(device)
+output_dir = Path(output_dir)
+
+
+def _load_audio(source: str, target_sample_rate: int):
+    parsed = urlparse(source)
+    if parsed.scheme in {"http", "https"}:
+        response = requests.get(source)
+        response.raise_for_status()
+        buffer = io.BytesIO(response.content)
+        waveform_np, sample_rate = sf.read(buffer, dtype="float32")
+    else:
+        waveform_np, sample_rate = sf.read(source, dtype="float32")
+    if waveform_np.ndim > 1:
+        waveform_np = waveform_np.mean(axis=1)
+    waveform = torch.from_numpy(waveform_np)
+    if sample_rate != target_sample_rate:
+        resampler = torchaudio.transforms.Resample(sample_rate, target_sample_rate)
+        waveform = resampler(waveform.unsqueeze(0)).squeeze(0)
+        sample_rate = target_sample_rate
+    return waveform, sample_rate
+
+
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+target_sampling_rate = feature_extractor.sampling_rate
+waveform, sampling_rate = _load_audio(audio_path, target_sampling_rate)
+audio_samples = waveform.cpu().numpy()
+inputs = feature_extractor(audio_samples, sampling_rate=sampling_rate, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs, output_hidden_states=True)
+
+last_hidden_state = outputs.hidden_states[-1].cpu()
+RESULT = {"last_hidden_state": last_hidden_state}
+
+
+def _save_output(name: str, value, directory: Path):
+    if torch.is_tensor(value):
+        np.save(str(directory / f"{name}.npy"), value.numpy())
+        return
+    if isinstance(value, np.ndarray):
+        np.save(str(directory / f"{name}.npy"), value)
+        return
+    if isinstance(value, (str, int, float, bool)):
+        with open(directory / f"{name}.txt", "w", encoding="utf-8") as handle:
+            handle.write(str(value))
+        return
+    with open(directory / f"{name}.json", "w", encoding="utf-8") as handle:
+        json.dump(value, handle)
+
+
+if __name__ == "__main__":
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for output_name, output_value in RESULT.items():
+        _save_output(output_name, output_value, output_dir)

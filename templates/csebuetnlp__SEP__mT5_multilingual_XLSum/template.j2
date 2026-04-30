@@ -1,0 +1,49 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set article_text = 'sample text' %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/csebuetnlp__SEP__mT5_multilingual_XLSum" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+article_text = """{{ article_text }}"""
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+
+tokenized_inputs = tokenizer(
+    article_text,
+    return_tensors="pt",
+    padding="max_length",
+    truncation=True,
+    max_length=512,
+)
+tokenized_inputs = {key: value.to(device) for key, value in tokenized_inputs.items()}
+
+generate_kwargs = dict(
+    input_ids=tokenized_inputs["input_ids"],
+    attention_mask=tokenized_inputs["attention_mask"],
+    max_length=84,
+    num_beams=4,
+    no_repeat_ngram_size=2,
+)
+
+with torch.no_grad():
+    generated_ids = model.generate(**generate_kwargs)
+
+summary = tokenizer.decode(
+    generated_ids[0],
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=False,
+)
+
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

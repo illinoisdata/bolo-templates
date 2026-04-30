@@ -1,0 +1,8 @@
+{% set repo_id = "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp" %}
+
+repo_id = "{{ repo_id }}"
+
+from huggingface_hub import list_repo_files
+
+files = list_repo_files(repo_id)
+print(files)

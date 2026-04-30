@@ -1,0 +1,54 @@
+{% set repo_id = "tohoku-nlp/bert-base-japanese-v3" %}
+{% set device = "cuda:0" %}
+{% set mask_prompt = "私は[MASK]が好きです。" %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/tohoku-nlp__SEP__bert-base-japanese-v3" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ mask_prompt }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+from pathlib import Path
+import json
+import torch
+from transformers import AutoModelForPreTraining, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+tokenized_input = tokenizer(text_input, return_tensors="pt")
+inputs = {key: tensor.to(device) for key, tensor in tokenized_input.items()}
+outputs = model(**inputs)
+logits = outputs.prediction_logits
+mask_token_id = tokenizer.mask_token_id
+mask_positions = (inputs["input_ids"] == mask_token_id).nonzero(as_tuple=False)
+masked_predictions = []
+
+for position in mask_positions:
+    batch_index = int(position[0])
+    sequence_index = int(position[1])
+    mask_logits = logits[batch_index, sequence_index]
+    mask_probs = torch.softmax(mask_logits, dim=-1)
+    top_probs, top_indices = mask_probs.topk(top_k)
+    top_token_ids = top_indices.tolist()
+    token_strings = tokenizer.convert_ids_to_tokens(top_token_ids)
+    for token_id, score, token_str in zip(top_token_ids, top_probs.tolist(), token_strings):
+        masked_predictions.append(
+            {
+                "batch_index": batch_index,
+                "sequence_index": sequence_index,
+                "token": token_str,
+                "token_id": int(token_id),
+                "score": float(score),
+            }
+        )
+
+RESULT = {"masked_predictions": masked_predictions}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    with open(output_path / "masked_predictions.json", "w", encoding="utf-8") as output_file:
+        json.dump(RESULT["masked_predictions"], output_file, ensure_ascii=False, indent=2)

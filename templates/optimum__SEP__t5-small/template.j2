@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("optimum/t5-small") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("My name is Eustache and I have a pet raccoon") %}
+{% set translation_prefix = translation_prefix | default("translate English to French: ") %}
+{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/optimum__SEP__t5-small") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = """{{ input_text }}"""
+translation_prefix = """{{ translation_prefix }}"""
+output_dir = "{{ output_dir }}"
+execution_preference = "CUDAExecutionProvider" if device.lower().startswith("cuda") else "CPUExecutionProvider"
+
+import os
+import onnxruntime as ort
+from transformers import AutoTokenizer
+from optimum.onnxruntime import ORTModelForSeq2SeqLM
+
+available_providers = ort.get_available_providers()
+execution_provider = (
+    execution_preference
+    if execution_preference in available_providers
+    else "CPUExecutionProvider"
+)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = ORTModelForSeq2SeqLM.from_pretrained(repo_id, provider=execution_provider)
+
+prompt = f"{translation_prefix}{input_text}"
+encoded_inputs = tokenizer(prompt, return_tensors="pt")
+tensor_device = device if execution_provider == "CUDAExecutionProvider" else "cpu"
+encoded_inputs = {key: value.to(tensor_device) for key, value in encoded_inputs.items()}
+
+generated_tokens = model.generate(**encoded_inputs, max_new_tokens=128)
+translation = tokenizer.batch_decode(
+    generated_tokens,
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=True,
+)[0]
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "translation.txt")
+    with open(output_path, "w", encoding="utf-8") as file:
+        file.write(translation)

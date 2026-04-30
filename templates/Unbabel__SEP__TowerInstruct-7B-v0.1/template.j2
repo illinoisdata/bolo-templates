@@ -1,0 +1,55 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Unbabel__SEP__TowerInstruct-7B-v0.1" %}
+{% set user_prompt = "Translate the following text from Portuguese into English.\nPortuguese: Um grupo de investigadores lançou um novo modelo para tarefas relacionadas com tradução.\nEnglish:" %}
+{% set max_new_tokens = 256 %}
+{% set temperature = 0.0 %}
+{% set top_p = 0.95 %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+user_prompt = """{{ user_prompt }}"""
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+
+import os
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+if tokenizer.pad_token_id is None:
+    tokenizer.pad_token_id = tokenizer.eos_token_id
+model = AutoModelForCausalLM.from_pretrained(repo_id)
+model = model.to(device)
+
+messages = [{"role": "user", "content": user_prompt}]
+prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+generation_kwargs = {
+    "max_new_tokens": max_new_tokens,
+    "do_sample": temperature > 0,
+    "temperature": temperature if temperature > 0 else 1.0,
+    "top_p": top_p,
+    "eos_token_id": tokenizer.eos_token_id,
+    "pad_token_id": tokenizer.pad_token_id,
+}
+
+with torch.inference_mode():
+    generated = model.generate(**inputs, **generation_kwargs)
+
+generated_sequence = generated[0]
+prompt_length = inputs["input_ids"].shape[1]
+generated_tokens = generated_sequence[prompt_length:]
+generated_text = tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "generated_text.txt")
+    with open(output_path, "w", encoding="utf-8") as output_file:
+        output_file.write(RESULT["generated_text"])

@@ -1,0 +1,37 @@
+{% set repo_id = "csebuetnlp/banglat5_banglaparaphrase" %}
+{% set device = "cuda:0" %}
+{% set input_sentence = "আমি বাংলায় কথা বলতে ভালোবাসি।" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/csebuetnlp__SEP__banglat5_banglaparaphrase" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_sentence = "{{ input_sentence }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(torch_device)
+
+encoding = tokenizer(input_sentence, return_tensors="pt", padding=True)
+encoding = {key: value.to(torch_device) for key, value in encoding.items()}
+
+generated_tokens = model.generate(**encoding)
+
+paraphrase = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=True)[0]
+
+RESULT = {"paraphrase": paraphrase}
+
+if __name__ == "__main__":
+    output_root = Path(output_dir)
+    output_root.mkdir(parents=True, exist_ok=True)
+    output_path = output_root / "paraphrase.txt"
+    output_path.write_text(RESULT["paraphrase"], encoding="utf-8")

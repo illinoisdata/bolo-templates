@@ -1,0 +1,51 @@
+{% set input_text = "이 문장을 정중한 표현으로 바꿔 주세요." %}
+{% set num_beams = 5 %}
+{% set max_length = 256 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/circulus__SEP__kobart-trans-formal-v2" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+num_beams = {{ num_beams }}
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+device_obj = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device_obj)
+
+encoded = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+    padding=True,
+    max_length=max_length,
+)
+encoded = {key: value.to(device_obj) for key, value in encoded.items()}
+
+generated_tokens = model.generate(
+    **encoded,
+    max_length=max_length,
+    num_beams=num_beams,
+    early_stopping=True,
+)
+decoded_outputs = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+generated_text = decoded_outputs[0] if len(decoded_outputs) == 1 else decoded_outputs
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    target_dir = Path(output_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    text_output = RESULT["generated_text"]
+    output_file = target_dir / "generated_text.txt"
+    if isinstance(text_output, str):
+        output_file.write_text(text_output, encoding="utf-8")
+    else:
+        output_file.write_text("\n".join(text_output), encoding="utf-8")

@@ -1,0 +1,34 @@
+{% set repo_id = "Helsinki-NLP/opus-mt-nl-en" %}
+{% set device = "cuda:0" %}
+{% set source_text = "Dit is een voorbeeldzin om te vertalen." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-nl-en" %}
+{% set max_new_tokens = 128 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = "{{ source_text }}"
+output_dir = "{{ output_dir }}"
+max_new_tokens = {{ max_new_tokens }}
+
+import os
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
+
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoded_input = tokenizer(source_text, return_tensors="pt")
+encoded_input = {key: value.to(device) for key, value in encoded_input.items()}
+
+generated_tokens = model.generate(**encoded_input, max_new_tokens=max_new_tokens)
+decoded_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+translated_text = decoded_texts[0]
+
+RESULT = {"translation": translated_text}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    translation_path = Path(output_dir) / "translation.txt"
+    translation_path.write_text(RESULT["translation"], encoding="utf-8")

@@ -1,0 +1,57 @@
+{% set repo_id = "havenhq/mamba-chat" %}
+{% set device = "cuda:0" %}
+{% set user_message = "Hello, how are you?" %}
+{% set max_new_tokens = 128 %}
+{% set temperature = 0.7 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/havenhq__SEP__mamba-chat" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+user_message = "{{ user_message }}"
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, MambaConfig, MambaForCausalLM
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_path, "r", encoding="utf-8") as config_file:
+    config_dict = json.load(config_file)
+config = MambaConfig(**config_dict)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = MambaForCausalLM.from_pretrained(
+    repo_id,
+    config=config,
+    ignore_mismatched_sizes=True,
+)
+model = model.to_empty(device=device)
+
+prompt = f"<|user|> {user_message}\n<|assistant|>"
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        temperature=temperature,
+        do_sample=True,
+        pad_token_id=pad_token_id,
+    )
+
+generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+assistant_response = generated_text.split("<|assistant|>")[-1].strip()
+
+RESULT = {"generated_text": assistant_response}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

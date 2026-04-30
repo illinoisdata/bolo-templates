@@ -1,0 +1,48 @@
+{% set prompt = "Generate a warm, expressive greeting introducing yourself as a helpful digital assistant." %}
+{% set max_new_tokens = 256 %}
+{% set temperature = 0.7 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/unsloth__SEP__orpheus-3b-0.1-ft" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+if tokenizer.pad_token_id is None and tokenizer.eos_token_id is not None:
+    tokenizer.pad_token_id = tokenizer.eos_token_id
+pad_token_id = tokenizer.pad_token_id or tokenizer.eos_token_id
+model = AutoModelForCausalLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+with torch.inference_mode():
+    generated_tokens = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        temperature=temperature,
+        do_sample=True,
+        pad_token_id=pad_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    text_path = output_path / "generated_text.txt"
+    text_path.write_text(RESULT["generated_text"], encoding="utf-8")

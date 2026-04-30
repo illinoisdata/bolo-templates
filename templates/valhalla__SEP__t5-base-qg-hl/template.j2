@@ -1,0 +1,42 @@
+{% set input_text = "<hl> 42 <hl> is the answer to life, the universe and everything. </s>" %}
+{% set max_new_tokens = 64 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/valhalla__SEP__t5-base-qg-hl" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+tokenized_inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    padding=True,
+    truncation=True,
+)
+inputs = {k: v.to(device) for k, v in tokenized_inputs.items()}
+
+generated_tokens = model.generate(
+    **inputs,
+    max_new_tokens=max_new_tokens,
+    num_beams=num_beams,
+)
+
+generated_questions = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"generated_questions": generated_questions}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_questions.txt").write_text("\n".join(RESULT["generated_questions"]), encoding="utf-8")

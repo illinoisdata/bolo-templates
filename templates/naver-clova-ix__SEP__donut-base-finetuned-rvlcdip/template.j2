@@ -1,0 +1,54 @@
+{% set document_image = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/naver-clova-ix__SEP__donut-base-finetuned-rvlcdip" %}
+{% set max_length = 64 %}
+{% set num_beams = 1 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+document_image = "{{ document_image }}"
+output_dir = "{{ output_dir }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+
+import os
+from io import BytesIO
+from pathlib import Path
+from urllib.parse import urlparse
+
+import requests
+from PIL import Image
+from transformers import AutoProcessor, VisionEncoderDecoderModel
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = VisionEncoderDecoderModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+def load_image(source):
+    parsed = urlparse(source)
+    if parsed.scheme in {"http", "https"}:
+        response = requests.get(source)
+        response.raise_for_status()
+        return Image.open(BytesIO(response.content)).convert("RGB")
+    return Image.open(source).convert("RGB")
+
+image = load_image(document_image)
+inputs = processor(image, return_tensors="pt")
+pixel_values = inputs["pixel_values"].to(device)
+generated_ids = model.generate(
+    pixel_values,
+    decoder_start_token_id=processor.tokenizer.cls_token_id,
+    eos_token_id=processor.tokenizer.eos_token_id,
+    pad_token_id=processor.tokenizer.pad_token_id,
+    max_length=max_length,
+    num_beams=num_beams,
+)
+
+generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    text_path = Path(output_dir) / "generated_text.txt"
+    text_path.write_text(generated_text, encoding="utf-8")

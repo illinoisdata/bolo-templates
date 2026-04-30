@@ -1,0 +1,31 @@
+{% set text = "Ceci est une phrase d'exemple." %}
+{% set max_length = 512 %}
+{% set num_beams = 4 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+from pathlib import Path
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(text, return_tensors="pt", padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    output_dir = Path(".")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    with open(output_dir / "translations.txt", "w", encoding="utf-8") as f:
+        for line in RESULT["translations"]:
+            f.write(line + "\n")

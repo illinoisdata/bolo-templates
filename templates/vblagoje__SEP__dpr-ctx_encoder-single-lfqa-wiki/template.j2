@@ -1,0 +1,33 @@
+{% set query = "Where an aircraft passes through a cloud, it can disperse the cloud in its path..." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/vblagoje__SEP__dpr-ctx_encoder-single-lfqa-wiki" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query = """{{ query }}"""
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+
+import numpy as np
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded = tokenizer(query, return_tensors="pt", truncation=True, max_length=512)
+encoded = {key: value.to(device) for key, value in encoded.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded)
+
+embeddings = outputs.pooler_output
+embedding_list = embeddings.cpu().tolist()
+
+RESULT = {"query_embedding": embedding_list}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    embedding_path = Path(output_dir) / "query_embedding.npy"
+    np.save(embedding_path, np.array(RESULT["query_embedding"], dtype=np.float32))

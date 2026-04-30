@@ -1,0 +1,86 @@
+{% set video_path = "/u/yli77/projects/ML-code-generation/data/video.avi" %}
+{% set prompt_text = "Describe what happens in this video." %}
+{% set num_frames = 8 %}
+{% set max_new_tokens = 150 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/llava-hf__SEP__LLaVA-NeXT-Video-7B-hf" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+video_path = "{{ video_path }}"
+prompt_text = "{{ prompt_text }}"
+num_frames = {{ num_frames }}
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+
+from io import BytesIO
+from urllib.parse import urlparse
+import os
+
+import av
+import numpy as np
+import requests
+import torch
+from transformers import AutoProcessor, LlavaNextVideoForConditionalGeneration
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = LlavaNextVideoForConditionalGeneration.from_pretrained(repo_id).to(device)
+
+
+def _read_video_frames(path, frame_count):
+    parsed = urlparse(path)
+    is_url = parsed.scheme in {"http", "https"}
+    if is_url:
+        response = requests.get(path, stream=True)
+        response.raise_for_status()
+        buffer = BytesIO(response.content)
+        container = av.open(buffer)
+    else:
+        container = av.open(path)
+    try:
+        frames = [frame.to_ndarray(format="rgb24") for frame in container.decode(video=0)]
+    finally:
+        container.close()
+    if not frames:
+        raise ValueError("Video has no decodable frames.")
+    if len(frames) >= frame_count:
+        indices = np.linspace(0, len(frames) - 1, frame_count, dtype=int)
+        sampled_frames = [frames[i] for i in indices]
+    else:
+        sampled_frames = frames.copy()
+        last_frame = frames[-1]
+        while len(sampled_frames) < frame_count:
+            sampled_frames.append(last_frame.copy())
+    return np.stack(sampled_frames)
+
+video_array = _read_video_frames(video_path, num_frames)
+
+conversation = [
+    {
+        "role": "user",
+        "content": [
+            {"type": "text", "text": prompt_text},
+            {"type": "video"},
+        ],
+    },
+]
+prompt = processor.apply_chat_template(conversation, add_generation_prompt=True)
+inputs = processor(
+    text=prompt,
+    videos=video_array,
+    num_frames=num_frames,
+    padding=True,
+    return_tensors="pt",
+).to(device)
+
+with torch.inference_mode():
+    generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
+
+generated_text = processor.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    generated_path = os.path.join(output_dir, "generated_text.txt")
+    with open(generated_path, "w", encoding="utf-8") as writer:
+        writer.write(RESULT["generated_text"])

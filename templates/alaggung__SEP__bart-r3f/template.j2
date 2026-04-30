@@ -1,0 +1,30 @@
+{% set repo_id = "alaggung/bart-r3f" %}
+{% set device = "cuda:0" %}
+{% set text = "[BOS]밥 ㄱ?[SEP]고고고고 뭐 먹을까?[SEP]어제 김치찌개 먹어서 한식말고 딴 거[SEP]그럼 돈까스 어때?[SEP]오 좋다 1시 학관 앞으로 오셈[SEP]ㅇㅋ[EOS]" %}
+{% set max_length = 64 %}
+{% set top_k = 5 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_length = {{ max_length }}
+top_k = {{ top_k }}
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+outputs = model.generate(**inputs, max_length=max_length, top_k=top_k)
+summary = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
+
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    with open("summary.txt", "w", encoding="utf-8") as f:
+        f.write(RESULT["summary"])

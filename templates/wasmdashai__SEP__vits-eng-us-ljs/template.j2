@@ -1,0 +1,35 @@
+{% set text_input = "The quick brown fox jumps over the lazy dog." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/wasmdashai__SEP__vits-eng-us-ljs" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+
+import soundfile as sf
+import torch
+from transformers import pipeline
+
+# initialize text-to-speech pipeline
+torch_device = torch.device(device)
+tts = pipeline("text-to-speech", model=repo_id, device=torch_device)
+
+# run inference
+tts_outputs = tts(text_input)
+if isinstance(tts_outputs, list):
+    tts_outputs = tts_outputs[0]
+
+# post-process output
+speech_array = tts_outputs.get("audio")
+if speech_array is None:
+    speech_array = tts_outputs.get("array")
+SAMPLE_RATE = tts_outputs.get("sampling_rate", tts.model.config.sampling_rate)
+
+RESULT = {"speech": speech_array}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    sf.write(os.path.join(output_dir, "speech.wav"), RESULT["speech"], SAMPLE_RATE)

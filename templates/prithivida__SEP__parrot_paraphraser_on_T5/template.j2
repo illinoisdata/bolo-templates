@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("prithivida/parrot_paraphraser_on_T5") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = "Can you recommend some upscale restaurants in New York?" %}
+{% set max_new_tokens = 64 %}
+{% set num_beams = 4 %}
+{% set max_input_length = 128 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/prithivida__SEP__parrot_paraphraser_on_T5" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
+max_input_length = {{ max_input_length }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    input_text,
+    max_length=max_input_length,
+    truncation=True,
+    padding=True,
+    return_tensors="pt",
+)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **encoded_inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+    )
+
+paraphrases = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"paraphrases": paraphrases}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    destination = output_path / "paraphrases.txt"
+    destination.write_text("\n".join(RESULT["paraphrases"]), encoding="utf-8")

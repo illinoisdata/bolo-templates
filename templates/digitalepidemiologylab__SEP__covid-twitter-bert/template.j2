@@ -1,0 +1,51 @@
+{% set repo_id = "digitalepidemiologylab/covid-twitter-bert" %}
+{% set device = "cuda:0" %}
+{% set text_input = "Assess how Twitter discussions around COVID-19 vaccines evolve over time." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/digitalepidemiologylab__SEP__covid-twitter-bert" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+
+import numpy as np
+from transformers import AutoModel, AutoTokenizer
+
+device_obj = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model.to(device_obj)
+model.eval()
+
+inputs = tokenizer(text_input, return_tensors="pt", truncation=True)
+inputs = {key: tensor.to(device_obj) for key, tensor in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+last_hidden_state = outputs.last_hidden_state
+cls_embedding = last_hidden_state[:, 0, :]
+last_hidden_state = last_hidden_state.detach().cpu()
+cls_embedding = cls_embedding.detach().cpu()
+
+RESULT = {
+    "last_hidden_state": last_hidden_state,
+    "cls_embedding": cls_embedding,
+}
+
+if __name__ == "__main__":
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    for name, value in RESULT.items():
+        array = value
+        if isinstance(array, torch.Tensor):
+            array = array.detach().cpu().numpy()
+        elif isinstance(array, np.ndarray):
+            array = array
+        else:
+            continue
+        np.save(destination / f"{name}.npy", array)

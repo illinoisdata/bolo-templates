@@ -1,0 +1,65 @@
+{% set text_input = "The quick brown fox jumps over the lazy dog." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/nealcly__SEP__detection-longformer" %}
+{% set max_length = 4096 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = """{{ text_input }}"""
+output_dir = "{{ output_dir }}"
+max_length = {{ max_length }}
+
+from pathlib import Path
+import json
+
+import torch
+import torch.nn.functional as F
+from huggingface_hub import hf_hub_download
+from transformers import (
+    LongformerConfig,
+    LongformerForSequenceClassification,
+    LongformerTokenizerFast,
+)
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_path, "r", encoding="utf-8") as config_file:
+    remote_config = json.load(config_file)
+remote_id2label = remote_config.get("id2label", {})
+remote_config["id2label"] = {
+    int(key): str(value)
+    for key, value in remote_id2label.items()
+}
+
+model_config = LongformerConfig.from_dict(remote_config)
+model = LongformerForSequenceClassification.from_pretrained(repo_id, config=model_config).to(device)
+model.eval()
+
+tokenizer = LongformerTokenizerFast.from_pretrained(repo_id)
+encoded_inputs = tokenizer(
+    text_input,
+    return_tensors="pt",
+    padding=True,
+    truncation=True,
+    max_length=max_length,
+)
+encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+logits = outputs.logits
+probabilities = F.softmax(logits, dim=-1).squeeze(0)
+predicted_id = int(torch.argmax(logits, dim=-1).item())
+predicted_label = model.config.id2label.get(predicted_id, predicted_id)
+
+RESULT = {
+    "label": predicted_label,
+    "label_id": predicted_id,
+    "scores": [float(value) for value in probabilities.tolist()],
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    result_file = output_path / "result.json"
+    with result_file.open("w", encoding="utf-8") as f:
+        json.dump(RESULT, f, ensure_ascii=False, indent=2)

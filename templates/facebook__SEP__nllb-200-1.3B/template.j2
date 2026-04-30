@@ -1,0 +1,20 @@
+{% set src_text = "Hello world" %}
+{% set src_lang = "eng_Latn" %}
+{% set tgt_lang = "fra_Latn" %}
+{% set max_new_tokens = 60 %}
+{% set output_dir = "/tmp" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+src_text = "{{ src_text }}"
+src_lang = "{{ src_lang }}"
+tgt_lang = "{{ tgt_lang }}"
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+from pathlib import Path
+import sys
+from transformers import NllbTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = NllbTokenizer.from_pretrained(repo_id, src_lang=src_lang, tgt_lang=tgt_lang)
+print(tokenizer.__class__)
+print(dir(tokenizer))
+sys.exit(0)

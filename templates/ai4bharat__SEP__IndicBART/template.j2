@@ -1,0 +1,59 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set input_text = input_text | default("Hello, how are you? </s> <2en>") %}
+{% set target_lang = target_lang | default("<2hi>") %}
+{% set num_beams = num_beams | default(4) %}
+{% set max_length = max_length | default(50) %}
+{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ai4bharat__SEP__IndicBART") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_text = {{ input_text | tojson }}
+target_lang = {{ target_lang | tojson }}
+num_beams = {{ num_beams }}
+max_length = {{ max_length }}
+output_dir = {{ output_dir | tojson }}
+
+from pathlib import Path
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+# Load model and tokenizer
+tokenizer = AutoTokenizer.from_pretrained(repo_id, do_lower_case=False, use_fast=False, keep_accents=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+# Pre-process input text
+encoded = tokenizer(input_text, add_special_tokens=False, return_tensors="pt", padding=True)
+input_ids = encoded["input_ids"].to(device)
+attention_mask = encoded["attention_mask"].to(device)
+
+# Prepare generation parameters
+pad_token_id = tokenizer.pad_token_id
+bos_token_id = tokenizer.bos_token_id
+eos_token_id = tokenizer.eos_token_id
+decoder_start_token_id = tokenizer._convert_token_to_id_with_added_voc(target_lang)
+
+# Run inference
+enable_kwargs = dict(
+    input_ids=input_ids,
+    attention_mask=attention_mask,
+    max_length=max_length,
+    num_beams=num_beams,
+    early_stopping=True,
+    pad_token_id=pad_token_id,
+    bos_token_id=bos_token_id,
+    eos_token_id=eos_token_id,
+    decoder_start_token_id=decoder_start_token_id,
+    use_cache=True,
+)
+output_ids = model.generate(**enable_kwargs)
+
+# Post-process output
+generated_text = tokenizer.decode(output_ids[0], skip_special_tokens=True, clean_up_tokenization_spaces=False)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

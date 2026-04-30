@@ -1,0 +1,70 @@
+{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
+{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__wav2vec2-xls-r-1b") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+output_dir = "{{ output_dir }}"
+
+import io
+from pathlib import Path
+
+import numpy as np
+import requests
+import soundfile as sf
+import torchaudio.functional as F
+import torch
+from transformers import AutoFeatureExtractor, AutoModelForPreTraining
+
+device = torch.device(device)
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+target_sampling_rate = feature_extractor.sampling_rate
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    response = requests.get(audio_path)
+    response.raise_for_status()
+    audio_source = io.BytesIO(response.content)
+else:
+    audio_source = audio_path
+
+waveform, sampling_rate = sf.read(audio_source, dtype="float32")
+if waveform.ndim > 1:
+    waveform = waveform.mean(axis=1)
+
+sampling_rate = int(sampling_rate)
+if sampling_rate != target_sampling_rate:
+    waveform_tensor = torch.from_numpy(waveform)
+    resampled = F.resample(waveform_tensor, sampling_rate, target_sampling_rate)
+    waveform = resampled.numpy()
+    sampling_rate = target_sampling_rate
+
+inputs = feature_extractor(waveform, sampling_rate=sampling_rate, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+result_dict = {}
+for key, value in outputs.__dict__.items():
+    if key.startswith("_"):
+        continue
+    if isinstance(value, torch.Tensor):
+        normalized_value = value.detach().cpu().numpy()
+    elif value is None:
+        normalized_value = None
+    else:
+        normalized_value = np.array(value)
+    result_dict[key] = normalized_value
+RESULT = result_dict
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    for key, value in RESULT.items():
+        if value is None:
+            continue
+        np.save(output_path / f"{key}.npy", value)

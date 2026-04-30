@@ -1,0 +1,28 @@
+{% set sequence = 'M T E Y K L V V V G A G G V G K S A L T I Q L I Q' %}
+{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Rostlab__SEP__prot_albert' %}
+
+repo_id = '{{ repo_id }}'
+device = '{{ device }}'
+sequence = '{{ sequence }}'
+output_dir = '{{ output_dir }}'
+
+import torch
+from transformers import AlbertTokenizer, AlbertModel
+
+tokenizer = AlbertTokenizer.from_pretrained(repo_id)
+model = AlbertModel.from_pretrained(repo_id)
+model.to(device)
+
+inputs = tokenizer(sequence, return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+embeddings = outputs.last_hidden_state
+RESULT = {'embeddings': embeddings}
+
+if __name__ == '__main__':
+    import os
+    os.makedirs(output_dir, exist_ok=True)
+    torch.save(RESULT['embeddings'].cpu(), os.path.join(output_dir, 'embeddings.pt'))

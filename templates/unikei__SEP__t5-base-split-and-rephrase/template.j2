@@ -1,0 +1,44 @@
+{% set complex_sentence = "Cystic Fibrosis (CF) is an autosomal recessive disorder that affects multiple organs, which is common in the Caucasian population, symptomatically affecting 1 in 2500 newborns in the UK, and more than 80,000 individuals globally." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/unikei__SEP__t5-base-split-and-rephrase" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+complex_sentence = "{{ complex_sentence }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+
+tokenized = tokenizer(
+    complex_sentence,
+    padding="max_length",
+    truncation=True,
+    max_length=256,
+    return_tensors="pt",
+)
+input_ids = tokenized.input_ids.to(device)
+attention_mask = tokenized.attention_mask.to(device)
+
+generated_ids = model.generate(
+    input_ids=input_ids,
+    attention_mask=attention_mask,
+    max_length=256,
+    num_beams=5,
+)
+
+simple_sentences = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"simple_sentences": simple_sentences}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    simple_path = os.path.join(output_dir, "simple_sentences.txt")
+    with open(simple_path, "w", encoding="utf-8") as f:
+        for sentence in RESULT["simple_sentences"]:
+            f.write(sentence)
+            f.write("\n")

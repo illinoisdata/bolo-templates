@@ -1,0 +1,7 @@
+{% set repo_id = "debug" %}
+
+repo_id = "{{ repo_id }}"
+
+import huggingface_hub
+
+print(huggingface_hub.list_repo_files("ArthurConmy/redwood_tokenizer"))

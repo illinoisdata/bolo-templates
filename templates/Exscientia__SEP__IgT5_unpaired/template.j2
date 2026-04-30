@@ -1,0 +1,41 @@
+{% set input_sequences = ["EVVMTQSPASLSVSPGERATLSCRARASLGISTDLAWYQQRPGQAPRLLIYGASTRATGIPARFSGSGSGTEFTLTISSLQSEDSAVYYCQQYSNWPLTFGGGTKVEIK", "ALTQPASVSGSPGQSITISCTGTSSDVGGYNYVSWYQQHPGKAPKLMIYDVSKRPSGVSNRFSGSKSGNTASLTISGLQSEDEADYYCNSLTSISTWVFGGGTKLTVL"] %}
+{% set max_new_tokens = 64 %}
+{% set num_return_sequences = 1 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Exscientia__SEP__IgT5_unpaired" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_sequences = {{ input_sequences | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+num_return_sequences = {{ num_return_sequences }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, T5Tokenizer
+
+tokenizer = T5Tokenizer.from_pretrained(repo_id, do_lower_case=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+processed_sequences = [" ".join(sequence) for sequence in input_sequences]
+tokenized_inputs = tokenizer(processed_sequences, return_tensors="pt", padding=True, truncation=True)
+tokenized_inputs = {k: v.to(device) for k, v in tokenized_inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **tokenized_inputs,
+        max_new_tokens=max_new_tokens,
+        num_return_sequences=num_return_sequences,
+    )
+
+generated_sequences = tokenizer.batch_decode(generated_ids.cpu(), skip_special_tokens=True)
+
+RESULT = {"generated_sequences": generated_sequences}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    with (output_path / "generated_sequences.txt").open("w", encoding="utf-8") as f:
+        for sequence in RESULT["generated_sequences"]:
+            f.write(sequence + "\n")

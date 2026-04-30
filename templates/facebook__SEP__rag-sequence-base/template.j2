@@ -1,0 +1,14 @@
+repo_id = "{{ repo_id }}"
+
+import json
+
+from transformers import RagTokenizer
+
+tokenizer = RagTokenizer.from_pretrained(repo_id)
+info = {
+    "has_question_encoder": hasattr(tokenizer, "question_encoder"),
+    "has_question_encoder_tokenizer": hasattr(tokenizer, "question_encoder_tokenizer"),
+    "question_encoder_type": tokenizer.question_encoder.__class__.__name__ if hasattr(tokenizer, "question_encoder") else None,
+    "question_encoder_tokenizer_type": tokenizer.question_encoder_tokenizer.__class__.__name__ if hasattr(tokenizer, "question_encoder_tokenizer") else None,
+}
+print(json.dumps(info))

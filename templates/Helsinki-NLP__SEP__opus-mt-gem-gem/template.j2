@@ -1,0 +1,29 @@
+{% set text_input = ">>eng_Latn<< Translate this sentence to English." %}
+{% set output_dir = "/tmp" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
+
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(text_input, return_tensors="pt", padding=True, truncation=True).to(device)
+
+generated_ids = model.generate(**inputs)
+
+decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+translation = decoded[0] if decoded else ""
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    (Path(output_dir) / "translation.txt").write_text(translation, encoding="utf-8")

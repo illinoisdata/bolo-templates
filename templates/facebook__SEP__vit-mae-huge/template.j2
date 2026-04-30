@@ -1,0 +1,67 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__vit-mae-huge" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+from urllib.parse import urlparse
+
+import numpy as np
+import requests
+import torch
+from PIL import Image
+from transformers import AutoImageProcessor, AutoModelForPreTraining
+
+processor = AutoImageProcessor.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+
+def _is_url(path: str) -> bool:
+    parsed = urlparse(path)
+    return parsed.scheme in {"http", "https"}
+
+
+def _load_image(path: str) -> Image.Image:
+    if _is_url(path):
+        response = requests.get(path, stream=True)
+        response.raise_for_status()
+        image = Image.open(response.raw)
+    else:
+        image = Image.open(path)
+    return image.convert("RGB")
+
+
+image = _load_image(image_path)
+inputs = processor(images=image, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+reconstructed_pixels = outputs.logits.detach().cpu()
+mask_tensor = outputs.mask.detach().cpu()
+ids_restore_tensor = outputs.ids_restore.detach().cpu()
+loss_tensor = outputs.loss.detach().cpu() if outputs.loss is not None else None
+
+RESULT = {
+    "reconstructed_pixels": reconstructed_pixels,
+    "mask": mask_tensor,
+    "ids_restore": ids_restore_tensor,
+    "loss": loss_tensor,
+}
+
+
+if __name__ == "__main__":
+    result_dir = Path(output_dir)
+    result_dir.mkdir(parents=True, exist_ok=True)
+    np.save(result_dir / "reconstructed_pixels.npy", RESULT["reconstructed_pixels"].numpy())
+    np.save(result_dir / "mask.npy", RESULT["mask"].numpy())
+    np.save(result_dir / "ids_restore.npy", RESULT["ids_restore"].numpy())
+    if RESULT["loss"] is not None:
+        np.save(result_dir / "loss.npy", RESULT["loss"].numpy())

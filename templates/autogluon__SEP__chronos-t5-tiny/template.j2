@@ -1,0 +1,68 @@
+{% set context_sequence = [112.0, 118.5, 121.5, 123.2, 128.6, 130.1, 133.4, 136.0, 138.7, 140.2, 141.8, 143.1] %}
+{% set prediction_length = 12 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/autogluon__SEP__chronos-t5-tiny" %}
+{% set temperature = 1.0 %}
+{% set top_k = 50 %}
+{% set top_p = 0.95 %}
+{% set num_return_sequences = 1 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+context_sequence = {{ context_sequence }}
+prediction_length = {{ prediction_length }}
+output_dir = "{{ output_dir }}"
+temperature = {{ temperature }}
+top_k = {{ top_k }}
+top_p = {{ top_p }}
+num_return_sequences = {{ num_return_sequences }}
+
+import json
+import re
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+device = torch.device(device)
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model.eval()
+
+context_text = " ".join(str(value) for value in context_sequence)
+inputs = tokenizer(context_text, return_tensors="pt", truncation=True)
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+numeric_pattern = re.compile(r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
+
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=prediction_length,
+        temperature=temperature,
+        top_k=top_k,
+        top_p=top_p,
+        do_sample=True,
+        num_return_sequences=num_return_sequences,
+    )
+
+forecast_texts = [text.strip() for text in tokenizer.batch_decode(generated, skip_special_tokens=True)]
+forecast_values = [
+    [float(token) for token in text.split() if numeric_pattern.fullmatch(token)]
+    for text in forecast_texts
+]
+
+RESULT = {
+    "forecast_texts": forecast_texts,
+    "forecast_values": forecast_values,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "forecast_texts.json").write_text(
+        json.dumps(forecast_texts, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    (output_path / "forecast_values.json").write_text(
+        json.dumps(forecast_values, indent=2), encoding="utf-8"
+    )

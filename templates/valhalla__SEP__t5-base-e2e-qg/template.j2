@@ -1,0 +1,50 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "valhalla/t5-base-e2e-qg" %}
+{% set text = "Python is a programming language. It is developed by Guido Van Rossum and released in 1991. </s>" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import sys
+import site
+# Ensure the actual site-packages directories are searched before any local paths named 'transformers'
+site_paths = list(site.getsitepackages())
+site_user_path = site.getusersitepackages()
+if site_user_path:
+    site_paths.append(site_user_path)
+for site_path in reversed(site_paths):
+    if site_path not in sys.path:
+        sys.path.insert(0, site_path)
+
+import torch
+# Monkey-patch deprecated tensor aliases for compatibility
+if not hasattr(torch, "LongTensor"):
+    torch.LongTensor = torch.tensor([], dtype=torch.long).__class__
+if not hasattr(torch, "FloatTensor"):
+    torch.FloatTensor = torch.tensor([], dtype=torch.float).__class__
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+# Pre-process input with task-specific prefix
+prefix = model.config.task_specific_params["summarization"]["prefix"]
+input_str = prefix + text
+encoded_inputs = tokenizer(input_str, return_tensors="pt")
+encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+
+# Run inference
+gen_kwargs = model.config.task_specific_params["summarization"].copy()
+gen_kwargs.pop("prefix", None)
+outputs = model.generate(**encoded_inputs, **gen_kwargs)
+
+# Post-process
+questions = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+
+RESULT = {"questions": questions}
+
+if __name__ == "__main__":
+    with open("questions.txt", "w") as f:
+        for q in RESULT["questions"]:
+            f.write(q + "\n")

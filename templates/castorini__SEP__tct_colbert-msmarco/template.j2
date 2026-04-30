@@ -1,0 +1,41 @@
+{% set input_text = "What is dense retrieval?" %}
+{% set max_length = 128 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/castorini__SEP__tct_colbert-msmarco" %}
+{% set tokenizer_repo = "bert-base-uncased" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+tokenizer_repo = "{{ tokenizer_repo }}"
+
+import numpy as np
+import torch
+from pathlib import Path
+from transformers import AutoTokenizer, BertModel
+
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_repo)
+model = BertModel.from_pretrained(repo_id).to(torch.device(device))
+model.eval()
+
+tokenized_inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+    padding="max_length",
+    max_length=max_length,
+)
+tokenized_inputs = {key: value.to(torch.device(device)) for key, value in tokenized_inputs.items()}
+
+with torch.inference_mode():
+    outputs = model(**tokenized_inputs)
+
+embedding = outputs.last_hidden_state.mean(dim=1)
+embedding = embedding.cpu().numpy()
+RESULT = {"embedding": embedding}
+
+if __name__ == "__main__":
+    output_dir_path = Path(output_dir)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
+    np.save(output_dir_path / "embedding.npy", RESULT["embedding"])

@@ -1,0 +1,40 @@
+{% set input_series = "series: [11.0, 10.5, 10.8, 11.2]; horizon: 4" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/AutonLab__SEP__MOMENT-1-small" %}
+{% set tokenizer_source = "google/flan-t5-small" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_series = "{{ input_series }}"
+output_dir = "{{ output_dir }}"
+tokenizer_source = "{{ tokenizer_source }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, AutoConfig
+
+model_kwargs = {}
+
+generation_kwargs = {}
+
+config = AutoConfig.from_pretrained(tokenizer_source)
+
+generation_kwargs["decoder_start_token_id"] = config.decoder_start_token_id
+
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_source, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, config=config, **model_kwargs).to(device)
+model.eval()
+
+processed_inputs = tokenizer(input_series, return_tensors="pt")
+processed_inputs = {k: v.to(device) for k, v in processed_inputs.items()}
+
+generated_tokens = model.generate(**processed_inputs, **generation_kwargs)
+decoded = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+forecast_output = decoded[0] if decoded else ""
+
+RESULT = {"forecast": forecast_output}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    forecast_path = os.path.join(output_dir, "forecast.txt")
+    with open(forecast_path, "w", encoding="utf-8") as f:
+        f.write(RESULT["forecast"])

@@ -1,0 +1,38 @@
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/deepset__SEP__bert-small-mm_retrieval-passage_encoder" %}
+{% set text_passage = "In dense passage retrieval tasks, context passages are embedded by specialized encoders to facilitate efficient nearest-neighbor search." %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+text_passage = """{{ text_passage }}"""
+
+import json
+import os
+
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(
+    text_passage,
+    truncation=True,
+    padding=True,
+    return_tensors="pt",
+)
+inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+
+with torch.no_grad():
+    model_outputs = model(**inputs)
+
+pooler_output = model_outputs.pooler_output
+context_embedding = pooler_output[0].detach().cpu().tolist()
+
+RESULT = {"context_embedding": context_embedding}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    embedding_path = os.path.join(output_dir, "context_embedding.json")
+    with open(embedding_path, "w", encoding="utf-8") as output_file:
+        json.dump(RESULT["context_embedding"], output_file)

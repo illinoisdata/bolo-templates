@@ -1,0 +1,67 @@
+{% set input_text = ["сеглдыя хорош ден", "когд а вы прдет к нам в госи"] %}
+{% set task_prefix = "Spell correct: " %}
+{% set max_input_length = 256 %}
+{% set max_output_length = 256 %}
+{% set num_return_sequences = 1 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/UrukHan__SEP__t5-russian-spell" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = {{ input_text | tojson }}
+task_prefix = {{ task_prefix | tojson }}
+max_input_length = {{ max_input_length }}
+max_output_length = {{ max_output_length }}
+num_return_sequences = {{ num_return_sequences }}
+num_beams = {{ num_beams }}
+output_dir = {{ output_dir | tojson }}
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+torch_device = torch.device(device)
+model = model.to(torch_device)
+model.eval()
+
+if isinstance(input_text, str):
+    normalized_inputs = [input_text]
+else:
+    normalized_inputs = list(input_text)
+prefixed_inputs = [f"{task_prefix}{sequence}" for sequence in normalized_inputs]
+encoded_inputs = tokenizer(
+    prefixed_inputs,
+    padding="longest",
+    truncation=True,
+    max_length=max_input_length,
+    return_tensors="pt",
+)
+encoded_inputs = {name: tensor.to(torch_device) for name, tensor in encoded_inputs.items()}
+
+with torch.no_grad():
+    generated_sequences = model.generate(
+        **encoded_inputs,
+        max_length=max_output_length,
+        num_beams=num_beams,
+        num_return_sequences=num_return_sequences,
+    )
+
+decoded_outputs = tokenizer.batch_decode(generated_sequences, skip_special_tokens=True)
+if num_return_sequences > 1:
+    grouped_outputs = [
+        decoded_outputs[i : i + num_return_sequences]
+        for i in range(0, len(decoded_outputs), num_return_sequences)
+    ]
+else:
+    grouped_outputs = decoded_outputs
+
+RESULT = {"generated_text": grouped_outputs}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    result_file = output_path / "result.json"
+    result_file.write_text(json.dumps(RESULT, ensure_ascii=False, indent=2), encoding="utf-8")

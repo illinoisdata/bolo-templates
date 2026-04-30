@@ -1,0 +1,37 @@
+{% set repo_id = "bvanaken/CORe-clinical-outcome-biobert-v1" %}
+{% set device = "cuda:0" %}
+{% set text = "Patient is a 67-year-old male with chest pain and shortness of breath." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/bvanaken__SEP__CORe-clinical-outcome-biobert-v1" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModel
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+
+# Preprocess input text
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+# Run inference
+outputs = model(**inputs)
+
+# Post-process outputs
+# last_hidden_state: [batch_size, sequence_length, hidden_size]
+# pooler_output: [batch_size, hidden_size]
+RESULT = {
+    "last_hidden_state": outputs.last_hidden_state.cpu(),
+    "pooler_output": outputs.pooler_output.cpu(),
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    torch.save(RESULT["last_hidden_state"], os.path.join(output_dir, "last_hidden_state.pt"))
+    torch.save(RESULT["pooler_output"], os.path.join(output_dir, "pooler_output.pt"))

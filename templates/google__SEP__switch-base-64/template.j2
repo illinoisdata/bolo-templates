@@ -1,0 +1,30 @@
+{% set text_input = "A <extra_id_0> walks into a bar and orders a <extra_id_1>." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__switch-base-64" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(text_input, return_tensors="pt")
+inputs = {key: tensor.to(device) for key, tensor in inputs.items()}
+
+generated_tokens = model.generate(**inputs)
+generated_text = tokenizer.decode(
+    generated_tokens[0], skip_special_tokens=True, clean_up_tokenization_spaces=True
+)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_dir_path = Path(output_dir)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
+    for key, value in RESULT.items():
+        output_path = output_dir_path / f"{key}.txt"
+        output_path.write_text(value)

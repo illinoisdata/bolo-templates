@@ -1,0 +1,52 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__trocr-small-printed" %}
+{% set max_length = 128 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_dir = "{{ output_dir }}"
+max_length = {{ max_length }}
+
+import os
+from urllib.parse import urlparse
+
+import requests
+import torch
+from PIL import Image
+from transformers import AutoImageProcessor, AutoTokenizer, VisionEncoderDecoderModel
+
+image_processor = AutoImageProcessor.from_pretrained(repo_id)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = VisionEncoderDecoderModel.from_pretrained(repo_id).to(device)
+
+if hasattr(model, "config") and getattr(model.config, "pad_token_id", None) is not None:
+    pad_token_id = model.config.pad_token_id
+else:
+    pad_token_id = None
+
+
+def _load_image(source_path: str) -> Image.Image:
+    parsed = urlparse(source_path)
+    if parsed.scheme in {"http", "https"}:
+        response = requests.get(source_path, stream=True)
+        return Image.open(response.raw).convert("RGB")
+    return Image.open(source_path).convert("RGB")
+
+image = _load_image(image_path)
+pixel_values = image_processor(images=image, return_tensors="pt").pixel_values.to(device)
+
+generate_kwargs = {"max_length": max_length}
+if pad_token_id is not None:
+    generate_kwargs["pad_token_id"] = pad_token_id
+
+generated_ids = model.generate(pixel_values, **generate_kwargs)
+generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, "generated_text.txt")
+    with open(output_file, "w", encoding="utf-8") as handle:
+        handle.write(RESULT["generated_text"])

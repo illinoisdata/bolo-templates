@@ -1,0 +1,63 @@
+{% set repo_id = "microsoft/unispeech-sat-large" %}
+{% set device = "cuda:0" %}
+{% set audio_file = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__unispeech-sat-large" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_file = "{{ audio_file }}"
+output_dir = "{{ output_dir }}"
+
+import requests
+import io
+import soundfile as sf
+import torch
+import torchaudio
+from transformers import AutoFeatureExtractor, AutoModelForPreTraining
+
+# Load feature extractor and model
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+
+# Load and preprocess audio
+if audio_file.startswith("http"):  # URL
+    response = requests.get(audio_file)
+    audio_bytes = io.BytesIO(response.content)
+    speech_array, sampling_rate = sf.read(audio_bytes)
+else:
+    speech_array, sampling_rate = sf.read(audio_file)
+
+# Resample if necessary
+expected_sr = feature_extractor.sampling_rate
+if sampling_rate != expected_sr:
+    resampler = torchaudio.transforms.Resample(orig_freq=sampling_rate, new_freq=expected_sr)
+    waveform = torch.from_numpy(speech_array).float()
+    if waveform.ndim == 1:
+        waveform = waveform.unsqueeze(0)
+    speech_array = resampler(waveform).squeeze(0).numpy()
+    sampling_rate = expected_sr
+
+inputs = feature_extractor(speech_array, sampling_rate=sampling_rate, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+# Run inference
+with torch.no_grad():
+    outputs = model(**inputs)
+
+# Post-process outputs to dict
+RESULT = vars(outputs)
+
+if __name__ == "__main__":
+    import os
+    import json
+    import numpy as np
+
+    os.makedirs(output_dir, exist_ok=True)
+    for name, value in RESULT.items():
+        if isinstance(value, torch.Tensor):
+            file_path = os.path.join(output_dir, f"{name}.npy")
+            np.save(file_path, value.cpu().numpy())
+        else:
+            file_path = os.path.join(output_dir, f"{name}.json")
+            with open(file_path, "w") as f:
+                json.dump(value, f)

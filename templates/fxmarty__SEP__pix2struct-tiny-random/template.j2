@@ -1,0 +1,50 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set max_new_tokens = 64 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/fxmarty__SEP__pix2struct-tiny-random" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+
+import os
+from io import BytesIO
+import requests
+from PIL import Image
+import torch
+from transformers import AutoProcessor, Pix2StructForConditionalGeneration
+
+torch_device = torch.device(device)
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = Pix2StructForConditionalGeneration.from_pretrained(repo_id).to(torch_device)
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    response = requests.get(image_path)
+    response.raise_for_status()
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = processor(images=image, return_tensors="pt")
+encoder_kwargs = {}
+if "pixel_values" in inputs:
+    encoder_kwargs["pixel_values"] = inputs["pixel_values"].to(torch_device)
+elif "flattened_patches" in inputs:
+    encoder_kwargs["flattened_patches"] = inputs["flattened_patches"].to(torch_device)
+    if "attention_mask" in inputs:
+        encoder_kwargs["attention_mask"] = inputs["attention_mask"].to(torch_device)
+else:
+    raise ValueError(f"Processor returned unexpected keys: {list(inputs.keys())}")
+
+generated_ids = model.generate(max_new_tokens=max_new_tokens, **encoder_kwargs)
+generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "generated_text.txt")
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(RESULT["generated_text"])

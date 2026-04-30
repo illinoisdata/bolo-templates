@@ -1,0 +1,41 @@
+{% set repo_id = "juierror/flan-t5-text2sql-with-schema" %}
+{% set device = "cuda:0" %}
+{% set question = "get people name with age equal 25" %}
+{% set table = ["id", "name", "age"] %}
+{% set input_max_length = 512 %}
+{% set num_beams = 10 %}
+{% set top_k = 10 %}
+{% set generation_max_length = 700 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+table = {{ table }}
+input_max_length = {{ input_max_length }}
+num_beams = {{ num_beams }}
+top_k = {{ top_k }}
+generation_max_length = {{ generation_max_length }}
+
+import os
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+
+table_prefix = "table:"
+question_prefix = "question:"
+join_table = ",".join(table)
+inputs = question_prefix + " " + question + " " + table_prefix + " " + join_table
+input_ids = tokenizer(inputs, max_length=input_max_length, return_tensors="pt").input_ids
+input_ids = input_ids.to(device)
+
+outputs = model.generate(input_ids, num_beams=num_beams, top_k=top_k, max_length=generation_max_length)
+
+result = tokenizer.decode(outputs[0], skip_special_tokens=True)
+RESULT = {"sql_query": result}
+
+if __name__ == "__main__":
+    os.makedirs("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/juierror__SEP__flan-t5-text2sql-with-schema", exist_ok=True)
+    with open(os.path.join("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/juierror__SEP__flan-t5-text2sql-with-schema", "sql_query.txt"), "w") as f:
+        f.write(RESULT["sql_query"])

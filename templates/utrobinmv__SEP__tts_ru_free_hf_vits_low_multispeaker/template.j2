@@ -1,0 +1,47 @@
+{% set repo_id = "utrobinmv/tts_ru_free_hf_vits_low_multispeaker" %}
+{% set device = "cuda:0" %}
+{% set text = "прив+ет, как дел+а? всё +очень хорош+о! а у тебя как?" %}
+{% set speaker_id = 0 %}
+{% set seed = 555 %}
+{% set accent_model_size = "turbo" %}
+{% set accent_use_dictionary = True %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/utrobinmv__SEP__tts_ru_free_hf_vits_low_multispeaker" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+speaker_id = {{ speaker_id }}
+seed = {{ seed }}
+accent_model_size = "{{ accent_model_size }}"
+accent_use_dictionary = {{ accent_use_dictionary }}
+output_dir = "{{ output_dir }}"
+
+from transformers import VitsModel, AutoTokenizer, set_seed
+import torch
+import scipy.io.wavfile
+import os
+from ruaccent import RUAccent
+
+set_seed(seed)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = VitsModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+accentizer = RUAccent()
+accentizer.load(omograph_model_size=accent_model_size, use_dictionary=accent_use_dictionary, device=device)
+
+text = accentizer.process_all(text)
+
+inputs = tokenizer(text, return_tensors="pt").to(device)
+
+with torch.no_grad():
+    waveform = model(**inputs, speaker_id=speaker_id).waveform
+    waveform = waveform.detach().cpu().numpy()[0]
+
+RESULT = {"waveform": waveform, "sampling_rate": model.config.sampling_rate}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    filepath = os.path.join(output_dir, "tts_audio.wav")
+    scipy.io.wavfile.write(filepath, rate=RESULT["sampling_rate"], data=RESULT["waveform"])

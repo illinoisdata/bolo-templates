@@ -1,0 +1,44 @@
+{% set text_input = "The quick brown fox jumps over the lazy dog." %}
+{% set max_length = 128 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__deberta-xlarge-v2" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import numpy as np
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModel.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    text_input,
+    return_tensors="pt",
+    padding="max_length",
+    truncation=True,
+    max_length=max_length,
+)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    model_outputs = model(**encoded_inputs)
+last_hidden_state = model_outputs.last_hidden_state.cpu()
+cls_embedding = last_hidden_state[:, 0, :]
+
+RESULT = {
+    "last_hidden_state": last_hidden_state,
+    "cls_embedding": cls_embedding,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    np.save(output_path / "last_hidden_state.npy", RESULT["last_hidden_state"].numpy())
+    np.save(output_path / "cls_embedding.npy", RESULT["cls_embedding"].numpy())

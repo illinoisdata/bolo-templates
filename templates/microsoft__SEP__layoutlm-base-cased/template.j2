@@ -1,0 +1,36 @@
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__layoutlm-base-cased" %}
+{% set document_words = ["Hello", "world"] %}
+{% set bounding_boxes = [[0, 0, 0, 0], [0, 0, 0, 0]] %}
+
+repo_id = "{{ repo_id }}"
+output_dir = "{{ output_dir }}"
+device = "{{ device }}"
+document_words = {{ document_words }}
+bounding_boxes = {{ bounding_boxes }}
+
+from pathlib import Path
+
+import numpy as np
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+
+encoded_inputs = tokenizer(
+    document_words,
+    boxes=bounding_boxes,
+    return_tensors="pt",
+    is_split_into_words=True,
+)
+encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+last_hidden_state = outputs.last_hidden_state
+RESULT = {"last_hidden_state": last_hidden_state.detach().cpu()}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    np.save(Path(output_dir) / "last_hidden_state.npy", RESULT["last_hidden_state"].numpy())

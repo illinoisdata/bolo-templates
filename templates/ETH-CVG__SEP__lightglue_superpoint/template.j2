@@ -1,0 +1,57 @@
+{% set image_path_1 = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set image_path_2 = "/u/yli77/projects/ML-code-generation/data/image2.jpeg" %}
+{% set matching_threshold = 0.2 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ETH-CVG__SEP__lightglue_superpoint" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path_1 = "{{ image_path_1 }}"
+image_path_2 = "{{ image_path_2 }}"
+matching_threshold = {{ matching_threshold }}
+output_dir = "{{ output_dir }}"
+import json
+import os
+import requests
+import torch
+from PIL import Image
+from transformers import AutoImageProcessor, AutoModel
+processor = AutoImageProcessor.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+def _load_image(source: str) -> Image.Image:
+    if source.startswith(("http://", "https://")):
+        response = requests.get(source, stream=True)
+        response.raise_for_status()
+        return Image.open(response.raw).convert("RGB")
+    return Image.open(source).convert("RGB")
+
+image_one = _load_image(image_path_1)
+image_two = _load_image(image_path_2)
+images = [image_one, image_two]
+prepared_inputs = processor(images, return_tensors="pt")
+prepared_inputs = {key: value.to(device) for key, value in prepared_inputs.items()}
+with torch.no_grad():
+    raw_outputs = model(**prepared_inputs)
+image_sizes = [[(image.height, image.width) for image in images]]
+processed_matches = processor.post_process_keypoint_matching(
+    raw_outputs,
+    image_sizes,
+    threshold=matching_threshold,
+)
+formatted_matches = []
+for match in processed_matches:
+    formatted_matches.append(
+        {
+            "keypoints0": [kp.tolist() for kp in match["keypoints0"]],
+            "keypoints1": [kp.tolist() for kp in match["keypoints1"]],
+            "matching_scores": [score.tolist() if hasattr(score, "tolist") else score for score in match["matching_scores"]],
+        }
+    )
+RESULT = {"matches": formatted_matches}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "keypoint_matches.json")
+    with open(output_path, "w", encoding="utf-8") as handle:
+        json.dump(RESULT["matches"], handle, ensure_ascii=False, indent=2)

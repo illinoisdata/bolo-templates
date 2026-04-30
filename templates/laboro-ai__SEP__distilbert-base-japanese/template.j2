@@ -1,0 +1,48 @@
+{% set text = "これは日本語で書かれた短いテキストです。" %}
+{% set max_length = 128 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/laboro-ai__SEP__distilbert-base-japanese" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoModel, AutoTokenizer
+
+device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    text,
+    return_tensors="pt",
+    padding="longest",
+    truncation=True,
+    max_length=max_length,
+)
+encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+last_hidden_state = outputs.last_hidden_state.detach().cpu()
+cls_embedding = last_hidden_state[:, 0, :].clone()
+mean_embedding = last_hidden_state.mean(dim=1)
+
+RESULT = {
+    "last_hidden_state": last_hidden_state,
+    "cls_embedding": cls_embedding,
+    "mean_embedding": mean_embedding,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    torch.save(RESULT["last_hidden_state"], output_path / "last_hidden_state.pt")
+    torch.save(RESULT["cls_embedding"], output_path / "cls_embedding.pt")
+    torch.save(RESULT["mean_embedding"], output_path / "mean_embedding.pt")

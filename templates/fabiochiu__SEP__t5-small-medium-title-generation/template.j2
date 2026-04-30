@@ -1,0 +1,42 @@
+{% set repo_id = "fabiochiu/t5-small-medium-title-generation" %}
+{% set device = "cuda:0" %}
+{% set input_text = "Many financial institutions started building conversational AI, prior to the Covid19 pandemic, as part of a digital transformation initiative." %}
+{% set max_input_length = 512 %}
+{% set num_beams = 8 %}
+{% set do_sample = True %}
+{% set min_length = 10 %}
+{% set max_length = 64 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/fabiochiu__SEP__t5-small-medium-title-generation" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_input_length = {{ max_input_length }}
+num_beams = {{ num_beams }}
+do_sample = {{ do_sample }}
+min_length = {{ min_length }}
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+import os
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+prefix = model.config.task_specific_params.get("summarization", {}).get("prefix", "")
+input_str = prefix + input_text
+inputs = tokenizer([input_str], max_length=max_input_length, truncation=True, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+output_ids = model.generate(**inputs, num_beams=num_beams, do_sample=do_sample, min_length=min_length, max_length=max_length)
+decoded_output = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
+predicted_title = decoded_output.strip().split(".")[0]
+
+RESULT = {"predicted_title": predicted_title}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "predicted_title.txt"), "w") as f:
+        f.write(RESULT["predicted_title"])

@@ -1,0 +1,39 @@
+{% set sentences = [
+    "Học sinh cần được hướng dẫn kỹ năng học tập.",
+    "Thời tiết hôm nay thật đẹp và mát mẻ.",
+    "Công nghệ AI đang thay đổi thế giới từng ngày.",
+    "Người dân đổ xô đi mua sắm dịp cuối năm.",
+    "Giá xăng dầu giảm mạnh so với tháng trước.",
+    "Chương trình khuyến mãi hấp dẫn đang diễn ra tại các siêu thị.",
+    "Đội tuyển Việt Nam vô địch giải bóng đá Đông Nam Á.",
+    "Thủ tướng phát biểu tại hội nghị quốc tế về môi trường.",
+    "Nhiều tuyến đường ở thành phố Hồ Chí Minh bị ngập nặng sau cơn mưa lớn.",
+    "Sách là nguồn tri thức vô giá cho mỗi con người."
+] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/linhphanff__SEP__semantic-base-vi" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sentences = {{ sentences | tojson }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+inputs = tokenizer(sentences, padding=True, truncation=True, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs, output_hidden_states=True, return_dict=True)
+    embeddings = outputs.pooler_output
+embedding_list = embeddings.cpu().tolist()
+RESULT = {"embeddings": embedding_list}
+
+if __name__ == "__main__":
+    out_path = Path(output_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+    (out_path / "embeddings.json").write_text(json.dumps(RESULT["embeddings"]))

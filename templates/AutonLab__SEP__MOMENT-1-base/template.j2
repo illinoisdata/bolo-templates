@@ -1,0 +1,44 @@
+{% set forecast_prompt = "series: 100.0, 102.5, 101.0, 104.8, 103.6; task: forecast the next 6 values" %}
+{% set max_new_tokens = 64 %}
+{% set num_return_sequences = 1 %}
+{% set transformer_backbone = "google/flan-t5-base" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/AutonLab__SEP__MOMENT-1-base" %}
+{% set output_filename = "forecast.txt" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+forecast_prompt = "{{ forecast_prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+num_return_sequences = {{ num_return_sequences }}
+transformer_backbone = "{{ transformer_backbone }}"
+output_dir = "{{ output_dir }}"
+output_filename = "{{ output_filename }}"
+
+from pathlib import Path
+from transformers import AutoConfig, AutoTokenizer, T5ForConditionalGeneration
+
+config = AutoConfig.from_pretrained(transformer_backbone)
+if getattr(config, "decoder_start_token_id", None) is None:
+    config.decoder_start_token_id = getattr(config, "pad_token_id", 0)
+if getattr(config, "bos_token_id", None) is None:
+    config.bos_token_id = config.decoder_start_token_id
+tokenizer = AutoTokenizer.from_pretrained(transformer_backbone)
+model = T5ForConditionalGeneration.from_pretrained(repo_id, config=config).to(device)
+if getattr(model.generation_config, "decoder_start_token_id", None) is None:
+    model.generation_config.decoder_start_token_id = config.decoder_start_token_id
+if getattr(model.generation_config, "bos_token_id", None) is None:
+    model.generation_config.bos_token_id = config.bos_token_id
+encoded_prompt = tokenizer(forecast_prompt, return_tensors="pt")
+encoded_prompt = {key: value.to(device) for key, value in encoded_prompt.items()}
+generated_tokens = model.generate(
+    **encoded_prompt,
+    max_new_tokens=max_new_tokens,
+    num_return_sequences=num_return_sequences,
+)
+generated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+forecast_output = generated_texts[0] if generated_texts else ""
+RESULT = {"forecast": forecast_output}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / output_filename).write_text(RESULT["forecast"], encoding="utf-8")

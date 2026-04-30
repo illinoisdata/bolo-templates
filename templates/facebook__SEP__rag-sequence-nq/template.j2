@@ -1,0 +1,30 @@
+{% set question = "how many countries are in europe" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__rag-sequence-nq" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+output_dir = "{{ output_dir }}"
+from pathlib import Path
+from transformers import RagRetriever, RagSequenceForGeneration, RagTokenizer
+
+# Load tokenizer, retriever, and generative model
+tokenizer = RagTokenizer.from_pretrained(repo_id)
+retriever = RagRetriever.from_pretrained(repo_id, index_name="exact", use_dummy_dataset=True)
+model = RagSequenceForGeneration.from_pretrained(repo_id, retriever=retriever).to(device)
+
+# Preprocess the input text prompt
+raw_inputs = tokenizer(question, return_tensors="pt")
+filtered_inputs = {key: tensor for key, tensor in raw_inputs.items() if key in {"input_ids", "attention_mask"}}
+inputs = {key: tensor.to(device) for key, tensor in filtered_inputs.items()}
+
+# Run inference to generate an answer
+generated_ids = model.generate(**inputs, num_beams=1, num_return_sequences=1).cpu()
+answer = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+# Inference results are stored in this dict for downstream evaluation
+RESULT = {"answer": answer}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "answer.txt").write_text(answer, encoding="utf-8")

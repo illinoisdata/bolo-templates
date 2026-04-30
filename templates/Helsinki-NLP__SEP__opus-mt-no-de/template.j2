@@ -1,0 +1,32 @@
+{% set repo_id = "Helsinki-NLP/opus-mt-no-de" %}
+{% set device = "cuda:0" %}
+{% set src_texts = ["Dette er en test."] %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+src_texts = {{ src_texts }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+# Pre-process input texts
+inputs = tokenizer(src_texts, return_tensors="pt", padding=True).to(device)
+
+# Run inference
+generated_ids = model.generate(**inputs)
+
+# Post-process outputs
+translations = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+# Build result dict
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    # Save translations to disk
+    with open("translations.txt", "w", encoding="utf-8") as f:
+        for line in RESULT["translations"]:
+            f.write(line + "\n")

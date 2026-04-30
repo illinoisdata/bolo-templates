@@ -1,0 +1,32 @@
+{% set repo_id = "dbmdz/bert-base-turkish-cased" %}
+{% set device = "cuda:0" %}
+{% set text = "Merhaba, nasılsınız?" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/dbmdz__SEP__bert-base-turkish-cased" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer, AutoModel
+import torch
+import numpy as np
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt").to(device)
+with torch.no_grad():
+    outputs = model(**inputs)
+
+RESULT = {
+    "last_hidden_state": outputs.last_hidden_state,
+    "pooler_output": outputs.pooler_output,
+}
+
+if __name__ == "__main__":
+    import os
+    os.makedirs(output_dir, exist_ok=True)
+    np.save(os.path.join(output_dir, "last_hidden_state.npy"), RESULT["last_hidden_state"].cpu().numpy())
+    np.save(os.path.join(output_dir, "pooler_output.npy"), RESULT["pooler_output"].cpu().numpy())

@@ -1,0 +1,57 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set prompts = ["a photo of a cat", "a photo of a dog", "a photo of an astronaut"] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/timm__SEP__vit_large_patch14_clip_224.openai" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+prompts = {{ prompts }}
+output_dir = "{{ output_dir }}"
+
+import json
+from io import BytesIO
+from pathlib import Path
+
+import requests
+import torch
+from PIL import Image
+from transformers import CLIPModel, CLIPProcessor
+
+processor = CLIPProcessor.from_pretrained(repo_id)
+model = CLIPModel.from_pretrained(repo_id).to(device)
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    response = requests.get(image_path)
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = processor(text=prompts, images=image, return_tensors="pt", padding=True)
+inputs = inputs.to(device)
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits_per_image = outputs.logits_per_image
+probabilities = logits_per_image.softmax(dim=1)
+logits_cpu = logits_per_image.detach().cpu().tolist()
+probabilities_cpu = probabilities.detach().cpu().tolist()
+predictions = []
+for prompt, logit_value, probability_value in zip(prompts, logits_cpu[0], probabilities_cpu[0]):
+    predictions.append(
+        {
+            "prompt": prompt,
+            "logit": logit_value,
+            "probability": probability_value,
+        }
+    )
+
+RESULT = {
+    "logits_per_image": logits_cpu,
+    "probabilities_per_image": probabilities_cpu,
+    "predictions": predictions,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "result.json").write_text(json.dumps(RESULT, indent=2))

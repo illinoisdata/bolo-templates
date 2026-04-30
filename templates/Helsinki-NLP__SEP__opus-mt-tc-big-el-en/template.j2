@@ -1,0 +1,31 @@
+{% set input_texts = ["Το σχολείο μας έχει εννιά τάξεις.", "Άρχισε να τρέχει."] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-tc-big-el-en" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_texts = {{ input_texts }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import os
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+encoded_inputs = tokenizer(
+    input_texts,
+    return_tensors="pt",
+    padding=True,
+)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+generated_tokens = model.generate(**encoded_inputs)
+translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"translations": translations}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    translations_path = os.path.join(output_dir, "translations.txt")
+    with open(translations_path, "w", encoding="utf-8") as file:
+        file.write("\n".join(RESULT["translations"]))

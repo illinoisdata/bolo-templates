@@ -1,0 +1,38 @@
+{% set repo_id = "roborovski/superprompt-v1" %}
+{% set device = "cuda:0" %}
+{% set input_text = "Expand the following prompt to add more detail: A man in a suit walking down the street" %}
+{% set max_new_tokens = 77 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/roborovski__SEP__superprompt-v1" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+# Load model and tokenizer
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+
+# Pre-process input
+inputs = tokenizer(input_text, return_tensors="pt").to(device)
+
+# Run inference
+outputs = model.generate(**inputs, max_new_tokens=max_new_tokens)
+
+# Post-process output
+generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+# Build result dict
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    import os
+
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "generated_text.txt"), "w", encoding="utf-8") as f:
+        f.write(RESULT["generated_text"])

@@ -1,0 +1,56 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set article_text = "US FCC commissioner Brendan Carr has asked Apple and Google to remove TikTok from their app stores. The video app is owned by Chinese company ByteDance. Carr claims that TikTok functions as a surveillance tool that harvests extensive amounts of personal and sensitive data from US citizens. TikTok says its data access approval process is overseen by a US-based security team and that data is only accessed on an as-needed basis under strict controls." %}
+{% set max_input_length = 384 %}
+{% set max_output_length = 84 %}
+{% set num_beams = 4 %}
+{% set no_repeat_ngram_size = 2 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/JulesBelveze__SEP__t5-small-headline-generator" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+article_text = "{{ article_text }}"
+max_input_length = {{ max_input_length }}
+max_output_length = {{ max_output_length }}
+num_beams = {{ num_beams }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoding = tokenizer(
+    article_text,
+    return_tensors="pt",
+    padding="max_length",
+    truncation=True,
+    max_length=max_input_length,
+)
+
+input_ids = encoding["input_ids"].to(device)
+attention_mask = encoding["attention_mask"].to(device)
+
+generated_ids = model.generate(
+    input_ids=input_ids,
+    attention_mask=attention_mask,
+    max_length=max_output_length,
+    num_beams=num_beams,
+    no_repeat_ngram_size=no_repeat_ngram_size,
+)
+
+headline = tokenizer.decode(
+    generated_ids[0],
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=False,
+)
+
+RESULT = {"headline": headline}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "headline.txt").write_text(RESULT["headline"], encoding="utf-8")

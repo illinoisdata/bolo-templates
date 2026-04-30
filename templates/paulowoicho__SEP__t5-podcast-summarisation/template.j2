@@ -1,0 +1,46 @@
+{% set input_text = "The podcast transcript explores lessons learned from a recent engineering expedition, highlighting teamwork, unexpected challenges, and how every member contributed to solving complex problems. This summary should capture the most actionable insights." %}
+{% set min_length = 30 %}
+{% set max_length = 200 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/paulowoicho__SEP__t5-podcast-summarisation" %}
+{% set task_prefix = "summarize: " %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = """{{ input_text }}"""
+min_length = {{ min_length }}
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+task_prefix = "{{ task_prefix }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(torch_device)
+
+prompt = f"{task_prefix}{input_text}"
+encoded_inputs = tokenizer(prompt, return_tensors="pt", truncation=True)
+encoded_inputs = {key: value.to(torch_device) for key, value in encoded_inputs.items()}
+
+generated_ids = model.generate(
+    **encoded_inputs,
+    min_length=min_length,
+    max_length=max_length,
+    num_beams=4,
+    length_penalty=2.0,
+    no_repeat_ngram_size=3,
+    early_stopping=True,
+)
+
+summary_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+
+RESULT = {"summary_text": summary_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir) / "summary.txt"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(RESULT["summary_text"], encoding="utf-8")

@@ -1,0 +1,4 @@
+import pkg_resources
+
+dist = pkg_resources.get_distribution("ltp")
+print("ltp dependencies:", sorted(str(req) for req in dist.requires()))

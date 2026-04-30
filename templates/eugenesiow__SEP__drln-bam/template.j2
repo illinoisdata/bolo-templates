@@ -1,0 +1,93 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set scale = 2 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/eugenesiow__SEP__drln-bam" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+scale = {{ scale }}
+output_dir = "{{ output_dir }}"
+
+from io import BytesIO
+from pathlib import Path
+
+import requests
+from PIL import Image
+import torch
+from super_image import DrlnModel, ImageLoader
+
+
+def _load_image_from_path_or_url(source: str) -> Image.Image:
+    lower_source = source.lower()
+    if lower_source.startswith("http://") or lower_source.startswith("https://"):
+        response = requests.get(source, stream=True)
+        response.raise_for_status()
+        return Image.open(BytesIO(response.content)).convert("RGB")
+    return Image.open(source).convert("RGB")
+
+
+def _move_to_device(value, device_str: str):
+    if isinstance(value, torch.Tensor):
+        return value.to(device_str)
+    if isinstance(value, dict):
+        return {key: _move_to_device(val, device_str) for key, val in value.items()}
+    if isinstance(value, (list, tuple)):
+        return type(value)(_move_to_device(item, device_str) for item in value)
+    return value
+
+
+def _extract_tensor_from_output(output):
+    if isinstance(output, torch.Tensor):
+        return output
+    if isinstance(output, dict):
+        for inner in output.values():
+            tensor = _extract_tensor_from_output(inner)
+            if tensor is not None:
+                return tensor
+    if isinstance(output, (list, tuple)):
+        for item in output:
+            tensor = _extract_tensor_from_output(item)
+            if tensor is not None:
+                return tensor
+    return None
+
+
+def _tensor_to_image(tensor: torch.Tensor) -> Image.Image:
+    tensor = tensor.detach().cpu()
+    if tensor.ndim == 4 and tensor.shape[0] == 1:
+        tensor = tensor.squeeze(0)
+    if tensor.ndim == 3:
+        pass
+    elif tensor.ndim == 2:
+        tensor = tensor.unsqueeze(0)
+    else:
+        raise ValueError("Expected tensor with 2 to 4 dimensions representing an image")
+    tensor = tensor.clamp(0, 1)
+    array = (tensor * 255).round().to(torch.uint8).permute(1, 2, 0).numpy()
+    if array.shape[2] == 1:
+        array = array[:, :, 0]
+    return Image.fromarray(array)
+
+
+image = _load_image_from_path_or_url(image_path)
+inputs = ImageLoader.load_image(image)
+model = DrlnModel.from_pretrained(repo_id, scale=scale).to(device)
+model.eval()
+with torch.no_grad():
+    inputs = _move_to_device(inputs, device)
+    raw_output = model(inputs)
+
+tensor_output = _extract_tensor_from_output(raw_output)
+if tensor_output is None:
+    raise ValueError("The model output did not contain a tensor to convert into an image")
+upscaled_image = _tensor_to_image(tensor_output)
+
+RESULT = {"upscaled_image": upscaled_image}
+
+if __name__ == "__main__":
+    save_dir = Path(output_dir)
+    save_dir.mkdir(parents=True, exist_ok=True)
+    artifact_path = save_dir / f"upscaled_image_{scale}x.png"
+    RESULT["upscaled_image"].save(artifact_path)

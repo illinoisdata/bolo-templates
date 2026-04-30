@@ -1,0 +1,40 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set prompt = "a photography of" %}
+{% set max_new_tokens = 50 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/abhijit2111__SEP__Pic2Story" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import requests
+from PIL import Image
+from transformers import AutoProcessor, BlipForConditionalGeneration
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = BlipForConditionalGeneration.from_pretrained(repo_id).to(device)
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    with requests.get(image_path, stream=True) as response:
+        response.raise_for_status()
+        image = Image.open(response.raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = processor(images=image, text=prompt, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+caption = processor.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"caption": caption}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "caption.txt").write_text(RESULT["caption"], encoding="utf-8")

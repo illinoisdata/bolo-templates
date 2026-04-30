@@ -1,0 +1,43 @@
+{% set repo_id = "cointegrated/rut5-base" %}
+{% set device = "cuda:0" %}
+{% set input_text = "Hello, world!" %}
+{% set max_length = 50 %}
+{% set num_beams = 1 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+
+inputs = tokenizer(input_text, return_tensors="pt", padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+generated_ids = model.generate(
+    input_ids=inputs["input_ids"],
+    attention_mask=inputs["attention_mask"],
+    max_length=max_length,
+    num_beams=num_beams,
+)
+
+generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    from pathlib import Path
+
+    output_dir = Path("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/cointegrated__SEP__rut5-base")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / "generated_text.txt"
+    with open(output_path, "w", encoding="utf-8") as f:
+        for text in RESULT["generated_text"]:
+            f.write(text)
+            if not text.endswith("\n"):
+                f.write("\n")

@@ -1,0 +1,58 @@
+{% set repo_id = "Qdrant/multilingual-e5-large-onnx" %}
+{% set device = "cpu" %}
+{% set sentence1 = "This is a test sentence." %}
+{% set sentence2 = "This is another test sentence." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qdrant__SEP__multilingual-e5-large-onnx" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sentence1 = "{{ sentence1 }}"
+sentence2 = "{{ sentence2 }}"
+output_dir = "{{ output_dir }}"
+
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+import onnxruntime as ort
+import torch
+import torch.nn.functional as F
+
+
+def _get_torch_device(device_str: str) -> torch.device:
+    if device_str.startswith("cuda"):
+        return torch.device(device_str)
+    return torch.device("cpu")
+
+
+def _mean_pooling(token_embeddings: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+    expanded_mask = attention_mask.unsqueeze(-1).to(dtype=token_embeddings.dtype)
+    sum_embeddings = (token_embeddings * expanded_mask).sum(dim=1)
+    divisor = expanded_mask.sum(dim=1).clamp(min=1e-9)
+    return sum_embeddings / divisor
+
+
+torch_device = _get_torch_device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+onnx_path = hf_hub_download(repo_id, "model.onnx")
+session = ort.InferenceSession(onnx_path, providers=["CPUExecutionProvider"])
+
+inputs_1 = tokenizer(sentence1, return_tensors="pt", truncation=True, padding=True)
+inputs_2 = tokenizer(sentence2, return_tensors="pt", truncation=True, padding=True)
+
+inputs_1_np = {inp.name: inputs_1[inp.name].cpu().numpy() for inp in session.get_inputs()}
+inputs_2_np = {inp.name: inputs_2[inp.name].cpu().numpy() for inp in session.get_inputs()}
+
+outputs_1 = session.run(None, inputs_1_np)[0]
+outputs_2 = session.run(None, inputs_2_np)[0]
+
+embedding_1 = _mean_pooling(torch.from_numpy(outputs_1).to(torch_device), inputs_1["attention_mask"].to(torch_device))
+embedding_2 = _mean_pooling(torch.from_numpy(outputs_2).to(torch_device), inputs_2["attention_mask"].to(torch_device))
+similarity = F.cosine_similarity(embedding_1, embedding_2).item()
+
+RESULT = {"score": similarity}
+
+if __name__ == "__main__":
+    import os
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "score.txt"), "w") as f:
+        f.write(str(RESULT["score"]))

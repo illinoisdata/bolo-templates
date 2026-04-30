@@ -1,0 +1,46 @@
+{% set text_input = "Toto je [MASK] věta." %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ufal__SEP__eleczech-lc-small" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+# 3. Imports
+from pathlib import Path
+import json
+
+from transformers import AutoTokenizer, AutoModelForMaskedLM, pipeline
+
+# 4. Load tokenizer/processor & model
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+if device.startswith("cuda"):
+    pipeline_device = int(device.split(":", 1)[1]) if ":" in device else 0
+else:
+    pipeline_device = -1
+fill_mask_pipeline = pipeline(
+    "fill-mask",
+    model=model,
+    tokenizer=tokenizer,
+    device=pipeline_device,
+)
+
+# 5. Pre-process input
+input_text = text_input
+
+# 6. Run inference
+fill_mask_output = fill_mask_pipeline(input_text, top_k=top_k)
+
+# 7. Post-process & build RESULT dict
+RESULT = {"fill_mask": fill_mask_output}
+
+# 8. if __name__ == "__main__": guard
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    file_path = output_path / "fill_mask.json"
+    with file_path.open("w", encoding="utf-8") as fp:
+        json.dump(RESULT["fill_mask"], fp, ensure_ascii=False, indent=2)

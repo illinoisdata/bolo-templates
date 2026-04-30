@@ -1,0 +1,39 @@
+{% set doc_image_path = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
+{% set prompt = "<s_cord>" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/naver-clova-ix__SEP__donut-base-finetuned-cord-v2" %}
+{% set max_length = 256 %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+doc_image_path = "{{ doc_image_path }}"
+prompt = "{{ prompt }}"
+output_dir = "{{ output_dir }}"
+max_length = {{ max_length }}
+from pathlib import Path
+import os
+from urllib.request import urlopen
+
+import torch
+from PIL import Image
+from transformers import AutoProcessor, VisionEncoderDecoderModel
+processor = AutoProcessor.from_pretrained(repo_id)
+model = VisionEncoderDecoderModel.from_pretrained(repo_id).to(device)
+if doc_image_path.startswith(("http://", "https://")):
+    image = Image.open(urlopen(doc_image_path))
+else:
+    image = Image.open(doc_image_path)
+image = image.convert("RGB")
+pixel_values = processor(image, return_tensors="pt").pixel_values.to(device)
+tokenizer = processor.tokenizer
+generated_ids = model.generate(
+    pixel_values,
+    decoder_start_token_id=tokenizer.cls_token_id,
+    eos_token_id=tokenizer.sep_token_id,
+    pad_token_id=tokenizer.pad_token_id,
+    max_length=max_length,
+)
+generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+RESULT = {"predicted_text": generated_text}
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    result_path = Path(output_dir) / "predicted_text.txt"
+    result_path.write_text(RESULT["predicted_text"], encoding="utf-8")

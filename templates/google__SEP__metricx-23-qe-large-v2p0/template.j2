@@ -1,0 +1,66 @@
+{% set repo_id = "google/metricx-23-qe-large-v2p0" %}
+{% set tokenizer_repo = "google/mt5-large" %}
+{% set device = "cuda:0" %}
+{% set source_text = "The cat is on the mat." %}
+{% set hypothesis_text = "Die Katze liegt auf der Matte." %}
+{% set max_input_length = 1024 %}
+{% set max_new_tokens = 10 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__metricx-23-qe-large-v2p0" %}
+
+repo_id = "{{ repo_id }}"
+tokenizer_repo = "{{ tokenizer_repo }}"
+device = "{{ device }}"
+source_text = "{{ source_text }}"
+hypothesis_text = "{{ hypothesis_text }}"
+max_input_length = {{ max_input_length }}
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+# Load tokenizer and model
+
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_repo, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+# Pre-process inputs
+
+inputs = tokenizer(
+    text=source_text,
+    text_pair=hypothesis_text,
+    truncation=True,
+    max_length=max_input_length,
+    return_tensors="pt",
+)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+# Run inference
+
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+
+# Post-process generated sentinel tokens to numeric score
+tokens = tokenizer.convert_ids_to_tokens(generated_ids[0])
+digit_map = {f"<extra_id_{i}>": str(i) for i in range(10)}
+digit_map["<extra_id_10>"] = "."
+digits = []
+for tok in tokens:
+    normalized = tok.lstrip("▁")
+    if normalized in digit_map:
+        digits.append(digit_map[normalized])
+    elif digits:
+        break
+score_str = "".join(digits)
+prediction = float(score_str)
+
+# Build result dict
+RESULT = {"prediction": prediction}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    with open(Path(output_dir) / "prediction.txt", "w") as output_file:
+        output_file.write(str(RESULT["prediction"]))

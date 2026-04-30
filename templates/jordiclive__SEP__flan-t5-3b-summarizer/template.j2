@@ -1,0 +1,66 @@
+{% set prompt = "Produce an article summary of the following news article:" %}
+{% set raw_document = "The economic landscape has shifted dramatically over the past few quarters, with inflation peaking and then gradually easing. The latest data shows that consumer prices are stabilizing, yet uncertainty lingers across labor markets and international trade tensions continue to influence central bank policies." %}
+{% set max_length = 200 %}
+{% set min_length = 30 %}
+{% set num_beams = 4 %}
+{% set length_penalty = 2.0 %}
+{% set no_repeat_ngram_size = 3 %}
+{% set early_stopping = true %}
+{% set max_input_length = 512 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/jordiclive__SEP__flan-t5-3b-summarizer" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+raw_document = """{{ raw_document }}"""
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+num_beams = {{ num_beams }}
+length_penalty = {{ length_penalty }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+early_stopping = {{ early_stopping }}
+max_input_length = {{ max_input_length }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+input_text = f"{prompt} {raw_document}"
+encoded_inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+    padding="longest",
+    max_length=max_input_length,
+)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+generated_tokens = model.generate(
+    **encoded_inputs,
+    max_length=max_length,
+    min_length=min_length,
+    num_beams=num_beams,
+    length_penalty=length_penalty,
+    no_repeat_ngram_size=no_repeat_ngram_size,
+    early_stopping=early_stopping,
+)
+
+generated_texts = tokenizer.batch_decode(
+    generated_tokens,
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=True,
+)
+summary_text = generated_texts[0].strip()
+
+RESULT = {"summary": summary_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    summary_file = output_path / "summary.txt"
+    summary_file.write_text(RESULT["summary"], encoding="utf-8")

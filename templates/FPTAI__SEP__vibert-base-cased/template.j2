@@ -1,0 +1,55 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set input_texts = ["I am very satisfied with the service.", "The final result did not meet my expectations."] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/FPTAI__SEP__vibert-base-cased" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_texts = {{ input_texts }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSequenceClassification.from_pretrained(repo_id)
+device = torch.device(device)
+model = model.to(device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    input_texts,
+    padding=True,
+    truncation=True,
+    return_tensors="pt",
+)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+logits = outputs.logits
+probabilities = torch.nn.functional.softmax(logits, dim=-1).cpu()
+
+result_entries = []
+for text, probs in zip(input_texts, probabilities):
+    best_idx = int(torch.argmax(probs).item())
+    label = model.config.id2label[best_idx]
+    result_entries.append(
+        {
+            "text": text,
+            "label": label,
+            "score": float(probs[best_idx]),
+            "probabilities": probs.tolist(),
+        }
+    )
+
+RESULT = {"predictions": result_entries}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    with open(output_path / "predictions.json", "w", encoding="utf-8") as writer:
+        json.dump(RESULT["predictions"], writer, ensure_ascii=False, indent=2)

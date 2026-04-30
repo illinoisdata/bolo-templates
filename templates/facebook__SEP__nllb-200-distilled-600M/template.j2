@@ -1,0 +1,42 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/nllb-200-distilled-600M" %}
+{% set src_lang = "eng_Latn" %}
+{% set tgt_lang = "fra_Latn" %}
+{% set text = "Hello world" %}
+{% set max_length = 200 %}
+{% set num_beams = 5 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+src_lang = "{{ src_lang }}"
+tgt_lang = "{{ tgt_lang }}"
+text = "{{ text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+tokenizer.src_lang = src_lang
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+lang_token = f"<<{tgt_lang}>>"
+forced_bos_token_id = tokenizer.convert_tokens_to_ids(lang_token)
+generated_tokens = model.generate(
+    **inputs,
+    forced_bos_token_id=forced_bos_token_id,
+    max_length=max_length,
+    num_beams=num_beams
+)
+
+translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    with open("translation.txt", "w") as f:
+        f.write(RESULT["translation"])

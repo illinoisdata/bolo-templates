@@ -1,0 +1,70 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set text_input = "The patient showed symptoms of an emerging respiratory disease." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/dmis-lab__SEP__biosyn-biobert-ncbi-disease" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForTokenClassification, AutoTokenizer, BertConfig
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+config = BertConfig.from_pretrained(repo_id)
+model = AutoModelForTokenClassification.from_pretrained(repo_id, config=config)
+runtime_device = torch.device(device)
+model.to(runtime_device)
+model.eval()
+
+tokenized = tokenizer(
+    text_input,
+    return_tensors="pt",
+    return_offsets_mapping=True,
+    truncation=True,
+)
+offset_mapping = tokenized["offset_mapping"][0].tolist()
+input_ids = tokenized["input_ids"][0].tolist()
+inputs = {
+    name: tensor.to(runtime_device)
+    for name, tensor in tokenized.items()
+    if name != "offset_mapping"
+}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits[0]
+probabilities = torch.softmax(logits, dim=-1).cpu()
+predictions = torch.argmax(probabilities, dim=-1)
+tokens = tokenizer.convert_ids_to_tokens(input_ids)
+label_map = getattr(model.config, "id2label", None) or {
+    idx: str(idx) for idx in range(model.config.num_labels)
+}
+entities = []
+for idx, (token, offset) in enumerate(zip(tokens, offset_mapping)):
+    if offset[0] == offset[1]:
+        continue
+    label_id = int(predictions[idx].item())
+    label = label_map.get(label_id, str(label_id))
+    score = probabilities[idx, label_id].item()
+    entities.append(
+        {
+            "token": token,
+            "label": label,
+            "score": score,
+            "start": offset[0],
+            "end": offset[1],
+        }
+    )
+
+RESULT = {"entities": entities}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    result_path = output_path / "entities.json"
+    with result_path.open("w", encoding="utf-8") as result_file:
+        json.dump(RESULT["entities"], result_file, ensure_ascii=False, indent=2)

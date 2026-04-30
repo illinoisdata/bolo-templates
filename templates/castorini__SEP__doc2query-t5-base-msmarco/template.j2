@@ -1,0 +1,49 @@
+{% set repo_id = "castorini/doc2query-t5-base-msmarco" %}
+{% set device = "cuda:0" %}
+{% set doc_text = "Document expansion generates helpful queries to improve retrieval quality." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/castorini__SEP__doc2query-t5-base-msmarco" %}
+{% set num_return_sequences = 3 %}
+{% set num_beams = 4 %}
+{% set max_length = 64 %}
+{% set temperature = 1.0 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+doc_text = "{{ doc_text }}"
+output_dir = "{{ output_dir }}"
+num_return_sequences = {{ num_return_sequences }}
+num_beams = {{ num_beams }}
+max_length = {{ max_length }}
+temperature = {{ temperature }}
+
+import os
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(doc_text, return_tensors="pt", truncation=True, max_length=512)
+for k, v in inputs.items():
+    inputs[k] = v.to(device)
+
+generated_tokens = model.generate(
+    **inputs,
+    num_beams=num_beams,
+    num_return_sequences=num_return_sequences,
+    max_length=max_length,
+    temperature=temperature,
+    early_stopping=True,
+)
+generated_queries = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"generated_queries": generated_queries}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    queries_path = Path(output_dir) / "generated_queries.txt"
+    queries_path.write_text("\n".join(RESULT["generated_queries"]), encoding="utf-8")

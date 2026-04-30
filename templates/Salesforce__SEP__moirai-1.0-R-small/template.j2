@@ -1,0 +1,85 @@
+{% set repo_id = "Salesforce/moirai-1.0-R-small" %}
+{% set device = "cuda:0" %}
+{% set freq = "1h" %}
+{% set dataset_length = 400 %}
+{% set prediction_length = 24 %}
+{% set context_length = 200 %}
+{% set patch_size = "auto" %}
+{% set num_samples = 100 %}
+{% set batch_size = 16 %}
+{% set test_horizon = 48 %}
+{% set seed = 0 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+freq = "{{ freq }}"
+dataset_length = {{ dataset_length }}
+prediction_length = {{ prediction_length }}
+context_length = {{ context_length }}
+patch_size = "{{ patch_size }}"
+num_samples = {{ num_samples }}
+batch_size = {{ batch_size }}
+test_horizon = {{ test_horizon }}
+seed = {{ seed }}
+
+import json
+import os
+
+import numpy as np
+import pandas as pd
+import torch
+from gluonts.dataset.pandas import PandasDataset
+from gluonts.dataset.split import split
+from uni2ts.model.moirai import MoiraiForecast, MoiraiModule
+
+torch_device = torch.device(device)
+
+phase = np.linspace(0.0, 4.0 * np.pi, dataset_length)
+trend = np.linspace(0.0, 0.75, dataset_length)
+rng = np.random.default_rng(seed)
+noise = rng.normal(scale=0.02, size=dataset_length)
+values = np.sin(phase) + trend + noise
+
+date_index = pd.date_range("2020-01-01", periods=dataset_length, freq=freq)
+df = pd.DataFrame({"target": values}, index=date_index)
+
+pandas_dataset = PandasDataset(dict(df))
+_, test_template = split(pandas_dataset, offset=-test_horizon)
+windows = max(1, test_horizon // prediction_length)
+test_data = test_template.generate_instances(
+    prediction_length=prediction_length,
+    windows=windows,
+    distance=prediction_length,
+)
+
+module = MoiraiModule.from_pretrained(repo_id).to(torch_device)
+module.eval()
+model = MoiraiForecast(
+    module=module,
+    prediction_length=prediction_length,
+    context_length=context_length,
+    patch_size=patch_size,
+    num_samples=num_samples,
+    target_dim=1,
+    feat_dynamic_real_dim=pandas_dataset.num_feat_dynamic_real,
+    past_feat_dynamic_real_dim=pandas_dataset.num_past_feat_dynamic_real,
+)
+predictor = model.create_predictor(batch_size=batch_size)
+forecast_iter = predictor.predict(test_data.input)
+forecast_list = list(forecast_iter)
+forecast = forecast_list[0]
+
+forecast_mean = forecast.mean.tolist()
+forecast_samples = forecast.samples.tolist()
+
+RESULT = {
+    "forecast_mean": forecast_mean,
+    "forecast_samples": forecast_samples,
+}
+
+if __name__ == "__main__":
+    output_dir = os.environ.get("OUTPUT_DIR", "./output")
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "forecast.json")
+    with open(output_path, "w") as f:
+        json.dump(RESULT, f)

@@ -1,0 +1,51 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set document_image_path = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
+{% set max_length = 768 %}
+{% set num_beams = 1 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/to-be__SEP__donut-base-finetuned-invoices" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+document_image_path = "{{ document_image_path }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from io import BytesIO
+from pathlib import Path
+
+import requests
+import torch
+from PIL import Image
+from transformers import DonutProcessor, VisionEncoderDecoderModel
+
+torch_device = torch.device(device)
+processor = DonutProcessor.from_pretrained(repo_id)
+model = VisionEncoderDecoderModel.from_pretrained(repo_id).to(torch_device)
+model.eval()
+
+if document_image_path.startswith("http://") or document_image_path.startswith("https://"):
+    response = requests.get(document_image_path, timeout=30)
+    response.raise_for_status()
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(document_image_path).convert("RGB")
+
+pixel_values = processor(images=image, return_tensors="pt").pixel_values.to(torch_device)
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        pixel_values,
+        max_length=max_length,
+        num_beams=num_beams,
+    )
+
+generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_text.txt").write_text(generated_text, encoding="utf-8")

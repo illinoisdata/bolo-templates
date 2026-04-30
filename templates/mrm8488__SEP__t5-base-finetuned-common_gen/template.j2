@@ -1,0 +1,36 @@
+{% set prompt = "tree plant ground hole dig" %}
+{% set max_length = 64 %}
+{% set num_beams = 4 %}
+{% set num_return_sequences = 1 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/mrm8488__SEP__t5-base-finetuned-common_gen" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+num_return_sequences = {{ num_return_sequences }}
+output_dir = "{{ output_dir }}"
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import os
+
+_tokenizer = AutoTokenizer.from_pretrained(repo_id)
+_model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+_model = _model.to(device)
+_model.eval()
+
+_inputs = _tokenizer(prompt, return_tensors="pt")
+_inputs = {key: value.to(device) for key, value in _inputs.items()}
+
+_generated = _model.generate(**_inputs, max_length=max_length, num_beams=num_beams, num_return_sequences=num_return_sequences)
+_decoded = _tokenizer.batch_decode(
+    _generated, skip_special_tokens=True, clean_up_tokenization_spaces=True
+)
+
+RESULT = {"generated_sentences": _decoded}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "generated_sentences.txt")
+    with open(output_path, "w", encoding="utf-8") as out_file:
+        for sentence in RESULT["generated_sentences"]:
+            out_file.write(f"{sentence}\n")

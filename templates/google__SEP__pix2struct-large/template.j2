@@ -1,0 +1,43 @@
+{% set repo_id = "google/pix2struct-large" %}
+{% set device = "cuda:0" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set prompt = "Describe the image in a single sentence." %}
+{% set max_new_tokens = 128 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__pix2struct-large" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+output_dir = "{{ output_dir }}"
+
+import io
+import os
+from PIL import Image
+import requests
+from transformers import AutoProcessor, Pix2StructForConditionalGeneration
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    response = requests.get(image_path)
+    response.raise_for_status()
+    image = Image.open(io.BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = Pix2StructForConditionalGeneration.from_pretrained(repo_id).to(device)
+
+inputs = processor(images=image, text=prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+caption = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+
+RESULT = {"caption": caption}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    caption_path = os.path.join(output_dir, "caption.txt")
+    with open(caption_path, "w", encoding="utf-8") as f:
+        f.write(RESULT["caption"])

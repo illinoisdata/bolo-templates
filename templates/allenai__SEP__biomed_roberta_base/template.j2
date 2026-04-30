@@ -1,0 +1,35 @@
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allenai__SEP__biomed_roberta_base" %}
+{% set text = "Clinical note: A patient exhibits persistent cough and fever." %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+text = "{{ text }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+hidden_states = outputs.last_hidden_state
+pooled = hidden_states.mean(dim=1).squeeze()
+pooled_embedding = pooled.detach().cpu().tolist()
+
+RESULT = {"pooled_embedding": pooled_embedding}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    output_file = output_path / "pooled_embedding.json"
+    output_file.write_text(json.dumps(RESULT["pooled_embedding"]), encoding="utf-8")

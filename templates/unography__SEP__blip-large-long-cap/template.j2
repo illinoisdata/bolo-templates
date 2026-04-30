@@ -1,0 +1,41 @@
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set max_length = 250 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/unography__SEP__blip-large-long-cap" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+from io import BytesIO
+from pathlib import Path
+from urllib.parse import urlparse
+
+import requests
+from PIL import Image
+from transformers import AutoProcessor, BlipForConditionalGeneration
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = BlipForConditionalGeneration.from_pretrained(repo_id).to(device)
+
+parsed_image_path = urlparse(image_path)
+if parsed_image_path.scheme in {"http", "https"}:
+    response = requests.get(image_path, stream=True)
+    response.raise_for_status()
+    raw_image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    raw_image = Image.open(image_path).convert("RGB")
+
+inputs = processor(raw_image, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+generated_ids = model.generate(**inputs, max_length=max_length)
+caption = processor.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"caption": caption}
+
+if __name__ == "__main__":
+    output_directory = Path(output_dir)
+    output_directory.mkdir(parents=True, exist_ok=True)
+    caption_path = output_directory / "caption.txt"
+    caption_path.write_text(RESULT["caption"], encoding="utf-8")

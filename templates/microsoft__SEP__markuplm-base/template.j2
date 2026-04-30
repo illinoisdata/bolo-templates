@@ -1,0 +1,33 @@
+{% set repo_id = "microsoft/markuplm-base" %}
+{% set device = "cuda:0" %}
+{% set text_input = "<html><body><p>Hello world!</p></body></html>" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__markuplm-base" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer, AutoModel
+import torch
+import os
+import numpy as np
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(text_input, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+features = outputs.last_hidden_state.cpu().numpy()
+
+RESULT = {
+    "features": features,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    np.save(os.path.join(output_dir, "features.npy"), RESULT["features"])

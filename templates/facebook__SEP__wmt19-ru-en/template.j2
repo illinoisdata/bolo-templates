@@ -1,0 +1,31 @@
+{% set input_text = "Машинное обучение - это здорово, не так ли?" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__wmt19-ru-en" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+# Load tokenizer and model onto the target device
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+# Pre-process input
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+# Run inference
+generated_tokens = model.generate(**inputs)
+
+# Post-process
+translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    save_path = Path(output_dir)
+    save_path.mkdir(parents=True, exist_ok=True)
+    (save_path / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

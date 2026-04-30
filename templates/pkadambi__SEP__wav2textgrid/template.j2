@@ -1,0 +1,79 @@
+{% set repo_id = "pkadambi/wav2textgrid" %}
+{% set device = "cuda:0" %}
+{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set sampling_rate = 16000 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/pkadambi__SEP__wav2textgrid" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+sampling_rate = {{ sampling_rate }}
+output_dir = "{{ output_dir }}"
+
+import io
+import json
+from pathlib import Path
+from urllib.parse import urlparse
+
+import requests
+import soundfile as sf
+import torch
+import torchaudio.functional as F
+from transformers import AutoModelForAudioFrameClassification, AutoFeatureExtractor
+
+def is_url(path: str) -> bool:
+    parsed = urlparse(path)
+    return parsed.scheme in {"http", "https"}
+
+
+def load_audio(path_or_url: str) -> "list[float]":
+    if is_url(path_or_url):
+        response = requests.get(path_or_url)
+        response.raise_for_status()
+        data, sr = sf.read(io.BytesIO(response.content))
+    else:
+        data, sr = sf.read(path_or_url)
+    if data.ndim > 1:
+        data = data.mean(axis=1)
+    data = data.astype("float32")
+    if sr != sampling_rate:
+        tensor = torch.from_numpy(data)
+        tensor = F.resample(tensor, sr, sampling_rate)
+        data = tensor.numpy()
+    return data
+
+
+torch_device = torch.device(device)
+
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+model = AutoModelForAudioFrameClassification.from_pretrained(repo_id)
+model = model.to(torch_device)
+model.eval()
+
+speech_array = load_audio(audio_path)
+
+inputs = feature_extractor(speech_array, sampling_rate=sampling_rate, return_tensors="pt", padding=True)
+inputs = {name: tensor.to(torch_device) for name, tensor in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits.detach().cpu()
+predictions = torch.argmax(logits, dim=-1)
+
+frame_logits = logits.tolist()
+frame_predictions = predictions.tolist()
+
+RESULT = {
+    "frame_logits": frame_logits,
+    "frame_predictions": frame_predictions,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "frame_predictions.json").write_text(
+        json.dumps(RESULT["frame_predictions"], indent=2)
+    )
+    (output_path / "frame_logits.json").write_text(
+        json.dumps(RESULT["frame_logits"], indent=2)
+    )

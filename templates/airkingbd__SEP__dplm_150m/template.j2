@@ -1,0 +1,42 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set input_sequences = ["MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQ"] %}
+{% set max_length = 512 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/airkingbd__SEP__dplm_150m" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_sequences = {{ input_sequences }}
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    input_sequences,
+    padding=True,
+    truncation=True,
+    max_length=max_length,
+    return_tensors="pt",
+)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+with torch.no_grad():
+    model_outputs = model(**encoded_inputs)
+
+logits = model_outputs.logits if hasattr(model_outputs, "logits") else model_outputs.last_hidden_state
+logits = logits.cpu()
+
+RESULT = {"logits": logits}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    torch.save(RESULT["logits"], output_path / "logits.pt")

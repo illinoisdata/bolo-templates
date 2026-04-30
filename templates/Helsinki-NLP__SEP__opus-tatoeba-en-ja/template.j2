@@ -1,0 +1,38 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set input_text = "Hello, how are you today?" %}
+{% set output_dir = "/tmp" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+# Load tokenizer and model weights onto the specified device
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+torch_device = torch.device(device)
+model = model.to(torch_device)
+
+# Pre-process the input text
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {k: v.to(torch_device) for k, v in inputs.items()}
+
+# Run inference
+generated_tokens = model.generate(**inputs)
+
+# Post-process the predictions
+decoded = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+translation = decoded[0].strip()
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    translation_path = output_path / "translation.txt"
+    translation_path.write_text(RESULT["translation"], encoding="utf-8")

@@ -1,0 +1,11 @@
+repo_id = "parler-tts/parler_tts_mini_v0.1"
+
+print("repo", repo_id)
+
+import transformers
+import pkgutil
+from pathlib import Path
+
+print("transformers path", transformers.__file__)
+print("transformers version", getattr(transformers, "__version__", None))
+print("models modules", [name for _, name, _ in pkgutil.iter_modules(transformers.models.__path__) if name.startswith("parler") or "parler" in name])

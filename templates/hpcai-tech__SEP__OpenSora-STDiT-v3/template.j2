@@ -1,0 +1,11 @@
+{% set repo_id = "hpcai-tech/OpenSora-STDiT-v3" %}
+{% set device = "cuda:0" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+import pkgutil
+import transformers
+modules = [m.name for m in pkgutil.iter_modules(transformers.models.__path__) if "stdit" in m.name.lower()]
+RESULT = {"modules": modules}
+
+if __name__ == "__main__":
+    pass

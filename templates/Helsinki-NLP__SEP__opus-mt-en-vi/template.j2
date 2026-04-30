@@ -1,0 +1,65 @@
+{% set repo_id = "Helsinki-NLP/opus-mt-en-vi" %}
+{% set device = "cuda:0" %}
+{% set source_text = "Hello, how are you?" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-en-vi" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = """{{ source_text }}"""
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+if isinstance(source_text, str):
+    batch_texts = [source_text]
+else:
+    batch_texts = list(source_text)
+
+max_length = getattr(model.config, "max_length", None) or 512
+inputs = tokenizer(
+    batch_texts,
+    return_tensors="pt",
+    padding=True,
+    truncation=True,
+    max_length=max_length,
+)
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+generate_kwargs = {}
+if model.config.decoder_start_token_id is not None:
+    generate_kwargs["forced_bos_token_id"] = model.config.decoder_start_token_id
+
+generated_tokens = model.generate(
+    **inputs,
+    max_length=max_length,
+    **generate_kwargs,
+)
+decoded_translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+translation_output = (
+    decoded_translations[0]
+    if len(decoded_translations) == 1
+    else decoded_translations
+)
+
+RESULT = {"translation": translation_output}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = Path(output_dir) / "translation.txt"
+    serialization_target = translation_output
+    if isinstance(serialization_target, list):
+        serialization_target = "\n".join(str(element) for element in serialization_target)
+    else:
+        serialization_target = str(serialization_target)
+    with open(output_path, "w", encoding="utf-8") as writer:
+        writer.write(serialization_target)

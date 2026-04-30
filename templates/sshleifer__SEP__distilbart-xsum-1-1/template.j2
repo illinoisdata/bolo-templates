@@ -1,0 +1,42 @@
+{% set input_text = "The council approved a new climate resilience fund to help coastal communities rebuild after the storm surge that eroded miles of shoreline." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/sshleifer__SEP__distilbart-xsum-1-1" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = """{{ input_text }}"""
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+    max_length=1024,
+)
+encoded = {k: v.to(device) for k, v in encoded.items()}
+
+generated_ids = model.generate(
+    **encoded,
+    max_length=128,
+    min_length=30,
+    num_beams=4,
+    early_stopping=True,
+)
+generated_ids = generated_ids.cpu()
+
+summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    summary_path = Path(output_dir) / "generated_summary.txt"
+    summary_path.write_text(RESULT["summary"], encoding="utf-8")

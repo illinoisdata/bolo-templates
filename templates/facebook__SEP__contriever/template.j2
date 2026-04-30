@@ -1,0 +1,36 @@
+{% set repo_id = "facebook/contriever" %}
+{% set device = "cuda:0" %}
+{% set sentences = ["Where was Marie Curie born?", "Maria Sklodowska, later known as Marie Curie, was born on November 7, 1867.", "Born in Paris on 15 May 1859, Pierre Curie was the son of Eugène Curie, a doctor of French Catholic origin from Alsace."] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__contriever" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sentences = {{ sentences }}
+output_dir = "{{ output_dir }}"
+
+import os
+import numpy as np
+import torch
+from transformers import AutoTokenizer, AutoModel
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(sentences, padding=True, truncation=True, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+mask = inputs["attention_mask"].bool()
+
+def mean_pooling(token_embeddings, mask):
+    token_embeddings = token_embeddings.masked_fill(~mask[..., None], 0.)
+    return token_embeddings.sum(dim=1) / mask.sum(dim=1)[..., None]
+
+outputs = model(**inputs)
+embeddings = mean_pooling(outputs.last_hidden_state, mask)
+
+RESULT = {"embeddings": embeddings.cpu().detach().numpy()}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    np.save(os.path.join(output_dir, "embeddings.npy"), RESULT["embeddings"])

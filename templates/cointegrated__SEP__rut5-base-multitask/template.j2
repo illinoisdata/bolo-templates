@@ -1,0 +1,33 @@
+{% set text = "translate ru-en | Каждый охотник желает знать, где сидит фазан." %}
+{% set num_beams = 5 %}
+{% set max_length = None %}
+
+repo_id = {{ repo_id|tojson }}
+device = {{ device|tojson }}
+text = {{ text|tojson }}
+num_beams = {{ num_beams }}
+max_length = {{ max_length }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generation_kwargs = {"num_beams": num_beams}
+    {% if max_length is not none %}
+    generation_kwargs["max_length"] = max_length
+    {% endif %}
+    outputs = model.generate(**inputs, **generation_kwargs)
+
+decoded = tokenizer.decode(outputs[0], skip_special_tokens=True)
+RESULT = {"generated_text": decoded}
+
+if __name__ == "__main__":
+    with open("generated_text.txt", "w", encoding="utf-8") as f:
+        f.write(RESULT["generated_text"])

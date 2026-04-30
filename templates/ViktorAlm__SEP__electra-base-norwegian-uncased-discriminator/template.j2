@@ -1,0 +1,40 @@
+{% set text_input = "Dette er en testsetning for norsk Electra-modellen." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ViktorAlm__SEP__electra-base-norwegian-uncased-discriminator" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import json
+import torch
+from transformers import AutoModelForPreTraining, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer(text_input, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+result_data = {}
+discriminator_logits = getattr(outputs, "discriminator_logits", None)
+if discriminator_logits is not None:
+    result_data["discriminator_logits"] = discriminator_logits.cpu().tolist()
+generator_logits = getattr(outputs, "generator_logits", None)
+if generator_logits is not None:
+    result_data["generator_logits"] = generator_logits.cpu().tolist()
+logits = getattr(outputs, "logits", None)
+if logits is not None:
+    result_data["logits"] = logits.cpu().tolist()
+
+RESULT = result_data
+
+if __name__ == "__main__":
+    output_path = Path(output_dir) / "result.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as result_file:
+        json.dump(RESULT, result_file, ensure_ascii=False, indent=2)

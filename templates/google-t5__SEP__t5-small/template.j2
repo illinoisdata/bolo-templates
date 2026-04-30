@@ -1,0 +1,45 @@
+{% set prompt = "translate English to German: The quick brown fox jumps over the lazy dog." %}
+{% set max_length = 64 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google-t5__SEP__t5-small" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoding = tokenizer(
+    prompt,
+    return_tensors="pt",
+    truncation=True,
+    max_length=min(max_length, tokenizer.model_max_length),
+)
+input_ids = encoding.input_ids.to(device)
+attention_mask = encoding.attention_mask.to(device)
+
+generated_ids = model.generate(
+    input_ids=input_ids,
+    attention_mask=attention_mask,
+    max_length=max_length,
+    num_beams=num_beams,
+    early_stopping=True,
+)
+
+generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    for key, value in RESULT.items():
+        (output_path / f"{key}.txt").write_text(value, encoding="utf-8")

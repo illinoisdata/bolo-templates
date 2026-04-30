@@ -1,0 +1,75 @@
+{% set audio_input_path = audio_input_path | default('/u/yli77/projects/ML-code-generation/data/audio.wav') %}
+{% set vocoder_repo_id = vocoder_repo_id | default('microsoft/speecht5_hifigan') %}
+{% set output_dir = output_dir | default('/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__speecht5_vc') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_input_path = "{{ audio_input_path }}"
+vocoder_repo_id = "{{ vocoder_repo_id }}"
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from urllib.parse import urlparse
+import io
+
+import requests
+import soundfile as sf
+import torch
+from torchaudio.functional import resample
+from transformers import SpeechT5ForSpeechToSpeech, SpeechT5HifiGan, SpeechT5Processor
+
+
+def _is_remote_path(path):
+    parsed = urlparse(path)
+    return parsed.scheme in {"http", "https"}
+
+
+def _load_audio(path):
+    if _is_remote_path(path):
+        response = requests.get(path)
+        response.raise_for_status()
+        data, sampling_rate = sf.read(io.BytesIO(response.content), dtype="float32")
+    else:
+        data, sampling_rate = sf.read(path, dtype="float32")
+    if data.ndim > 1:
+        data = data[:, 0]
+    return data, sampling_rate
+
+
+processor = SpeechT5Processor.from_pretrained(repo_id)
+model = SpeechT5ForSpeechToSpeech.from_pretrained(repo_id)
+model = model.to(device)
+vocoder = SpeechT5HifiGan.from_pretrained(vocoder_repo_id)
+vocoder = vocoder.to(device)
+
+audio_array, sampling_rate = _load_audio(audio_input_path)
+target_sampling_rate = processor.feature_extractor.sampling_rate
+if sampling_rate != target_sampling_rate:
+    resampled = resample(
+        torch.tensor(audio_array, dtype=torch.float32),
+        orig_freq=sampling_rate,
+        new_freq=target_sampling_rate,
+    )
+    audio_array = resampled.numpy()
+    sampling_rate = target_sampling_rate
+
+inputs = processor(audio=audio_array, sampling_rate=sampling_rate, return_tensors="pt")
+input_values = inputs["input_values"].to(device)
+
+speaker_embeddings = torch.zeros(
+    1, model.config.speaker_embedding_dim, device=device, dtype=model.dtype
+)
+
+with torch.inference_mode():
+    generated_speech = model.generate_speech(input_values, speaker_embeddings, vocoder=vocoder)
+converted_speech = generated_speech.cpu().squeeze(0).numpy()
+
+RESULT = {
+    "converted_speech": converted_speech,
+    "sampling_rate": sampling_rate,
+}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    output_path = Path(output_dir) / "converted_speech.wav"
+    sf.write(output_path, RESULT["converted_speech"], samplerate=RESULT["sampling_rate"])

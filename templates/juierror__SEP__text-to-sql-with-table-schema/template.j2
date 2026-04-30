@@ -1,0 +1,42 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set question = "get people name with age equal 25" %}
+{% set table_columns = ["id", "name", "age"] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/juierror__SEP__text-to-sql-with-table-schema" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+table_columns = {{ table_columns }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+table_prefix = "table:"
+question_prefix = "question:"
+joined_table = ",".join(table_columns)
+input_text = f"{question_prefix} {question} {table_prefix} {joined_table}"
+encoded_inputs = tokenizer(input_text, max_length=700, truncation=True, return_tensors="pt")
+input_ids = encoded_inputs.input_ids.to(device)
+attention_mask = encoded_inputs.attention_mask.to(device)
+
+generated_tokens = model.generate(
+    input_ids=input_ids,
+    attention_mask=attention_mask,
+    num_beams=10,
+    top_k=10,
+    max_length=700,
+)
+
+sql = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+
+RESULT = {"sql": sql}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    result_file = output_path / "result.sql.txt"
+    result_file.write_text(RESULT["sql"], encoding="utf-8")

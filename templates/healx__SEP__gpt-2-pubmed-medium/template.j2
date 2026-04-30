@@ -1,0 +1,58 @@
+{% set prompt = "Write a PubMed-style abstract summarizing a novel biomedical finding related to targeted therapeutics." %}
+{% set max_new_tokens = 256 %}
+{% set temperature = 1.0 %}
+{% set top_p = 0.95 %}
+{% set repetition_penalty = 1.0 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/healx__SEP__gpt-2-pubmed-medium" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+repetition_penalty = {{ repetition_penalty }}
+output_dir = {{ output_dir | tojson }}
+
+import os
+
+import torch
+from transformers import GPT2LMHeadModel, GPT2Tokenizer
+
+model = GPT2LMHeadModel.from_pretrained(repo_id)
+model.to(torch.device(device))
+model.eval()
+
+tokenizer = GPT2Tokenizer.from_pretrained(repo_id)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+inputs = tokenizer(prompt, return_tensors="pt")
+input_ids = inputs["input_ids"].to(model.device)
+attention_mask = inputs.get("attention_mask")
+if attention_mask is not None:
+    attention_mask = attention_mask.to(model.device)
+
+generation_kwargs = {
+    "input_ids": input_ids,
+    "max_new_tokens": max_new_tokens,
+    "temperature": temperature,
+    "top_p": top_p,
+    "repetition_penalty": repetition_penalty,
+    "pad_token_id": tokenizer.eos_token_id,
+    "do_sample": True,
+}
+if attention_mask is not None:
+    generation_kwargs["attention_mask"] = attention_mask
+
+generated_outputs = model.generate(**generation_kwargs)
+
+generated_text = tokenizer.decode(generated_outputs[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "generated_text.txt")
+    with open(output_path, "w", encoding="utf-8") as output_file:
+        output_file.write(RESULT["generated_text"])

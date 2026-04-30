@@ -1,0 +1,60 @@
+{% set input_text = "The capital of France is [MASK]." %}
+{% set top_k = 5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-4_H-128_A-2" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(input_text, return_tensors="pt")
+tensor_inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**tensor_inputs)
+
+mask_token_id = tokenizer.mask_token_id
+mask_positions = (tensor_inputs["input_ids"] == mask_token_id).nonzero(as_tuple=False)
+
+mask_predictions = []
+for batch_index, seq_index in mask_positions:
+    logits_for_mask = outputs.logits[batch_index, seq_index]
+    probabilities = torch.softmax(logits_for_mask, dim=-1)
+    topk_prob, topk_indices = probabilities.topk(top_k)
+    topk_token_ids = topk_indices.tolist()
+    topk_scores = topk_prob.tolist()
+    tokens = tokenizer.convert_ids_to_tokens(topk_token_ids)
+    token_entries = []
+    for token, token_id, score in zip(tokens, topk_token_ids, topk_scores):
+        token_entries.append(
+            {
+                "token": token,
+                "token_id": token_id,
+                "score": score,
+            }
+        )
+    mask_predictions.append(
+        {
+            "mask_position": seq_index.item(),
+            "predictions": token_entries,
+        }
+    )
+
+RESULT = {"mask_predictions": mask_predictions}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    result_path = os.path.join(output_dir, "result.json")
+    with open(result_path, "w", encoding="utf-8") as result_file:
+        json.dump(RESULT, result_file, indent=2)

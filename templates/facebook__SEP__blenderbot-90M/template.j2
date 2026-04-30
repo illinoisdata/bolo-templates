@@ -1,0 +1,42 @@
+{% set repo_id = "facebook/blenderbot-90M" %}
+{% set device = "cuda:0" %}
+{% set user_prompt = "Hello! I'm trying out BlenderBot. What's on your mind today?" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__blenderbot-90M" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+user_prompt = "{{ user_prompt }}"
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+processing_inputs = tokenizer(user_prompt, return_tensors="pt", truncation=True)
+processing_inputs = {key: value.to(device) for key, value in processing_inputs.items()}
+
+generation_kwargs = dict(
+    max_length=getattr(model.config, "max_length", 128),
+    min_length=getattr(model.config, "min_length", 20),
+    num_beams=getattr(model.config, "num_beams", 1),
+    length_penalty=getattr(model.config, "length_penalty", 1.0),
+    no_repeat_ngram_size=getattr(model.config, "no_repeat_ngram_size", 0),
+    early_stopping=True,
+)
+
+generated_tokens = model.generate(**processing_inputs, **generation_kwargs)
+decoded_responses = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+response_text = decoded_responses[0].strip() if decoded_responses else ""
+
+RESULT = {"generated_text": response_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

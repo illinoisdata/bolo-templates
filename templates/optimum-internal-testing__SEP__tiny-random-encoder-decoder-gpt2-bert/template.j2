@@ -1,0 +1,44 @@
+{% set prompt = "Summarize the following text: Transformers enable flexible sequence-to-sequence modeling." %}
+{% set max_length = 32 %}
+{% set num_beams = 3 %}
+{% set early_stopping = true %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/optimum-internal-testing__SEP__tiny-random-encoder-decoder-gpt2-bert" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+early_stopping = {{ "True" if early_stopping else "False" }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import os
+
+# Load tokenizer and model then move model to device
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+# Pre-process input text
+encoded_inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True)
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+# Run inference
+generated_tokens = model.generate(
+    **encoded_inputs,
+    max_length=max_length,
+    num_beams=num_beams,
+    early_stopping=early_stopping,
+)
+
+# Post-process output to human-readable text
+generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "generated_text.txt")
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(RESULT["generated_text"])

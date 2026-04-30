@@ -1,0 +1,40 @@
+{% set repo_id = "aiassociates/t5-small-grammar-correction-german" %}
+{% set device = "cuda:0" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/aiassociates__SEP__t5-small-grammar-correction-german" %}
+{% set input_text = "hier ein kleines beispiel was haltet ihr von der korrektur" %}
+{% set prefix = "grammar: " %}
+{% set num_beams = 5 %}
+{% set min_length = 1 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+input_text = "{{ input_text }}"
+prefix = "{{ prefix }}"
+num_beams = {{ num_beams }}
+min_length = {{ min_length }}
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+import os
+
+# Load model and tokenizer
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+# Preprocess input text with the required prefix
+text = prefix + input_text
+inputs = tokenizer(text, return_tensors="pt").to(device)
+
+# Inference
+output_ids = model.generate(**inputs, num_beams=num_beams, min_length=min_length)
+
+# Post-process and build RESULT dict
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+RESULT = {"generated_text": output_text}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    out_path = os.path.join(output_dir, "generated_text.txt")
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(RESULT["generated_text"])

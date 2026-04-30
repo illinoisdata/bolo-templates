@@ -1,0 +1,53 @@
+{% set instruction = "Instruction: given a dialog context, you need to response empathically." %}
+{% set knowledge = "" %}
+{% set dialog = [
+    "Does money buy happiness?",
+    "It is a question. Money buys you a lot of things, but not enough to buy happiness.",
+    "What is the best way to buy happiness ?"
+] %}
+{% set output_dir = "/tmp" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+instruction = "{{ instruction }}"
+knowledge = "{{ knowledge }}"
+dialog = {{ dialog }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+
+knowledge_segment = f"[KNOWLEDGE] {knowledge.strip()}" if knowledge.strip() else ""
+dialog_context = " EOS ".join(dialog)
+query_components = [instruction, "[CONTEXT]", dialog_context]
+if knowledge_segment:
+    query_components.append(knowledge_segment)
+query = " ".join(query_components)
+
+encoded_inputs = tokenizer(query, return_tensors="pt")
+encoded_inputs = {key: value.to(torch_device) for key, value in encoded_inputs.items()}
+
+generated_tokens = model.generate(
+    **encoded_inputs,
+    max_length=128,
+    min_length=8,
+    top_p=0.9,
+    do_sample=True,
+)
+
+response = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+
+RESULT = {"response": response}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    response_path = output_path / "response.txt"
+    response_path.write_text(response, encoding="utf-8")

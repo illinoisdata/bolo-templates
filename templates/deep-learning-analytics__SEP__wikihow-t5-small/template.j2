@@ -1,0 +1,73 @@
+{% set text -%}
+Lack of fluids can lead to dry mouth, which is a leading cause of bad breath. Water
+can also dilute any chemicals in your mouth or gut that are causing bad breath., Studies show that
+eating 6 ounces of yogurt a day reduces the level of odor-causing compounds in the mouth. In
+particular, look for yogurt containing the active bacteria Streptococcus thermophilus or
+Lactobacillus bulgaricus., The abrasive nature of fibrous fruits and vegetables helps to clean
+teeth, while the vitamins, antioxidants, and acids they contain improve dental health.Foods that can
+be particularly helpful include:Apples — Apples contain vitamin C, which is necessary for health
+gums, as well as malic acid, which helps to whiten teeth.Carrots — Carrots are rich in vitamin A,
+which strengthens tooth enamel.Celery — Chewing celery produces a lot of saliva, which helps to
+neutralize bacteria that cause bad breath.Pineapples — Pineapples contain bromelain, an enzyme that
+cleans the mouth., These teas have been shown to kill the bacteria that cause bad breath and
+plaque., An upset stomach can lead to burping, which contributes to bad breath. Don’t eat foods that
+upset your stomach, or if you do, use antacids. If you are lactose intolerant, try lactase tablets.,
+They can all cause bad breath. If you do eat them, bring sugar-free gum or a toothbrush and
+toothpaste to freshen your mouth afterwards., Diets low in carbohydrates lead to ketosis — a state
+in which the body burns primarily fat instead of carbohydrates for energy. This may be good for your
+waistline, but it also produces chemicals called ketones, which contribute to bad breath.To stop the
+problem, you must change your diet. Or, you can combat the smell in one of these ways:Drink lots of
+water to dilute the ketones.Chew sugarless gum or suck on sugarless mints.Chew mint leaves.
+{%- endset %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/deep-learning-analytics__SEP__wikihow-t5-small" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = """{{ text }}"""
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+preprocessed_text = " ".join(
+    line.strip()
+    for line in text.splitlines()
+    if line.strip()
+)
+inputs = tokenizer(
+    preprocessed_text,
+    return_tensors="pt",
+    truncation=True,
+    padding="longest",
+    max_length=512,
+)
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_length=150,
+        num_beams=4,
+        length_penalty=1.0,
+        repetition_penalty=2.5,
+        no_repeat_ngram_size=3,
+        early_stopping=True,
+    )
+
+summary = tokenizer.decode(
+    generated_ids[0],
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=True,
+)
+
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    summary_file = output_path / "summary.txt"
+    summary_file.write_text(RESULT["summary"], encoding="utf-8")

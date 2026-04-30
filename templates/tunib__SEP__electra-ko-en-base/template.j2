@@ -1,0 +1,46 @@
+{% set repo_id = "tunib/electra-ko-en-base" %}
+{% set device = "cuda:0" %}
+{% set input_text = "이 문장은 영어와 한국어를 모두 포함합니다. This sentence demonstrates bilingual support." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/tunib__SEP__electra-ko-en-base" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import AutoModelForPreTraining, AutoTokenizer
+
+# Load model and tokenizer
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+model.eval()
+
+# Preprocess input
+tokenized_inputs = tokenizer(input_text, return_tensors="pt")
+tokenized_inputs_for_model = {key: value.to(device) for key, value in tokenized_inputs.items()}
+input_ids_cpu = tokenized_inputs["input_ids"].squeeze().cpu()
+
+# Run inference
+with torch.no_grad():
+    outputs = model(**tokenized_inputs_for_model)
+
+# Post-process outputs
+prediction_ids = torch.argmax(outputs.logits, dim=-1).squeeze().cpu().tolist()
+tokens = tokenizer.convert_ids_to_tokens(input_ids_cpu.tolist())
+
+RESULT = {
+    "tokens": tokens,
+    "prediction_ids": prediction_ids,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    tokens_path = os.path.join(output_dir, "tokens.json")
+    prediction_path = os.path.join(output_dir, "prediction_ids.json")
+    with open(tokens_path, "w", encoding="utf-8") as token_file:
+        json.dump(RESULT["tokens"], token_file, ensure_ascii=False, indent=2)
+    with open(prediction_path, "w", encoding="utf-8") as prediction_file:
+        json.dump(RESULT["prediction_ids"], prediction_file, indent=2)

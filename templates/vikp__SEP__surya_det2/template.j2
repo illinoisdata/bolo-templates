@@ -1,0 +1,46 @@
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/vikp__SEP__surya_det2" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+image_path = "{{ image_path }}"
+
+from io import BytesIO
+from pathlib import Path
+
+import requests
+from PIL import Image
+import torch
+from torch.nn.functional import interpolate
+from transformers import AutoImageProcessor, AutoModelForSemanticSegmentation
+
+torch_device = torch.device(device)
+processor = AutoImageProcessor.from_pretrained(repo_id)
+model = AutoModelForSemanticSegmentation.from_pretrained(repo_id, ignore_mismatched_sizes=True).to(torch_device)
+model.eval()
+
+is_url = image_path.startswith("http://") or image_path.startswith("https://")
+if is_url:
+    response = requests.get(image_path)
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = processor(image, return_tensors="pt")
+inputs = {k: v.to(torch_device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+seg = torch.argmax(logits, dim=1).float().unsqueeze(1)
+seg_resized = interpolate(seg, size=image.size[::-1], mode="nearest").squeeze(1).to(torch.int64)
+segmentation = seg_resized[0].cpu().numpy()
+segmentation_image = Image.fromarray(segmentation.astype("uint8"))
+
+RESULT = {"segmentation": segmentation_image}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    segmentation_path = output_path / "segmentation.png"
+    RESULT["segmentation"].save(segmentation_path)

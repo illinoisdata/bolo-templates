@@ -1,0 +1,64 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hubertsiuzdak__SEP__snac_32khz" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+output_dir = "{{ output_dir }}"
+
+import io
+import os
+
+import numpy as np
+import requests
+import soundfile as sf
+import torch
+import torch.nn.functional as F
+from snac import SNAC
+
+TARGET_SAMPLING_RATE = 32000
+device_obj = torch.device(device)
+
+model = SNAC.from_pretrained(repo_id).to(device_obj).eval()
+
+is_audio_url = audio_path.startswith("http://") or audio_path.startswith("https://")
+audio_source = audio_path
+if is_audio_url:
+    response = requests.get(audio_path)
+    response.raise_for_status()
+    audio_source = io.BytesIO(response.content)
+
+waveform, sampling_rate = sf.read(audio_source, dtype="float32")
+if waveform.ndim > 1:
+    waveform = waveform.mean(axis=1)
+
+audio_tensor = torch.from_numpy(waveform).unsqueeze(0).unsqueeze(0)
+if sampling_rate != TARGET_SAMPLING_RATE:
+    target_length = max(1, int(round(audio_tensor.shape[-1] * TARGET_SAMPLING_RATE / sampling_rate)))
+    audio_tensor = F.interpolate(audio_tensor, size=target_length, mode="linear", align_corners=False)
+
+audio_tensor = audio_tensor.to(device_obj)
+
+with torch.inference_mode():
+    codes = model.encode(audio_tensor)
+    reconstructed_audio_tensor = model.decode(codes)
+
+encoded_codes = [code.squeeze(0).cpu().tolist() for code in codes]
+reconstructed_audio = reconstructed_audio_tensor.squeeze(0).squeeze(0).cpu().numpy()
+
+RESULT = {
+    "encoded_codes": encoded_codes,
+    "reconstructed_audio": reconstructed_audio,
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    codes_dir = os.path.join(output_dir, "codes")
+    os.makedirs(codes_dir, exist_ok=True)
+    for level_index, code_list in enumerate(RESULT["encoded_codes"]):
+        code_array = np.array(code_list, dtype=np.int64)
+        np.save(os.path.join(codes_dir, f"level_{level_index}.npy"), code_array)
+    reconstructed_audio_path = os.path.join(output_dir, "reconstructed_audio.wav")
+    sf.write(reconstructed_audio_path, RESULT["reconstructed_audio"], TARGET_SAMPLING_RATE)

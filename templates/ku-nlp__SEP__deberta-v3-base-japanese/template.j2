@@ -1,0 +1,32 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set sentences = ["京都大学で自然言語処理を研究する。", "I research NLP at Kyoto University.", "int main() { printf(\"Hello, world!\"); return 0; }"] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ku-nlp__SEP__deberta-v3-base-japanese" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sentences = {{ sentences }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import torch
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(sentences, return_tensors="pt", padding=True, truncation=True)
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    logits = model(**inputs).logits
+
+predictions = torch.argmax(logits, dim=-1)
+decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+
+RESULT = {"predicted_texts": decoded_predictions}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "predicted_texts.txt").write_text("\n".join(RESULT["predicted_texts"]), encoding="utf-8")

@@ -1,0 +1,52 @@
+{% set text_input = "Die internationalen Klimaverhandlungen erstrecken sich über viele Staaten und treffen auf unterschiedliche Interessen." %}
+{% set summary_prefix = "summarize: " %}
+{% set min_length = 30 %}
+{% set max_length = 200 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Einmalumdiewelt__SEP__T5-Base_GNAD" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = """{{ text_input }}"""
+summary_prefix = "{{ summary_prefix }}"
+min_length = {{ min_length }}
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+
+inference_device = torch.device(device)
+model = model.to(inference_device)
+
+prefixed_input = f"{summary_prefix}{text_input}"
+inputs = tokenizer(prefixed_input, return_tensors="pt", truncation=True)
+inputs = {k: v.to(inference_device) for k, v in inputs.items()}
+
+generated_tokens = model.generate(
+    **inputs,
+    max_length=max_length,
+    min_length=min_length,
+    num_beams=num_beams,
+    early_stopping=True,
+    no_repeat_ngram_size=3,
+)
+
+decoded = tokenizer.batch_decode(
+    generated_tokens,
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=True,
+)
+summary = decoded[0].strip()
+
+RESULT = {"summary": summary}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    summary_path = output_path / "summary.txt"
+    summary_path.write_text(RESULT["summary"], encoding="utf-8")

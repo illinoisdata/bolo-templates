@@ -1,0 +1,85 @@
+{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set target_sample_rate = 16000 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__wav2vec2-large-robust" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+target_sample_rate = {{ target_sample_rate }}
+output_dir = "{{ output_dir }}"
+
+import io
+import json
+from pathlib import Path
+
+import librosa
+import numpy as np
+import requests
+import soundfile as sf
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import Wav2Vec2Config, Wav2Vec2FeatureExtractor, Wav2Vec2ForPreTraining
+
+# Load and adjust model configuration to bypass missing vocab_size
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_file, "r", encoding="utf-8") as f:
+    config_dict = json.load(f)
+config_dict["vocab_size"] = config_dict.get("vocab_size") or 1
+config = Wav2Vec2Config(**config_dict)
+
+feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(repo_id)
+model = Wav2Vec2ForPreTraining.from_pretrained(repo_id, config=config).to(device)
+model.eval()
+
+def load_audio_file(source_path: str):
+    if source_path.lower().startswith("http"):
+        response = requests.get(source_path)
+        response.raise_for_status()
+        audio_stream = io.BytesIO(response.content)
+        speech_array, sampling_rate = sf.read(audio_stream, dtype="float32")
+    else:
+        speech_array, sampling_rate = sf.read(source_path, dtype="float32")
+    speech_array = np.asarray(speech_array, dtype="float32")
+    if speech_array.ndim > 1:
+        speech_array = speech_array.mean(axis=1)
+    if sampling_rate != target_sample_rate:
+        speech_array = librosa.resample(
+            speech_array, orig_sr=sampling_rate, target_sr=target_sample_rate
+        )
+        sampling_rate = target_sample_rate
+    return speech_array, sampling_rate
+
+speech_array, sampling_rate = load_audio_file(audio_path)
+inputs = feature_extractor(
+    speech_array, sampling_rate=sampling_rate, return_tensors="pt", padding=True
+)
+input_values = inputs["input_values"].to(device)
+attention_mask = inputs.get("attention_mask")
+if attention_mask is not None:
+    attention_mask = attention_mask.to(device)
+
+inference_inputs = {"input_values": input_values}
+if attention_mask is not None:
+    inference_inputs["attention_mask"] = attention_mask
+
+with torch.no_grad():
+    outputs = model(**inference_inputs)
+
+# Convert outputs to numpy arrays
+
+def to_numpy(obj):
+    if isinstance(obj, torch.Tensor):
+        return obj.detach().cpu().numpy()
+    if isinstance(obj, (list, tuple)):
+        return type(obj)(to_numpy(o) for o in obj)
+    if isinstance(obj, dict):
+        return {k: to_numpy(v) for k, v in obj.items()}
+    return obj
+
+raw_outputs = dict(outputs)
+RESULT = {k: to_numpy(v) for k, v in raw_outputs.items()}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    np.savez(output_path / "outputs.npz", **RESULT)

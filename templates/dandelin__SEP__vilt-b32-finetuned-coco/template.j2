@@ -1,0 +1,47 @@
+{% set repo_id = "dandelin/vilt-b32-finetuned-coco" %}
+{% set device = "cuda:0" %}
+{% set image = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set texts = ["An image of two cats chilling on a couch", "A football player scoring a goal"] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/dandelin__SEP__vilt-b32-finetuned-coco" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image = "{{ image }}"
+texts = {{ texts }}
+output_dir = "{{ output_dir }}"
+
+from transformers import ViltProcessor, ViltForImageAndTextRetrieval
+import os
+import requests
+from PIL import Image
+
+# Load processor and model
+processor = ViltProcessor.from_pretrained(repo_id)
+model = ViltForImageAndTextRetrieval.from_pretrained(repo_id)
+model.to(device)
+
+# Pre-process input: load image from local path or URL
+if image.startswith("http://") or image.startswith("https://"):
+    img = Image.open(requests.get(image, stream=True).raw)
+else:
+    img = Image.open(image)
+
+# Run inference and post-process outputs
+scores = {}
+for text in texts:
+    encoding = processor(img, text, return_tensors="pt")
+    # move tensors to device
+    encoding = {k: v.to(device) for k, v in encoding.items()}
+    outputs = model(**encoding)
+    # extract matching score as a float
+    scores[text] = outputs.logits.flatten()[0].item()
+
+# Build RESULT dict
+RESULT = {"scores": scores}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    # save scores to a JSON file
+    import json
+    with open(os.path.join(output_dir, "scores.json"), "w") as f:
+        json.dump(RESULT["scores"], f)

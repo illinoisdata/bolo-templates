@@ -1,0 +1,36 @@
+{% set repo_id = "wasmdashai/vits-ar-sa-huba-v2" %}
+{% set device = "cuda:0" %}
+{% set text = "السلام عليكم كيفك عساك بخير" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/wasmdashai__SEP__vits-ar-sa-huba-v2" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import numpy as np
+import torch
+from scipy.io.wavfile import write
+from transformers import VitsModel, AutoTokenizer
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = VitsModel.from_pretrained(repo_id).to(device)
+
+# Pre-process input
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+# Run inference
+with torch.no_grad():
+    generated = model(**inputs)
+waveform = generated.waveform.cpu().numpy().reshape(-1)
+sampling_rate = model.config.sampling_rate
+
+# Build result dict
+RESULT = {"waveform": waveform, "sampling_rate": sampling_rate}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    write(os.path.join(output_dir, "output.wav"), sampling_rate, waveform)

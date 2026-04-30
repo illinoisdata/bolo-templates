@@ -1,0 +1,70 @@
+{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__unispeech-sat-base-plus-sv" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+output_dir = "{{ output_dir }}"
+
+import io
+from pathlib import Path
+
+import numpy as np
+import requests
+import soundfile as sf
+import torch
+from torchaudio.functional import resample as torchaudio_resample
+from transformers import AutoFeatureExtractor, UniSpeechSatForXVector
+
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+model = UniSpeechSatForXVector.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+def _load_audio(path: str, target_sampling_rate: int) -> tuple[np.ndarray, int]:
+    if path.startswith("http://") or path.startswith("https://"):
+        response = requests.get(path)
+        response.raise_for_status()
+        data, sampling_rate = sf.read(io.BytesIO(response.content))
+    else:
+        data, sampling_rate = sf.read(path)
+
+    if data.ndim > 1:
+        data = data.mean(axis=1)
+
+    data = data.astype("float32")
+
+    if sampling_rate != target_sampling_rate:
+        waveform = torch.from_numpy(data)
+        data = torchaudio_resample(waveform, sampling_rate, target_sampling_rate).numpy()
+        sampling_rate = target_sampling_rate
+
+    return data, sampling_rate
+
+speech_array, sample_rate = _load_audio(audio_path, feature_extractor.sampling_rate or 16000)
+
+inputs = feature_extractor(
+    speech_array,
+    sampling_rate=sample_rate,
+    return_tensors="pt",
+)
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+embedding = outputs.embeddings
+normalized_embedding = torch.nn.functional.normalize(embedding, dim=-1)
+
+embedding_array = embedding.detach().cpu().numpy()
+normalized_embedding_array = normalized_embedding.detach().cpu().numpy()
+
+RESULT = {
+    "embedding": embedding_array,
+    "normalized_embedding": normalized_embedding_array,
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    np.save(output_path / "embedding.npy", RESULT["embedding"])
+    np.save(output_path / "normalized_embedding.npy", RESULT["normalized_embedding"])

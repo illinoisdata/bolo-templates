@@ -1,0 +1,5 @@
+from pathlib import Path
+import os
+import transformers.models.bridgetower as bridgetower
+print(bridgetower.__file__)
+print(os.listdir(Path(bridgetower.__file__).resolve().parent))

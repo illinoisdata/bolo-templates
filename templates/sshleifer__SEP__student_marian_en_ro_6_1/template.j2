@@ -1,0 +1,35 @@
+{% set input_text = "This is a test." %}
+{% set num_beams = 6 %}
+{% set max_length = 512 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+num_beams = {{ num_beams }}
+max_length = {{ max_length }}
+
+from transformers import MarianTokenizer, AutoModelForSeq2SeqLM
+import torch
+
+# Load tokenizer and model
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+# Pre-process input text
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+# Run inference
+generated_tokens = model.generate(**inputs, num_beams=num_beams, max_length=max_length)
+
+# Post-process output
+translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    import os
+    from pathlib import Path
+
+    output_dir = Path(os.environ.get("OUTPUT_DIR", "."))
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

@@ -1,0 +1,30 @@
+{% set input_text = "Patient has been admitted with persistent cough and requires further evaluation." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/bionlp__SEP__bluebert_pubmed_mimic_uncased_L-12_H-768_A-12" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = """{{ input_text }}"""
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import BertModel, BertTokenizer
+
+tokenizer = BertTokenizer.from_pretrained(repo_id, do_lower_case=True)
+model = BertModel.from_pretrained(repo_id)
+model = model.to(device)
+
+encoded_inputs = tokenizer(input_text, return_tensors="pt", truncation=True)
+encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+
+cls_embedding = outputs.last_hidden_state[:, 0, :].squeeze(0).cpu().tolist()
+RESULT = {"cls_embedding": cls_embedding}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    result_path = Path(output_dir) / "cls_embedding.json"
+    with result_path.open("w", encoding="utf-8") as result_file:
+        json.dump(RESULT["cls_embedding"], result_file)

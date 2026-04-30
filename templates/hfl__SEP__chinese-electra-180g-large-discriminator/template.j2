@@ -1,0 +1,41 @@
+{% set input_text = input_text | default("今天天气晴朗，我们一起学习自然语言处理。") %}
+{% set max_length = max_length | default(128) %}
+{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hfl__SEP__chinese-electra-180g-large-discriminator") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = """{{ input_text }}"""
+max_length = {{ max_length }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+
+import numpy as np
+import torch
+from transformers import AutoModelForPreTraining, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+    padding="max_length",
+    max_length=max_length,
+)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits.detach().cpu()
+
+RESULT = {"logits": logits}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    np.save(output_path / "logits.npy", RESULT["logits"].numpy())

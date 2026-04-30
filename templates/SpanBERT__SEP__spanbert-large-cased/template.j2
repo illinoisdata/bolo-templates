@@ -1,0 +1,53 @@
+{% set repo_id = repo_id | default("SpanBERT/spanbert-large-cased") %}
+{% set device = device | default("cuda:0") %}
+{% set inference_text = inference_text | default("SpanBERT is a [MASK] of BERT.") %}
+{% set top_k = top_k | default(5) %}
+{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/SpanBERT__SEP__spanbert-large-cased") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+inference_text = {{ inference_text | tojson }}
+top_k = {{ top_k }}
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(inference_text, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+mask_token_id = tokenizer.mask_token_id
+mask_positions = torch.where(inputs["input_ids"][0] == mask_token_id)[0]
+
+mask_predictions = []
+for position in mask_positions:
+    logits_at_position = logits[0, position, :]
+    topk = torch.topk(logits_at_position, k=top_k, dim=-1)
+    token_ids = topk.indices.cpu().tolist()
+    scores = torch.softmax(topk.values, dim=-1).cpu().tolist()
+    mask_predictions.append(
+        {
+            "mask_index": int(position),
+            "topk_tokens": tokenizer.convert_ids_to_tokens(token_ids),
+            "topk_scores": scores,
+        }
+    )
+
+RESULT = {"mask_predictions": mask_predictions}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    result_path = os.path.join(output_dir, "mask_predictions.json")
+    with open(result_path, "w", encoding="utf-8") as output_file:
+        json.dump(RESULT, output_file, ensure_ascii=False, indent=2)

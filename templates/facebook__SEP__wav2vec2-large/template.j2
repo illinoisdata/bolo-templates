@@ -1,0 +1,61 @@
+{% set repo_id = "facebook/wav2vec2-large" %}
+{% set device = "cuda:0" %}
+{% set audio_filepath = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__wav2vec2-large" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_filepath = "{{ audio_filepath }}"
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoFeatureExtractor, AutoModelForPreTraining
+import torch
+import soundfile as sf
+import numpy as np
+import requests
+import io
+import os
+import torchaudio.functional as F
+
+# Load feature extractor and model
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+
+# Load audio input (local path or URL)
+if audio_filepath.startswith("http://") or audio_filepath.startswith("https://"):
+    response = requests.get(audio_filepath)
+    audio_bytes = io.BytesIO(response.content)
+    speech_array, sampling_rate = sf.read(audio_bytes)
+else:
+    speech_array, sampling_rate = sf.read(audio_filepath)
+
+speech_array = np.asarray(speech_array, dtype=np.float32)
+if speech_array.ndim > 1:
+    speech_array = speech_array.mean(axis=1)
+
+recorded_sampling_rate = sampling_rate
+target_sampling_rate = feature_extractor.sampling_rate
+if recorded_sampling_rate != target_sampling_rate:
+    speech_tensor = torch.from_numpy(speech_array)
+    speech_tensor = F.resample(speech_tensor, recorded_sampling_rate, target_sampling_rate)
+    speech_array = speech_tensor.numpy()
+    sampling_rate = target_sampling_rate
+else:
+    sampling_rate = recorded_sampling_rate
+
+# Pre-process input
+inputs = feature_extractor(speech_array, sampling_rate=sampling_rate, return_tensors="pt", padding=True)
+input_values = inputs["input_values"].to(device)
+
+# Run inference
+with torch.no_grad():
+    outputs = model(input_values=input_values)
+
+# Post-process outputs
+projected_states = outputs.projected_states.cpu().numpy()
+
+RESULT = {"projected_states": projected_states}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    np.save(os.path.join(output_dir, "projected_states.npy"), RESULT["projected_states"])

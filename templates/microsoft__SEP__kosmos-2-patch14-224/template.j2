@@ -1,0 +1,55 @@
+{% set prompt = '<grounding> An image of' %}
+{% set image = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
+{% set use_cache = True %}
+{% set max_new_tokens = 128 %}
+
+repo_id = '{{ repo_id }}'
+device = '{{ device }}'
+prompt = '{{ prompt }}'
+image = '{{ image }}'
+use_cache = {{ use_cache }}
+max_new_tokens = {{ max_new_tokens }}
+
+import requests
+from PIL import Image
+import torch
+from transformers import AutoProcessor, Kosmos2ForConditionalGeneration
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = Kosmos2ForConditionalGeneration.from_pretrained(repo_id)
+model = model.to(device)
+
+if image.startswith('http://') or image.startswith('https://'):
+    image_obj = Image.open(requests.get(image, stream=True).raw).convert('RGB')
+else:
+    image_obj = Image.open(image).convert('RGB')
+
+inputs = processor(text=prompt, images=image_obj, return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items() if isinstance(v, torch.Tensor)}
+
+generated_ids = model.generate(
+    pixel_values=inputs['pixel_values'],
+    input_ids=inputs['input_ids'],
+    attention_mask=inputs['attention_mask'],
+    image_embeds=None,
+    image_embeds_position_mask=inputs['image_embeds_position_mask'],
+    use_cache=use_cache,
+    max_new_tokens=max_new_tokens,
+)
+
+generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+processed_text, entities = processor.post_process_generation(generated_text)
+
+RESULT = {
+    'generated_text': processed_text,
+    'entities': entities,
+}
+
+if __name__ == '__main__':
+    import json
+    from pathlib import Path
+
+    output_dir = Path('./')
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / 'generated_text.txt').write_text(RESULT['generated_text'], encoding='utf-8')
+    (output_dir / 'entities.json').write_text(json.dumps(RESULT['entities']), encoding='utf-8')

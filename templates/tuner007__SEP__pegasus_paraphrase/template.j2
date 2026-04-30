@@ -1,0 +1,39 @@
+{% set repo_id = "tuner007/pegasus_paraphrase" %}
+{% set device = "cuda:0" %}
+{% set input_text = "The ultimate test of your knowledge is your capacity to convey it to another." %}
+{% set num_beams = 10 %}
+{% set num_return_sequences = 10 %}
+{% set max_length = 60 %}
+{% set temperature = 1.5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/tuner007__SEP__pegasus_paraphrase" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+num_beams = {{ num_beams }}
+num_return_sequences = {{ num_return_sequences }}
+max_length = {{ max_length }}
+temperature = {{ temperature }}
+output_dir = "{{ output_dir }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+if device.startswith("cuda") and not torch.cuda.is_available():
+    device = "cpu"
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+inputs = tokenizer([input_text], truncation=True, padding="longest", max_length=max_length, return_tensors="pt").to(device)
+generated = model.generate(**inputs, max_length=max_length, num_beams=num_beams, num_return_sequences=num_return_sequences, temperature=temperature)
+paraphrases = tokenizer.batch_decode(generated, skip_special_tokens=True)
+
+RESULT = {"paraphrases": paraphrases}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "paraphrases.txt"), "w") as f:
+        for paraphrase in RESULT["paraphrases"]:
+            f.write(paraphrase + "\n")

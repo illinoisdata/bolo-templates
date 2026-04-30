@@ -1,0 +1,54 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set max_length = 250 %}
+{% set num_beams = 3 %}
+{% set repetition_penalty = 2.5 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/unography__SEP__blip-long-cap" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+repetition_penalty = {{ repetition_penalty }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from urllib.parse import urlparse
+
+import requests
+from PIL import Image
+from transformers import BlipProcessor, BlipForConditionalGeneration
+
+processor = BlipProcessor.from_pretrained(repo_id)
+model = BlipForConditionalGeneration.from_pretrained(repo_id).to(device)
+
+def _load_image(source):
+    parsed = urlparse(source)
+    if parsed.scheme in ("http", "https"):
+        response = requests.get(source, stream=True)
+        response.raise_for_status()
+        return Image.open(response.raw).convert("RGB")
+    return Image.open(source).convert("RGB")
+
+image = _load_image(image_path)
+
+inputs = processor(image, return_tensors="pt")
+pixel_values = inputs.pixel_values.to(device)
+
+generated_ids = model.generate(
+    pixel_values=pixel_values,
+    max_length=max_length,
+    num_beams=num_beams,
+    repetition_penalty=repetition_penalty,
+)
+
+caption = processor.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"caption": caption}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "caption.txt").write_text(RESULT["caption"], encoding="utf-8")

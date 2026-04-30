@@ -1,0 +1,27 @@
+{% set repo_id = repo_id %}
+{% set device = device %}
+{% set source_text = "Dobrý den! Toto je test překladu." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-cs-en" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = {{ source_text | tojson }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
+
+inputs = tokenizer(source_text, return_tensors="pt")
+inputs = {key: value.to(device) for key, value in inputs.items()}
+
+generated_ids = model.generate(**inputs)
+translation = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir) / "translation.txt"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(translation, encoding="utf-8")

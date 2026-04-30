@@ -1,0 +1,42 @@
+{% set text_input = "In this work, we explore how to learn task specific language models aimed towards learning rich representation of keyphrases from text documents. We experiment with different masking strategies for pre-training transformer language models in discriminative as well as generative settings." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/bloomberg__SEP__KeyBART" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = {{ text_input | tojson }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+torch_device = torch.device(device)
+model.to(torch_device)
+
+inputs = tokenizer(
+    text_input,
+    return_tensors="pt",
+    truncation=True,
+    max_length=1024,
+)
+
+inputs = {name: tensor.to(torch_device) for name, tensor in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_length=128,
+        num_beams=4,
+        early_stopping=True,
+    )
+
+generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"generated_keyphrases": generated_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    result_file = output_path / "generated_keyphrases.txt"
+    result_file.write_text(RESULT["generated_keyphrases"], encoding="utf-8")

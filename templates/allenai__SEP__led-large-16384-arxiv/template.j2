@@ -1,0 +1,44 @@
+{% set text_input = "Solar researchers studied the 155-day periodicity in sunspot data and developed methods to confirm if the peak was a true cycle." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allenai__SEP__led-large-16384-arxiv" %}
+{% set max_length = 512 %}
+{% set num_beams = 4 %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = """{{ text_input }}"""
+output_dir = "{{ output_dir }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+encoded_input = tokenizer(text_input, return_tensors="pt", truncation=True)
+input_ids = encoded_input.input_ids.to(device)
+attention_mask = encoded_input.attention_mask.to(device)
+global_attention_mask = torch.zeros_like(input_ids)
+global_attention_mask[:, 0] = 1
+
+generated_sequences = model.generate(
+    input_ids=input_ids,
+    attention_mask=attention_mask,
+    global_attention_mask=global_attention_mask,
+    max_length=max_length,
+    num_beams=num_beams,
+    early_stopping=True,
+)
+
+decoded_summaries = tokenizer.batch_decode(generated_sequences, skip_special_tokens=True)
+
+RESULT = {"summaries": decoded_summaries}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    summary_file = output_path / "summaries.txt"
+    summary_file.write_text("\n\n".join(RESULT["summaries"]))

@@ -1,0 +1,43 @@
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/german-nlp-group__SEP__electra-base-german-uncased" %}
+{% set text_input = "Das ist ein Beispielsatz für die Inferenz mit dem Electra-Modell." %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+output_dir = "{{ output_dir }}"
+text_input = "{{ text_input }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForPreTraining, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+
+encoded_text = tokenizer(text_input, return_tensors="pt", padding=True, truncation=True)
+encoded_input = {key: tensor.to(device) for key, tensor in encoded_text.items()}
+
+outputs = model(**encoded_input)
+logits = outputs.logits
+predicted_token_ids = logits.argmax(dim=-1)
+
+input_ids = encoded_text["input_ids"].tolist()
+input_tokens = [
+    tokenizer.convert_ids_to_tokens(token_ids)
+    for token_ids in encoded_text["input_ids"]
+]
+
+RESULT = {
+    "input_tokens": input_tokens,
+    "input_ids": input_ids,
+    "predicted_token_ids": predicted_token_ids.tolist(),
+    "logits": logits.detach().cpu().tolist(),
+}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    for name, value in RESULT.items():
+        file_path = output_path / f"{name}.json"
+        with file_path.open("w", encoding="utf-8") as output_file:
+            json.dump(value, output_file, ensure_ascii=False, indent=2)

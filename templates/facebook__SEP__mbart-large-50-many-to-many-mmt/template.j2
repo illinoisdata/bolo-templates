@@ -1,0 +1,39 @@
+{% set text_input = "The UN secretary-general says there is no military solution in Syria." %}
+{% set src_lang = "en_XX" %}
+{% set target_lang = "fr_XX" %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mbart-large-50-many-to-many-mmt" %}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+text_input = {{ text_input | tojson }}
+src_lang = {{ src_lang | tojson }}
+target_lang = {{ target_lang | tojson }}
+output_dir = {{ output_dir | tojson }}
+
+import torch
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+tokenizer.src_lang = src_lang
+encoded_inputs = tokenizer(text_input, return_tensors="pt")
+encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+forced_bos_token_id = tokenizer.lang_code_to_id[target_lang]
+generated_tokens = model.generate(
+    **encoded_inputs,
+    forced_bos_token_id=forced_bos_token_id,
+)
+
+decoded_sentences = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+translation = decoded_sentences[0] if decoded_sentences else ""
+
+RESULT = {"translation": translation}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir) / "translation.txt"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(RESULT["translation"], encoding="utf-8")

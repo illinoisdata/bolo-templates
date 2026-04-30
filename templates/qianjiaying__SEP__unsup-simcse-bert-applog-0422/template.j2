@@ -1,0 +1,42 @@
+{% set sentences = ["An example sentence for unsupervised SimCSE inference."] %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/qianjiaying__SEP__unsup-simcse-bert-applog-0422" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sentences = {{ sentences }}
+output_dir = "{{ output_dir }}"
+
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    sentences,
+    padding=True,
+    truncation=True,
+    return_tensors="pt",
+)
+encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded_inputs, return_dict=True)
+
+pooler_output = outputs.pooler_output
+if pooler_output is None:
+    pooler_output = outputs.last_hidden_state[:, 0]
+sentence_embeddings = pooler_output.detach().cpu().tolist()
+
+RESULT = {"sentence_embeddings": sentence_embeddings}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "sentence_embeddings.json").write_text(
+        json.dumps(RESULT["sentence_embeddings"], ensure_ascii=False)
+    )

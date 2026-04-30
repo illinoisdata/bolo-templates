@@ -1,0 +1,35 @@
+{% set input_text = "repair_sentence: m a medical doct context: {That is my job I a}{or I save lives} </s>" %}
+{% set max_length = 32 %}
+{% set num_beams = 1 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/flexudy__SEP__t5-base-multi-sentence-doctor" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import torch
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+
+inputs = tokenizer(input_text, return_tensors="pt")
+for key, value in inputs.items():
+    inputs[key] = value.to(torch_device)
+
+generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+corrected_sentence = tokenizer.decode(generated_tokens[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
+
+RESULT = {"corrected_sentence": corrected_sentence}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    corrected_path = output_path / "corrected_sentence.txt"
+    corrected_path.write_text(RESULT["corrected_sentence"], encoding="utf-8")

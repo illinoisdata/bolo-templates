@@ -1,0 +1,28 @@
+{% set input_text = "我喜欢学习数据科学和机器学习。" %}
+{% set max_length = 400 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/liam168__SEP__trans-opus-mt-zh-en" %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+import torch
+from pathlib import Path
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+device_obj = torch.device(device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device_obj)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+inputs = tokenizer(input_text, return_tensors="pt", truncation=True, padding=True)
+inputs = {key: value.to(device_obj) for key, value in inputs.items()}
+generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+translation_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+
+RESULT = {"translation": translation_text}
+
+if __name__ == "__main__":
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    (Path(output_dir) / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

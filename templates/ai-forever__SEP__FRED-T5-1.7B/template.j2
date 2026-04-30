@@ -1,0 +1,51 @@
+{% set prompt = "<LM>Принялся Кутузов рассказывать свою историю как он сюда попал. Началось" %}
+{% set max_length = 256 %}
+{% set num_return_sequences = 1 %}
+{% set do_sample = False %}
+{% set output_dir = "/tmp" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = """{{ prompt }}"""
+max_length = {{ max_length }}
+num_return_sequences = {{ num_return_sequences }}
+do_sample = {{ do_sample }}
+output_dir = "{{ output_dir }}"
+
+import os
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+torch_device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(torch_device)
+
+encoded_inputs = tokenizer(prompt, return_tensors="pt")
+input_ids = encoded_inputs["input_ids"].to(torch_device)
+attention_mask = encoded_inputs["attention_mask"].to(torch_device)
+
+generated_tokens = model.generate(
+    input_ids=input_ids,
+    attention_mask=attention_mask,
+    max_length=max_length,
+    num_return_sequences=num_return_sequences,
+    do_sample=do_sample,
+)
+
+generated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
+RESULT = {"generated_texts": generated_texts}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    text_file = output_path / "generated_texts.txt"
+    with text_file.open("w", encoding="utf-8") as handler:
+        for index, text in enumerate(RESULT["generated_texts"], start=1):
+            handler.write(f"# {index}\n")
+            handler.write(text)
+            handler.write("\n")

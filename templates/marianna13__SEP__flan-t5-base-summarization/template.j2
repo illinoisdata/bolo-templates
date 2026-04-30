@@ -1,0 +1,45 @@
+{% set text = "The Arctic ice is melting faster than predicted, endangering species and coastal communities." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/marianna13__SEP__flan-t5-base-summarization" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = """{{ text }}"""
+output_dir = "{{ output_dir }}"
+
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
+
+prefix = "summarize: "
+prompt = prefix + text
+tokenized_inputs = tokenizer(
+    prompt,
+    return_tensors="pt",
+    truncation=True,
+    padding="longest",
+)
+
+tokenized_inputs = {key: value.to(device) for key, value in tokenized_inputs.items()}
+
+generated_ids = model.generate(
+    **tokenized_inputs,
+    max_length=200,
+    min_length=30,
+    early_stopping=True,
+    length_penalty=2.0,
+    num_beams=4,
+    no_repeat_ngram_size=3,
+    decoder_start_token_id=model.config.decoder_start_token_id,
+)
+
+summary_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+
+RESULT = {"summary": summary_text}
+
+if __name__ == "__main__":
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

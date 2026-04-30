@@ -1,0 +1,35 @@
+{% set text_input = "Merhaba dunya, bu bir test cumlesidir." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/dbmdz__SEP__distilbert-base-turkish-cased" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+output_dir = "{{ output_dir }}"
+
+import json
+import os
+
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+encoded = tokenizer(text_input, return_tensors="pt")
+encoded = {key: value.to(device) for key, value in encoded.items()}
+
+with torch.no_grad():
+    outputs = model(**encoded)
+sequence_output = outputs.last_hidden_state
+pooled_embedding = sequence_output.mean(dim=1).squeeze(0)
+embedding = pooled_embedding.cpu().tolist()
+
+RESULT = {"embedding": embedding}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    embedding_path = os.path.join(output_dir, "embedding.json")
+    with open(embedding_path, "w", encoding="utf-8") as output_file:
+        json.dump(RESULT["embedding"], output_file, ensure_ascii=False)

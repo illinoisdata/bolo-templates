@@ -1,0 +1,53 @@
+{% set input_text = "The quick brown fox jumps over the lazy dog." %}
+{% set max_length = 64 %}
+{% set min_length = 10 %}
+{% set num_beams = 4 %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/sshleifer__SEP__bart-tiny-random" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+num_beams = {{ num_beams }}
+output_dir = "{{ output_dir }}"
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import os
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+
+encoded_inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+    max_length=1024,
+)
+encoded_inputs = encoded_inputs.to(device)
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **encoded_inputs,
+        max_length=max_length,
+        min_length=min_length,
+        num_beams=num_beams,
+        early_stopping=True,
+    )
+
+decoded_summary = tokenizer.batch_decode(
+    generated_ids,
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=True,
+)
+
+RESULT = {"summary": decoded_summary}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, "summary.txt")
+    with open(output_file, "w", encoding="utf-8") as f:
+        for line in RESULT["summary"]:
+            f.write(f"{line}\n")

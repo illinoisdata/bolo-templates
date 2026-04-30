@@ -1,0 +1,45 @@
+{% set repo_id = "Salesforce/blip-itm-large-flickr" %}
+{% set device = "cuda:0" %}
+{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set question = "A woman and a dog sitting together in a beach." %}
+{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Salesforce__SEP__blip-itm-large-flickr" %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+question = "{{ question }}"
+output_dir = "{{ output_dir }}"
+
+import os
+import json
+import requests
+from PIL import Image
+from transformers import BlipProcessor, BlipForImageTextRetrieval
+
+# Load model and processor
+processor = BlipProcessor.from_pretrained(repo_id)
+model = BlipForImageTextRetrieval.from_pretrained(repo_id).to(device)
+
+# Load input image from local path or URL
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    raw_image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    raw_image = Image.open(image_path).convert("RGB")
+
+# Pre-process inputs
+inputs = processor(raw_image, question, return_tensors="pt").to(device)
+
+# Run inference
+itm_scores = model(**inputs)[0]
+cosine_score = model(**inputs, use_itm_head=False)[0]
+
+# Post-process outputs
+RESULT = {
+    "itm_scores": itm_scores.detach().cpu().numpy().tolist(),
+    "cosine_score": cosine_score.detach().cpu().numpy().tolist(),
+}
+
+if __name__ == "__main__":
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "result.json"), "w") as f:
+        json.dump(RESULT, f)
