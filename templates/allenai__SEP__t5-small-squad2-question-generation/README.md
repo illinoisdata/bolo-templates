@@ -1,0 +1,31 @@
+---
+language: en
+---
+A simple question-generation model built based on SQuAD 2.0 dataset. 
+Example use: 
+
+```python
+from transformers import T5Config, T5ForConditionalGeneration, T5Tokenizer
+
+model_name = "allenai/t5-small-squad2-question-generation"
+tokenizer = T5Tokenizer.from_pretrained(model_name)
+model = T5ForConditionalGeneration.from_pretrained(model_name)
+
+def run_model(input_string, **generator_args):
+    input_ids = tokenizer.encode(input_string, return_tensors="pt")
+    res = model.generate(input_ids, **generator_args)
+    output = tokenizer.batch_decode(res, skip_special_tokens=True)
+    print(output)
+    return output
+
+
+run_model("shrouds herself in white and walks penitentially disguised as brotherly love through factories and parliaments; offers help, but desires power;")
+run_model("He thanked all fellow bloggers and organizations that showed support.")
+run_model("Races are held between April and December at the Veliefendi Hippodrome near Bakerky, 15 km (9 miles) west of Istanbul.")
+```
+which should result in the following:
+```
+['What is the name of the man who is a brotherly love?']
+['What did He thank all fellow bloggers and organizations that showed support?']
+['Where is the Veliefendi Hippodrome located?']
+```

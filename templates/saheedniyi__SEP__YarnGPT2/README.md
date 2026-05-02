@@ -1,0 +1,293 @@
+---
+library_name: transformers
+license: apache-2.0
+language:
+- en
+base_model:
+- HuggingFaceTB/SmolLM2-360M
+pipeline_tag: text-to-speech
+---
+
+# YarnGPT2
+![image/png](https://huggingface.co/saheedniyi/YarnGPT/resolve/main/audio/logo.webp)
+
+## Table of Contents
+
+1. [Model Summary](#model-summary)  
+2. [Model Description](#model-description)  
+3. [Bias, Risks, and Limitations](#bias-risks-and-limitations)  
+   - [Recommendations](#recommendations)  
+4. [Speech Samples](#speech-samples)  
+5. [Training](#training)  
+6. [Future Improvements](#future-improvements)  
+7. [Citation](#citation)  
+8. [Credits & References](#credits--references)
+
+## Model Summary
+
+YarnGPT2 is a text-to-speech (TTS) model designed to synthesize Nigerian-accented Languages (yoruba, igbo, hausa and english) leveraging pure language modelling without external adapters or complex architectures, offering high-quality, natural, and culturally relevant speech synthesis for diverse applications.
+
+<video controls width="600">
+  <source src="https://huggingface.co/saheedniyi/YarnGPT/resolve/main/audio/YearnGPT.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+#### How to use (Colab)
+The model can generate audio on its own but its better to use a voice to prompt the model:
+
+##### Voices (arranged in order of perfomance and stability)
+- English: idera, chinenye, jude, emma,umar,,joke,zainab ,osagie, remi, tayo
+- Yoruba: yoruba_male2, yoruba_female2, yoruba_feamle1
+- Igbo: igbo_female2, igbo_male2,igbo_female1,
+- Hausa: hausa_feamle1,hausa_female2, hausa_male2,hausa_male1
+
+### Prompt YarnGPT2
+```python
+
+!git clone https://github.com/saheedniyi02/yarngpt.git
+
+pip install outetts uroman
+
+import os
+import re
+import json
+import torch
+import inflect
+import random
+import uroman as ur
+import numpy as np
+import torchaudio
+import IPython
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from outetts.wav_tokenizer.decoder import WavTokenizer
+
+
+!wget https://huggingface.co/novateur/WavTokenizer-medium-speech-75token/resolve/main/wavtokenizer_mediumdata_frame75_3s_nq1_code4096_dim512_kmeans200_attn.yaml
+!gdown 1-ASeEkrn4HY49yZWHTASgfGFNXdVnLTt
+
+
+from yarngpt.audiotokenizer import AudioTokenizerV2
+
+tokenizer_path="saheedniyi/YarnGPT2"
+wav_tokenizer_config_path="/content/wavtokenizer_mediumdata_frame75_3s_nq1_code4096_dim512_kmeans200_attn.yaml"
+wav_tokenizer_model_path = "/content/wavtokenizer_large_speech_320_24k.ckpt"
+
+
+audio_tokenizer=AudioTokenizerV2(
+    tokenizer_path,wav_tokenizer_model_path,wav_tokenizer_config_path
+    )
+
+
+model = AutoModelForCausalLM.from_pretrained(tokenizer_path,torch_dtype="auto").to(audio_tokenizer.device)
+
+#change the text
+text="The election was won by businessman and politician, Moshood Abiola, but Babangida annulled the results, citing concerns over national security."
+
+# change the language and voice
+prompt=audio_tokenizer.create_prompt(text,lang="english",speaker_name="idera")
+
+input_ids=audio_tokenizer.tokenize_prompt(prompt)
+
+output  = model.generate(
+            input_ids=input_ids,
+            temperature=0.1,
+            repetition_penalty=1.1,
+            max_length=4000,
+            #num_beams=5,# using a beam size helps for the local languages but not english
+        )
+
+codes=audio_tokenizer.get_codes(output)
+audio=audio_tokenizer.get_audio(codes)
+IPython.display.Audio(audio,rate=24000)
+torchaudio.save(f"Sample.wav", audio, sample_rate=24000)
+
+```
+
+## Model Description
+
+- **Developed by:** [Saheedniyi](https://linkedin.com/in/azeez-saheed)
+- **Model type:** Text-to-Speech
+- **Language(s) (NLP):** English--> Nigerian Accented English
+- **Finetuned from:** [HuggingFaceTB/SmolLM2-360M](https://huggingface.co/HuggingFaceTB/SmolLM2-360M)
+- **Repository:** [YarnGPT Github Repository](https://github.com/saheedniyi02/yarngpt)
+- **Paper:** IN PROGRESS.
+- **Demo:** 1) [Prompt YarnGPT2 notebook](https://colab.research.google.com/drive/1PYuCSpGZKmUS1nGGzdFWbnuM2t0jP24S?usp=sharing)
+            2) [Simple news reader](https://colab.research.google.com/drive/1Ulte8I-A_0vqH7Y7teCkPIflULTHqTc_?usp=sharing)
+            
+
+
+#### Uses
+
+Generate Nigerian-accented English speech for experimental purposes.
+
+
+#### Out-of-Scope Use
+
+The model is not suitable for generating speech in languages other than English or other accents.
+
+
+## Bias, Risks, and Limitations
+
+The model may not capture the full diversity of Nigerian accents and could exhibit biases based on the training dataset. Also a lot of the text the model was trained on were automatically generated which could impact performance.
+
+
+#### Recommendations
+
+<!-- This section is meant to convey recommendations with respect to the bias, risk, and technical limitations. -->
+
+Users (both direct and downstream) should be made aware of the risks, biases, and limitations of the model. Feedback and diverse training data contributions are encouraged.
+## Speech Samples
+
+Listen to samples generated by YarnGPT:
+
+<div style="margin-top: 20px;">
+<table style="width: 100%; border-collapse: collapse;">
+  <thead>
+    <tr>
+        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; width: 40%;">Input</th>
+        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; width: 40%;">Audio</th>
+        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; width: 10%;">Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;">Uhm, so, what was the inspiration behind your latest project? Like, was there a specific moment where you were like, 'Yeah, this is it!' Or, you know, did it just kind of, uh, come together naturally over time</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">
+            <audio controls style="width: 100%;">
+                <source src="https://huggingface.co/saheedniyi/YarnGPT2/resolve/main/Audio/Audio1.wav" type="audio/wav">
+                Your browser does not support the audio element.
+            </audio>
+        </td>
+        <td style="border: 1px solid #ddd; padding: 8px;">(temperature=0.1, repetition_penalty=1.1), language: english, voice: idera</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;">The election was won by businessman and politician, Moshood Abiola, but Babangida annulled the results, citing concerns over national security.</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">
+            <audio controls style="width: 100%;">
+                <source src="https://huggingface.co/saheedniyi/YarnGPT2/resolve/main/Audio/Audio2.wav" type="audio/wav">
+                Your browser does not support the audio element.
+            </audio>
+        </td>
+        <td style="border: 1px solid #ddd; padding: 8px;">(temperature=0.1, repetition_penalty=1.1), language: english, voice: zainab</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;">Habeeb Okikiọla Olalomi Badmus ti ọpọ awọn ololufẹ rẹ mọ si Portable ti sọ fun ile ẹjọ majisireeti ti ipinlẹ Ogun wi pe ṣaka lara oun da, oun ko ni aisan tabi arun kankan lara.</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">
+            <audio controls style="width: 100%;">
+                <source src="https://huggingface.co/saheedniyi/YarnGPT2/resolve/main/Audio/Audio3.wav" type="audio/wav">
+                Your browser does not support the audio element.
+            </audio>
+        </td>
+        <td style="border: 1px solid #ddd; padding: 8px;">(temperature=0.1, repetition_penalty=1.1), language: yoruba, voice: yoruba_male2</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;">Gómìnà náà fẹ̀sùn kàn pé àwọn alága àná gbìyànjú láti fi ipá gba àwọn ìjọba ìbílẹ̀ lọ́nà àìtọ́, tó sì jẹ́ pé ó yẹ kí àwọn ìjọba ìbílẹ̀ náà wà ní títì</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">
+            <audio controls style="width: 100%;">
+                <source src="https://huggingface.co/saheedniyi/YarnGPT2/resolve/main/Audio/Audio4.wav" type="audio/wav">
+                Your browser does not support the audio element.
+            </audio>
+        </td>
+        <td style="border: 1px solid #ddd; padding: 8px;">(temperature=0.1, repetition_penalty=1.1), language: yoruba, voice: yoruba_female2</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;">Ọ bụ oge ha si Enugwu steeti eme njem aga Anambra ka ndị omekome ahụ wakporo ụgbọala ha.</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">
+            <audio controls style="width: 100%;">
+                <source src="https://huggingface.co/saheedniyi/YarnGPT2/resolve/main/Audio/Audio5.wav" type="audio/wav">
+                Your browser does not support the audio element.
+            </audio>
+        </td>
+        <td style="border: 1px solid #ddd; padding: 8px;">(temperature=0.1, repetition_penalty=1.1), language: igbo, voice: igbo_male2</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;">Isi ụlọorụ Shell dị na Lọndọn na gọọmenti Naịjirịa ekwuputala ugboro ugboro na ọrụ ịsacha ogbe ndị lara n'iyi n'Ogoni bụ nke malitere ihe dịka afọ asatọ gara aga na-aga nke ọma.</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">
+            <audio controls style="width: 100%;">
+                <source src="https://huggingface.co/saheedniyi/YarnGPT2/resolve/main/Audio/Audio6.wav" type="audio/wav">
+                Your browser does not support the audio element.
+            </audio>
+        </td>
+        <td style="border: 1px solid #ddd; padding: 8px;">(temperature=0.1, repetition_penalty=1.1), language: igbo, voice: igbo_female1</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;">Gwamnatin Najeriya ta sake maka shafin hada-hadar kuɗin kirifto na Binance a kotu, inda take buƙatar ya biya ta diyyar kuɗi dalar Amurka biliyan 81.5</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">
+            <audio controls style="width: 100%;">
+                <source src="https://huggingface.co/saheedniyi/YarnGPT2/resolve/main/Audio/Audio7.wav" type="audio/wav">
+                Your browser does not support the audio element.
+            </audio>
+        </td>
+        <td style="border: 1px solid #ddd; padding: 8px;">(temperature=0.1, repetition_penalty=1.1), language: hausa, voice: hausa_female1</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;">Bisa ga dukkan alamu, haƙata cimma ruwa, dangane da koke-koken da tsofaffin ma'aikatan tarayya ke ta yi, a kan dimbin basukan wasu hakkokinsu da suke bi shekara da shekaru.</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">
+            <audio controls style="width: 100%;">
+                <source src="https://huggingface.co/saheedniyi/YarnGPT2/resolve/main/Audio/Audio8.wav" type="audio/wav">
+                Your browser does not support the audio element.
+            </audio>
+        </td>
+        <td style="border: 1px solid #ddd; padding: 8px;">(temperature=0.1, repetition_penalty=1.1), language: hausa, voice: hausa_male2</td>
+    </tr>
+  </tbody>
+  </table>
+</div>
+
+
+## Training
+
+#### Data
+Trained on a dataset of publicly available Nigerian movies, podcasts ( using the subtitle-audio pairs) and open source Nigerian-related audio data on Huggingface,
+
+#### Preprocessing 
+
+Audio files were preprocessed and resampled to 24Khz and tokenized using [wavtokenizer](https://huggingface.co/novateur/WavTokenizer).
+
+#### Training Hyperparameters
+- **Number of epochs:** 5
+- **batch_size:** 4
+- **Scheduler:** linear schedule with warmup for 4 epochs, then linear decay to zero for the last epoch
+- **Optimizer:** AdamW (betas=(0.9, 0.95),weight_decay=0.01)
+- **Learning rate:** 1*10^-3
+
+#### Hardware
+
+- **GPUs:** 1 A100 (google colab: 50 hours)
+
+#### Software
+
+- **Training Framework:** Pytorch
+
+## Future Improvements?
+- Scaling up model size and human-annotaed/ reviewed training data
+- Wrap the model around an API endpoint 
+- Voice cloning.
+- Potential expansion into speech-to-speech assistant models
+
+## Citation [optional]
+
+#### BibTeX:
+
+```python
+@misc{yarngpt2025,
+  author = {Saheed Azeez},
+  title = {YarnGPT: Nigerian-Accented English Text-to-Speech Model},
+  year = {2025},
+  publisher = {Hugging Face},
+  url = {https://huggingface.co/SaheedAzeez/yarngpt}
+}
+```
+
+#### APA:
+
+```python
+Saheed Azeez. (2025). YarnGPT: Nigerian-Accented English Text-to-Speech Model. Hugging Face. Available at: https://huggingface.co/saheedniyi/YarnGPT
+```
+
+
+## Credits & References
+- [OuteAI/OuteTTS-0.2-500M](https://huggingface.co/OuteAI/OuteTTS-0.2-500M/)
+- [WavTokenizer](https://github.com/jishengpeng/WavTokenizer)
+- [CTC Forced Alignment](https://pytorch.org/audio/stable/tutorials/ctc_forced_alignment_api_tutorial.html)
+- [Voicera](https://huggingface.co/Lwasinam/voicera)

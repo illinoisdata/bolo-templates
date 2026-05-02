@@ -14,3 +14,4 @@
 
 - `remove_old_output.py` for Task 1.
 - `ensure_jinja_variables.py` for Task 3.
+- `get_modelcard.py` for Task 4.
