@@ -1,10 +1,9 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "chancharikm/qwen2.5-vl-7b-cam-motion" %}
+{% set device = "cuda:0" %}
 {% set video_input_path = "/u/yli77/projects/ML-code-generation/data/video.avi" %}
 {% set question_text = "Describe the camera motion in this video." %}
 {% set max_new_tokens = 128 %}
 {% set fps = 8.0 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/chancharikm__SEP__qwen2.5-vl-7b-cam-motion" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -12,7 +11,6 @@ video_input_path = "{{ video_input_path }}"
 question_text = "{{ question_text }}"
 max_new_tokens = {{ max_new_tokens }}
 fps = {{ fps }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -71,15 +69,3 @@ output_text = processor.batch_decode(
 )
 
 RESULT = {"generated_text": output_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    for key, value in RESULT.items():
-        target_file = output_path / f"{key}.txt"
-        if isinstance(value, str):
-            target_file.write_text(value, encoding="utf-8")
-        elif isinstance(value, list):
-            target_file.write_text("\n".join(value), encoding="utf-8")
-        else:
-            target_file.write_text(str(value), encoding="utf-8")

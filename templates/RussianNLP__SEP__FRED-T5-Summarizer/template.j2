@@ -1,5 +1,5 @@
-{% set repo_id = 'RussianNLP/FRED-T5-Summarizer' %}
-{% set device = 'cuda:0' %}
+{% set repo_id = "RussianNLP/FRED-T5-Summarizer" %}
+{% set device = "cuda:0" %}
 {% set input_text = '<LM> Сократи текст.\n В деревне, затерянной среди зелёных холмов, жил старик по имени Иван. Его жизнь протекала медленно и размеренно. Каждое утро Иван выходил на поля, чтобы заботиться о своём скромном участке земли. Он выращивал картофель и морковь, которые были его главным источником пищи. Вечера старик проводил у камина, читая книги и вспоминая молодость. Жизнь в деревне была тяжёлая, но Иван находил в ней простые радости.' %}
 {% set num_beams = 5 %}
 {% set min_new_tokens = 17 %}
@@ -7,7 +7,6 @@
 {% set do_sample = True %}
 {% set no_repeat_ngram_size = 4 %}
 {% set top_p = 0.9 %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/RussianNLP__SEP__FRED-T5-Summarizer' %}
 
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
@@ -18,7 +17,6 @@ max_new_tokens = {{ max_new_tokens }}
 do_sample = {{ do_sample }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
 top_p = {{ top_p }}
-output_dir = '{{ output_dir }}'
 
 import os
 import torch
@@ -45,9 +43,3 @@ outputs = model.generate(
 summary = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
 RESULT = {'summary_text': summary}
-
-if __name__ == '__main__':
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, 'summary.txt')
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(RESULT['summary_text'])

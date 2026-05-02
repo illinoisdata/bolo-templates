@@ -1,4 +1,5 @@
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ibm-granite__SEP__granite-embedding-107m-multilingual" %}
+{% set device = "cuda:0" %}
+{% set repo_id = "ibm-granite/granite-embedding-107m-multilingual" %}
 {% set query_texts = ["Who made the song My achy breaky heart?", "summit define"] %}
 {% set passage_texts = ["Achy Breaky Heart is a country song written by Don Von Tress. Originally titled Don't Tell My Heart and performed by The Marcy Brothers in 1991.", "Definition of summit: the highest point of a mountain, the highest level, or a meeting of governments."] %}
 
@@ -6,7 +7,6 @@ repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query_texts = {{ query_texts }}
 passage_texts = {{ passage_texts }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import json
@@ -44,10 +44,3 @@ RESULT = {
     "passage_embeddings": passage_embeddings_cpu.tolist(),
     "similarity": similarity_scores_cpu.tolist(),
 }
-
-if __name__ == "__main__":
-    out_path = Path(output_dir)
-    out_path.mkdir(parents=True, exist_ok=True)
-    (out_path / "query_embeddings.json").write_text(json.dumps(RESULT["query_embeddings"], indent=2))
-    (out_path / "passage_embeddings.json").write_text(json.dumps(RESULT["passage_embeddings"], indent=2))
-    (out_path / "similarity.json").write_text(json.dumps(RESULT["similarity"], indent=2))

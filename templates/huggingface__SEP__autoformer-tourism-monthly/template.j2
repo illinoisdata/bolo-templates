@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "huggingface/autoformer-tourism-monthly" %}
 from transformers.models.autoformer.modeling_autoformer import AutoformerForPrediction
 import inspect
 print(AutoformerForPrediction)

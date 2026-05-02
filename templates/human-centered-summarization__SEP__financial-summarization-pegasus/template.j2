@@ -31,9 +31,3 @@ output_ids = model.generate(
 summary = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
 
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    output_dir = os.environ.get("OUTPUT_DIR", os.getcwd())
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "summary.txt"), "w", encoding="utf-8") as f:
-        f.write(RESULT["summary"])

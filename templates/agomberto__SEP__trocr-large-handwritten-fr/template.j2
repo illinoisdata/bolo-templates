@@ -1,13 +1,11 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/agomberto__SEP__trocr-large-handwritten-fr" %}
+{% set repo_id = "agomberto/trocr-large-handwritten-fr" %}
+{% set device = "cuda:0" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set max_length = 64 %}
 {% set num_beams = 4 %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 image_path = "{{ image_path }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
@@ -36,9 +34,3 @@ generated_ids = model.generate(pixel_values, max_length=max_length, num_beams=nu
 generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(output_path, "w", encoding="utf-8") as writer:
-        writer.write(RESULT["generated_text"])

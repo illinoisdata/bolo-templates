@@ -18,9 +18,3 @@ outputs = model.generate(**inputs)
 answer = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
 RESULT = {"answer": answer}
-
-if __name__ == "__main__":
-    out_dir = pathlib.Path("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/yjernite__SEP__bart_eli5")
-    out_dir.mkdir(parents=True, exist_ok=True)
-    with open(out_dir / "answer.txt", "w") as f:
-        f.write(RESULT["answer"])

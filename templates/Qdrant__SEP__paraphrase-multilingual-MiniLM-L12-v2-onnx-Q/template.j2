@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Qdrant/paraphrase-multilingual-MiniLM-L12-v2-onnx-Q" %}
 {% set text_inputs = ["The quick brown fox jumps over the lazy dog.", "A fast brown fox leaps over a sleepy dog."] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qdrant__SEP__paraphrase-multilingual-MiniLM-L12-v2-onnx-Q" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_inputs = {{ text_inputs|tojson }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import json
@@ -67,11 +67,3 @@ RESULT = {
     "sentence_embeddings": sentence_embeddings,
     "pairwise_cosine_similarity": pairwise_cosine_similarity,
 }
-
-if __name__ == "__main__":
-    output_root = Path(output_dir)
-    output_root.mkdir(parents=True, exist_ok=True)
-    (output_root / "sentence_embeddings.json").write_text(json.dumps(RESULT["sentence_embeddings"]))
-    (output_root / "pairwise_cosine_similarity.txt").write_text(
-        str(RESULT["pairwise_cosine_similarity"])
-    )

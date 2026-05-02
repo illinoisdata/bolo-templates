@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "hallisky/bart-base-nontoxic-expert" %}
 {% set text = "This is a toxic example sentence that needs rewriting into a non-toxic form." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hallisky__SEP__bart-base-nontoxic-expert" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -18,9 +18,3 @@ decoded = tokenizer.batch_decode(output_ids, skip_special_tokens=True, clean_up_
 result_text = decoded[0]
 
 RESULT = {"generated_text": result_text}
-
-if __name__ == "__main__":
-    import os
-    os.makedirs(output_dir, exist_ok=True)
-    with open(f"{output_dir}/generated_text.txt", "w", encoding="utf-8") as f:
-        f.write(RESULT["generated_text"])

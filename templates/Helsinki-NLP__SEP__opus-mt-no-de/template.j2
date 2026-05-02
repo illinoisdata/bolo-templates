@@ -24,9 +24,3 @@ translations = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
 # Build result dict
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    # Save translations to disk
-    with open("translations.txt", "w", encoding="utf-8") as f:
-        for line in RESULT["translations"]:
-            f.write(line + "\n")

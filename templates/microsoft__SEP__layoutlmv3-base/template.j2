@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "microsoft/layoutlmv3-base" %}
 {% set document_image_path = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
 {% set text_inputs = ["LayoutLMv3", "document", "processor"] %}
 {% set boxes = [[0, 0, 500, 500], [0, 500, 500, 1000], [500, 500, 1000, 1000]] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__layoutlmv3-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 document_image_path = "{{ document_image_path }}"
 text_inputs = {{ text_inputs }}
 boxes = {{ boxes }}
-output_dir = "{{ output_dir }}"
 
 import numpy as np
 import requests
@@ -46,8 +46,3 @@ with torch.no_grad():
 
 last_hidden_state = outputs.last_hidden_state.detach().cpu().numpy()
 RESULT = {"last_hidden_state": last_hidden_state}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    np.save(output_path / "last_hidden_state.npy", RESULT["last_hidden_state"])

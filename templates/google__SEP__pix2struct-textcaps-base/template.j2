@@ -3,14 +3,12 @@
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set prompt_text = "" %}
 {% set max_patches = None %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__pix2struct-textcaps-base" %}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 image_path = {{ image_path | tojson }}
 prompt_text = {{ prompt_text | tojson }}
 max_patches = {{ max_patches }}
-output_dir = {{ output_dir | tojson }}
 
 import os
 from pathlib import Path
@@ -40,11 +38,3 @@ outputs = model.generate(**inputs)
 captions = [processor.decode(seq.cpu(), skip_special_tokens=True) for seq in outputs]
 
 RESULT = {"captions": captions}
-
-if __name__ == "__main__":
-    output_dir_path = Path(output_dir)
-    output_dir_path.mkdir(parents=True, exist_ok=True)
-    captions_path = output_dir_path / "captions.txt"
-    with captions_path.open("w", encoding="utf-8") as captions_file:
-        for caption in RESULT["captions"]:
-            captions_file.write(caption + "\n")

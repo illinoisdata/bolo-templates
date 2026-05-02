@@ -32,8 +32,3 @@ transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[
 
 # Build RESULT dict
 RESULT = {"transcription": transcription}
-
-if __name__ == "__main__":
-    # Save the transcription to a text file
-    with open("transcription.txt", "w") as f:
-        f.write(RESULT["transcription"])

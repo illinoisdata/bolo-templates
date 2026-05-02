@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "allegro/herbert-klej-cased-v1" %}
 {% set text_input = "To przykładowe zdanie w języku polskim do analizy." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allegro__SEP__herbert-klej-cased-v1" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
-output_dir = "{{ output_dir }}"
 
 import os
 from pathlib import Path
@@ -37,8 +37,3 @@ RESULT = {
     "last_hidden_state": result_last_hidden_state,
     "cls_embedding": result_cls_embedding,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(Path(output_dir) / "last_hidden_state.npy", RESULT["last_hidden_state"])
-    np.save(Path(output_dir) / "cls_embedding.npy", RESULT["cls_embedding"])

@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "pszemraj/pegasus-x-large-book-summary" %}
 {% set input_text = "Modern long-form summarization models condense extensive documents into concise overviews while respecting the core arguments and narrative flow." %}
 {% set max_length = 512 %}
 {% set min_length = 8 %}
@@ -5,7 +7,6 @@
 {% set length_penalty = 0.8 %}
 {% set no_repeat_ngram_size = 3 %}
 {% set early_stopping = true %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/pszemraj__SEP__pegasus-x-large-book-summary" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -16,7 +17,6 @@ num_beams = {{ num_beams }}
 length_penalty = {{ length_penalty }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
 early_stopping = {{ early_stopping }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -46,13 +46,3 @@ generated_ids = model.generate(
 summary_candidates = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 summary_output = summary_candidates[0] if len(summary_candidates) == 1 else summary_candidates
 RESULT = {"summary": summary_output}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    stored_summary = RESULT["summary"]
-    if isinstance(stored_summary, list):
-        serialized_summary = "\n\n".join(stored_summary)
-    else:
-        serialized_summary = stored_summary
-    (output_path / "summary.txt").write_text(serialized_summary, encoding="utf-8")

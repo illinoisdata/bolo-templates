@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "SEBIS/code_trans_t5_base_code_documentation_generation_python" %}
 {% set input_code = "def e ( message , exit_code = None ) : print_log ( message , YELLOW , BOLD ) if exit_code is not None : sys . exit ( exit_code )" %}
 {% set max_length = 512 %}
 {% set num_beams = 4 %}
 {% set prefix = "function documentation generation python: " %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/SEBIS__SEP__code_trans_t5_base_code_documentation_generation_python" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -10,7 +11,6 @@ input_code = "{{ input_code }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 prefix = "{{ prefix }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -36,8 +36,3 @@ generated_tokens = model.generate(
 documentation = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
 
 RESULT = {"documentation": documentation}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "documentation.txt").write_text(RESULT["documentation"], encoding="utf-8")

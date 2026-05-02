@@ -1,13 +1,13 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-tn-en" %}
 {% set input_texts = ["Sbah el khir, kifeh el hal?"] %}
 {% set num_beams = 4 %}
 {% set max_length = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-tn-en" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_texts = {{ input_texts | tojson }}
 num_beams = {{ num_beams }}
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -33,9 +33,3 @@ generated_tokens = model.generate(
 translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    translations_path = output_path / "translations.txt"
-    translations_path.write_text("\n".join(RESULT["translations"]), encoding="utf-8")

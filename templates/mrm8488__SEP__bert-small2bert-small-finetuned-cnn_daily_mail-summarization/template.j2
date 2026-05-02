@@ -1,9 +1,9 @@
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/mrm8488__SEP__bert-small2bert-small-finetuned-cnn_daily_mail-summarization" %}
+{% set device = "cuda:0" %}
+{% set repo_id = "mrm8488/bert-small2bert-small-finetuned-cnn_daily_mail-summarization" %}
 {% set input_text = "The CNN/DailyMail article describes daily news summaries that emphasize the most important sentences in a concise way." %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 input_text = "{{ input_text }}"
 
 torch_device = None
@@ -37,9 +37,3 @@ generated_tokens = model.generate(
 summary_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
 
 RESULT = {"summary": summary_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    summary_file = output_path / "summary.txt"
-    summary_file.write_text(RESULT["summary"], encoding="utf-8")

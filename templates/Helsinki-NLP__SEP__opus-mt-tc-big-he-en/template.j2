@@ -19,8 +19,3 @@ translated = model.generate(**inputs)
 translations = [tokenizer.decode(t, skip_special_tokens=True) for t in translated]
 
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    with open("translations.txt", "w", encoding="utf-8") as f:
-        for translation in RESULT["translations"]:
-            f.write(translation + "\n")

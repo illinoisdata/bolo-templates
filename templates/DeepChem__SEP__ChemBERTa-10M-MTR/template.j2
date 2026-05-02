@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "DeepChem/ChemBERTa-10M-MTR" %}
 {% set text_input = "The molecule exhibits hydrogen bonding and interacts with solvents." %}
 {% set max_length = 256 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/DeepChem__SEP__ChemBERTa-10M-MTR" %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_input = {{ text_input | tojson }}
 max_length = {{ max_length }}
-output_dir = {{ output_dir | tojson }}
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 import os
@@ -41,9 +41,3 @@ for logits_per_example in logits:
     batch_predictions.append(prediction)
 
 RESULT = {"predictions": batch_predictions}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    results_path = os.path.join(output_dir, "predictions.json")
-    with open(results_path, "w") as results_file:
-        json.dump(RESULT["predictions"], results_file, indent=2)

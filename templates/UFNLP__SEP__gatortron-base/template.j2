@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "UFNLP/gatortron-base" %}
 {% set text_input = "Bone scan: Negative for distant metastasis." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/UFNLP__SEP__gatortron-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -32,9 +32,3 @@ RESULT = {
     "last_hidden_state": last_hidden_state,
     "pooler_output": pooler_output,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    torch.save(RESULT["last_hidden_state"], os.path.join(output_dir, "last_hidden_state.pt"))
-    if RESULT["pooler_output"] is not None:
-        torch.save(RESULT["pooler_output"], os.path.join(output_dir, "pooler_output.pt"))

@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "allegro/plt5-base" %}
 {% set prompt = "translate Polish to English: To jest testowy akapit opisujący pogodę." %}
 {% set max_new_tokens = 64 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allegro__SEP__plt5-base/outputs" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -22,9 +22,3 @@ generated_tokens = model.generate(**inputs, max_new_tokens=max_new_tokens)
 
 generated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 RESULT = {"generated_text": generated_texts[0]}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(output_path, "w", encoding="utf-8") as output_file:
-        output_file.write(RESULT["generated_text"])

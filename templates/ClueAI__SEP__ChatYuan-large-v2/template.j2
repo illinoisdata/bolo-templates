@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "ClueAI/ChatYuan-large-v2" %}
 {% set text = "你好" %}
 {% set max_length = 250 %}
 {% set temperature = 0.7 %}
 {% set top_p = 1 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ClueAI__SEP__ChatYuan-large-v2" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -10,7 +11,6 @@ text = "{{ text }}"
 max_length = {{ max_length }}
 temperature = {{ temperature }}
 top_p = {{ top_p }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -24,9 +24,3 @@ inputs = tokenizer(text, return_tensors="pt", truncation=True).to(device)
 outputs = model.generate(**inputs, max_length=max_length, do_sample=True, temperature=temperature, top_p=top_p)
 result_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
 RESULT = {"generated_text": result_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    with open(output_path / "generated_text.txt", "w", encoding="utf-8") as f:
-        f.write(RESULT["generated_text"])

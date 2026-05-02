@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "syssec-utd/py36-pylingual-v1-statement" %}
 {% set input_text = "Write a Python function to compute the factorial of a number." %}
 {% set max_new_tokens = 128 %}
 {% set num_beams = 4 %}
@@ -19,9 +21,3 @@ generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens, num_beam
 generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs("outputs", exist_ok=True)
-    with open(os.path.join("outputs", "generated_text.txt"), "w") as f:
-        for line in generated_text:
-            f.write(line + "\n")

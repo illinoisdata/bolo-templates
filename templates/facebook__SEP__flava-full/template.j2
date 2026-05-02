@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set text = "a photo of a cat" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__flava-full" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 from transformers import AutoProcessor, AutoModelForPreTraining
@@ -41,8 +39,3 @@ RESULT = {
     "image_features": image_features,
     "text_features": text_features,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "image_features.npy"), RESULT["image_features"])
-    np.save(os.path.join(output_dir, "text_features.npy"), RESULT["text_features"])

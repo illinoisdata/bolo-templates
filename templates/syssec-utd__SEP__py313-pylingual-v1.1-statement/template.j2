@@ -1,12 +1,10 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "syssec-utd/py313-pylingual-v1.1-statement" %}
+{% set device = "cuda:0" %}
 {% set text_inputs = ["summarize: The quick brown fox jumps over the lazy dog."] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/syssec-utd__SEP__py313-pylingual-v1.1-statement" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_inputs = {{ text_inputs }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -34,9 +32,3 @@ generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 generated_text = [segment.strip() for segment in generated_text]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    serialized = "\n".join(RESULT["generated_text"])
-    (output_path / "generated_text.txt").write_text(serialized, encoding="utf-8")

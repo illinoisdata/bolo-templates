@@ -1,12 +1,10 @@
 {% set repo_id = "MarcoMancini/low-law-emb" %}
 {% set device = "cuda:0" %}
 {% set sentences = ["This is an example sentence for embedding.", "Each sentence is converted into a dense vector representation."] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/MarcoMancini__SEP__low-law-emb" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences | tojson }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -40,8 +38,3 @@ embeddings = sum_hidden / mask_sum
 embeddings = embeddings.cpu().numpy()
 
 RESULT = {"embeddings": embeddings}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    np.save(output_path / "embeddings.npy", RESULT["embeddings"])

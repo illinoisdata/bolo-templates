@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/t5-base-lm-adapt" %}
 {% set input_text = "summarize: Transfer learning enables a model to leverage pretraining on large corpora before adapting to downstream tasks with limited data." %}
 {% set max_new_tokens = 64 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__t5-base-lm-adapt" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -24,9 +24,3 @@ generated_ids = model.generate(**encoded_inputs, max_new_tokens=max_new_tokens)
 generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    generation_path = output_path / "generated_text.txt"
-    generation_path.write_text(RESULT["generated_text"], encoding="utf-8")

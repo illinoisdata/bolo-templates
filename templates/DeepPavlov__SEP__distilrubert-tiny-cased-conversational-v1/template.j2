@@ -1,12 +1,10 @@
 {% set repo_id = "DeepPavlov/distilrubert-tiny-cased-conversational-v1" %}
 {% set device = "cuda:0" %}
 {% set input_text = "Привет, как [MASK]?" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/DeepPavlov__SEP__distilrubert-tiny-cased-conversational-v1" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import json
@@ -36,8 +34,3 @@ topk_probs = topk.values.tolist()
 topk_tokens = tokenizer.convert_ids_to_tokens(topk_indices)
 
 RESULT = {"tokens": topk_tokens, "scores": topk_probs}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "result.json"), "w", encoding="utf-8") as f:
-        json.dump(RESULT, f, ensure_ascii=False)

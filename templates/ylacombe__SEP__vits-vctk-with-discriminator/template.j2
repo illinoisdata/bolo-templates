@@ -4,7 +4,6 @@
 {% set speaker_id = 0 %}
 {% set speaking_rate = 1.0 %}
 {% set sampling_rate = 22050 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ylacombe__SEP__vits-vctk-with-discriminator" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -12,7 +11,6 @@ text = "{{ text }}"
 speaker_id = {{ speaker_id }}
 speaking_rate = {{ speaking_rate }}
 sampling_rate = {{ sampling_rate }}
-output_dir = "{{ output_dir }}"
 
 import os
 from pathlib import Path
@@ -39,7 +37,3 @@ outputs = model(input_ids=input_ids, attention_mask=attention_mask, speaker_id=s
 waveform = outputs.waveform[0].detach().cpu().numpy()
 
 RESULT = {"waveform": waveform}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    sf.write(Path(output_dir) / "waveform.wav", RESULT["waveform"], sampling_rate)

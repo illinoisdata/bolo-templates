@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-ru-en" %}
 {% set input_text = "Привет, как дела?" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-ru-en" %}
 {% set max_length = 128 %}
 {% set num_beams = 5 %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 
@@ -23,9 +23,3 @@ generated_tokens = model.generate(**encoded_inputs, max_length=max_length, num_b
 translation_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"translation": translation_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "translation.txt")
-    with open(output_path, "w", encoding="utf-8") as output_file:
-        output_file.write(RESULT["translation"])

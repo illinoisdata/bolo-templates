@@ -3,14 +3,12 @@
 {% set questions = ["What is love?"] %}
 {% set titles = ["Haddaway"] %}
 {% set texts = ["'What Is Love' is a song recorded by the artist Haddaway"] %}
-{% set output_dir = "./" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 questions = {{ questions }}
 titles = {{ titles }}
 texts = {{ texts }}
-output_dir = "{{ output_dir }}"
 
 import os
 import numpy as np
@@ -42,9 +40,3 @@ RESULT = {
     "end_logits": end_logits,
     "relevance_logits": relevance_logits,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "start_logits.npy"), RESULT["start_logits"])
-    np.save(os.path.join(output_dir, "end_logits.npy"), RESULT["end_logits"])
-    np.save(os.path.join(output_dir, "relevance_logits.npy"), RESULT["relevance_logits"])

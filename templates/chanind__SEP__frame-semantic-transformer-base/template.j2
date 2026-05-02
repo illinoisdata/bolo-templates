@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "chanind/frame-semantic-transformer-base" %}
 {% set text_to_parse = "The agent quickly filled out the application." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/chanind__SEP__frame-semantic-transformer-base" %}
 {% set max_new_tokens = 128 %}
 {% set num_beams = 4 %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_to_parse = "{{ text_to_parse }}"
-output_dir = "{{ output_dir }}"
 max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
 
@@ -41,7 +41,3 @@ generated_decoded = tokenizer.batch_decode(generated_tokens, skip_special_tokens
 generated_text = generated_decoded[0]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    (Path(output_dir) / "generated_text.txt").write_text(generated_text, encoding="utf-8")

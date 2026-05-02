@@ -1,13 +1,11 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "Helsinki-NLP/opus-mt-ga-en" %}
+{% set device = "cuda:0" %}
 {% set source_text = "Dia dhuit! Conas atá tú inniu?" %}
 {% set max_new_tokens = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-ga-en" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = """{{ source_text }}"""
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 import os
 
@@ -34,9 +32,3 @@ translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True
 translation_text = translations[0] if translations else ""
 
 RESULT = {"translation": translation_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "translation.txt")
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(translation_text)

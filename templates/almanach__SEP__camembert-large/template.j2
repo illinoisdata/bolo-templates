@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "almanach/camembert-large" %}
 {% set fill_text = "Le camembert est <mask> :)" %}
 {% set top_k = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/almanach__SEP__camembert-large" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 fill_text = "{{ fill_text }}"
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -43,9 +43,3 @@ for score, token_id in zip(candidate_scores.tolist(), topk_token_ids.tolist()):
     filled_sequences.append({"sequence": sequence, "score": score, "token": token_id})
 
 RESULT = {"fill_mask": filled_sequences}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    with open(output_path / "fill_mask.json", "w", encoding="utf-8") as fo:
-        json.dump(RESULT["fill_mask"], fo, ensure_ascii=False, indent=2)

@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/pegasus-large" %}
 {% set input_text = "Pegasus excels at abstractive summarization of long documents by modeling encoder-decoder sequences." %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__pegasus-large" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 
@@ -33,9 +33,3 @@ generated_ids = model.generate(
 summaries = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
 RESULT = {"summary": summaries[0] if summaries else ""}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    summary_path = os.path.join(output_dir, "summary.txt")
-    with open(summary_path, "w", encoding="utf-8") as summary_file:
-        summary_file.write(RESULT["summary"])

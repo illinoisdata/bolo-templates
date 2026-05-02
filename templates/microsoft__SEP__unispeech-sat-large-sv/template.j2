@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "microsoft/unispeech-sat-large-sv" %}
 {% set input_audio = '/u/yli77/projects/ML-code-generation/data/audio.wav' %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__unispeech-sat-large-sv' %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_audio = "{{ input_audio }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import tempfile
@@ -22,11 +22,9 @@ feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
 model = UniSpeechSatForXVector.from_pretrained(repo_id).to(device)
 model.eval()
 
-
 def _is_url(path: str) -> bool:
     parsed = urlparse(path)
     return parsed.scheme in {"http", "https"}
-
 
 def _read_audio(path: str):
     source_path = path
@@ -50,7 +48,6 @@ def _read_audio(path: str):
     array = array.astype(np.float32)
     return array, sampling_rate
 
-
 def _prepare_audio(audio_path: str):
     array, sampling_rate = _read_audio(audio_path)
     target_sr = feature_extractor.sampling_rate
@@ -71,8 +68,3 @@ with torch.no_grad():
 
 speaker_embedding = normalized_embeddings.squeeze(0).cpu().numpy()
 RESULT = {"speaker_embedding": speaker_embedding}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    np.save(output_path / "speaker_embedding.npy", RESULT["speaker_embedding"])

@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Stancld/longt5-tglobal-large-16384-pubmed-3k_steps" %}
 {% set text_to_summarize = "Anxiety affects quality of life in those living with Parkinson's disease more so than cognitive status, motor deficits, apathy, and depression." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Stancld__SEP__longt5-tglobal-large-16384-pubmed-3k_steps" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_to_summarize = """{{ text_to_summarize }}"""
-output_dir = "{{ output_dir }}"
 from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
@@ -28,8 +28,3 @@ decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 summary_text = decoded[0].strip()
 
 RESULT = {"summary": summary_text}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    summary_path = Path(output_dir) / "summary.txt"
-    summary_path.write_text(RESULT["summary"], encoding="utf-8")

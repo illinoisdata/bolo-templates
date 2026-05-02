@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "circulus/kobart-letter-v1" %}
 {% set max_new_tokens = 128 %}
 {% set input_text = "안녕하세요. 편지를 작성해 주세요." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/circulus__SEP__kobart-letter-v1" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -22,8 +22,3 @@ decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 generated_text = decoded[0] if decoded else ""
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(generated_text, encoding="utf-8")

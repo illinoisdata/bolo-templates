@@ -5,7 +5,6 @@
 {% set max_target_length = 200 %}
 {% set num_beams = 5 %}
 {% set no_repeat_ngram_size = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/IlyaGusev__SEP__mbart_ru_sum_gazeta" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -14,7 +13,6 @@ max_source_length = {{ max_source_length }}
 max_target_length = {{ max_target_length }}
 num_beams = {{ num_beams }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from pathlib import Path
@@ -42,7 +40,3 @@ output_ids = model.generate(
 
 summary = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    (Path(output_dir) / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

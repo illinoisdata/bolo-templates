@@ -1,5 +1,6 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "recogna-nlp/ptt5-base-summ-xlsum" %}
 {% set text_input = """O homem, Wilmer Antonio Marin, conhecido como Hugo, seria um alto comandante das Forças Armadas Revolucionárias da Colômbia (Farc), o maior grupo rebelde do país. Ele é acusado de ter perpetrado um ataque num clube noturno em fevereiro que matou 35 pessoas e feriu 160. Hugo também estaria envolvido no assassinato do empresário japonês Chikao Muramatsu que foi encontrado morto a tiros em novembro, quase três anos depois de ter sido seqüestrado. Golpe O resgate de US$ 19 milhões (R$ 55 milhões) tinha sido pedido para a libertação de Muramatsu. As autoridades colombianas acreditam que a detenção de Hugo representa um grande golpe na estrutura da Farc em Bogotá. Wilmer Antonio Marin é acusado de administrar uma rede de seqüestros que teria, como alvo, empresários ricos e estrangeiros. Ele seria reponsável por seqüestrá-los no meio da rua e levá-los para as montanhas onde a guerrilha tem suas bases.""" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/recogna-nlp__SEP__ptt5-base-summ-xlsum" %}
 {% set min_length = 32 %}
 {% set max_length = 256 %}
 {% set num_beams = 5 %}
@@ -9,7 +10,6 @@
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = {{ text_input | tojson }}
-output_dir = {{ output_dir | tojson }}
 min_length = {{ min_length }}
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
@@ -51,8 +51,3 @@ with torch.no_grad():
 summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
 
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

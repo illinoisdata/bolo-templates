@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "ramsrigouthamg/t5_squad_v1" %}
 {% set question = "What is the capital of France?" %}
 {% set context = "Paris is the capital of France, known for its art, cuisine, and fashion." %}
 {% set max_length = 64 %}
@@ -23,7 +25,3 @@ generated_ids = model.generate(**inputs, max_length=max_length, num_beams=num_be
 answer = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"answer": answer}
-
-if __name__ == "__main__":
-    with open("answer.txt", "w") as f:
-        f.write(RESULT["answer"])

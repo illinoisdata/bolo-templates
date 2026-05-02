@@ -1,12 +1,10 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "monologg/koelectra-small-v3-discriminator" %}
+{% set device = "cuda:0" %}
 {% set text_input = "이 문장은 KoELECTRA 사전학습 모델 테스트용 예시입니다." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/monologg__SEP__koelectra-small-v3-discriminator/output" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -32,13 +30,3 @@ RESULT = {
     "predicted_tokens": prediction_tokens,
     "logits": logits,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    tokens_path = os.path.join(output_dir, "predicted_tokens.txt")
-    with open(tokens_path, "w", encoding="utf-8") as tokens_file:
-        for token in RESULT["predicted_tokens"]:
-            tokens_file.write(f"{token}\n")
-    logits_path = os.path.join(output_dir, "logits.json")
-    with open(logits_path, "w", encoding="utf-8") as logits_file:
-        json.dump(RESULT["logits"], logits_file, ensure_ascii=False)

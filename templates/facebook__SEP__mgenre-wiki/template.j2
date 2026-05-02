@@ -1,13 +1,13 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/mgenre-wiki" %}
 {% set input_sentences = ["[START] Einstein [END] era un fisico tedesco."] %}
 {% set num_beams = 5 %}
 {% set num_return_sequences = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mgenre-wiki" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_sentences = {{ input_sentences }}
 num_beams = {{ num_beams }}
 num_return_sequences = {{ num_return_sequences }}
-output_dir = "{{ output_dir }}"
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import os
 
@@ -25,10 +25,3 @@ outputs = model.generate(
 generated_texts = tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
 RESULT = {"generated_entities": generated_texts}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_file = os.path.join(output_dir, "generated_entities.txt")
-    with open(output_file, "w", encoding="utf-8") as f:
-        for text in generated_texts:
-            f.write(text + "\n")

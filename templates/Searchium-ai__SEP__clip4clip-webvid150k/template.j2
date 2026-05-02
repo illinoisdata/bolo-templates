@@ -1,13 +1,13 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Searchium-ai/clip4clip-webvid150k" %}
 {% set text_query = "a cinematic drone shot of a coastline" %}
 {% set video_path = "/u/yli77/projects/ML-code-generation/data/video.avi" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Searchium-ai__SEP__clip4clip-webvid150k" %}
 {% set max_video_frames = 16 %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_query = "{{ text_query }}"
 video_path = "{{ video_path }}"
-output_dir = "{{ output_dir }}"
 max_video_frames = {{ max_video_frames }}
 
 import os
@@ -26,10 +26,8 @@ model = AutoModel.from_pretrained(repo_id)
 model = model.to(device)
 model.eval()
 
-
 def _is_remote_resource(location: str) -> bool:
     return location.startswith(("http://", "https://"))
-
 
 def _download_to_temp(location: str) -> str:
     response = requests.get(location, stream=True)
@@ -40,7 +38,6 @@ def _download_to_temp(location: str) -> str:
         for chunk in response.iter_content(chunk_size=8192):
             handle.write(chunk)
     return tmp_file.name
-
 
 def _extract_video_frames(video_file: str, max_frames: int) -> list[Image.Image]:
     capture = cv2.VideoCapture(video_file)
@@ -59,7 +56,6 @@ def _extract_video_frames(video_file: str, max_frames: int) -> list[Image.Image]
     if not frames:
         raise ValueError("No frames were decoded from the video file.")
     return frames
-
 
 frames: list[Image.Image]
 temp_video = None
@@ -106,10 +102,3 @@ RESULT = {
     "video_embedding": video_embedding_vector.cpu().tolist(),
     "text_video_similarity": similarity_score,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    np.save(output_path / "text_embedding.npy", np.array(RESULT["text_embedding"], dtype=np.float32))
-    np.save(output_path / "video_embedding.npy", np.array(RESULT["video_embedding"], dtype=np.float32))
-    (output_path / "similarity.txt").write_text(str(RESULT["text_video_similarity"]), encoding="utf-8")

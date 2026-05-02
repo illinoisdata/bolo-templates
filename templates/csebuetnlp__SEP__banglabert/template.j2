@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "csebuetnlp/banglabert" %}
 {% set text_input = "আমি কৃতজ্ঞ কারণ আপনি আমার জন্য অনেক কিছু করেছেন।" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/csebuetnlp__SEP__banglabert" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import json
@@ -36,10 +36,3 @@ RESULT = {
     "probabilities": probabilities_list,
     "predictions": predictions_list,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "inference_result.json").write_text(
-        json.dumps(RESULT, ensure_ascii=False, indent=2)
-    )

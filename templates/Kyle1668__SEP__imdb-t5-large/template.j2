@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Kyle1668/imdb-t5-large" %}
 {% set input_text = 'The movie was fantastic and had a thrilling plot.' %}
 {% set prefix = 'summarize: ' %}
 {% set max_length = 200 %}
@@ -6,7 +8,6 @@
 {% set num_beams = 4 %}
 {% set no_repeat_ngram_size = 3 %}
 {% set early_stopping = True %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Kyle1668__SEP__imdb-t5-large' %}
 
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
@@ -18,7 +19,6 @@ length_penalty = {{ length_penalty }}
 num_beams = {{ num_beams }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
 early_stopping = {{ early_stopping }}
-output_dir = '{{ output_dir }}'
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
@@ -34,8 +34,3 @@ decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True)
 summary_text = decoded[0]
 
 RESULT = {'summary_text': summary_text}
-
-if __name__ == '__main__':
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, 'summary.txt'), 'w') as f:
-        f.write(RESULT['summary_text'])

@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "liam168/trans-opus-mt-en-zh" %}
 {% set text_input = "I like to study Data Science and Machine Learning." %}
 {% set max_length = 512 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/liam168__SEP__trans-opus-mt-en-zh" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -32,11 +32,3 @@ generated_tokens = model.generate(
 translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "translations.txt").write_text(
-        "\n".join(RESULT["translations"]),
-        encoding="utf-8",
-    )

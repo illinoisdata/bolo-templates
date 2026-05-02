@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set text = "I wish you were here but it is impossible" %}
 {% set max_length = 2 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/mrm8488__SEP__t5-base-finetuned-emotion" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -30,9 +28,3 @@ decoded = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
 label = decoded[0]
 
 RESULT = {"label": label}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "label.txt")
-    with open(output_path, "w") as f:
-        f.write(label)

@@ -1,11 +1,9 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "lighthouse/mdeberta-v3-base-kor-further" %}
+{% set device = "cuda:0" %}
 {% set text = "한국어 테스트 문장입니다." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/lighthouse__SEP__mdeberta-v3-base-kor-further" %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text = {{ text | tojson }}
-output_dir = {{ output_dir | tojson }}
 
 import json
 from pathlib import Path
@@ -25,8 +23,3 @@ with torch.inference_mode():
 last_hidden_state = outputs.last_hidden_state.detach().cpu().tolist()
 
 RESULT = {"last_hidden_state": last_hidden_state}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "last_hidden_state.json").write_text(json.dumps(RESULT["last_hidden_state"]))

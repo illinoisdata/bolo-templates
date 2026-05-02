@@ -36,7 +36,3 @@ generated_tokens = model.generate(
 translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    with open("translation.txt", "w") as f:
-        f.write(RESULT["translation"])

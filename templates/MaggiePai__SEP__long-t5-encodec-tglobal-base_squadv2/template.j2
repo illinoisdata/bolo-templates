@@ -1,19 +1,17 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "MaggiePai/long-t5-encodec-tglobal-base_squadv2" %}
 {% set input_text = "Context: The Eiffel Tower is located in Paris, France. Question: What is the capital city of France?" %}
 {% set max_length = 256 %}
 {% set num_beams = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/MaggiePai__SEP__long-t5-encodec-tglobal-base_squadv2" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = {{ input_text | tojson }}
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-
-output_dir = Path(output_dir)
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
@@ -31,12 +29,3 @@ decoded_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=Tru
 primary_text = decoded_texts[0]
 
 RESULT = {"generated_text": primary_text, "decoded_texts": decoded_texts}
-
-if __name__ == "__main__":
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "generated_text.txt").write_text(
-        RESULT["generated_text"], encoding="utf-8"
-    )
-    (output_dir / "decoded_texts.txt").write_text(
-        "\n".join(RESULT["decoded_texts"]), encoding="utf-8"
-    )

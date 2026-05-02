@@ -1,11 +1,10 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "diffusers/ddpm_dummy" %}
+{% set device = "cuda:0" %}
 {% set batch_size = 1 %}
 {% set num_channels = 3 %}
 {% set height = 32 %}
 {% set width = 32 %}
 {% set time_step_value = 10 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/diffusers__SEP__ddpm_dummy" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -14,7 +13,6 @@ num_channels = {{ num_channels }}
 height = {{ height }}
 width = {{ width }}
 time_step_value = {{ time_step_value }}
-output_dir = "{{ output_dir }}"
 
 import json
 import inspect
@@ -50,7 +48,3 @@ model_output = model(dummy_noise, time_step)
 denoised_sample = model_output.sample
 
 RESULT = {"denoised_image": denoised_sample.detach().cpu()}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    torch.save(RESULT["denoised_image"], Path(output_dir) / "denoised_image.pt")

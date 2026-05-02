@@ -1,12 +1,10 @@
-{% set repo_id = repo_id if repo_id is defined else "Helsinki-NLP/opus-mt-en-gl" %}
-{% set device = device if device is defined else "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-en-gl" %}
+{% set device = "cuda:0" %}
 {% set text_inputs = text_inputs if text_inputs is defined else ["The weather is nice today."] %}
-{% set output_dir = output_dir if output_dir is defined else "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-en-gl" %}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_inputs = {{ text_inputs | tojson }}
-output_dir = {{ output_dir | tojson }}
 
 from pathlib import Path
 
@@ -39,11 +37,3 @@ translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True
 RESULT = {
     "translations": translations,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    translations_path = output_path / "translations.txt"
-    with translations_path.open("w", encoding="utf-8") as file:
-        for translation in translations:
-            file.write(translation + "\n")

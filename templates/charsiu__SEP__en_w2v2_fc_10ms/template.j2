@@ -1,14 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "charsiu/en_w2v2_fc_10ms" %}
 {% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set output_dir = "/tmp" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
-output_dir = "{{ output_dir }}"
 
 from transformers.models.wav2vec2 import modeling_wav2vec2
 
 available = [name for name in dir(modeling_wav2vec2) if name.startswith("Wav2Vec2")]
 RESULT = {"available_classes": available}
-
-if __name__ == "__main__":
-    pass

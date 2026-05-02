@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set text_input = "안녕하세요. 영어로 번역을 위한 예시 문장입니다." %}
 {% set max_new_tokens = 256 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/circulus__SEP__canvers-ko2en-v2" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -27,8 +25,3 @@ generated_tokens = model.generate(**encoded_inputs, max_new_tokens=max_new_token
 translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

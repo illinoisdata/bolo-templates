@@ -1,12 +1,10 @@
 {% set audio_file = '/u/yli77/projects/ML-code-generation/data/audio.wav' %}
-{% set repo_id = 'facebook/mms-300m' %}
-{% set device = 'cuda:0' %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mms-300m' %}
+{% set repo_id = "facebook/mms-300m" %}
+{% set device = "cuda:0" %}
 
 audio_file = '{{ audio_file }}'
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
-output_dir = '{{ output_dir }}'
 
 import torch
 import requests
@@ -59,9 +57,3 @@ for name, blob in desired_outputs.items():
     else:
         processed_outputs[name] = blob
 RESULT = processed_outputs
-
-if __name__ == '__main__':
-    import os
-    os.makedirs(output_dir, exist_ok=True)
-    for key, value in RESULT.items():
-        np.save(os.path.join(output_dir, f'{key}.npy'), value)

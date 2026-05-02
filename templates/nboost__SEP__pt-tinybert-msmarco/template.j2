@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "nboost/pt-tinybert-msmarco" %}
 {% set text_input = "Encode a sample Portuguese query with pt-tinybert-msmarco." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/nboost__SEP__pt-tinybert-msmarco" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
-output_dir = "{{ output_dir }}"
 
 import torch
 from transformers import AutoModel, AutoTokenizer
@@ -24,11 +24,3 @@ outputs = model(**inputs)
 cls_embedding = outputs.last_hidden_state[:, 0, :].squeeze(0).detach().cpu().tolist()
 
 RESULT = {"cls_embedding": cls_embedding}
-
-if __name__ == "__main__":
-    import json
-    import os
-
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "cls_embedding.json"), "w", encoding="utf-8") as f:
-        json.dump(RESULT["cls_embedding"], f)

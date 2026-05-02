@@ -1,13 +1,11 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Unbabel__SEP__TowerInstruct-7B-v0.1" %}
+{% set repo_id = "Unbabel/TowerInstruct-7B-v0.1" %}
+{% set device = "cuda:0" %}
 {% set user_prompt = "Translate the following text from Portuguese into English.\nPortuguese: Um grupo de investigadores lançou um novo modelo para tarefas relacionadas com tradução.\nEnglish:" %}
 {% set max_new_tokens = 256 %}
 {% set temperature = 0.0 %}
 {% set top_p = 0.95 %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 user_prompt = """{{ user_prompt }}"""
 max_new_tokens = {{ max_new_tokens }}
 temperature = {{ temperature }}
@@ -47,9 +45,3 @@ generated_tokens = generated_sequence[prompt_length:]
 generated_text = tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(output_path, "w", encoding="utf-8") as output_file:
-        output_file.write(RESULT["generated_text"])

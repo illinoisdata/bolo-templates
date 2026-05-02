@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Salesforce/blip-itm-base-coco" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set prompt = "A woman and a dog sitting together in a beach." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Salesforce__SEP__blip-itm-base-coco" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 prompt = "{{ prompt }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from urllib.parse import urlparse
@@ -40,11 +40,3 @@ RESULT = {
     "itm_scores": itm_scores.cpu().tolist(),
     "cosine_score": cosine_score.cpu().tolist(),
 }
-
-if __name__ == "__main__":
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    with open(output_dir / "itm_scores.json", "w", encoding="utf-8") as handle:
-        json.dump(RESULT["itm_scores"], handle)
-    with open(output_dir / "cosine_score.json", "w", encoding="utf-8") as handle:
-        json.dump(RESULT["cosine_score"], handle)

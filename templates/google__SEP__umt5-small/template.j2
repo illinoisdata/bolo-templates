@@ -1,14 +1,12 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "google/umt5-small" %}
+{% set device = "cuda:0" %}
 {% set input_text = "translate English to Spanish: Machine learning is transforming the world." %}
 {% set max_new_tokens = 64 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__umt5-small" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -39,9 +37,3 @@ decoded_texts = tokenizer.batch_decode(
 )
 
 RESULT = {"generated_text": decoded_texts[0]}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(output_path, "w", encoding="utf-8") as out_file:
-        out_file.write(RESULT["generated_text"])

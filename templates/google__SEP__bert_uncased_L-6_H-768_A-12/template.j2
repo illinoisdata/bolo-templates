@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/bert_uncased_L-6_H-768_A-12" %}
 {% set text_inputs = ["The quick brown fox jumps over the lazy dog.", "Transformers enable easy model reuse."] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-6_H-768_A-12" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_inputs = {{ text_inputs }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -29,9 +29,3 @@ RESULT = {
     "pooled_embeddings": pooled_embeddings,
     "token_embeddings": token_embeddings,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "results.json")
-    with open(output_path, "w", encoding="utf-8") as output_file:
-        json.dump(RESULT, output_file, ensure_ascii=False, indent=2)

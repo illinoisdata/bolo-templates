@@ -1,3 +1,4 @@
+{% set device = "cuda:0" %}
 {% set repo_id = "parler-tts/dac_44khZ_8kbps" %}
 repo_id = "{{ repo_id }}"
 import inspect
@@ -15,8 +16,3 @@ if hasattr(dac_module, "DACFeatureExtractor"):
     print("DACFeatureExtractor found")
 
 RESULT = {"status": "inspection"}
-
-if __name__ == "__main__":
-    output_path = os.path.join(".", "inspection.txt")
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write("inspection complete")

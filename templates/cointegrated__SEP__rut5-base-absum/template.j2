@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "cointegrated/rut5-base-absum" %}
 {% set text = """Высота башни составляет 324 метра (1063 фута), примерно такая же высота, как у 81-этажного здания, и самое высокое сооружение в Париже. Его основание квадратно, размером 125 метров (410 футов) с любой стороны. Во время строительства Эйфелева башня превзошла монумент Вашингтона, став самым высоким искусственным сооружением в мире, и этот титул она удерживала в течение 41 года до завершения строительство здания Крайслер в Нью-Йорке в 1930 году. Это первое сооружение которое достигло высоты 300 метров. Из-за добавления вещательной антенны на вершине башни в 1957 году она сейчас выше здания Крайслер на 5,2 метра (17 футов). За исключением передатчиков, Эйфелева башня является второй самой высокой отдельно стоящей структурой во Франции после виадука Мийо.""" %}
 {% set n_words = none %}
 {% set compression = none %}
@@ -5,7 +7,6 @@
 {% set num_beams = 4 %}
 {% set do_sample = false %}
 {% set repetition_penalty = 1.5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/cointegrated__SEP__rut5-base-absum/results" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -16,7 +17,6 @@ max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 do_sample = {{ do_sample }}
 repetition_penalty = {{ repetition_penalty }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -54,8 +54,3 @@ with torch.inference_mode():
 
 summary_text = tokenizer.decode(generated[0], skip_special_tokens=True).strip()
 RESULT = {"summary": summary_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

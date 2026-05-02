@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "naver-clova-ix/donut-base" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/naver-clova-ix__SEP__donut-base" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-output_dir = "{{ output_dir }}"
 
 import io
 import os
@@ -39,7 +39,3 @@ with torch.no_grad():
 
 generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    (Path(output_dir) / "generated_text.txt").write_text(generated_text, encoding="utf-8")

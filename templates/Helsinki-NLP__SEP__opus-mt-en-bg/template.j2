@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set target_lang = "bul" %}
 {% set source_text = "Hello, world!" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-en-bg" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 target_lang = "{{ target_lang }}"
 source_text = "{{ source_text }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from pathlib import Path
@@ -22,8 +20,3 @@ generated_tokens = model.generate(**encoded_inputs)
 translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"translation": translations[0]}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    with open(Path(output_dir) / "translation.txt", "w", encoding="utf-8") as f:
-        f.write(RESULT["translation"])

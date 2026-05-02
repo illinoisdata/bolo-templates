@@ -1,15 +1,15 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "czearing/article-title-generator" %}
 {% set article_text = "Summarize the latest sustainable energy article for urban planners." %}
 {% set prefix = "write an article title for: " %}
 {% set max_length = 40 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/czearing__SEP__article-title-generator" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 article_text = """{{ article_text }}"""
 prefix = "{{ prefix }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -25,9 +25,3 @@ with torch.no_grad():
     generated_ids = model.generate(**inputs, max_length=max_length, num_beams=num_beams, early_stopping=True)
 title = tokenizer.decode(generated_ids[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
 RESULT = {"title": title}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_title.txt")
-    with open(output_path, "w", encoding="utf-8") as output_file:
-        output_file.write(RESULT["title"])

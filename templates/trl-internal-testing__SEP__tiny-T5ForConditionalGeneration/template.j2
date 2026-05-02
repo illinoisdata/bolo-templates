@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "trl-internal-testing/tiny-T5ForConditionalGeneration" %}
 {% set prompt = "summarize: The quick brown fox jumps over the lazy dog and the story of its journey to the mountain." %}
 {% set max_new_tokens = 64 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/trl-internal-testing__SEP__tiny-T5ForConditionalGeneration" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"
 max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -34,9 +34,3 @@ with torch.no_grad():
 generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    (Path(output_dir) / "generated_text.txt").write_text(
-        RESULT["generated_text"], encoding="utf-8"
-    )

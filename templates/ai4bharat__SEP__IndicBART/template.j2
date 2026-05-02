@@ -1,10 +1,9 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "ai4bharat/IndicBART" %}
+{% set device = "cuda:0" %}
 {% set input_text = input_text | default("Hello, how are you? </s> <2en>") %}
 {% set target_lang = target_lang | default("<2hi>") %}
 {% set num_beams = num_beams | default(4) %}
 {% set max_length = max_length | default(50) %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ai4bharat__SEP__IndicBART") %}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
@@ -12,7 +11,6 @@ input_text = {{ input_text | tojson }}
 target_lang = {{ target_lang | tojson }}
 num_beams = {{ num_beams }}
 max_length = {{ max_length }}
-output_dir = {{ output_dir | tojson }}
 
 from pathlib import Path
 import torch
@@ -52,8 +50,3 @@ output_ids = model.generate(**enable_kwargs)
 generated_text = tokenizer.decode(output_ids[0], skip_special_tokens=True, clean_up_tokenization_spaces=False)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    out_dir = Path(output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

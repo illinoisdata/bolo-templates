@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "nguyenvulebinh/wav2vec2-base-vi" %}
 {% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set output_dir = "./inference_output" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
-output_dir = "{{ output_dir }}"
 
 import io
 from pathlib import Path
@@ -63,9 +63,3 @@ if sampled_targets is not None:
     result_data["sampled_targets"] = sampled_targets
 
 RESULT = result_data
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    for key, value in RESULT.items():
-        np.save(output_path / f"{key}.npy", value.numpy())

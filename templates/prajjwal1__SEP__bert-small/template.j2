@@ -1,16 +1,15 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "prajjwal1/bert-small" %}
 {% set text_input = "The quick brown fox jumps over the lazy dog." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/prajjwal1__SEP__bert-small" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
 import torch
 from transformers import BertModel, BertTokenizer
 
-output_dir = Path(output_dir)
 torch_device = torch.device(device)
 
 tokenizer = BertTokenizer.from_pretrained(repo_id)
@@ -39,9 +38,3 @@ RESULT = {
     "last_hidden_state": last_hidden_state,
     "pooler_output": pooler_output,
 }
-
-if __name__ == "__main__":
-    output_dir.mkdir(parents=True, exist_ok=True)
-    torch.save(RESULT["last_hidden_state"], output_dir / "last_hidden_state.pt")
-    if RESULT["pooler_output"] is not None:
-        torch.save(RESULT["pooler_output"], output_dir / "pooler_output.pt")

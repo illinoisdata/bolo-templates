@@ -1,6 +1,5 @@
-{% set repo_id = 'dwzhu/e5-base-4k' %}
-{% set device = 'cuda:0' %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/dwzhu__SEP__e5-base-4k' %}
+{% set repo_id = "dwzhu/e5-base-4k" %}
+{% set device = "cuda:0" %}
 {% set input_texts = ['query: how much protein should a female eat', 'query: summit define', 'passage: As a general guideline, the CDC\'s average requirement of protein for women ages 19 to 70 is 46 grams per day. But, as you can see from this chart, you\'ll need to increase that if you\'re expecting or training for a marathon. Check out the chart below to see how much protein you should be eating each day.', 'passage: Definition of summit for English Language Learners. : 1  the highest point of a mountain : the top of a mountain. : 2  the highest level. : 3  a meeting or series of meetings between the leaders of two or more governments.'] %}
 {% set max_length = 4096 %}
 {% set max_original_positions = 512 %}
@@ -8,7 +7,6 @@
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 input_texts = {{ input_texts }}
 max_length = {{ max_length }}
 max_original_positions = {{ max_original_positions }}
@@ -57,7 +55,3 @@ with torch.no_grad():
 # Post-process & build RESULT dict
 
 RESULT = {"embeddings": embeddings}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "embeddings.npy"), RESULT["embeddings"].cpu().numpy())

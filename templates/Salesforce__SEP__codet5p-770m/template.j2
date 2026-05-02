@@ -1,6 +1,5 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
-
+{% set repo_id = "Salesforce/codet5p-770m" %}
+{% set device = "cuda:0" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 
@@ -12,9 +11,3 @@ with open(config_path, "r") as f:
     tokenizer_config = json.load(f)
 
 RESULT = {"tokenizer_config": tokenizer_config}
-
-if __name__ == "__main__":
-    output_dir = os.getcwd()
-    output_path = os.path.join(output_dir, "tokenizer_config.json")
-    with open(output_path, "w") as f:
-        json.dump(RESULT["tokenizer_config"], f)

@@ -4,7 +4,6 @@
 {% set input_max_length = 1024 %}
 {% set generation_max_length = 256 %}
 {% set max_new_tokens = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__pegasus-x-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -12,12 +11,10 @@ text_input = "{{ text_input }}"
 input_max_length = {{ input_max_length }}
 generation_max_length = {{ generation_max_length }}
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
@@ -39,11 +36,3 @@ generated_tokens = model.generate(
 generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(
-        "\n".join(RESULT["generated_text"]),
-        encoding="utf-8",
-    )

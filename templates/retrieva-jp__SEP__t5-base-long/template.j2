@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "retrieva-jp/t5-base-long" %}
 {% set prompt_text = "Translate English to Japanese: The quick brown fox jumps over the lazy dog." %}
 {% set max_new_tokens = 128 %}
 {% set num_beams = 4 %}
 {% set temperature = 1.0 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/retrieva-jp__SEP__t5-base-long" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -10,13 +11,11 @@ prompt_text = """{{ prompt_text }}"""
 max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
 temperature = {{ temperature }}
-output_dir = "{{ output_dir }}"
 
 import os
 
 import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
@@ -38,9 +37,3 @@ generated_tokens = model.generate(
 
 generated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 RESULT = {"generated_text": generated_texts[0]}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(output_path, "w", encoding="utf-8") as file:
-        file.write(RESULT["generated_text"])

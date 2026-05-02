@@ -1,14 +1,12 @@
-{% set repo_id = 'ai-forever/sage-fredt5-distilled-95m' %}
-{% set device = 'cuda:0' %}
+{% set repo_id = "ai-forever/sage-fredt5-distilled-95m" %}
+{% set device = "cuda:0" %}
 {% set input_text = 'И не чсно прохожим в этот день непогожйи почему я веселый такйо' %}
 {% set length_multiplier = 1.5 %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ai-forever__SEP__sage-fredt5-distilled-95m' %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 length_multiplier = {{ length_multiplier }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -26,10 +24,3 @@ outputs = model.generate(**inputs, max_length=int(inputs["input_ids"].size(1) * 
 generated_texts = tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
 RESULT = {"generated_texts": generated_texts}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_texts.txt")
-    with open(output_path, "w", encoding="utf-8") as f:
-        for text in RESULT["generated_texts"]:
-            f.write(text + "\n")

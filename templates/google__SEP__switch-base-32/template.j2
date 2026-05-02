@@ -1,12 +1,10 @@
-{% set repo_id = repo_id | default("google/switch-base-32") %}
-{% set device = device | default("cuda:0") %}
+{% set repo_id = "google/switch-base-32" %}
+{% set device = "cuda:0" %}
 {% set text_input = text_input | default("A <extra_id_0> walks into a bar and orders a <extra_id_1> with <extra_id_2> pinch of <extra_id_3>.") %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__switch-base-32") %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""
-output_dir = """{{ output_dir }}"""
 
 import torch
 from pathlib import Path
@@ -24,8 +22,3 @@ decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 generated_text = decoded[0] if decoded else ""
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

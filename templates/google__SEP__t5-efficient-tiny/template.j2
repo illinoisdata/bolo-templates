@@ -1,11 +1,9 @@
 {% set repo_id = "google/t5-efficient-tiny" %}
 {% set device = "cuda:0" %}
 {% set input_text = "translate English to German: HuggingFace transformers are incredible." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__t5-efficient-tiny" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""
-output_dir = "{{ output_dir }}"
 from pathlib import Path
 import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -19,8 +17,3 @@ with torch.no_grad():
 decoded_tokens = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 generated_text = decoded_tokens[0] if decoded_tokens else ""
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    path = Path(output_dir)
-    path.mkdir(parents=True, exist_ok=True)
-    (path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

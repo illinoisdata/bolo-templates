@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/wmt19-en-de" %}
 {% set text_input = "Machine learning is great, isn't it?" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__wmt19-en-de" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ text_input }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import os
@@ -18,9 +18,3 @@ generated_tokens = model.generate(**encoded_inputs)
 translation = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    translation_path = os.path.join(output_dir, "translation.txt")
-    with open(translation_path, "w", encoding="utf-8") as f:
-        f.write(translation)

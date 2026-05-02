@@ -1,12 +1,10 @@
 {% set repo_id = "circulus/kobart-trans-dialect-v2" %}
 {% set device = "cuda:0" %}
 {% set text = "안녕하세요, 만나서 반갑습니다." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/circulus__SEP__kobart-trans-dialect-v2" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
@@ -24,8 +22,3 @@ with torch.no_grad():
 generated_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    output_path = Path(output_dir) / "generated_text.txt"
-    output_path.write_text(generated_text, encoding="utf-8")

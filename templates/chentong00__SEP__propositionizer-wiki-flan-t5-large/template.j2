@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "chentong00/propositionizer-wiki-flan-t5-large" %}
 {% set title = "Leaning Tower of Pisa" %}
 {% set section = "" %}
 {% set content = "Prior to restoration work performed between 1990 and 2001, Leaning Tower of Pisa leaned at an angle of 5.5 degrees, but the tower now leans at about 3.99 degrees. This means the top of the tower is displaced horizontally 3.9 meters (12 ft 10 in) from the center." %}
 {% set max_new_tokens = 512 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/chentong00__SEP__propositionizer-wiki-flan-t5-large" %}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
@@ -10,14 +11,12 @@ title = {{ title | tojson }}
 section = {{ section | tojson }}
 content = {{ content | tojson }}
 max_new_tokens = {{ max_new_tokens }}
-output_dir = {{ output_dir | tojson }}
 
 import json
 import os
 
 import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
@@ -34,9 +33,3 @@ generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 propositions = json.loads(generated_text)
 
 RESULT = {"propositions": propositions}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "propositions.json")
-    with open(output_path, "w", encoding="utf-8") as fp:
-        json.dump(RESULT["propositions"], fp, indent=2, ensure_ascii=False)

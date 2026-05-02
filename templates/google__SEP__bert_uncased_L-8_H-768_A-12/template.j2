@@ -1,12 +1,10 @@
 {% set repo_id = "google/bert_uncased_L-8_H-768_A-12" %}
 {% set device = "cuda:0" %}
 {% set text = "Hello, I'm a [MASK] model." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-8_H-768_A-12" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import json
@@ -38,8 +36,3 @@ for token in top_tokens:
     predictions.append({"token": token, "score": score, "token_str": token_str, "sequence": sequence})
 
 RESULT = {"predictions": predictions}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "predictions.json"), "w") as f:
-        json.dump(RESULT["predictions"], f)

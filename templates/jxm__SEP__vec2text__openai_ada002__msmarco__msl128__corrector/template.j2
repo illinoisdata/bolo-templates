@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "jxm/vec2text__openai_ada002__msmarco__msl128__corrector" %}
 {% set input_text = "Correct this sentence: Thsi exampel contains errors to be fixed." %}
 {% set max_new_tokens = 64 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/jxm__SEP__vec2text__openai_ada002__msmarco__msl128__corrector" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 import sys
 import types
@@ -46,8 +46,3 @@ encoded_inputs = {key: value.to(torch_device) for key, value in encoded_inputs.i
 generated_tokens = model.generate(**encoded_inputs, max_new_tokens=max_new_tokens)
 generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
 RESULT = {"corrected_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "corrected_text.txt").write_text(RESULT["corrected_text"], encoding="utf-8")

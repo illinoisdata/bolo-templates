@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "sonoisa/t5-base-japanese-v1.1" %}
 {% set input_text = "これは日本語テキスト生成のサンプルです。続きの文章を生成してください。" %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/sonoisa__SEP__t5-base-japanese-v1.1" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = {{ input_text | tojson }}
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -21,7 +21,3 @@ generated_ids = model.generate(**inputs, max_length=max_length, num_beams=num_be
 generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    (Path(output_dir) / "generated_text.txt").write_text(generated_text, encoding="utf-8")

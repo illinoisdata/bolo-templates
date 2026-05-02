@@ -1,5 +1,5 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "QCRI/PropagandaTechniquesAnalysis-en-BERT" %}
+{% set device = "cuda:0" %}
 {% set text = "Hello, my dog is cute" %}
 
 repo_id = "{{ repo_id }}"
@@ -41,8 +41,3 @@ RESULT = {
     "token_results": token_results,
     "sequence_results": sequence_results,
 }
-
-if __name__ == "__main__":
-    import json
-    with open("result.json", "w") as f:
-        json.dump(RESULT, f)

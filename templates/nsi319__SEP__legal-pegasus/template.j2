@@ -1,6 +1,5 @@
 {% set repo_id = "nsi319/legal-pegasus" %}
 {% set device = "cuda:0" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/nsi319__SEP__legal-pegasus" %}
 {% set input_text = "The defendant was found guilty of fraud and sentenced to ten years in prison." %}
 {% set max_length = 128 %}
 {% set min_length = 32 %}
@@ -10,7 +9,6 @@
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 input_text = "{{ input_text }}"
 max_length = {{ max_length }}
 min_length = {{ min_length }}
@@ -43,9 +41,3 @@ generated_ids = model.generate(
 summary = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 RESULT = {"summary_text": summary}
-
-if __name__ == "__main__":
-    import os
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "summary.txt"), "w") as f:
-        f.write(RESULT["summary_text"])

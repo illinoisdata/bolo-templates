@@ -29,15 +29,3 @@ generated_ids = model.generate(
 
 generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    from pathlib import Path
-
-    output_dir = Path("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/cointegrated__SEP__rut5-base")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / "generated_text.txt"
-    with open(output_path, "w", encoding="utf-8") as f:
-        for text in RESULT["generated_text"]:
-            f.write(text)
-            if not text.endswith("\n"):
-                f.write("\n")

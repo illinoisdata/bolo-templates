@@ -8,7 +8,6 @@
 {% set no_repeat_ngram_size = 3 %}
 {% set length_penalty = 2.0 %}
 {% set early_stopping = true %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/adasnew__SEP__t5-small-xsum" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -20,7 +19,6 @@ num_beams = {{ num_beams }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
 length_penalty = {{ length_penalty }}
 early_stopping = {{ early_stopping }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -50,8 +48,3 @@ outputs = model.generate(
 # Postprocess and prepare RESULT
 decoded = tokenizer.decode(outputs[0], skip_special_tokens=True)
 RESULT = {"summary_text": decoded}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "summary.txt"), "w") as f:
-        f.write(RESULT["summary_text"])

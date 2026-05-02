@@ -3,14 +3,12 @@
 {% set question_input = "Frank Zappa ||| Disbandment ||| What group disbanded ||| Zappa and the Mothers of Invention ||| When did they disband?" %}
 {% set max_new_tokens = 64 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/castorini__SEP__t5-base-canard" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 question_input = "{{ question_input }}"
 max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -33,9 +31,3 @@ rewritten_candidates = tokenizer.batch_decode(generated_ids, skip_special_tokens
 rewritten_text = rewritten_candidates[0].strip()
 
 RESULT = {"rewritten_question": rewritten_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "rewritten_question.txt")
-    with open(output_path, "w", encoding="utf-8") as file_obj:
-        file_obj.write(RESULT["rewritten_question"])

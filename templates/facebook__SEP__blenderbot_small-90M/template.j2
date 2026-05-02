@@ -1,11 +1,9 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__blenderbot_small-90M" %}
+{% set repo_id = "facebook/blenderbot_small-90M" %}
+{% set device = "cuda:0" %}
 {% set input_text = "Hello, how are you?" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 input_text = "{{ input_text }}"
 
 import os
@@ -27,9 +25,3 @@ outputs = model.generate(**inputs)
 generated_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(RESULT["generated_text"])

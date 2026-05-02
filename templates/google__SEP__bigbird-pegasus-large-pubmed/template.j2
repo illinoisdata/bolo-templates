@@ -1,15 +1,15 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/bigbird-pegasus-large-pubmed" %}
 {% set input_text = "Summarize the following biomedical abstract that describes a long clinical study with complex findings." %}
 {% set max_length = 256 %}
 {% set min_length = 30 %}
 {% set num_beams = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bigbird-pegasus-large-pubmed" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""
 max_length = {{ max_length }}
 min_length = {{ min_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 from pathlib import Path
@@ -42,9 +42,3 @@ summary_text = tokenizer.batch_decode(
 )[0]
 
 RESULT = {"summary": summary_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    summary_file = output_path / "summary.txt"
-    summary_file.write_text(RESULT["summary"], encoding="utf-8")

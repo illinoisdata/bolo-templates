@@ -1,14 +1,12 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "bionlp/bluebert_pubmed_uncased_L-24_H-1024_A-16" %}
+{% set device = "cuda:0" %}
 {% set input_text = "The patient was prescribed [MASK] for treatment." %}
 {% set top_k = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/bionlp__SEP__bluebert_pubmed_uncased_L-24_H-1024_A-16" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -68,9 +66,3 @@ if mask_positions[0].numel() > 0:
         )
 
 RESULT = {"fill_mask_suggestions": suggestions}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "fill_mask_suggestions.json")
-    with open(output_path, "w", encoding="utf-8") as output_file:
-        json.dump(RESULT["fill_mask_suggestions"], output_file, ensure_ascii=False, indent=2)

@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "unum-cloud/uform-gen" %}
 {% set prompt = "[cap] Summarize the visual content of the image." %}
 {% set max_new_tokens = 128 %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/unum-cloud__SEP__uform-gen" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"
 max_new_tokens = {{ max_new_tokens }}
 image_path = "{{ image_path }}"
-output_dir = "{{ output_dir }}"
 
 import os
 from pathlib import Path
@@ -19,7 +19,6 @@ import torch
 from PIL import Image
 from transformers.modeling_utils import PreTrainedModel
 from uform.gen_model import VLMForCausalLM, VLMProcessor
-
 
 def _patched_move_missing_keys_from_meta_to_device(self, missing_keys, *args, **kwargs):
     return missing_keys
@@ -62,9 +61,3 @@ generated_tokens = output[:, prompt_len:]
 generated_text = processor.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"caption": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = Path(output_dir) / "caption.txt"
-    with open(output_path, "w", encoding="utf-8") as output_file:
-        output_file.write(RESULT["caption"])

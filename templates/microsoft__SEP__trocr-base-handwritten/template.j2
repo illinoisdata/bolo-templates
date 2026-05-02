@@ -1,11 +1,9 @@
 {% set repo_id = "microsoft/trocr-base-handwritten" %}
 {% set device = "cuda:0" %}
 {% set document_image = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__trocr-base-handwritten" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 document_image = "{{ document_image }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -18,7 +16,6 @@ processor = AutoProcessor.from_pretrained(repo_id)
 model = VisionEncoderDecoderModel.from_pretrained(repo_id)
 model = model.to(torch.device(device))
 model.eval()
-
 
 def load_image(source: str) -> Image.Image:
     if source.startswith("http://") or source.startswith("https://"):
@@ -34,8 +31,3 @@ generated_ids = model.generate(pixel_values)
 generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

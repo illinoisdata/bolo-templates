@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "utrobinmv/t5_translate_en_ru_zh_large_1024" %}
 {% set input_text = "translate to ru: The purpose of the development is to provide users with a personal synchronized interpreter." %}
 {% set generate_max_length = 256 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/utrobinmv__SEP__t5_translate_en_ru_zh_large_1024" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 generate_max_length = {{ generate_max_length }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -22,8 +22,3 @@ tokenized_inputs = {key: value.to(device) for key, value in tokenized_inputs.ite
 generated_tokens = model.generate(**tokenized_inputs, max_length=generate_max_length)
 decoded_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 RESULT = {"translated_text": decoded_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "translated_text.txt").write_text(RESULT["translated_text"], encoding="utf-8")

@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Salesforce/codet5p-220m" %}
 {% set prompt = "def print_hello_world():<extra_id_0>" %}
 {% set max_length = 64 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Salesforce__SEP__codet5p-220m" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 import os
 import transformers
@@ -22,7 +22,6 @@ def _patched_pt_init(self, *args, **kwargs):
         return _orig_pt_init(self, *args, **kwargs)
     finally:
         PreTrainedTokenizer.add_tokens = orig_add
-
 
 def _patched_ptf_init(self, *args, **kwargs):
     orig_add_fast = PreTrainedTokenizerFast.add_tokens
@@ -43,10 +42,3 @@ encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()
 generated_ids = model.generate(**encoded_inputs, max_length=max_length)
 generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    for key, value in RESULT.items():
-        file_path = os.path.join(output_dir, f"{key}.txt")
-        with open(file_path, "w", encoding="utf-8") as file:
-            file.write(value if isinstance(value, str) else str(value))

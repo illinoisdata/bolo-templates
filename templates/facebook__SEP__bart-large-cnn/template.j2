@@ -1,6 +1,5 @@
-{% set repo_id = 'facebook/bart-large-cnn' %}
-{% set device = 'cuda:0' %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__bart-large-cnn' %}
+{% set repo_id = "facebook/bart-large-cnn" %}
+{% set device = "cuda:0" %}
 {% set article %}
 New York (CNN)When Liana Barrientos was 23 years old, she got married in Westchester County, New York.
 A year later, she got married again in Westchester County, but to a different man and without divorcing her first husband.
@@ -23,7 +22,6 @@ If convicted, Barrientos faces up to four years in prison.  Her next court appea
 
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
-output_dir = '{{ output_dir }}'
 article = '''{{ article }}'''
 
 import os
@@ -49,9 +47,3 @@ output_ids = model.generate(
 summary = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
 
 RESULT = {'summary_text': summary}
-
-if __name__ == '__main__':
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, 'summary_text.txt')
-    with open(output_path, 'w') as f:
-        f.write(RESULT['summary_text'])

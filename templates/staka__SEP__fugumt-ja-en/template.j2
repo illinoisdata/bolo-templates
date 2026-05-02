@@ -1,11 +1,9 @@
-{% set device = device %}
-{% set repo_id = repo_id %}
+{% set device = "cuda:0" %}
+{% set repo_id = "staka/fugumt-ja-en" %}
 {% set input_text = "猫はかわいいです。" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/staka__SEP__fugumt-ja-en" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = '{{ input_text }}'
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -26,8 +24,3 @@ decoded_translations = tokenizer.batch_decode(generated_tokens, skip_special_tok
 translation = decoded_translations[0]
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    output_root = Path(output_dir)
-    output_root.mkdir(parents=True, exist_ok=True)
-    (output_root / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

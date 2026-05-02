@@ -3,13 +3,11 @@
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/team-lucid__SEP__trocr-small-korean" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 from io import BytesIO
@@ -43,8 +41,3 @@ text_outputs = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 text_result = text_outputs[0]
 
 RESULT = {"generated_text": text_result}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    output_file = Path(output_dir) / "generated_text.txt"
-    output_file.write_text(RESULT["generated_text"], encoding="utf-8")

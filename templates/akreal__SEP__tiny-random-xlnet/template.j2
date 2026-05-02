@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "akreal/tiny-random-xlnet" %}
 {% set prompt = "Hello, huggingface" %}
 {% set max_new_tokens = 20 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/akreal__SEP__tiny-random-xlnet" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 import pathlib
 
@@ -23,8 +23,3 @@ with torch.no_grad():
 generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = pathlib.Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated.txt").write_text(RESULT["generated_text"], encoding="utf-8")

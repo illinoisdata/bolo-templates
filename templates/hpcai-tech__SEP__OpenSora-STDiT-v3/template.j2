@@ -6,6 +6,3 @@ import pkgutil
 import transformers
 modules = [m.name for m in pkgutil.iter_modules(transformers.models.__path__) if "stdit" in m.name.lower()]
 RESULT = {"modules": modules}
-
-if __name__ == "__main__":
-    pass

@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-tc-big-lt-en" %}
 {% set input_texts = ["Katė sedėjo ant kėdės."] %}
 {% set num_beams = 4 %}
 {% set max_length = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-tc-big-lt-en" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_texts = {{ input_texts | tojson }}
 num_beams = {{ num_beams }}
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -33,10 +33,3 @@ with torch.no_grad():
 
 translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_file = os.path.join(output_dir, "translations.txt")
-    with open(output_file, "w", encoding="utf-8") as writer:
-        for translation in RESULT["translations"]:
-            writer.write(translation + "\n")

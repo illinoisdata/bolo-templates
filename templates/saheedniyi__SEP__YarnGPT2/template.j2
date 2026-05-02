@@ -1,7 +1,6 @@
 {% set device = "cuda:0" %}
 {% set repo_id = "saheedniyi/YarnGPT2" %}
 {% set text = "The election was won by businessman and politician, Moshood Abiola, but Babangida annulled the results, citing concerns over national security." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/saheedniyi__SEP__YarnGPT2" %}
 {% set temperature = 0.7 %}
 {% set max_new_tokens = 256 %}
 {% set repetition_penalty = 1.1 %}
@@ -10,7 +9,6 @@
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 temperature = {{ temperature }}
 max_new_tokens = {{ max_new_tokens }}
 repetition_penalty = {{ repetition_penalty }}
@@ -56,15 +54,3 @@ RESULT = {
     "continuation_text": continuation_text,
     "generated_token_ids": generated_token_ids,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    generated_text_path = os.path.join(output_dir, "generated_text.txt")
-    continuation_text_path = os.path.join(output_dir, "continuation_text.txt")
-    token_ids_path = os.path.join(output_dir, "generated_token_ids.json")
-    with open(generated_text_path, "w", encoding="utf-8") as generated_file:
-        generated_file.write(RESULT["generated_text"])
-    with open(continuation_text_path, "w", encoding="utf-8") as continuation_file:
-        continuation_file.write(RESULT["continuation_text"])
-    with open(token_ids_path, "w", encoding="utf-8") as ids_file:
-        json.dump(RESULT["generated_token_ids"], ids_file, ensure_ascii=False)

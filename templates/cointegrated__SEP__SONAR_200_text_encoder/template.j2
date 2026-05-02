@@ -1,11 +1,9 @@
 {% set repo_id = "cointegrated/SONAR_200_text_encoder" %}
 {% set device = "cuda:0" %}
 {% set input_texts = ["This is a test sentence.", "Multilingual sentence embedding example."] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/cointegrated__SEP__SONAR_200_text_encoder" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_texts = {{ input_texts }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -44,8 +42,3 @@ sentence_embeddings = sum_hidden / mask_sum
 sentence_embeddings = sentence_embeddings.cpu()
 
 RESULT = {"sentence_embeddings": sentence_embeddings}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    torch.save(RESULT["sentence_embeddings"], output_path / "sentence_embeddings.pt")

@@ -1,12 +1,10 @@
 {% set repo_id = "facebook/blenderbot-3B" %}
 {% set device = "cuda:0" %}
 {% set prompt_text = "Hello! How are you doing today?" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__blenderbot-3B" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt_text = "{{ prompt_text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -22,9 +20,3 @@ generated_tokens = model.generate(**encoded_inputs, max_new_tokens=60, num_beams
 generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    generated_path = os.path.join(output_dir, "generated_response.txt")
-    with open(generated_path, "w", encoding="utf-8") as handle:
-        handle.write(RESULT["generated_text"])

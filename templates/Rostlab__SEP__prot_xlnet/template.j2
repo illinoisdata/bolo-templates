@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Rostlab/prot_xlnet" %}
 {% set text_sequence = "MGDVEKGKKIFIMKCSQCHTVEKGGKHKTGPNLHGLFGRKTGQAPGYSYTAANKNKGIIWGEDTLMEYLENPKKYIPGTKMIFAGIKG" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Rostlab__SEP__prot_xlnet" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_sequence = "{{ text_sequence }}"
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -41,10 +41,3 @@ RESULT = {
     "score": float(score_tensor.item()),
     "logits": logits_values,
 }
-
-if __name__ == "__main__":
-    output_dir_path = Path(output_dir)
-    output_dir_path.mkdir(parents=True, exist_ok=True)
-    (output_dir_path / "label.txt").write_text(RESULT["label"], encoding="utf-8")
-    with (output_dir_path / "scores.json").open("w", encoding="utf-8") as outfile:
-        json.dump({"score": RESULT["score"], "logits": RESULT["logits"]}, outfile)

@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "prithivida/active_to_passive_styletransfer" %}
 {% set text_inputs = "The committee approved the new policy yesterday." %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/prithivida__SEP__active_to_passive_styletransfer" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_inputs = "{{ text_inputs }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -32,9 +32,3 @@ decoded_outputs = tokenizer.batch_decode(generated_ids, skip_special_tokens=True
 generated_passive = decoded_outputs[0] if decoded_outputs else ""
 
 RESULT = {"generated_passive": generated_passive}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    file_path = output_path / "generated_passive.txt"
-    file_path.write_text(RESULT["generated_passive"], encoding="utf-8")

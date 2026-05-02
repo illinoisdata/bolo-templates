@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Rostlab/prot_t5_xl_half_uniref50-enc" %}
 {% set sequences = ["PRTEINO", "SEQWENCE"] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Rostlab__SEP__prot_t5_xl_half_uniref50-enc" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sequences = {{ sequences }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import re
@@ -53,9 +53,3 @@ RESULT = {
     "per_residue_embeddings": per_residue_embeddings,
     "per_protein_embeddings": per_protein_embeddings,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    torch.save(RESULT["per_residue_embeddings"], output_path / "per_residue_embeddings.pt")
-    torch.save(RESULT["per_protein_embeddings"], output_path / "per_protein_embeddings.pt")

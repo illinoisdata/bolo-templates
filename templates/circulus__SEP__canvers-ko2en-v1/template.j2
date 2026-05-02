@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "circulus/canvers-ko2en-v1" %}
 {% set input_text = "안녕하세요, 세계!" %}
 {% set max_length = 256 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/circulus__SEP__canvers-ko2en-v1" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -22,8 +22,3 @@ generated_ids = model.generate(**inputs, max_length=max_length, num_beams=num_be
 translation = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "translation.txt"), "w", encoding="utf-8") as f:
-        f.write(RESULT["translation"])

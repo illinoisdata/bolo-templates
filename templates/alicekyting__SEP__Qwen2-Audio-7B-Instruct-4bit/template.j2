@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "alicekyting/Qwen2-Audio-7B-Instruct-4bit" %}
 {% set audio_path = '/u/yli77/projects/ML-code-generation/data/audio.wav' %}
 {% set output_path = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/alicekyting__SEP__Qwen2-Audio-7B-Instruct-4bit/response.txt' %}
 {% set max_new_tokens = 256 %}
@@ -75,8 +77,3 @@ response = processor.batch_decode(
 )[0]
 
 RESULT = {"response": response}
-
-if __name__ == "__main__":
-    output_file = Path(output_path)
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-    output_file.write_text(RESULT["response"], encoding="utf-8")

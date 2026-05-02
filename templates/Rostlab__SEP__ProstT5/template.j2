@@ -1,5 +1,5 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "Rostlab/ProstT5" %}
+{% set device = "cuda:0" %}
 {% set aa_sequence = "PRTEINO" %}
 {% set translation_prefix_aa = "<AA2fold>" %}
 {% set translation_prefix_fold = "<fold2AA>" %}
@@ -17,7 +17,6 @@
 {% set fold2aa_temperature = 1.1 %}
 {% set fold2aa_top_k = 6 %}
 {% set fold2aa_repetition_penalty = 1.2 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Rostlab__SEP__ProstT5" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -38,7 +37,6 @@ fold2aa_top_p = {{ fold2aa_top_p }}
 fold2aa_temperature = {{ fold2aa_temperature }}
 fold2aa_top_k = {{ fold2aa_top_k }}
 fold2aa_repetition_penalty = {{ fold2aa_repetition_penalty }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -116,15 +114,3 @@ RESULT = {
     "decoded_backtranslations": decoded_backtranslations,
     "amino_acid_sequences": amino_acid_sequences,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    with (output_path / "decoded_translations.json").open("w", encoding="utf-8") as fp:
-        json.dump(RESULT["decoded_translations"], fp, ensure_ascii=False, indent=2)
-    with (output_path / "structure_sequences.json").open("w", encoding="utf-8") as fp:
-        json.dump(RESULT["structure_sequences"], fp, ensure_ascii=False, indent=2)
-    with (output_path / "decoded_backtranslations.json").open("w", encoding="utf-8") as fp:
-        json.dump(RESULT["decoded_backtranslations"], fp, ensure_ascii=False, indent=2)
-    with (output_path / "amino_acid_sequences.json").open("w", encoding="utf-8") as fp:
-        json.dump(RESULT["amino_acid_sequences"], fp, ensure_ascii=False, indent=2)

@@ -1,13 +1,13 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/mbart-large-en-ro" %}
 {% set source_lang = "en_XX" %}
 {% set target_lang = "ro_RO" %}
 {% set src_text = "This is a sample English sentence to translate into Romanian." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mbart-large-en-ro" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_lang = "{{ source_lang }}"
 target_lang = "{{ target_lang }}"
 src_text = "{{ src_text }}"
-output_dir = "{{ output_dir }}"
 import os
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
@@ -26,9 +26,3 @@ generated_tokens = model.generate(**encoded_inputs, forced_bos_token_id=forced_b
 translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_file = os.path.join(output_dir, "translation.txt")
-    with open(output_file, "w", encoding="utf-8") as handle:
-        handle.write(translation)

@@ -1,13 +1,13 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-it-de" %}
 {% set src_text = "Il gatto dorme sul tappeto." %}
 {% set num_beams = 4 %}
 {% set max_length = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-it-de" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 src_text = "{{ src_text }}"
 num_beams = {{ num_beams }}
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 from pathlib import Path
 
 from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
@@ -33,8 +33,3 @@ generated_tokens = model.generate(
 translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "translation.txt").write_text(translation, encoding="utf-8")

@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-gem-gem" %}
 {% set text_input = ">>eng_Latn<< Translate this sentence to English." %}
-{% set output_dir = "/tmp" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -23,7 +23,3 @@ decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 translation = decoded[0] if decoded else ""
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    (Path(output_dir) / "translation.txt").write_text(translation, encoding="utf-8")

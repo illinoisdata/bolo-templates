@@ -1,12 +1,10 @@
 {% set repo_id = "dbmdz/bert-base-turkish-128k-uncased" %}
 {% set device = "cuda:0" %}
 {% set text = "Merhaba dünya!" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/dbmdz__SEP__bert-base-turkish-128k-uncased" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModel
 import torch
@@ -23,7 +21,3 @@ with torch.no_grad():
     last_hidden_state = outputs.last_hidden_state
 
 RESULT = {"last_hidden_state": last_hidden_state.cpu()}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "last_hidden_state.npy"), RESULT["last_hidden_state"].numpy())

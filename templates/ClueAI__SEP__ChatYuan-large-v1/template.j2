@@ -1,10 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "ClueAI/ChatYuan-large-v1" %}
 {% set prompt = "用户：帮我写一个请假条，我因为新冠不舒服，需要请假3天，请领导批准\\n小元：" %}
 {% set max_input_length = 768 %}
 {% set max_new_tokens = 512 %}
 {% set sample_generation = true %}
 {% set temperature = 0.7 %}
 {% set top_p = 1.0 %}
-{% set output_dir = "./outputs" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -14,7 +15,6 @@ max_new_tokens = {{ max_new_tokens }}
 sample_generation = {{ "True" if sample_generation else "False" }}
 temperature = {{ temperature }}
 top_p = {{ top_p }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -26,14 +26,11 @@ tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
 model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
 model.eval()
 
-
 def preprocess(text: str) -> str:
     return text.replace("\n", "\\n").replace("\t", "\\t")
 
-
 def postprocess(text: str) -> str:
     return text.replace("\\n", "\n").replace("\\t", "\t")
-
 
 preprocessed_prompt = preprocess(prompt)
 encoding = tokenizer(
@@ -70,10 +67,3 @@ decoded_sequences = tokenizer.batch_decode(sequences, skip_special_tokens=True)
 generated_text = postprocess(decoded_sequences[0])
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(
-        RESULT["generated_text"], encoding="utf-8"
-    )

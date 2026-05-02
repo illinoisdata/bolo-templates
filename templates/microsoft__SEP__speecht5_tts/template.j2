@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "microsoft/speecht5_tts" %}
 {% set text = "Hello, my dog is cooler than you!" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__speecht5_tts" %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text = {{ text | tojson }}
-output_dir = {{ output_dir | tojson }}
 
 from pathlib import Path
 
@@ -29,9 +29,3 @@ speech_audio = speech["audio"]
 sampling_rate = speech["sampling_rate"]
 
 RESULT = {"speech_audio": speech_audio, "sampling_rate": sampling_rate}
-
-if __name__ == "__main__":
-    output_dir_path = Path(output_dir)
-    output_dir_path.mkdir(parents=True, exist_ok=True)
-    audio_path = output_dir_path / "speech.wav"
-    sf.write(audio_path, RESULT["speech_audio"], samplerate=RESULT["sampling_rate"])

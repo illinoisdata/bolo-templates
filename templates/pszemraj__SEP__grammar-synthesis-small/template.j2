@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "pszemraj/grammar-synthesis-small" %}
 {% set input_text = "i can has cheezburger" %}
 {% set max_length = 128 %}
 {% set min_length = 4 %}
@@ -5,7 +7,6 @@
 {% set repetition_penalty = 1.21 %}
 {% set length_penalty = 1.0 %}
 {% set early_stopping = true %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/pszemraj__SEP__grammar-synthesis-small" %}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
@@ -16,7 +17,6 @@ num_beams = {{ num_beams }}
 repetition_penalty = {{ repetition_penalty }}
 length_penalty = {{ length_penalty }}
 early_stopping = {{ early_stopping }}
-output_dir = {{ output_dir | tojson }}
 
 from pathlib import Path
 
@@ -40,8 +40,3 @@ generated_tokens = model.generate(
 decoded_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 correction = decoded_texts[0]
 RESULT = {"correction": correction}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "correction.txt").write_text(RESULT["correction"], encoding="utf-8")

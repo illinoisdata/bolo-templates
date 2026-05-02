@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "monologg/bert-base-cased-goemotions-group" %}
 {% set text = "I feel great today!" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/monologg__SEP__bert-base-cased-goemotions-group" %}
 {% set probability_threshold = 0.5 %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 probability_threshold = {{ probability_threshold }}
 
 from pathlib import Path
@@ -41,13 +41,3 @@ RESULT = {
     "probabilities_by_label": probabilities_by_label,
     "labels_above_threshold": labels_above_threshold,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    probabilities_path = output_path / "probabilities_by_label.json"
-    with open(probabilities_path, "w", encoding="utf-8") as probabilities_file:
-        json.dump(RESULT["probabilities_by_label"], probabilities_file, ensure_ascii=False, indent=2)
-    threshold_path = output_path / "labels_above_threshold.txt"
-    with open(threshold_path, "w", encoding="utf-8") as threshold_file:
-        threshold_file.write("\n".join(RESULT["labels_above_threshold"]))

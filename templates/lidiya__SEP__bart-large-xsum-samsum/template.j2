@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "lidiya/bart-large-xsum-samsum" %}
 {% set conversation = """Hannah: Hey, do you have Betty's number?
 Amanda: Lemme check
 Amanda: Sorry, can't find it.
@@ -14,7 +16,6 @@ Amanda: Bye bye""" %}
 {% set max_length = 60 %}
 {% set min_length = 11 %}
 {% set num_beams = 6 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/lidiya__SEP__bart-large-xsum-samsum" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -22,7 +23,6 @@ conversation = """{{ conversation }}"""
 max_length = {{ max_length }}
 min_length = {{ min_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -49,14 +49,3 @@ decoded_summaries = [summary.strip() for summary in decoded_summaries]
 RESULT = {
     "summary": decoded_summaries[0] if len(decoded_summaries) == 1 else decoded_summaries,
 }
-
-if __name__ == "__main__":
-    target_dir = Path(output_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-    summary_value = RESULT["summary"]
-    summary_file = target_dir / "summary.txt"
-    with summary_file.open("w", encoding="utf-8") as summary_handle:
-        if isinstance(summary_value, list):
-            summary_handle.write("\n".join(summary_value))
-        else:
-            summary_handle.write(summary_value)

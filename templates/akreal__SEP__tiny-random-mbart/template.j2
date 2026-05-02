@@ -3,13 +3,11 @@
 {% set text_input = "Hello, world!" %}
 {% set src_lang = "en_XX" %}
 {% set tgt_lang = "fr_XX" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/akreal__SEP__tiny-random-mbart" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
 src_lang = "{{ src_lang }}"
 tgt_lang = "{{ tgt_lang }}"
-output_dir = "{{ output_dir }}"
 from pathlib import Path
 import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -32,7 +30,3 @@ with torch.no_grad():
 # Post-process decoded translations
 translation = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    Path(output_dir, "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Xenova/sponsorblock-small" %}
 {% set input_text = "Describe how SponsorBlock uses the T5 backend to tag segments." %}
 {% set max_length = 64 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Xenova__SEP__sponsorblock-small" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -23,9 +23,3 @@ generated_ids = model.generate(**inputs, max_length=max_length)
 decoded_outputs = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
 RESULT = {"generated_text": decoded_outputs[0]}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    text_path = output_path / "generated_text.txt"
-    text_path.write_text(RESULT["generated_text"], encoding="utf-8")

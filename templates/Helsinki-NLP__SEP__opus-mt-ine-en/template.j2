@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-ine-en" %}
 {% set text = "This is a short sentence to translate into English." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-ine-en" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -25,7 +25,3 @@ generated_ids = model.generate(**encoded_inputs, max_length=256)
 # Post-process & build RESULT dict
 translation_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 RESULT = {"translation": translation_text}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    Path(output_dir, "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

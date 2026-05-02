@@ -1,15 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-tc-base-en-sh" %}
 {% set input_text = [">>hrv<< You're about to make a very serious mistake.", ">>bos_Latn<< I have a busy day ahead."] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-tc-base-en-sh" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = {{ input_text }}
-output_dir = "{{ output_dir }}"
 
 import os
 
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
@@ -32,10 +31,3 @@ generated_tokens = model.generate(
 translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    translations_path = os.path.join(output_dir, "translations.txt")
-    with open(translations_path, "w", encoding="utf-8") as translations_file:
-        for translation in RESULT["translations"]:
-            translations_file.write(f"{translation}\n")

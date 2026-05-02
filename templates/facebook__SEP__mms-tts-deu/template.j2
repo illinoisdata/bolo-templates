@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/mms-tts-deu" %}
 {% set text = "Guten Tag! Dies ist ein kurzes Beispiel für die deutsche TTS-Ausgabe." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mms-tts-deu" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 from pathlib import Path
@@ -23,10 +23,3 @@ with torch.no_grad():
 waveform = inference_outputs.waveform.squeeze().cpu().numpy()
 sampling_rate = model.config.sampling_rate
 RESULT = {"waveform": waveform, "sampling_rate": sampling_rate}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    wav_path = output_path / "tts_output.wav"
-    pcm_waveform = np.clip(RESULT["waveform"] * 32767, -32768, 32767).astype(np.int16)
-    scipy.io.wavfile.write(str(wav_path), RESULT["sampling_rate"], pcm_waveform)

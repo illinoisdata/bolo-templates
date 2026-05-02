@@ -3,14 +3,12 @@
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set prompt = "a picture of " %}
 {% set num_beams = 3 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/noamrot__SEP__FuseCap_Image_Captioning" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 prompt = "{{ prompt }}"
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from transformers import BlipProcessor, BlipForConditionalGeneration
 import torch
@@ -31,9 +29,3 @@ generated_ids = model.generate(**inputs, num_beams=num_beams)
 caption = processor.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"generated_text": caption}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(output_path, "w") as f:
-        f.write(RESULT["generated_text"])

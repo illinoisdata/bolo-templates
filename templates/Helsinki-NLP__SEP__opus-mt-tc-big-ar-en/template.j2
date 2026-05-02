@@ -1,12 +1,10 @@
 {% set repo_id = "Helsinki-NLP/opus-mt-tc-big-ar-en" %}
 {% set device = "cuda:0" %}
 {% set src_text = ["اتبع قلبك فحسب.", "وين راهي دّوش؟"] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-tc-big-ar-en" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 src_text = {{ src_text }}
-output_dir = "{{ output_dir }}"
 
 import os
 from transformers import MarianTokenizer, MarianMTModel
@@ -21,9 +19,3 @@ translated_tokens = model.generate(**inputs)
 translations = [tokenizer.decode(t, skip_special_tokens=True) for t in translated_tokens]
 
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "translations.txt"), "w", encoding="utf-8") as f:
-        for t in RESULT["translations"]:
-            f.write(t + "\n")

@@ -1,10 +1,9 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "ThomasNLG/t5-qg_squad1-en" %}
+{% set device = "cuda:0" %}
 {% set answer_text = "Paris" %}
 {% set context_text = "Paris is the capital of France, known for the Eiffel Tower and the Seine River." %}
 {% set max_length = 64 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ThomasNLG__SEP__t5-qg_squad1-en" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -12,7 +11,6 @@ answer_text = "{{ answer_text }}"
 context_text = "{{ context_text }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -36,9 +34,3 @@ with torch.no_grad():
 generated_question = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"generated_question": generated_question}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_question.txt")
-    with open(output_path, "w", encoding="utf-8") as out_f:
-        out_f.write(generated_question)

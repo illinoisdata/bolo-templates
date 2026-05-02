@@ -1,7 +1,7 @@
-{% set output_dir = "/tmp/mamba2_debug" %}
+{% set device = "cuda:0" %}
+{% set repo_id = "state-spaces/mamba2-2.7b" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -24,11 +24,3 @@ RESULT = {
     "tokenizer_config": tokenizer_config,
     "file_entries": file_entries,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "repo_files.json"), "w", encoding="utf-8") as writer:
-        json.dump({
-            "tokenizer_config": tokenizer_config,
-            "file_entries": file_entries,
-        }, writer)

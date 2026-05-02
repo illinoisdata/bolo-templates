@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "paust/pko-t5-base" %}
 {% set input_texts = ['qa question: 당신의 이름은 무엇인가요?'] %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/paust__SEP__pko-t5-base' %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_texts = {{ input_texts }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -32,10 +32,3 @@ generated_ids = model.generate(input_ids=input_ids, attention_mask=attention_mas
 generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
 RESULT = {"generated_texts": generated_texts}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_texts.txt")
-    with open(output_path, "w", encoding="utf-8") as f:
-        for text in RESULT["generated_texts"]:
-            f.write(text + "\n")

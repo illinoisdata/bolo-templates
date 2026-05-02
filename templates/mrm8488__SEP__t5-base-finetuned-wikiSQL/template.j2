@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "mrm8488/t5-base-finetuned-wikiSQL" %}
 {% set question = "How many models were finetuned using BERT as base model?" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/mrm8488__SEP__t5-base-finetuned-wikiSQL" %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 question = {{ question | tojson }}
-output_dir = {{ output_dir | tojson }}
 
 from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -19,9 +19,3 @@ generated_tokens = model.generate(**encoded_inputs, max_length=128)
 sql_query = tokenizer.decode(generated_tokens[0], skip_special_tokens=True).strip()
 
 RESULT = {"sql_query": sql_query}
-
-output_dir = Path(output_dir)
-
-if __name__ == "__main__":
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "sql_query.txt").write_text(RESULT["sql_query"], encoding="utf-8")

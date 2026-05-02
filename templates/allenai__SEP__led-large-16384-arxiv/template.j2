@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "allenai/led-large-16384-arxiv" %}
 {% set text_input = "Solar researchers studied the 155-day periodicity in sunspot data and developed methods to confirm if the peak was a true cycle." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allenai__SEP__led-large-16384-arxiv" %}
 {% set max_length = 512 %}
 {% set num_beams = 4 %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""
-output_dir = "{{ output_dir }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 
@@ -36,9 +36,3 @@ generated_sequences = model.generate(
 decoded_summaries = tokenizer.batch_decode(generated_sequences, skip_special_tokens=True)
 
 RESULT = {"summaries": decoded_summaries}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    summary_file = output_path / "summaries.txt"
-    summary_file.write_text("\n\n".join(RESULT["summaries"]))

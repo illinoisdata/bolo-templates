@@ -1,5 +1,5 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "grammarly/coedit-large" %}
+{% set device = "cuda:0" %}
 {% set input_text = "Fix grammatical errors in this sentence: When I grow up, I start to understand what he said is quite right." %}
 {% set max_length = 256 %}
 {% set num_beams = 4 %}
@@ -37,8 +37,3 @@ decoded_output = tokenizer.batch_decode(
 result_text = decoded_output[0].strip()
 
 RESULT = {"edited_text": result_text}
-
-if __name__ == "__main__":
-    output_dir = Path("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/grammarly__SEP__coedit-large")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "edited_text.txt").write_text(RESULT["edited_text"], encoding="utf-8")

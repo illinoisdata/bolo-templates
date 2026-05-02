@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "dmis-lab/bern2-ner" %}
 {% set input_text = "The patient was diagnosed with acute myeloid leukemia and started targeted therapy." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/dmis-lab__SEP__bern2-ner" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -33,9 +33,3 @@ RESULT = {
     "tokens": _tokens,
     "labels": _labels,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    result_path = os.path.join(output_dir, "ner_result.json")
-    with open(result_path, "w", encoding="utf-8") as result_file:
-        json.dump(RESULT, result_file, ensure_ascii=False, indent=2)

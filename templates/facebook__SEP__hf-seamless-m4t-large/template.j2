@@ -3,14 +3,12 @@
 {% set input_text = "Hello, my dog is cute" %}
 {% set src_lang = "eng" %}
 {% set tgt_lang = "rus" %}
-{% set output_dir = "." %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 src_lang = "{{ src_lang }}"
 tgt_lang = "{{ tgt_lang }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import numpy as np
@@ -27,8 +25,3 @@ inputs = {k: v.to(device) for k, v in inputs.items()}
 audio_array = model.generate(**inputs, tgt_lang=tgt_lang)[0].cpu().numpy().squeeze()
 
 RESULT = {"audio": audio_array}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "audio.wav")
-    sf.write(output_path, RESULT["audio"], 16000)

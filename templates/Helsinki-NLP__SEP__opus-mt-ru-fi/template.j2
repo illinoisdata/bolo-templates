@@ -1,11 +1,11 @@
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-ru-fi" %}
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-ru-fi" %}
 {% set input_text = "Привет, мир!" %}
 {% set max_length = 512 %}
 {% set num_beams = 6 %}
 {% set max_new_tokens = 128 %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 input_text = "{{ input_text }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
@@ -38,10 +38,3 @@ with torch.no_grad():
 decoded_translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"translations": decoded_translations}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "translation.txt").write_text(
-        "\n".join(RESULT["translations"]), encoding="utf-8"
-    )

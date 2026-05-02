@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "knkarthick/MEETING-SUMMARY-BART-LARGE-XSUM-SAMSUM-DIALOGSUM-AMI" %}
 {% set text_input = "The team held a kickoff meeting to design a remote control, discussing functionality, production cost, marketing, and next steps. They debated how to keep the device trendy yet affordable while covering a wide range of user needs." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/knkarthick__SEP__MEETING-SUMMARY-BART-LARGE-XSUM-SAMSUM-DIALOGSUM-AMI" %}
 {% set max_new_tokens = 128 %}
 {% set num_beams = 4 %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""
-output_dir = "{{ output_dir }}"
 max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
 
@@ -29,9 +29,3 @@ with torch.inference_mode():
 summary = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    summary_path = os.path.join(output_dir, "summary.txt")
-    with open(summary_path, "w", encoding="utf-8") as output_handle:
-        output_handle.write(RESULT["summary"])

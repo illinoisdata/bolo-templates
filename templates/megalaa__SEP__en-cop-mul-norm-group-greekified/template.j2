@@ -3,14 +3,12 @@
 {% set input_text = "The quick brown fox jumps over the lazy dog." %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/megalaa__SEP__en-cop-mul-norm-group-greekified" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 
@@ -26,11 +24,3 @@ encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.ite
 generated_tokens = model.generate(**encoded_inputs, max_length=max_length, num_beams=num_beams)
 translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 RESULT = {"translation": translations}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    translation_path = os.path.join(output_dir, "translation.txt")
-    with open(translation_path, "w", encoding="utf-8") as writer:
-        for translation in RESULT["translation"]:
-            writer.write(translation)
-            writer.write("\n")

@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "huawei-noah/TinyBERT_General_4L_312D" %}
 {% set mask_text = "The capital of France is [MASK]." %}
 {% set top_k = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/huawei-noah__SEP__TinyBERT_General_4L_312D" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 mask_text = "{{ mask_text }}"
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -44,9 +44,3 @@ if mask_positions[0].numel() > 0:
         )
 
 RESULT = {"mask_predictions": mask_predictions}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    with (output_path / "mask_predictions.json").open("w", encoding="utf-8") as dst:
-        json.dump(RESULT, dst, indent=2, ensure_ascii=False)

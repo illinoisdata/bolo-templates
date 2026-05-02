@@ -1,3 +1,4 @@
+{% set device = "cuda:0" %}
 {% set repo_id = "microsoft/xprophetnet-large-wiki100-cased" %}
 repo_id = "{{ repo_id }}"
 
@@ -12,6 +13,3 @@ print(json.dumps(tokenizer_config, indent=2))
 print(list_repo_files(repo_id))
 
 RESULT = {"ready": True}
-
-if __name__ == "__main__":
-    pass

@@ -3,14 +3,12 @@
 {% set source_text = "Hola, ¿cómo estás hoy?" %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-es-ca" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = "{{ source_text }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -38,11 +36,3 @@ with torch.no_grad():
 translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    translation_file = output_path / "translations.txt"
-    with translation_file.open("w", encoding="utf-8") as outfile:
-        for idx, translation in enumerate(RESULT["translations"], start=1):
-            outfile.write(f"{idx}\t{translation}\n")

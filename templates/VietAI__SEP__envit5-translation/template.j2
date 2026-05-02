@@ -1,6 +1,5 @@
 {% set repo_id = "VietAI/envit5-translation" %}
 {% set device = "cuda:0" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/VietAI__SEP__envit5-translation" %}
 {% set source_texts = [
     "vi: VietAI là tổ chức phi lợi nhuận với sứ mệnh ươm mầm tài năng về trí tuệ nhân tạo và xây dựng một cộng đồng các chuyên gia trong lĩnh vực trí tuệ nhân tạo đẳng cấp quốc tế tại Việt Nam.",
     "vi: Theo báo cáo mới nhất của Linkedin về danh sách việc làm triển vọng với mức lương hấp dẫn năm 2020, các chức danh công việc liên quan đến AI như Chuyên gia AI (Artificial Intelligence Specialist), Kỹ sư ML (Machine Learning Engineer) đều xếp thứ hạng cao.",
@@ -11,7 +10,6 @@
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 source_texts = {{ source_texts | tojson }}
 max_length = {{ max_length }}
 
@@ -51,7 +49,6 @@ def encode_batch(texts):
         attention[idx, :length] = 1
     return batch_input, attention
 
-
 def decode_sequences(batch_ids):
     decoded = []
     for ids in batch_ids:
@@ -64,7 +61,6 @@ def decode_sequences(batch_ids):
             filtered.append(token_id)
         decoded.append(processor.decode(filtered).strip())
     return decoded
-
 
 tokenizer_inputs, tokenizer_masks = encode_batch(source_texts)
 
@@ -81,10 +77,3 @@ generated_ids = model.generate(
 decoded = decode_sequences(generated_ids.cpu().tolist())
 
 RESULT = {"translations": decoded}
-
-if __name__ == "__main__":
-    makedirs(output_dir, exist_ok=True)
-    translations_path = join(output_dir, "translations.txt")
-    with open(translations_path, "w", encoding="utf-8") as out_file:
-        for translation in RESULT["translations"]:
-            out_file.write(f"{translation}\n")

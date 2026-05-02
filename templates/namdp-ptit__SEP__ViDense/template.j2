@@ -1,12 +1,10 @@
 {% set repo_id = "namdp-ptit/ViDense" %}
 {% set device = "cuda:0" %}
 {% set sentences = ["Tỉnh nào có diện tích lớn nhất Việt Nam", "Tỉnh nào có diện tích nhỏ nhất Việt Nam", "Tỉnh nào có diện tích rộng nhất Việt Nam"] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/namdp-ptit__SEP__ViDense" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -35,10 +33,3 @@ RESULT = {
     "cosine_sim_1": cosine_sim_1.item(),
     "cosine_sim_2": cosine_sim_2.item()
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "cosine_sim_1.txt"), "w") as f:
-        f.write(str(RESULT["cosine_sim_1"]))
-    with open(os.path.join(output_dir, "cosine_sim_2.txt"), "w") as f:
-        f.write(str(RESULT["cosine_sim_2"]))

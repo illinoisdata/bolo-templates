@@ -1,12 +1,10 @@
 {% set repo_id = "aglazkova/bart_finetuned_keyphrase_extraction" %}
 {% set device = "cuda:0" %}
 {% set text = "In this paper, we investigate cross-domain limitations of keyphrase generation using the models for abstractive text summarization." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/aglazkova__SEP__bart_finetuned_keyphrase_extraction" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
@@ -28,10 +26,3 @@ generated_keyphrases = tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
 # Build RESULT dict
 RESULT = {"generated_keyphrases": generated_keyphrases}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    # Save generated keyphrases to text file
-    with open(os.path.join(output_dir, "generated_keyphrases.txt"), "w") as f:
-        for phrase in RESULT["generated_keyphrases"]:
-            f.write(phrase + "\n")

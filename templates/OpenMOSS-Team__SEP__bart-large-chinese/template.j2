@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "OpenMOSS-Team/bart-large-chinese" %}
 {% set text_input = "北京是[MASK]的首都" %}
 {% set max_length = 50 %}
 {% set num_beams = 4 %}
 {% set do_sample = false %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/OpenMOSS-Team__SEP__bart-large-chinese" %}
 {% set output_filename = "generated_text.txt" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -10,7 +11,6 @@ text_input = "{{ text_input }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 do_sample = {{ "True" if do_sample else "False" }}
-output_dir = "{{ output_dir }}"
 output_filename = "{{ output_filename }}"
 
 import torch
@@ -41,9 +41,3 @@ generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True
 primary_generated_text = generated_texts[0] if generated_texts else ""
 
 RESULT = {"generated_text": primary_generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    destination = output_path / output_filename
-    destination.write_text(RESULT["generated_text"], encoding="utf-8")

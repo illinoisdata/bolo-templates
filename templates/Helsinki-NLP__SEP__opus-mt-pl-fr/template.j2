@@ -3,14 +3,12 @@
 {% set input_text = "Dzień dobry! Czy możesz przetłumaczyć ten tekst na francuski?" %}
 {% set num_beams = 6 %}
 {% set max_length = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-pl-fr" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 num_beams = {{ num_beams }}
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -42,9 +40,3 @@ translation = tokenizer.decode(
 )
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    file_path = output_path / "translation.txt"
-    file_path.write_text(RESULT["translation"], encoding="utf-8")

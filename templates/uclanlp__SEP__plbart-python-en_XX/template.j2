@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "uclanlp/plbart-python-en_XX" %}
 {% set source_text = "def greet():\n    print('Hello from PLBART translation!')" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/uclanlp__SEP__plbart-python-en_XX" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = """{{ source_text }}"""
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -21,9 +21,3 @@ with torch.no_grad():
 translations = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "translation.json")
-    with open(output_path, "w", encoding="utf-8") as output_file:
-        json.dump(RESULT, output_file, ensure_ascii=False, indent=2)

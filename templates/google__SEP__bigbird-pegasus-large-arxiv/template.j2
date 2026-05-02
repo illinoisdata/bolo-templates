@@ -1,12 +1,10 @@
 {% set repo_id = "google/bigbird-pegasus-large-arxiv" %}
 {% set device = "cuda:0" %}
 {% set text = "Replace me by any text you'd like." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bigbird-pegasus-large-arxiv" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -22,8 +20,3 @@ outputs = model.generate(**inputs)
 summary = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
 
 RESULT = {"summary_text": summary}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "summary_text.txt"), "w") as f:
-        f.write(RESULT["summary_text"])

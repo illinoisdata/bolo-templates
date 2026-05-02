@@ -1,11 +1,9 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "monologg/koelectra-small-v2-discriminator" %}
+{% set device = "cuda:0" %}
 {% set input_text = "안녕하세요! 이것은 테스트 입력입니다." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/monologg__SEP__koelectra-small-v2-discriminator/outputs" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -25,9 +23,3 @@ with torch.no_grad():
 logits = outputs.logits.detach().cpu().tolist()
 
 RESULT = {"discriminator_logits": logits}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    json_path = Path(output_dir) / "discriminator_logits.json"
-    with json_path.open("w", encoding="utf-8") as json_file:
-        json.dump(RESULT["discriminator_logits"], json_file)

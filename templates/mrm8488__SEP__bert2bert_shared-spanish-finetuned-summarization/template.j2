@@ -1,15 +1,15 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "mrm8488/bert2bert_shared-spanish-finetuned-summarization" %}
 {% set text_input = "Al filo de las 22.00 horas del jueves, la Asamblea de Madrid vive un momento sorprendente: Vox decide no apoyar una propuesta del PP en favor del blindaje fiscal de la Comunidad." %}
 {% set max_new_tokens = 60 %}
 {% set num_beams = 4 %}
 {% set max_input_length = 512 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/mrm8488__SEP__bert2bert_shared-spanish-finetuned-summarization" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = {{ text_input | tojson }}
 max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
 max_input_length = {{ max_input_length }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -45,8 +45,3 @@ summary = tokenizer.decode(
 )
 
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

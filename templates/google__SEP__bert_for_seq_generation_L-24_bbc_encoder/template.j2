@@ -1,12 +1,10 @@
 {% set repo_id = "google/bert_for_seq_generation_L-24_bbc_encoder" %}
 {% set device = "cuda:0" %}
 {% set text = "Hello, world!" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_for_seq_generation_L-24_bbc_encoder" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import numpy as np
@@ -26,7 +24,3 @@ with torch.no_grad():
 embeddings = hidden_states.cpu().numpy()
 
 RESULT = {"embeddings": embeddings}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "embeddings.npy"), RESULT["embeddings"])

@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "qianjiaying/unsup-simcse-bert-applog-0422" %}
 {% set sentences = ["An example sentence for unsupervised SimCSE inference."] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/qianjiaying__SEP__unsup-simcse-bert-applog-0422" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -33,10 +33,3 @@ if pooler_output is None:
 sentence_embeddings = pooler_output.detach().cpu().tolist()
 
 RESULT = {"sentence_embeddings": sentence_embeddings}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "sentence_embeddings.json").write_text(
-        json.dumps(RESULT["sentence_embeddings"], ensure_ascii=False)
-    )

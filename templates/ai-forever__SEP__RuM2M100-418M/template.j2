@@ -1,19 +1,17 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "ai-forever/RuM2M100-418M" %}
 {% set text_input = "прийдя в МГТУ я был удивлен никого необноружив там…" %}
 {% set src_lang = "ru" %}
 {% set tgt_lang = "ru" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ai-forever__SEP__RuM2M100-418M" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
 src_lang = "{{ src_lang }}"
 tgt_lang = "{{ tgt_lang }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-
-output_dir = Path(output_dir)
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id, src_lang=src_lang, tgt_lang=tgt_lang)
 model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
@@ -36,8 +34,3 @@ corrected_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=T
 corrected_text = corrected_texts[0]
 
 RESULT = {"corrected_text": corrected_text}
-
-if __name__ == "__main__":
-    output_dir.mkdir(parents=True, exist_ok=True)
-    corrected_path = output_dir / "corrected_text.txt"
-    corrected_path.write_text(corrected_text, encoding="utf-8")

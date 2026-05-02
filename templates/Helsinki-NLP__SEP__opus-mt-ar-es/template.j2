@@ -1,11 +1,9 @@
 {% set repo_id = "Helsinki-NLP/opus-mt-ar-es" %}
 {% set device = "cuda:0" %}
 {% set source_text = "مرحبا، كيف حالك؟" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-ar-es" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = "{{ source_text }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -25,9 +23,3 @@ generated_tokens = model.generate(**inputs)
 translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    translation_file = output_path / "translation.txt"
-    translation_file.write_text(translation, encoding="utf-8")

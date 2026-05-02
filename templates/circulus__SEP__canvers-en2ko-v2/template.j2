@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "circulus/canvers-en2ko-v2" %}
 {% set source_text = ["Translate this English sentence to Korean."] %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/circulus__SEP__canvers-en2ko-v2" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = {{ source_text }}
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -32,10 +32,3 @@ generated_tokens = model.generate(
 translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    translations_path = os.path.join(output_dir, "translations.txt")
-    with open(translations_path, "w", encoding="utf-8") as out_file:
-        for translation in translations:
-            out_file.write(f"{translation}\n")

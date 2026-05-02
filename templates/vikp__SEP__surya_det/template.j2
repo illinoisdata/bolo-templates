@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "vikp/surya_det" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/vikp__SEP__surya_det" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-output_dir = "{{ output_dir }}"
 
 import requests
 from io import BytesIO
@@ -35,9 +35,3 @@ target_sizes = [(image.height, image.width)]
 processed = processor.post_process_semantic_segmentation(outputs, target_sizes=target_sizes)
 segmentation_mask = processed[0].cpu().numpy()
 RESULT = {"segmentation_mask": segmentation_mask}
-
-if __name__ == "__main__":
-    save_path = Path(output_dir)
-    save_path.mkdir(parents=True, exist_ok=True)
-    mask_image = Image.fromarray(segmentation_mask.astype("uint8"))
-    mask_image.save(save_path / "segmentation_mask.png")

@@ -2,12 +2,10 @@
 {% set device = "cuda:0" %}
 {% set prompt = "translate English to German: Hello, how are you?" %}
 {% set max_new_tokens = 64 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__t5-large-lm-adapt" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = """{{ prompt }}"""
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -24,8 +22,3 @@ decoded = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 generated_text = decoded[0].strip() if decoded else ""
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

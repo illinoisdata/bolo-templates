@@ -1,14 +1,12 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "facebook/wav2vec2-large-lv60" %}
+{% set device = "cuda:0" %}
 {% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
 {% set target_sample_rate = 16000 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__wav2vec2-large-lv60" %}
 {% set projected_states_filename = "projected_states.npy" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
 target_sample_rate = {{ target_sample_rate }}
-output_dir = "{{ output_dir }}"
 projected_states_filename = "{{ projected_states_filename }}"
 
 import io
@@ -67,8 +65,3 @@ with torch.no_grad():
 
 projected_states = outputs.projected_states.detach().cpu().numpy()
 RESULT = {"projected_states": projected_states}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = Path(output_dir) / projected_states_filename
-    np.save(output_path, RESULT["projected_states"])

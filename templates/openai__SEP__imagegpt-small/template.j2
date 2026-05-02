@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "openai/imagegpt-small" %}
 {% set batch_size = 8 %}
 {% set temperature = 1.0 %}
 {% set top_k = 40 %}
 {% set do_sample = True %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/openai__SEP__imagegpt-small' %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -10,7 +11,6 @@ batch_size = {{ batch_size }}
 temperature = {{ temperature }}
 top_k = {{ top_k }}
 do_sample = {{ do_sample }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -57,8 +57,3 @@ samples_img = [
 images = [Image.fromarray(img) for img in samples_img]
 
 RESULT = {"images": images}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    for idx, image in enumerate(RESULT["images"]):
-        image.save(os.path.join(output_dir, f"{idx}.png"))

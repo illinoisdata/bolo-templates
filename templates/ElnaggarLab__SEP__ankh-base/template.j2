@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "ElnaggarLab/ankh-base" %}
 {% set input_text = "Summarize how proteins fold using structural features." %}
 {% set max_new_tokens = 256 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ElnaggarLab__SEP__ankh-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -24,13 +24,3 @@ generated_ids = model.generate(**encoded_inputs, max_new_tokens=max_new_tokens)
 generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    resolved_path = Path(output_dir) / "generated_text.txt"
-    text_output = (
-        "\n".join(RESULT["generated_text"])
-        if isinstance(RESULT["generated_text"], list)
-        else RESULT["generated_text"]
-    )
-    resolved_path.write_text(text_output, encoding="utf-8")

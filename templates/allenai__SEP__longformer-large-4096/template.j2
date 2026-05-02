@@ -1,11 +1,9 @@
 {% set repo_id = "allenai/longformer-large-4096" %}
 {% set device = "cuda:0" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allenai__SEP__longformer-large-4096" %}
 {% set text = "Longformer is a transformer model for long documents." %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 text = "{{ text }}"
 
 import os
@@ -28,7 +26,3 @@ with torch.no_grad():
 # Post-process outputs
 last_hidden_state = outputs.last_hidden_state.cpu().numpy()
 RESULT = {"last_hidden_state": last_hidden_state}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "last_hidden_state.npy"), RESULT["last_hidden_state"])

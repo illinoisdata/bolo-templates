@@ -1,15 +1,15 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "LIAMF-USP/roberta-large-finetuned-race" %}
 {% set question = "What is the capital of France?" %}
 {% set context = "France is a Western European country whose capital city is famous for the Eiffel Tower, art museums, and a rich cultural history." %}
 {% set options = ["Berlin", "Madrid", "Paris", "Rome"] %}
 {% set max_length = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/LIAMF-USP__SEP__roberta-large-finetuned-race" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 question = "{{ question }}"
 context = "{{ context }}"
 options = {{ options | tojson }}
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import json
@@ -60,10 +60,3 @@ RESULT = {
     "probabilities": probabilities_cpu.tolist(),
     "predicted_option": predicted_option,
 }
-
-if __name__ == "__main__":
-    out_path = Path(output_dir)
-    out_path.mkdir(parents=True, exist_ok=True)
-    for key, value in RESULT.items():
-        file_path = out_path / f"{key}.json"
-        file_path.write_text(json.dumps(value, ensure_ascii=False, indent=2))

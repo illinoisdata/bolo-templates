@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-tc-big-en-ko" %}
 {% set source_texts = ["2, 4, 6 etc. are even numbers.", "Yes."] %}
 {% set target_lang = "ko" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-tc-big-en-ko" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_texts = {{ source_texts }}
 target_lang = "{{ target_lang }}"
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -41,11 +41,3 @@ with torch.inference_mode():
 decoded_translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"translations": decoded_translations}
-
-if __name__ == "__main__":
-    result_root = Path(output_dir)
-    result_root.mkdir(parents=True, exist_ok=True)
-    translation_path = result_root / "translations.txt"
-    with translation_path.open("w", encoding="utf-8") as output_file:
-        for translation in RESULT["translations"]:
-            output_file.write(f"{translation}\n")

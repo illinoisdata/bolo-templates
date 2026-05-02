@@ -1,5 +1,5 @@
-{% set repo_id = repo_id | default("RE-N-Y/t5-v1_1-xxl") %}
-{% set device = device | default("cuda:0") %}
+{% set repo_id = "RE-N-Y/t5-v1_1-xxl" %}
+{% set device = "cuda:0" %}
 {% set input_text = input_text | default("This is a test sentence.") %}
 
 repo_id = "{{ repo_id }}"
@@ -27,7 +27,3 @@ embeddings = last_hidden_states.detach().to(torch.float32).cpu().numpy()
 
 # Build result dict
 RESULT = {"embeddings": embeddings}
-
-if __name__ == "__main__":
-    # Save embeddings to disk (saved in the current working directory)
-    np.save("embeddings.npy", RESULT["embeddings"])

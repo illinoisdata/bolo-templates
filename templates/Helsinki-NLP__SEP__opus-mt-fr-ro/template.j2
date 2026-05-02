@@ -1,12 +1,10 @@
-{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-fr-ro") -%}
-{% set device = device | default("cuda:0") -%}
+{% set repo_id = "Helsinki-NLP/opus-mt-fr-ro" %}
+{% set device = "cuda:0" %}
 {% set input_text = input_text | default("Bonjour, comment allez-vous aujourd'hui ?") -%}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-fr-ro") -%}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 input_text = {{ input_text | tojson }}
-output_dir = {{ output_dir | tojson }}
 
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import torch
@@ -37,13 +35,3 @@ else:
     translation_result = translations[0]
 
 RESULT = {"translated_text": translation_result}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    translated = RESULT["translated_text"]
-    destination = output_path / "translated_text.txt"
-    if isinstance(translated, (list, tuple)):
-        destination.write_text("\n".join(str(item) for item in translated), encoding="utf-8")
-    else:
-        destination.write_text(str(translated), encoding="utf-8")

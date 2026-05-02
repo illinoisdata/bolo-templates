@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set text_input = "東北大学で[MASK]の研究をしています。" %}
 {% set top_k = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/tohoku-nlp__SEP__bert-large-japanese-v2" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -44,11 +42,3 @@ for batch_index, sequence_index in mask_positions.tolist():
     )
 
 RESULT = {"mask_predictions": mask_predictions}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    for name, payload in RESULT.items():
-        file_path = output_path / f"{name}.json"
-        with file_path.open("w", encoding="utf-8") as file_obj:
-            json.dump(payload, file_obj, ensure_ascii=False, indent=2)

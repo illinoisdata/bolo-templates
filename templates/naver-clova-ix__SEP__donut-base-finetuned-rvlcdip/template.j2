@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "naver-clova-ix/donut-base-finetuned-rvlcdip" %}
 {% set document_image = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/naver-clova-ix__SEP__donut-base-finetuned-rvlcdip" %}
 {% set max_length = 64 %}
 {% set num_beams = 1 %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 document_image = "{{ document_image }}"
-output_dir = "{{ output_dir }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 
@@ -47,8 +47,3 @@ generated_ids = model.generate(
 generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    text_path = Path(output_dir) / "generated_text.txt"
-    text_path.write_text(generated_text, encoding="utf-8")

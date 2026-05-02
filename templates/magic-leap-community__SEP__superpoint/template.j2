@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "magic-leap-community/superpoint" %}
 {% set image_path = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/magic-leap-community__SEP__superpoint' %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -48,8 +48,3 @@ RESULT = {
     "scores": valid_scores,
     "descriptors": valid_descriptors,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "results.json").write_text(json.dumps(RESULT))

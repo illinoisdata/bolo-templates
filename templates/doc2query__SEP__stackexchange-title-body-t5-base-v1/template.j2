@@ -6,7 +6,6 @@
 {% set do_sample = true %}
 {% set top_p = 0.95 %}
 {% set num_return_sequences = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/doc2query__SEP__stackexchange-title-body-t5-base-v1" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -16,7 +15,6 @@ max_length = {{ max_length }}
 do_sample = {{ do_sample }}
 top_p = {{ top_p }}
 num_return_sequences = {{ num_return_sequences }}
-output_dir = "{{ output_dir }}"
 
 import os
 import json
@@ -40,8 +38,3 @@ outputs = model.generate(
 generated_queries = tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
 RESULT = {"generated_queries": generated_queries}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "generated_queries.json"), "w") as f:
-        json.dump(RESULT["generated_queries"], f)

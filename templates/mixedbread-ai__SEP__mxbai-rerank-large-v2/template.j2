@@ -1,6 +1,5 @@
 {% set repo_id = "mixedbread-ai/mxbai-rerank-large-v2" %}
 {% set device = "cuda:0" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/mixedbread-ai__SEP__mxbai-rerank-large-v2" %}
 {% set query = "Who wrote 'To Kill a Mockingbird'?" %}
 {% set documents = [
     "'To Kill a Mockingbird' is a novel by Harper Lee published in 1960. It was immediately successful, winning the Pulitzer Prize, and has become a classic of modern American literature.",
@@ -13,7 +12,6 @@
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
-output_dir = {{ output_dir | tojson }}
 query = {{ query | tojson }}
 documents = {{ documents | tojson }}
 
@@ -48,10 +46,3 @@ rankings = sorted(
 )
 
 RESULT = {"scores": scores, "rankings": rankings}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "scores.json"), "w") as f:
-        json.dump(RESULT["scores"], f)
-    with open(os.path.join(output_dir, "rankings.json"), "w") as f:
-        json.dump(RESULT["rankings"], f)

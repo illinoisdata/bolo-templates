@@ -1,14 +1,12 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "Helsinki-NLP/opus-mt-fr-ru" %}
+{% set device = "cuda:0" %}
 {% set text_input = "Ce texte en français sera traduit en russe." %}
 {% set max_length = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-fr-ru" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
 import os
@@ -21,10 +19,3 @@ generated_ids = model.generate(**inputs)
 translation = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    translation_text = "\n".join(RESULT["translation"])
-    output_path = os.path.join(output_dir, "translation.txt")
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(translation_text)

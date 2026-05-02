@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/switch-base-64" %}
 {% set text_input = "A <extra_id_0> walks into a bar and orders a <extra_id_1>." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__switch-base-64" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -21,10 +21,3 @@ generated_text = tokenizer.decode(
 )
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_dir_path = Path(output_dir)
-    output_dir_path.mkdir(parents=True, exist_ok=True)
-    for key, value in RESULT.items():
-        output_path = output_dir_path / f"{key}.txt"
-        output_path.write_text(value)

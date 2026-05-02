@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "mrm8488/t5-small-finetuned-common_gen" %}
 {% set input_text = "apples, oranges, and bananas" %}
 {% set max_length = 50 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/mrm8488__SEP__t5-small-finetuned-common_gen" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -39,9 +39,3 @@ generated_ids = model.generate(
 generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
 RESULT = {"generated_texts": generated_texts}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    generated_file = output_path / "generated_texts.txt"
-    generated_file.write_text("\n".join(RESULT["generated_texts"]), encoding="utf-8")

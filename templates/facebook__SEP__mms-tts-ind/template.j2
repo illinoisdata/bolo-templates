@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/mms-tts-ind" %}
 {% set tts_text = "Halo! Ini adalah demo teks-to-speech dalam bahasa Indonesia." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mms-tts-ind" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ tts_text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 from pathlib import Path
@@ -29,13 +29,3 @@ waveform = waveform.squeeze(0).detach().cpu().numpy()
 sampling_rate = model.config.sampling_rate
 
 RESULT = {"waveform": waveform, "sampling_rate": sampling_rate}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    normalized_waveform = waveform.copy()
-    peak = np.max(np.abs(normalized_waveform))
-    if peak > 0:
-        normalized_waveform = normalized_waveform / peak
-    clipped_waveform = np.clip(normalized_waveform, -1.0, 1.0)
-    int16_waveform = np.int16(clipped_waveform * 32767)
-    wavfile.write(Path(output_dir) / "tts_waveform.wav", sampling_rate, int16_waveform)

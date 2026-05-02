@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "ybelkada/tiny-random-T5ForConditionalGeneration-calibrated" %}
 {% set prompt = "translate English to German: The house is wonderful." %}
 {% set max_new_tokens = 32 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ybelkada__SEP__tiny-random-T5ForConditionalGeneration-calibrated" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import os
@@ -22,9 +22,3 @@ outputs = model.generate(**inputs, max_new_tokens=max_new_tokens)
 translations = tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    translations_path = os.path.join(output_dir, "translations.txt")
-    with open(translations_path, "w", encoding="utf-8") as fp:
-        fp.write("\n".join(translations))

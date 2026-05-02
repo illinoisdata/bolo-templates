@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set source_texts = ["I want to leave this room", "Hello world, my name is Nick"] %}
 {% set paraphrases = ["I want to go out of this room", "Hello world, my surname is Petrov"] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/s-nlp__SEP__Mutual_Implication_Score" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_texts = {{ source_texts }}
 paraphrases = {{ paraphrases }}
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
@@ -54,10 +52,3 @@ p_reverse = probs_reverse[:, entailment_id]
 scores = ((p_forward + p_reverse) / 2).tolist()
 
 RESULT = {"scores": scores}
-
-if __name__ == "__main__":
-    import os, json
-
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "scores.json"), "w") as f:
-        json.dump(RESULT["scores"], f)

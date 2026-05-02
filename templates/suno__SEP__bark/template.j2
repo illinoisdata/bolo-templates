@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "suno/bark" %}
 {% set text_prompt = "Hello, my name is Suno. Bark is speaking to demonstrate text-to-audio inference." %}
 {% set do_sample = true %}
 {% set temperature = 1.0 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/suno__SEP__bark" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_prompt = "{{ text_prompt }}"
 do_sample = {{ "True" if do_sample else "False" }}
 temperature = {{ temperature }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -33,10 +33,4 @@ if sampling_rate_value is None:
     sampling_rate_value = getattr(model.config, "sample_rate", 24000)
 sampling_rate = int(sampling_rate_value)
 
-output_path = Path(output_dir)
-
 RESULT = {"sampling_rate": sampling_rate, "audio": audio_array}
-
-if __name__ == "__main__":
-    output_path.mkdir(parents=True, exist_ok=True)
-    write_wav(output_path / "speech.wav", sampling_rate, audio_array)

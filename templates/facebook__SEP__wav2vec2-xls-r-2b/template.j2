@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/wav2vec2-xls-r-2b" %}
 {% set audio_path = '/u/yli77/projects/ML-code-generation/data/audio.wav' %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__wav2vec2-xls-r-2b' %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
-output_dir = "{{ output_dir }}"
 
 import io
 from pathlib import Path
@@ -52,13 +52,3 @@ for key, value in outputs.items():
         RESULT[key] = value.detach().cpu()
     else:
         RESULT[key] = value
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    for key, value in RESULT.items():
-        if isinstance(value, torch.Tensor):
-            torch.save(value, output_path / f"{key}.pt")
-        else:
-            with open(output_path / f"{key}.txt", "w", encoding="utf-8") as target_file:
-                target_file.write(str(value))

@@ -1,7 +1,8 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "jxm/gtr__nq__32" %}
 {% set text_query = "What is the capital of France?" %}
 {% set max_new_tokens = 64 %}
 {% set num_return_sequences = 1 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/jxm__SEP__gtr__nq__32" %}
 {% set tokenizer_id = "t5-base" %}
 
 repo_id = "{{ repo_id }}"
@@ -9,7 +10,6 @@ device = "{{ device }}"
 text_query = "{{ text_query }}"
 max_new_tokens = {{ max_new_tokens }}
 num_return_sequences = {{ num_return_sequences }}
-output_dir = "{{ output_dir }}"
 tokenizer_id = "{{ tokenizer_id }}"
 
 from pathlib import Path
@@ -49,10 +49,3 @@ with torch.no_grad():
 generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
 RESULT = {"generated_texts": generated_texts}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_texts.txt").write_text(
-        "\n".join(generated_texts), encoding="utf-8"
-    )

@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Babelscape/rebel-large" %}
 {% set text_input = "Punta Cana is a resort town in the municipality of Higüey, in La Altagracia Province, the eastern most province of the Dominican Republic." %}
 {% set max_length = 256 %}
 {% set min_length = 12 %}
@@ -5,7 +7,6 @@
 {% set num_return_sequences = 3 %}
 {% set length_penalty = 0 %}
 {% set early_stopping = true %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Babelscape__SEP__rebel-large" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -16,7 +17,6 @@ num_beams = {{ num_beams }}
 num_return_sequences = {{ num_return_sequences }}
 length_penalty = {{ length_penalty }}
 early_stopping = {{ early_stopping }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -47,7 +47,6 @@ generated_tokens = model.generate(
 )
 
 decoded_sequences = tokenizer.batch_decode(generated_tokens, skip_special_tokens=False)
-
 
 def extract_triplets_from_text(text: str):
     triplets = []
@@ -86,12 +85,3 @@ RESULT = {
     "generated_sequences": decoded_sequences,
     "extracted_triplets": extracted_triplets,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_sequences.txt").write_text(
-        "\n\n".join(decoded_sequences), encoding="utf-8"
-    )
-    with (output_path / "extracted_triplets.json").open("w", encoding="utf-8") as handle:
-        json.dump(extracted_triplets, handle, ensure_ascii=False, indent=2)

@@ -1,12 +1,10 @@
 {% set repo_id = "monologg/koelectra-base-discriminator" %}
 {% set device = "cuda:0" %}
 {% set input_text = "나는 방금 밥을 먹었다." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/monologg__SEP__koelectra-base-discriminator" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import json
@@ -34,9 +32,3 @@ token_predictions = [
 ]
 
 RESULT = {"token_predictions": token_predictions}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "token_predictions.json")
-    with open(output_path, "w", encoding="utf-8") as output_file:
-        json.dump(RESULT["token_predictions"], output_file, ensure_ascii=False, indent=2)

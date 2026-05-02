@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/bert_uncased_L-12_H-768_A-12" %}
 {% set text = "The capital of France is [MASK]." %}
 {% set top_k = 5 %}
 
@@ -29,9 +31,3 @@ top_k_indices = torch.topk(mask_token_logits, top_k, dim=1).indices[0].tolist()
 predicted_tokens = [tokenizer.decode([idx]).strip() for idx in top_k_indices]
 
 RESULT = {"predicted_tokens": predicted_tokens}
-
-if __name__ == "__main__":
-    output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-12_H-768_A-12"
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "predictions.json"), "w") as f:
-        json.dump(RESULT, f)

@@ -1,13 +1,11 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "microsoft/trocr-base-printed" %}
+{% set device = "cuda:0" %}
 {% set document_image_path = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__trocr-base-printed" %}
 {% set generate_max_length = 256 %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 document_image_path = "{{ document_image_path }}"
-output_dir = "{{ output_dir }}"
 generate_max_length = {{ generate_max_length }}
 
 from pathlib import Path
@@ -41,9 +39,3 @@ with torch.no_grad():
 generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    text_file = output_path / "generated_text.txt"
-    text_file.write_text(RESULT["generated_text"], encoding="utf-8")

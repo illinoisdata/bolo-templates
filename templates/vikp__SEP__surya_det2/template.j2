@@ -1,8 +1,8 @@
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/vikp__SEP__surya_det2" %}
+{% set device = "cuda:0" %}
+{% set repo_id = "vikp/surya_det2" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 image_path = "{{ image_path }}"
 
 from io import BytesIO
@@ -38,9 +38,3 @@ segmentation = seg_resized[0].cpu().numpy()
 segmentation_image = Image.fromarray(segmentation.astype("uint8"))
 
 RESULT = {"segmentation": segmentation_image}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    segmentation_path = output_path / "segmentation.png"
-    RESULT["segmentation"].save(segmentation_path)

@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Cohere/Cohere-embed-multilingual-v3.0" %}
 {% set texts = ["The capital of France is Paris", "PyTorch is a flexible deep learning framework", "Multilingual embeddings unlock powerful search"] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Cohere__SEP__Cohere-embed-multilingual-v3.0" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 texts = {{ texts | tojson }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -18,9 +18,3 @@ attention_mask = encoded_inputs["attention_mask"]
 tokens = [tokenizer.convert_ids_to_tokens(sequence) for sequence in input_ids]
 
 RESULT = {"input_ids": input_ids, "attention_mask": attention_mask, "tokens": tokens}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "tokenization.json")
-    with open(output_path, "w", encoding="utf-8") as output_file:
-        json.dump(RESULT, output_file, ensure_ascii=False, indent=2)

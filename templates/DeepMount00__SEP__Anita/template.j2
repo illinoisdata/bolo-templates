@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "DeepMount00/Anita" %}
 {% set sentences = [
     "Cosa faceva ogni sera Luca?",
     "Un cane felice corre nel parco, la coda ondeggiante al vento. Ogni erba, ogni farfalla, un'avventura. Occhi scintillanti, lingua penzolante, esplora gioiosamente, amato e coccolato dal suo fedele compagno umano. Insieme, condividono un legame indissolubile, tessuto di corse, giochi e affetto incondizionato.",
     "In un piccolo paesino circondato da colline verdeggianti e campi fioriti viveva una persona il cui sorriso era capace di illuminare la giornata più grigia. Questa persona, di nome Luca, aveva trovato la chiave della felicità nelle piccole gioie quotidiane: il profumo del caffè al mattino, il suono ridente dei bambini che giocavano in piazza, il tramonto che dipingeva il cielo di arancione e viola ogni sera."
 ] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/DeepMount00__SEP__Anita" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences }}
-output_dir = "{{ output_dir }}"
 
 import numpy as np
 import torch
@@ -48,9 +48,3 @@ RESULT = {
     "embeddings": embeddings_np,
     "similarity_matrix": similarity_matrix_np,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    np.save(output_path / "embeddings.npy", RESULT["embeddings"])
-    np.save(output_path / "similarity_matrix.npy", RESULT["similarity_matrix"])

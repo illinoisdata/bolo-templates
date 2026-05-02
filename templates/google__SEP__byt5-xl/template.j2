@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set source_text = "Life is like a box of chocolates." %}
 {% set max_length = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__byt5-xl" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = "{{ source_text }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -28,9 +26,3 @@ with torch.no_grad():
 generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(output_path, "w", encoding="utf-8") as output_file:
-        output_file.write(RESULT["generated_text"])

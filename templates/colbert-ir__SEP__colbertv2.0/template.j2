@@ -1,14 +1,12 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "colbert-ir/colbertv2.0" %}
+{% set device = "cuda:0" %}
 {% set query_text = "What is ColBERT retrieval?" %}
 {% set passage_text = "ColBERT uses contextual late interaction to compute dense passage representations." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/colbert-ir__SEP__colbertv2.0" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query_text = "{{ query_text }}"
 passage_text = "{{ passage_text }}"
-output_dir = "{{ output_dir }}"
 
 import numbers
 from pathlib import Path
@@ -18,11 +16,9 @@ import torch
 import torch.nn.functional as F
 from transformers import AutoModel, AutoTokenizer
 
-
 def tokenize_text(text: str):
     encoding = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
     return {key: value.to(torch_device) for key, value in encoding.items()}
-
 
 def mean_pooling(hidden_states: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
     mask = attention_mask.unsqueeze(-1).expand(hidden_states.size()).float()
@@ -30,7 +26,6 @@ def mean_pooling(hidden_states: torch.Tensor, attention_mask: torch.Tensor) -> t
     sum_embeddings = masked_hidden_states.sum(dim=1)
     mask_sum = mask.sum(dim=1).clamp(min=1e-9)
     return sum_embeddings / mask_sum
-
 
 torch_device = torch.device(device)
 
@@ -59,17 +54,3 @@ RESULT = {
     "passage_embedding": passage_embedding_np,
     "cosine_similarity": float(similarity_score),
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-
-    for key, value in RESULT.items():
-        if isinstance(value, np.ndarray):
-            np.save(output_path / f"{key}.npy", value)
-        elif isinstance(value, numbers.Real):
-            with open(output_path / f"{key}.txt", "w", encoding="utf-8") as file:
-                file.write(str(value))
-        else:
-            with open(output_path / f"{key}.txt", "w", encoding="utf-8") as file:
-                file.write(str(value))

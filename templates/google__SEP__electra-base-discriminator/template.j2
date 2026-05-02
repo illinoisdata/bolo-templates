@@ -1,12 +1,10 @@
 {% set repo_id = "google/electra-base-discriminator" %}
 {% set device = "cuda:0" %}
 {% set input_text = "The quick brown fox jumps over the lazy dog" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__electra-base-discriminator" %}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 input_text = {{ input_text | tojson }}
-output_dir = {{ output_dir | tojson }}
 
 import json
 from pathlib import Path
@@ -38,9 +36,3 @@ RESULT = {
     "logits": logits_list,
     "reality_predictions": predictions_list,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    with open(output_path / "result.json", "w", encoding="utf-8") as result_file:
-        json.dump(RESULT, result_file, ensure_ascii=False, indent=2)

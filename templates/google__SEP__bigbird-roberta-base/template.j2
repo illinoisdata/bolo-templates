@@ -1,8 +1,8 @@
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bigbird-roberta-base" %}
+{% set device = "cuda:0" %}
+{% set repo_id = "google/bigbird-roberta-base" %}
 {% set input_text = "Replace me by any text you'd like." %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 input_text = "{{ input_text }}"
 
 from pathlib import Path
@@ -37,15 +37,3 @@ RESULT = {
     "next_sentence_label": next_sentence_label,
     "next_sentence_logits": next_sentence_logits_cpu,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "masked_lm_text.txt").write_text(RESULT["masked_lm_text"], encoding="utf-8")
-    (output_path / "masked_lm_tokens.json").write_text(
-        json.dumps(RESULT["masked_lm_tokens"], ensure_ascii=False), encoding="utf-8"
-    )
-    (output_path / "next_sentence_label.txt").write_text(str(RESULT["next_sentence_label"]), encoding="utf-8")
-    (output_path / "next_sentence_logits.json").write_text(
-        json.dumps(RESULT["next_sentence_logits"], ensure_ascii=False), encoding="utf-8"
-    )

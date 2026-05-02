@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Narrativa/byt5-base-tweet-hate-detection" %}
 {% set tweet = "@user black lives really matter?" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Narrativa__SEP__byt5-base-tweet-hate-detection" %}
 {% set max_length = 512 %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 tweet = "{{ tweet }}"
-output_dir = "{{ output_dir }}"
 max_length = {{ max_length }}
 
 from pathlib import Path
@@ -29,8 +29,3 @@ _generated = _model.generate(input_ids=_input_ids, attention_mask=_attention_mas
 _prediction = _tokenizer.decode(_generated[0], skip_special_tokens=True)
 
 RESULT = {"prediction": _prediction}
-
-if __name__ == "__main__":
-    _output_path = Path(output_dir)
-    _output_path.mkdir(parents=True, exist_ok=True)
-    (_output_path / "prediction.txt").write_text(RESULT["prediction"], encoding="utf-8")

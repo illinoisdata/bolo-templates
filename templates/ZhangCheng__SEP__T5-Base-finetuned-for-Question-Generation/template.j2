@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "ZhangCheng/T5-Base-finetuned-for-Question-Generation" %}
 {% set answer = "ZhangCheng" %}
 {% set context = "ZhangCheng fine-tuned T5 on SQuAD dataset for question generation." %}
 {% set max_length = 64 %}
 {% set num_beams = 4 %}
-{% set output_dir = "./output" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -10,7 +11,6 @@ answer = """{{ answer }}"""
 context = """{{ context }}"""
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 from typing import Dict
@@ -39,10 +39,3 @@ RESULT: Dict[str, str] = {
     "answer": answer,
     "context": context,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    for key, value in RESULT.items():
-        file_path = os.path.join(output_dir, f"{key}.txt")
-        with open(file_path, "w", encoding="utf-8") as writer:
-            writer.write(value)

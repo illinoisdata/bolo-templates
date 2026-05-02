@@ -1,11 +1,9 @@
 {% set repo_id = "Qdrant/Splade_PP_en_v1" %}
 {% set device = "cuda:0" %}
 {% set input_texts = ["A curious cat is resting on the windowsill.", "A dog is running through the park on a sunny day."] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qdrant__SEP__Splade_PP_en_v1" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_texts = {{ input_texts }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -39,15 +37,3 @@ logits = outputs.logits
 logits = logits.detach().cpu().tolist()
 
 RESULT = {"logits": logits}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "logits.json")
-    with open(output_path, "w", encoding="utf-8") as output_file:
-        json.dump(
-            {
-                "input_texts": input_texts,
-                "logits": logits,
-            },
-            output_file,
-        )

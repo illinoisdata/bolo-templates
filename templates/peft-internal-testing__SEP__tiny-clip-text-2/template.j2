@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "peft-internal-testing/tiny-clip-text-2" %}
 {% set prompt = "A minimalist description of a cat" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/peft-internal-testing__SEP__tiny-clip-text-2" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import json
@@ -34,9 +34,3 @@ text_embeddings = outputs.text_embeds
 text_embeddings = text_embeddings[0].cpu().tolist()
 
 RESULT = {"text_embeddings": text_embeddings}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    with (output_path / "text_embeddings.json").open("w", encoding="utf-8") as handle:
-        json.dump(RESULT["text_embeddings"], handle)

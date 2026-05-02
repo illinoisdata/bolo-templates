@@ -3,13 +3,11 @@
 {% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
 {% set prompt = "<|audio_bos|><|AUDIO|><|audio_eos|>Generate the caption in English:" %}
 {% set max_length = 256 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qwen__SEP__Qwen2-Audio-7B" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
 prompt = "{{ prompt }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 from io import BytesIO
 from pathlib import Path
@@ -48,9 +46,3 @@ response = processor.batch_decode(
 )[0]
 
 RESULT = {"generated_text": response}
-
-if __name__ == "__main__":
-    target_dir = Path(output_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-    text_path = target_dir / "generated_text.txt"
-    text_path.write_text(RESULT["generated_text"], encoding="utf-8")

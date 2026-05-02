@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/mms-1b" %}
 {% set audio_path = '/u/yli77/projects/ML-code-generation/data/audio.wav' %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mms-1b' %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
-output_dir = "{{ output_dir }}"
 
 import os
 from io import BytesIO
@@ -20,7 +20,6 @@ feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
 model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
 model.eval()
 
-
 def _load_audio(path: str):
     if path.startswith("http://") or path.startswith("https://"):
         response = requests.get(path)
@@ -31,7 +30,6 @@ def _load_audio(path: str):
     if data.ndim > 1:
         data = data.mean(axis=1)
     return data, sampling_rate
-
 
 audio_data, sampling_rate = _load_audio(audio_path)
 if sampling_rate != feature_extractor.sampling_rate:
@@ -57,10 +55,3 @@ for key, value in outputs.__dict__.items():
     else:
         processed_outputs[key] = value
 RESULT = {"model_outputs": processed_outputs}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(
-        os.path.join(output_dir, "model_outputs.npy"),
-        RESULT["model_outputs"],
-    )

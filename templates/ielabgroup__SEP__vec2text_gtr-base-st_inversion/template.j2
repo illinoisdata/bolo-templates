@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "ielabgroup/vec2text_gtr-base-st_inversion" %}
 {% set prompt = "Summarize the potential research applications of text inversion models." %}
 {% set max_length = 64 %}
 {% set num_beams = 4 %}
@@ -69,9 +71,3 @@ with torch.no_grad():
 generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_dir = Path(output_path)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    text_output = "\n".join(RESULT["generated_text"])
-    (output_dir / "generated_text.txt").write_text(text_output, encoding="utf-8")

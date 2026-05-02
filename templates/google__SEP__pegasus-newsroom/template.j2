@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/pegasus-newsroom" %}
 {% set text_input = "The city council debated a new budget proposal that allocates additional funding to public health, infrastructure, and education. The plan also creates a small business grant program to support struggling entrepreneurs in under-resourced neighborhoods." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__pegasus-newsroom" %}
 {% set max_summary_length = 128 %}
 {% set min_summary_length = 32 %}
 {% set num_beams = 4 %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_input = {{ text_input | tojson }}
-output_dir = {{ output_dir | tojson }}
 max_summary_length = {{ max_summary_length }}
 min_summary_length = {{ min_summary_length }}
 num_beams = {{ num_beams }}
@@ -41,9 +41,3 @@ generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=Tr
 summary = generated_text[0].strip()
 
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    summary_path = output_path / "summary.txt"
-    summary_path.write_text(RESULT["summary"], encoding="utf-8")

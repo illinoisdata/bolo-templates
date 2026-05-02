@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "ddobokki/ko-trocr" %}
 {% set image_path = image_path | default('/u/yli77/projects/ML-code-generation/data/image1.jpeg') %}
-{% set output_dir = output_dir | default('/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ddobokki__SEP__ko-trocr') %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-output_dir = "{{ output_dir }}"
 
 import os
 from io import BytesIO
@@ -36,8 +36,3 @@ generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 generated_text = unicodedata.normalize("NFC", generated_text)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    text_path = Path(output_dir) / "generated_text.txt"
-    text_path.write_text(RESULT["generated_text"], encoding="utf-8")

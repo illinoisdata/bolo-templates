@@ -1,10 +1,8 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Riksarkivet__SEP__trocr-base-handwritten-hist-swe-2" %}
+{% set repo_id = "Riksarkivet/trocr-base-handwritten-hist-swe-2" %}
+{% set device = "cuda:0" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 
 import os
 from pathlib import Path
@@ -18,7 +16,3 @@ print("encoder device", next(model.encoder.parameters()).device)
 print("decoder device", next(model.decoder.parameters()).device)
 
 RESULT = {"status": "debug"}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    Path(output_dir, "debug.txt").write_text("debug done", encoding="utf-8")

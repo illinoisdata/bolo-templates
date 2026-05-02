@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "sshleifer/distill-pegasus-cnn-16-4" %}
 {% set input_text = "The government announced a new climate initiative that aims to reduce emissions substantially while boosting renewable energy infrastructure." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/sshleifer__SEP__distill-pegasus-cnn-16-4" %}
 {% set generation_max_length = 128 %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""
-output_dir = "{{ output_dir }}"
 generation_max_length = {{ generation_max_length }}
 
 from pathlib import Path
@@ -30,8 +30,3 @@ summary = tokenizer.batch_decode(
 )[0].strip()
 
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    out_dir = Path(output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

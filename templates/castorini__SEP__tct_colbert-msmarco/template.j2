@@ -1,13 +1,13 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "castorini/tct_colbert-msmarco" %}
 {% set input_text = "What is dense retrieval?" %}
 {% set max_length = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/castorini__SEP__tct_colbert-msmarco" %}
 {% set tokenizer_repo = "bert-base-uncased" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 tokenizer_repo = "{{ tokenizer_repo }}"
 
 import numpy as np
@@ -34,8 +34,3 @@ with torch.inference_mode():
 embedding = outputs.last_hidden_state.mean(dim=1)
 embedding = embedding.cpu().numpy()
 RESULT = {"embedding": embedding}
-
-if __name__ == "__main__":
-    output_dir_path = Path(output_dir)
-    output_dir_path.mkdir(parents=True, exist_ok=True)
-    np.save(output_dir_path / "embedding.npy", RESULT["embedding"])

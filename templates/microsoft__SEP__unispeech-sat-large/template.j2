@@ -1,12 +1,10 @@
 {% set repo_id = "microsoft/unispeech-sat-large" %}
 {% set device = "cuda:0" %}
 {% set audio_file = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__unispeech-sat-large" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_file = "{{ audio_file }}"
-output_dir = "{{ output_dir }}"
 
 import requests
 import io
@@ -46,18 +44,3 @@ with torch.no_grad():
 
 # Post-process outputs to dict
 RESULT = vars(outputs)
-
-if __name__ == "__main__":
-    import os
-    import json
-    import numpy as np
-
-    os.makedirs(output_dir, exist_ok=True)
-    for name, value in RESULT.items():
-        if isinstance(value, torch.Tensor):
-            file_path = os.path.join(output_dir, f"{name}.npy")
-            np.save(file_path, value.cpu().numpy())
-        else:
-            file_path = os.path.join(output_dir, f"{name}.json")
-            with open(file_path, "w") as f:
-                json.dump(value, f)

@@ -27,12 +27,3 @@ generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 # Build result dict
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    from pathlib import Path
-
-    output_dir = Path("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Salesforce__SEP__codet5-base")
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Save generated text to file
-    (output_dir / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

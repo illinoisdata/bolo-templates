@@ -1,11 +1,9 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "dmis-lab/biosyn-biobert-ncbi-disease" %}
+{% set device = "cuda:0" %}
 {% set text_input = "The patient showed symptoms of an emerging respiratory disease." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/dmis-lab__SEP__biosyn-biobert-ncbi-disease" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
-output_dir = "{{ output_dir }}"
 import json
 from pathlib import Path
 
@@ -61,10 +59,3 @@ for idx, (token, offset) in enumerate(zip(tokens, offset_mapping)):
     )
 
 RESULT = {"entities": entities}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    result_path = output_path / "entities.json"
-    with result_path.open("w", encoding="utf-8") as result_file:
-        json.dump(RESULT["entities"], result_file, ensure_ascii=False, indent=2)

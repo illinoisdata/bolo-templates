@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
 {% set sampling_rate = 24000 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hubertsiuzdak__SEP__snac_24khz" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
 sampling_rate = {{ sampling_rate }}
-output_dir = "{{ output_dir }}"
 
 import os
 import requests
@@ -41,9 +39,3 @@ audio_hat = audio_hat.squeeze(0).cpu()
 codes = [code.cpu().numpy().tolist() for code in codes]
 
 RESULT = {"audio_hat": audio_hat, "codes": codes}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    torchaudio.save(os.path.join(output_dir, "audio_hat.wav"), RESULT["audio_hat"], sampling_rate)
-    with open(os.path.join(output_dir, "codes.json"), "w") as f:
-        json.dump(RESULT["codes"], f)

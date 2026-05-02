@@ -6,7 +6,6 @@
 {% set max_length = 8192 %}
 {% set prefix = "<|im_start|>system\nJudge whether the Document meets the requirements based on the Query and the Instruct provided. Note that the answer can only be \"yes\" or \"no\".<|im_end|>\n<|im_start|>user\n" %}
 {% set suffix = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qwen__SEP__Qwen3-Reranker-8B" %}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
@@ -16,7 +15,6 @@ documents = {{ documents | tojson }}
 max_length = {{ max_length }}
 prefix = {{ prefix | tojson }}
 suffix = {{ suffix | tojson }}
-output_dir = {{ output_dir | tojson }}
 
 import os
 import json
@@ -40,7 +38,6 @@ def format_instruction(instruction, query, doc):
     output = f"<Instruct>: {instruction}\n<Query>: {query}\n<Document>: {doc}"
     return output
 
-
 def process_inputs(pairs):
     inputs = tokenizer(
         pairs,
@@ -61,7 +58,6 @@ def process_inputs(pairs):
         inputs[key] = inputs[key].to(device)
     return inputs
 
-
 @torch.no_grad()
 def compute_logits(inputs):
     batch_scores = model(**inputs).logits[:, -1, :]
@@ -79,8 +75,3 @@ scores = compute_logits(inputs)
 
 # Build result dict
 RESULT = {"scores": scores}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "scores.json"), "w") as f:
-        json.dump(RESULT["scores"], f)

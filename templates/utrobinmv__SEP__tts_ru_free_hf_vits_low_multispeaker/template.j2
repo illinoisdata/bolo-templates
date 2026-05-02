@@ -5,7 +5,6 @@
 {% set seed = 555 %}
 {% set accent_model_size = "turbo" %}
 {% set accent_use_dictionary = True %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/utrobinmv__SEP__tts_ru_free_hf_vits_low_multispeaker" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -14,7 +13,6 @@ speaker_id = {{ speaker_id }}
 seed = {{ seed }}
 accent_model_size = "{{ accent_model_size }}"
 accent_use_dictionary = {{ accent_use_dictionary }}
-output_dir = "{{ output_dir }}"
 
 from transformers import VitsModel, AutoTokenizer, set_seed
 import torch
@@ -40,8 +38,3 @@ with torch.no_grad():
     waveform = waveform.detach().cpu().numpy()[0]
 
 RESULT = {"waveform": waveform, "sampling_rate": model.config.sampling_rate}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    filepath = os.path.join(output_dir, "tts_audio.wav")
-    scipy.io.wavfile.write(filepath, rate=RESULT["sampling_rate"], data=RESULT["waveform"])

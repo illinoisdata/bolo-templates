@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-sn-en" %}
 {% set source_text = "Mhoro nyika" %}
 {% set max_length = 128 %}
 {% set num_beams = 5 %}
@@ -37,7 +39,3 @@ translated_text = translation[0]
 RESULT = {"translation": translated_text}
 
 OUTPUT_DIR = Path("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-sn-en")
-
-if __name__ == "__main__":
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    (OUTPUT_DIR / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

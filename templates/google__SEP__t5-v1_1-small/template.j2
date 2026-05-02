@@ -1,12 +1,10 @@
 {% set repo_id = "google/t5-v1_1-small" %}
 {% set device = "cuda:0" %}
 {% set input_text = "The quick brown fox jumps over the lazy dog." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__t5-v1_1-small" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
@@ -22,9 +20,3 @@ generated_ids = model.generate(**inputs)
 generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    file_path = os.path.join(output_dir, "generated_text.txt")
-    with open(file_path, "w") as f:
-        f.write(RESULT["generated_text"])

@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-eu-es" %}
 {% set text = "Nola zaude?" %}
 {% set max_new_tokens = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-eu-es" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
@@ -24,8 +24,3 @@ translation = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 RESULT = {
     "translation": translation,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

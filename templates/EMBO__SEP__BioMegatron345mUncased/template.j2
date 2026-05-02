@@ -1,14 +1,13 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "EMBO/BioMegatron345mUncased" %}
 {% set input_text = "The capital of France is [MASK]." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/EMBO__SEP__BioMegatron345mUncased" %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 input_text = {{ input_text | tojson }}
-output_dir = {{ output_dir | tojson }}
 
 import torch
 from pathlib import Path
 from transformers import AutoModelForMaskedLM, AutoTokenizer
-
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
@@ -40,13 +39,3 @@ RESULT = {
     "predicted_mask_token_ids": predicted_mask_token_ids,
     "mask_positions": mask_positions,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    tokens_path = output_path / "predicted_mask_tokens.txt"
-    tokens_path.write_text("\n".join(RESULT["predicted_mask_tokens"]))
-    token_ids_path = output_path / "predicted_mask_token_ids.txt"
-    token_ids_path.write_text(",".join(str(token_id) for token_id in RESULT["predicted_mask_token_ids"]))
-    positions_path = output_path / "mask_positions.txt"
-    positions_path.write_text(",".join(str(position) for position in RESULT["mask_positions"]))

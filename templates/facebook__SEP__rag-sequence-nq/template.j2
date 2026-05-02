@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/rag-sequence-nq" %}
 {% set question = "how many countries are in europe" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__rag-sequence-nq" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 question = "{{ question }}"
-output_dir = "{{ output_dir }}"
 from pathlib import Path
 from transformers import RagRetriever, RagSequenceForGeneration, RagTokenizer
 
@@ -23,8 +23,3 @@ answer = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 # Inference results are stored in this dict for downstream evaluation
 RESULT = {"answer": answer}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "answer.txt").write_text(answer, encoding="utf-8")

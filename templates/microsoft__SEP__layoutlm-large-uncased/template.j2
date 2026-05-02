@@ -1,15 +1,13 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "microsoft/layoutlm-large-uncased" %}
+{% set device = "cuda:0" %}
 {% set words = ["Invoice", "Date", "Amount", "Total", "."] %}
 {% set bounding_boxes = [[0, 0, 50, 50], [60, 0, 110, 50], [0, 60, 80, 110], [90, 60, 140, 110], [150, 60, 170, 80]] %}
 {% set max_length = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__layoutlm-large-uncased" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 words = {{ words | tojson }}
 bounding_boxes = {{ bounding_boxes | tojson }}
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModel
 import numpy as np
@@ -39,7 +37,3 @@ with torch.no_grad():
 
 last_hidden_state = model_output.last_hidden_state.detach().cpu()
 RESULT = {"last_hidden_state": last_hidden_state}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "last_hidden_state.npy"), RESULT["last_hidden_state"].numpy())

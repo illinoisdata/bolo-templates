@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Kirili4ik/mbart_ruDialogSum" %}
 {% set input_text = "Джефф: Могу ли я обучить модель 🤗 Transformers на Amazon SageMaker?\n\nФилипп: Конечно, вы можете использовать новый контейнер для глубокого обучения HuggingFace.\n\nДжефф: Хорошо.\n\nДжефф: и как я могу начать?\n\nДжефф: где я могу найти документацию?\n\nФилипп: ок, ок, здесь можно найти все: https://huggingface.co/blog/the-partnership-amazon-sagemaker-and-hugging-face" %}
 {% set summary_max_length = 600 %}
 {% set num_beams = 5 %}
 {% set no_repeat_ngram_size = 3 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Kirili4ik__SEP__mbart_ruDialogSum" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -10,7 +11,6 @@ input_text = """{{ input_text }}"""
 summary_max_length = {{ summary_max_length }}
 num_beams = {{ num_beams }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -43,8 +43,3 @@ with torch.no_grad():
 summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
 
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "summary.txt").write_text(summary, encoding="utf-8")

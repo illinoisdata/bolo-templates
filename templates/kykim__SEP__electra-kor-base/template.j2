@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "kykim/electra-kor-base" %}
 {% set sample_text = "이것은 Electra 기반 모델 테스트 문장입니다." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/kykim__SEP__electra-kor-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sample_text = "{{ sample_text }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import json
@@ -40,14 +40,3 @@ RESULT = {
     "masked_lm_predictions": predicted_tokens,
     "masked_lm_confidences": confidences,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "tokens.txt").write_text("\n".join(RESULT["tokens"]), encoding="utf-8")
-    (output_path / "masked_lm_predictions.txt").write_text(
-        "\n".join(RESULT["masked_lm_predictions"]),
-        encoding="utf-8",
-    )
-    with (output_path / "masked_lm_confidences.json").open("w", encoding="utf-8") as confidence_file:
-        json.dump(RESULT["masked_lm_confidences"], confidence_file, ensure_ascii=False, indent=2)

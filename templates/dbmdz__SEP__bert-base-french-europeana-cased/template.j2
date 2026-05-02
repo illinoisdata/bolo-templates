@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "dbmdz/bert-base-french-europeana-cased" %}
 {% set input_text = input_text | default("Bonjour, voici un exemple de texte en français pour tester le modèle de langage.") %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/dbmdz__SEP__bert-base-french-europeana-cased") %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 input_text = {{ input_text | tojson }}
-output_dir = {{ output_dir | tojson }}
 
 import os
 
@@ -29,9 +29,3 @@ RESULT = {
     "last_hidden_state": last_hidden_state,
     "pooled_output": pooled_output,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    torch.save(RESULT["last_hidden_state"], os.path.join(output_dir, "last_hidden_state.pt"))
-    if RESULT["pooled_output"] is not None:
-        torch.save(RESULT["pooled_output"], os.path.join(output_dir, "pooled_output.pt"))

@@ -1,12 +1,10 @@
 {% set repo_id = "moussaKam/barthez-orangesum-title" %}
 {% set device = "cuda:0" %}
 {% set text_input = "Citant les préoccupations de ses clients dénonçant des cas de censure, un fournisseur d'accès Internet de l'État de l'Idaho a décidé de bloquer Facebook et Twitter pour les clients mécontents de la politique de ces réseaux sociaux." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/moussaKam__SEP__barthez-orangesum-title" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""
-output_dir = "{{ output_dir }}"
 
 from huggingface_hub import hf_hub_download
 from transformers import PreTrainedTokenizerFast, AutoModelForSeq2SeqLM
@@ -60,9 +58,3 @@ decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_
 generated_title = decoded[0].strip()
 
 RESULT = {"generated_title": generated_title}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    result_path = os.path.join(output_dir, "generated_title.json")
-    with open(result_path, "w", encoding="utf-8") as file:
-        json.dump(RESULT, file, ensure_ascii=False, indent=2)

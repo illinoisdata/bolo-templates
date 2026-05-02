@@ -58,11 +58,3 @@ generated_ids = model.generate(
 
 answers = tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
 RESULT = {"answers": answers}
-
-if __name__ == "__main__":
-    output_dir = Path("output")
-    output_dir.mkdir(exist_ok=True)
-    answers_file = output_dir / "answers.txt"
-    with open(answers_file, "w", encoding="utf-8") as f:
-        for ans in RESULT["answers"]:
-            f.write(ans + "\n")

@@ -5,7 +5,6 @@
 {% set max_input_length = 512 %}
 {% set max_summary_length = 84 %}
 {% set beam_size = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/csebuetnlp__SEP__mT5_m2m_crossSum_enhanced" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -14,7 +13,6 @@ target_language = "{{ target_language }}"
 max_input_length = {{ max_input_length }}
 max_summary_length = {{ max_summary_length }}
 beam_size = {{ beam_size }}
-output_dir = "{{ output_dir }}"
 
 import os
 import re
@@ -59,9 +57,3 @@ summary = tokenizer.decode(
 )
 
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    summary_path = os.path.join(output_dir, "summary.txt")
-    with open(summary_path, "w", encoding="utf-8") as buffer:
-        buffer.write(RESULT["summary"])

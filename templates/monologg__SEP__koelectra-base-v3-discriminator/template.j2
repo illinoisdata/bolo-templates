@@ -1,11 +1,9 @@
-{% set repo_id = repo_id | default("monologg/koelectra-base-v3-discriminator") %}
-{% set device = device | default("cuda:0") %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/monologg__SEP__koelectra-base-v3-discriminator") %}
+{% set repo_id = "monologg/koelectra-base-v3-discriminator" %}
+{% set device = "cuda:0" %}
 {% set text = text | default("나는 내일 밥을 먹었다.") %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 text = "{{ text }}"
 
 from transformers import AutoModelForPreTraining, ElectraTokenizer
@@ -33,8 +31,3 @@ preds = preds.tolist()[1:-1]
 predictions = [{"token": t, "prediction": p} for t, p in zip(tokens, preds)]
 
 RESULT = {"predictions": predictions}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "predictions.json"), "w", encoding="utf-8") as f:
-        json.dump(RESULT["predictions"], f, ensure_ascii=False, indent=2)

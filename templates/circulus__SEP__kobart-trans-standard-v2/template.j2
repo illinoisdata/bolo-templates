@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "circulus/kobart-trans-standard-v2" %}
 {% set text = "안녕하세요. 이 문장을 영어로 번역해주세요." %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/circulus__SEP__kobart-trans-standard-v2" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -24,8 +24,3 @@ with torch.no_grad():
     translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    output_dir_path = Path(output_dir)
-    output_dir_path.mkdir(parents=True, exist_ok=True)
-    (output_dir_path / "translation.txt").write_text(translation, encoding="utf-8")

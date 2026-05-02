@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/wav2vec2-conformer-rel-pos-large" %}
 {% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
 {% set expected_sample_rate = 16000 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__wav2vec2-conformer-rel-pos-large" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
 expected_sample_rate = {{ expected_sample_rate }}
-output_dir = "{{ output_dir }}"
 
 import io
 from pathlib import Path
@@ -17,10 +17,8 @@ import torch
 import torchaudio.functional as F
 from transformers import AutoFeatureExtractor, AutoModelForPreTraining
 
-
 def _is_url(source: str) -> bool:
     return source.startswith("http://") or source.startswith("https://")
-
 
 def _load_waveform(source: str) -> torch.Tensor:
     if _is_url(source):
@@ -40,7 +38,6 @@ def _load_waveform(source: str) -> torch.Tensor:
         waveform_tensor = F.resample(shaped, sample_rate, expected_sample_rate).squeeze(0)
     return waveform_tensor
 
-
 feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
 model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
 model.eval()
@@ -59,9 +56,3 @@ RESULT = {
     name: value.detach().cpu() if isinstance(value, torch.Tensor) else value
     for name, value in outputs.items()
 }
-
-if __name__ == "__main__":
-    directory = Path(output_dir)
-    directory.mkdir(parents=True, exist_ok=True)
-    for key, value in RESULT.items():
-        torch.save(value, directory / f"{key}.pt")

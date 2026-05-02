@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "nealcly/detection-longformer" %}
 {% set text_input = "The quick brown fox jumps over the lazy dog." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/nealcly__SEP__detection-longformer" %}
 {% set max_length = 4096 %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""
-output_dir = "{{ output_dir }}"
 max_length = {{ max_length }}
 
 from pathlib import Path
@@ -56,10 +56,3 @@ RESULT = {
     "label_id": predicted_id,
     "scores": [float(value) for value in probabilities.tolist()],
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    result_file = output_path / "result.json"
-    with result_file.open("w", encoding="utf-8") as f:
-        json.dump(RESULT, f, ensure_ascii=False, indent=2)

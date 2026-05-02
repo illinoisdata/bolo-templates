@@ -3,14 +3,12 @@
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set max_length = 16 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/nlpconnect__SEP__vit-gpt2-image-captioning" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import io
@@ -46,9 +44,3 @@ captions = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
 captions = [caption.strip() for caption in captions]
 
 RESULT = {"captions": captions}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    captions_file = output_path / "captions.txt"
-    captions_file.write_text("\n".join(RESULT["captions"]), encoding="utf-8")

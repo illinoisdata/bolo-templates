@@ -3,13 +3,11 @@
 {% set text_input = "Please evaluate the toxicity of the following statement: I hate you." %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Kyle1668__SEP__boss-toxicity-t5-large" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -25,8 +23,3 @@ generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num
 generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"toxicity_assessment": generated_text}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    output_path = Path(output_dir) / "toxicity_assessment.txt"
-    output_path.write_text(RESULT["toxicity_assessment"], encoding="utf-8")

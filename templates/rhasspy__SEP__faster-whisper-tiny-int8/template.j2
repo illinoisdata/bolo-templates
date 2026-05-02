@@ -1,12 +1,10 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "rhasspy/faster-whisper-tiny-int8" %}
+{% set device = "cuda:0" %}
 {% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/rhasspy__SEP__faster-whisper-tiny-int8") %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
-output_dir = "{{ output_dir }}"
 
 import io
 from pathlib import Path
@@ -46,8 +44,3 @@ segments, _ = model.transcribe(audio_tensor.numpy())
 transcription = " ".join(segment.text.strip() for segment in segments).strip()
 
 RESULT = {"transcription": transcription}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "transcription.txt").write_text(RESULT["transcription"], encoding="utf-8")

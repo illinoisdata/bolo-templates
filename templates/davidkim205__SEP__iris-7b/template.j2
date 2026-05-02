@@ -1,6 +1,5 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/davidkim205__SEP__iris-7b" %}
+{% set repo_id = "davidkim205/iris-7b" %}
+{% set device = "cuda:0" %}
 {% set direction = "ko2en" %}
 {% set text = "아이리스는 딥러닝을 기반으로 한 한-영어 문장 번역을 위한 모델이다." %}
 {% set max_new_tokens = 2048 %}
@@ -9,7 +8,6 @@
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 direction = "{{ direction }}"
 text = "{{ text }}"
 max_new_tokens = {{ max_new_tokens }}
@@ -52,8 +50,3 @@ result = tokenizer.decode(output_tokens)
 
 # Build RESULT
 RESULT = {"translation": result}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "translation.txt"), "w", encoding="utf-8") as f:
-        f.write(RESULT["translation"])

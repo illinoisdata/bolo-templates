@@ -1,16 +1,14 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "castorini/monot5-base-msmarco" %}
+{% set device = "cuda:0" %}
 {% set query = "What is document reranking?" %}
 {% set document = "Monot5 is a T5-base reranker fine-tuned on MS MARCO passages." %}
 {% set max_new_tokens = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/castorini__SEP__monot5-base-msmarco" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query = "{{ query }}"
 document = """{{ document }}"""
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -29,8 +27,3 @@ with torch.no_grad():
 generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True).strip()
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    destination = Path(output_dir)
-    destination.mkdir(parents=True, exist_ok=True)
-    (destination / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

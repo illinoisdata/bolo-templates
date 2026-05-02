@@ -1,12 +1,10 @@
 {% set repo_id = "google/bert_uncased_L-4_H-256_A-4" %}
 {% set device = "cuda:0" %}
 {% set text = "The capital of France is <mask>." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-4_H-256_A-4" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import json
@@ -38,8 +36,3 @@ tokens = tokenizer.convert_ids_to_tokens(indices)
 predictions = [{"token": token, "score": score} for token, score in zip(tokens, scores)]
 
 RESULT = {"predictions": predictions}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "predictions.json"), "w") as f:
-        json.dump(RESULT["predictions"], f)

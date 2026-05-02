@@ -1,8 +1,8 @@
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/german-nlp-group__SEP__electra-base-german-uncased" %}
+{% set device = "cuda:0" %}
+{% set repo_id = "german-nlp-group/electra-base-german-uncased" %}
 {% set text_input = "Das ist ein Beispielsatz für die Inferenz mit dem Electra-Modell." %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 text_input = "{{ text_input }}"
 
 import json
@@ -33,11 +33,3 @@ RESULT = {
     "predicted_token_ids": predicted_token_ids.tolist(),
     "logits": logits.detach().cpu().tolist(),
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    for name, value in RESULT.items():
-        file_path = output_path / f"{name}.json"
-        with file_path.open("w", encoding="utf-8") as output_file:
-            json.dump(value, output_file, ensure_ascii=False, indent=2)

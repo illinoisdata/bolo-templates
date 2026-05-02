@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "tsystems/colqwen2.5-3b-base" %}
 {% set text_prompt = "Describe the content of the image in one sentence." %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/tsystems__SEP__colqwen2.5-3b-base" %}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_prompt = {{ text_prompt | tojson }}
 image_path = {{ image_path | tojson }}
-output_dir = {{ output_dir | tojson }}
 
 import io
 from pathlib import Path
@@ -38,8 +38,3 @@ with torch.inference_mode():
 pooled_embedding = outputs.last_hidden_state[:, 0, :].to(torch.float32).detach().cpu()
 
 RESULT = {"pooled_embedding": pooled_embedding}
-
-if __name__ == "__main__":
-    target_dir = Path(output_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-    np.save(target_dir / "pooled_embedding.npy", RESULT["pooled_embedding"].numpy())

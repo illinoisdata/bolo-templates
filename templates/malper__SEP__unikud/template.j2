@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set input_text = "שלום עולם" %}
 {% set max_length = 512 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/malper__SEP__unikud" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 import numpy as np
 import torch
@@ -33,8 +31,3 @@ with torch.inference_mode():
 
 last_hidden_state = outputs.last_hidden_state.detach().cpu().numpy()
 RESULT = {"last_hidden_state": last_hidden_state}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(output_path / "last_hidden_state.npz", last_hidden_state=RESULT["last_hidden_state"])

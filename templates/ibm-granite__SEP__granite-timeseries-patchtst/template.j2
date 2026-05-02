@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "ibm-granite/granite-timeseries-patchtst" %}
 {% set historical_values = [[0.0] * 7] * 512 %}
 {% set forecast_horizon = 96 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ibm-granite__SEP__granite-timeseries-patchtst" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 historical_values = {{ historical_values }}
 forecast_horizon = {{ forecast_horizon }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -41,8 +41,3 @@ if isinstance(forecast_tensor, torch.Tensor):
 else:
     forecast_array = np.asarray(forecast_tensor)
 RESULT = {"forecast": forecast_array}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    np.save(output_path / "forecast.npy", RESULT["forecast"])

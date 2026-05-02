@@ -1,5 +1,5 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "Qwen/Qwen3-VL-Reranker-2B" %}
+{% set device = "cuda:0" %}
 {% set instruction = "Retrieve images or text relevant to the user's query." %}
 {% set query_text = "A woman playing with her dog on a beach at sunset." %}
 {% set image1 = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
@@ -8,7 +8,6 @@
     {"image": image1},
     {"text": "A woman shares a joyful moment with her golden retriever on a sun-drenched beach at sunset, as the dog offers its paw in a heartwarming display of companionship and trust.", "image": image1}
 ] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qwen__SEP__Qwen3-VL-Reranker-2B" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -16,7 +15,6 @@ instruction = "{{ instruction }}"
 query_text = "{{ query_text }}"
 image1 = "{{ image1 }}"
 documents = {{ documents | tojson }}
-output_dir = "{{ output_dir }}"
 
 import os
 from pathlib import Path
@@ -90,10 +88,3 @@ for sequence in raw_sequences:
         scores.append(text)
 
 RESULT = {"scores": scores}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = Path(output_dir) / "scores.json"
-    with open(output_path, "w") as f:
-        import json
-        json.dump(RESULT["scores"], f)

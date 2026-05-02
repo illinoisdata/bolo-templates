@@ -1,8 +1,8 @@
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/deepset__SEP__bert-small-mm_retrieval-passage_encoder" %}
+{% set device = "cuda:0" %}
+{% set repo_id = "deepset/bert-small-mm_retrieval-passage_encoder" %}
 {% set text_passage = "In dense passage retrieval tasks, context passages are embedded by specialized encoders to facilitate efficient nearest-neighbor search." %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 text_passage = """{{ text_passage }}"""
 
 import json
@@ -30,9 +30,3 @@ pooler_output = model_outputs.pooler_output
 context_embedding = pooler_output[0].detach().cpu().tolist()
 
 RESULT = {"context_embedding": context_embedding}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    embedding_path = os.path.join(output_dir, "context_embedding.json")
-    with open(embedding_path, "w", encoding="utf-8") as output_file:
-        json.dump(RESULT["context_embedding"], output_file)

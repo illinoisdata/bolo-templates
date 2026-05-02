@@ -1,16 +1,15 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "abhigoyal/vllm-medusa-llama-68m-random" %}
 {% set check_name = "medusa" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/abhigoyal__SEP__vllm-medusa-llama-68m-random" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 check_name = "{{ check_name }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
 import torch
 import transformers
-
 
 exists = hasattr(transformers.models, check_name)
 found_items = []
@@ -19,9 +18,3 @@ if exists:
     found_items = [name for name in dir(module) if name.endswith("Model")]
 
 RESULT = {"exists": exists, "found_items": found_items}
-
-
-if __name__ == "__main__":
-    destination = Path(output_dir)
-    destination.mkdir(parents=True, exist_ok=True)
-    (destination / "medusa_check.txt").write_text(str(RESULT))

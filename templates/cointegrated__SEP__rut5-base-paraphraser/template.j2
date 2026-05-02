@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "cointegrated/rut5-base-paraphraser" %}
 {% set prompt = "Каждый охотник желает знать, где сидит фазан." %}
 {% set num_beams = 5 %}
 {% set encoder_no_repeat_ngram_size = 4 %}
@@ -5,7 +7,6 @@
 {% set length_factor = 1.5 %}
 {% set length_offset = 10 %}
 {% set max_length_cap = 256 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/cointegrated__SEP__rut5-base-paraphraser" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -16,7 +17,6 @@ do_sample = {{ do_sample }}
 length_factor = {{ length_factor }}
 length_offset = {{ length_offset }}
 max_length_cap = {{ max_length_cap }}
-output_dir = "{{ output_dir }}"
 
 import os
 
@@ -42,9 +42,3 @@ generated_ids = model.generate(
 paraphrase = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"paraphrase": paraphrase}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "paraphrase.txt")
-    with open(output_path, "w", encoding="utf-8") as writer:
-        writer.write(RESULT["paraphrase"])

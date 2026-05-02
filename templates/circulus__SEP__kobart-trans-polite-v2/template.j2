@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "circulus/kobart-trans-polite-v2" %}
 {% set text_input = "안녕하세요. 오늘 하루 어떠세요?" %}
 {% set max_new_tokens = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/circulus__SEP__kobart-trans-polite-v2" %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_input = {{ text_input | tojson }}
 max_new_tokens = {{ max_new_tokens }}
-output_dir = {{ output_dir | tojson }}
 
 import os
 
@@ -22,9 +22,3 @@ generated_tokens = model.generate(**inputs, max_new_tokens=max_new_tokens)
 generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(output_path, "w", encoding="utf-8") as file:
-        file.write(RESULT["generated_text"])

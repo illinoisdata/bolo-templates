@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "nfliu/scibert_basevocab_uncased" %}
 {% set text = 'Hello, world!' %}
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
@@ -17,10 +19,3 @@ outputs = model(**inputs)
 last_hidden_state = outputs.last_hidden_state.detach().cpu().numpy()
 
 RESULT = {'last_hidden_state': last_hidden_state}
-
-if __name__ == '__main__':
-    import os
-    import numpy as np
-    output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/nfliu__SEP__scibert_basevocab_uncased'
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, 'last_hidden_state.npy'), RESULT['last_hidden_state'])

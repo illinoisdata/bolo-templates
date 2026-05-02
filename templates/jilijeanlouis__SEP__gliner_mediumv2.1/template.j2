@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "jilijeanlouis/gliner_mediumv2.1" %}
 {% set text = "This example uses GLiNER token classification inference." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/jilijeanlouis__SEP__gliner_mediumv2.1" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import json
@@ -55,9 +55,3 @@ for idx, (token, label_id, mask_value) in enumerate(zip(tokens, prediction_ids, 
     )
 
 RESULT = {"token_classification": token_classification}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "token_classification.json")
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(RESULT["token_classification"], f, ensure_ascii=False, indent=2)

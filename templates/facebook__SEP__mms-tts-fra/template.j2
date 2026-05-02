@@ -1,12 +1,10 @@
-{% set repo_id = 'facebook/mms-tts-fra' %}
-{% set device = 'cuda:0' %}
+{% set repo_id = "facebook/mms-tts-fra" %}
+{% set device = "cuda:0" %}
 {% set text = 'Ceci est un exemple de texte en français.' %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mms-tts-fra' %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import VitsModel, AutoTokenizer
 import torch
@@ -27,7 +25,3 @@ with torch.no_grad():
 waveform = output.squeeze(0).cpu().numpy()
 
 RESULT = {"waveform": waveform}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    wavfile.write(os.path.join(output_dir, "output.wav"), rate=model.config.sampling_rate, data=waveform)

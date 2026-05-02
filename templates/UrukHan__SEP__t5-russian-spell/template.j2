@@ -1,10 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "UrukHan/t5-russian-spell" %}
 {% set input_text = ["сеглдыя хорош ден", "когд а вы прдет к нам в госи"] %}
 {% set task_prefix = "Spell correct: " %}
 {% set max_input_length = 256 %}
 {% set max_output_length = 256 %}
 {% set num_return_sequences = 1 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/UrukHan__SEP__t5-russian-spell" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = {{ input_text | tojson }}
@@ -13,7 +14,6 @@ max_input_length = {{ max_input_length }}
 max_output_length = {{ max_output_length }}
 num_return_sequences = {{ num_return_sequences }}
 num_beams = {{ num_beams }}
-output_dir = {{ output_dir | tojson }}
 
 import json
 from pathlib import Path
@@ -59,9 +59,3 @@ else:
     grouped_outputs = decoded_outputs
 
 RESULT = {"generated_text": grouped_outputs}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    result_file = output_path / "result.json"
-    result_file.write_text(json.dumps(RESULT, ensure_ascii=False, indent=2), encoding="utf-8")

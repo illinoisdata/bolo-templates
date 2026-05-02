@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/mms-tts-fin" %}
 {% set text = "Tämä on esimerkki suomenkielisestä tekstistä puheeksi." %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -25,8 +27,3 @@ if waveform_numpy.ndim == 2:
 
 sampling_rate = int(model.config.sampling_rate)
 RESULT = {"waveform": waveform_numpy, "sampling_rate": sampling_rate}
-
-if __name__ == "__main__":
-    output_dir = Path("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mms-tts-fin")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    wavfile.write(output_dir / "tts_output.wav", RESULT["sampling_rate"], RESULT["waveform"])

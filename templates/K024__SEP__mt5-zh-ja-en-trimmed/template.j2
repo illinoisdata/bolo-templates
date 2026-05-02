@@ -3,14 +3,12 @@
 {% set sentence = "ja2zh: 吾輩は猫である。名前はまだ無い。" %}
 {% set max_length = 100 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/K024__SEP__mt5-zh-ja-en-trimmed" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentence = "{{ sentence }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 
@@ -32,8 +30,3 @@ output_ids = model.generate(**inputs, max_length=max_length, num_beams=num_beams
 # Post-process & build RESULT dict
 generated_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "generated_text.txt"), "w", encoding="utf-8") as f:
-        f.write(RESULT["generated_text"])

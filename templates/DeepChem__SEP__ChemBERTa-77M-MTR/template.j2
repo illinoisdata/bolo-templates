@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "DeepChem/ChemBERTa-77M-MTR" %}
 {% set input_smiles = "CCO" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/DeepChem__SEP__ChemBERTa-77M-MTR" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_smiles = "{{ input_smiles }}"
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -28,10 +28,3 @@ per_label_scores = (
 )
 
 RESULT = {"regression_per_label": per_label_scores}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    target_file = output_path / "regression_per_label.json"
-    with target_file.open("w", encoding="utf-8") as f:
-        json.dump(RESULT["regression_per_label"], f, indent=2)

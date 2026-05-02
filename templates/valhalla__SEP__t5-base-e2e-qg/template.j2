@@ -43,8 +43,3 @@ outputs = model.generate(**encoded_inputs, **gen_kwargs)
 questions = tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
 RESULT = {"questions": questions}
-
-if __name__ == "__main__":
-    with open("questions.txt", "w") as f:
-        for q in RESULT["questions"]:
-            f.write(q + "\n")

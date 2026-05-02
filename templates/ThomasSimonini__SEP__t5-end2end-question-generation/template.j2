@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "ThomasSimonini/t5-end2end-question-generation" %}
 {% set input_context = "Context: The Apollo missions landed astronauts on the Moon and illustrated humanity's reach into space." %}
 {% set prefix = "generate questions: " %}
 {% set max_length = 256 %}
@@ -5,7 +7,6 @@
 {% set length_penalty = 1.5 %}
 {% set no_repeat_ngram_size = 3 %}
 {% set early_stopping = true %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ThomasSimonini__SEP__t5-end2end-question-generation" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -16,7 +17,6 @@ num_beams = {{ num_beams }}
 length_penalty = {{ length_penalty }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
 early_stopping = {{ "True" if early_stopping else "False" }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -53,9 +53,3 @@ if decoded_sequences:
     questions = [segment.strip() for segment in first_sequence.split("<sep>") if segment.strip()]
 
 RESULT = {"questions": questions}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    with open(output_path / "questions.json", "w", encoding="utf-8") as output_file:
-        json.dump(RESULT["questions"], output_file, ensure_ascii=False, indent=2)

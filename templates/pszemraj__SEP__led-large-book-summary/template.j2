@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "pszemraj/led-large-book-summary" %}
 {% set input_text = "LED applies sparse attention to condense lengthy documents for human consumption." %}
 {% set max_length = 64 %}
 {% set min_length = 8 %}
@@ -7,7 +9,6 @@
 {% set length_penalty = 0.3 %}
 {% set num_beams = 4 %}
 {% set early_stopping_flag = true %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/pszemraj__SEP__led-large-book-summary" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -20,13 +21,11 @@ repetition_penalty = {{ repetition_penalty }}
 length_penalty = {{ length_penalty }}
 num_beams = {{ num_beams }}
 early_stopping = {{ "True" if early_stopping_flag else "False" }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
 import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
@@ -64,10 +63,3 @@ summary_text = tokenizer.batch_decode(
 )[0].strip()
 
 RESULT = {"summary": summary_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    for name, value in RESULT.items():
-        file_path = output_path / f"{name}.txt"
-        file_path.write_text(value, encoding="utf-8")

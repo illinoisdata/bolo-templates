@@ -1,7 +1,6 @@
 {% set repo_id = "usyd-community/vitpose-plus-small" %}
 {% set device = "cuda:0" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/usyd-community__SEP__vitpose-plus-small" %}
 {% set person_detection_repo_id = "PekingU/rtdetr_r50vd_coco_o365" %}
 {% set person_detection_threshold = 0.3 %}
 {% set pose_threshold = 0.3 %}
@@ -9,7 +8,6 @@
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-output_dir = "{{ output_dir }}"
 person_detection_repo_id = "{{ person_detection_repo_id }}"
 person_detection_threshold = {{ person_detection_threshold }}
 pose_threshold = {{ pose_threshold }}
@@ -95,10 +93,3 @@ RESULT = {
     "person_detections": person_detections,
     "pose_results": pose_results_serialized,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "person_detections.json"), "w") as f:
-        json.dump(RESULT["person_detections"], f)
-    with open(os.path.join(output_dir, "pose_results.json"), "w") as f:
-        json.dump(RESULT["pose_results"], f)

@@ -1,9 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "philschmid/bart-large-cnn-samsum" %}
 {% set conversation = "Jeff: Can I train a 🤗 Transformers model on Amazon SageMaker? \nPhilipp: Sure you can use the new Hugging Face Deep Learning Container. \nJeff: ok.\nJeff: and how can I get started? \nJeff: where can I find documentation? \nPhilipp: ok, ok you can find everything here. https://huggingface.co/blog/the-partnership-amazon-sagemaker-and-hugging-face \n" %}
 {% set max_length = 142 %}
 {% set min_length = 56 %}
 {% set num_beams = 4 %}
 {% set early_stopping = true %}
-{% set output_dir = "/tmp" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -12,7 +13,6 @@ max_length = {{ max_length }}
 min_length = {{ min_length }}
 num_beams = {{ num_beams }}
 early_stopping = {{ early_stopping }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -39,9 +39,3 @@ summary_text = tokenizer.batch_decode(
 )[0]
 
 RESULT = {"summary": summary_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    summary_path = os.path.join(output_dir, "summary.txt")
-    with open(summary_path, "w", encoding="utf-8") as summary_file:
-        summary_file.write(RESULT["summary"])

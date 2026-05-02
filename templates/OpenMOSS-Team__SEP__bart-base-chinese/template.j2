@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "OpenMOSS-Team/bart-base-chinese" %}
 {% set prompt = "北京是[MASK]的首都" %}
 {% set max_length = 64 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/OpenMOSS-Team__SEP__bart-base-chinese" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 from pathlib import Path
@@ -41,9 +41,3 @@ generated_tokens = model.generate(**generation_kwargs)
 
 generated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 RESULT = {"generated_text": generated_texts[0]}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    result_file = output_path / "generated_text.txt"
-    result_file.write_text(RESULT["generated_text"], encoding="utf-8")

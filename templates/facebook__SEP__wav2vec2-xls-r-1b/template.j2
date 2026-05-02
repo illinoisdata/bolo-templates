@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/wav2vec2-xls-r-1b" %}
 {% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__wav2vec2-xls-r-1b") %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
-output_dir = "{{ output_dir }}"
 
 import io
 from pathlib import Path
@@ -60,11 +60,3 @@ for key, value in outputs.__dict__.items():
         normalized_value = np.array(value)
     result_dict[key] = normalized_value
 RESULT = result_dict
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    for key, value in RESULT.items():
-        if value is None:
-            continue
-        np.save(output_path / f"{key}.npy", value)

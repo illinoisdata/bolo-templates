@@ -1,12 +1,10 @@
 {% set repo_id = "nvidia/domain-classifier" %}
 {% set device = "cuda:0" %}
 {% set text_samples = ["Sports is a popular domain", "Politics is a popular domain"] %}
-{% set output_dir = "." %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_samples = {{ text_samples | tojson }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -45,10 +43,3 @@ predicted_indices = torch.argmax(outputs, dim=1)
 predicted_domains = [config.id2label[idx.item()] for idx in predicted_indices.cpu()]
 
 RESULT = {"predicted_domains": predicted_domains}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "predicted_domains.txt")
-    with open(output_path, "w") as f:
-        for domain in RESULT["predicted_domains"]:
-            f.write(f"{domain}\n")

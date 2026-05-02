@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/bert_uncased_L-4_H-768_A-12" %}
 {% set text_input = "The quick brown fox jumps over the lazy dog." %}
 {% set max_length = 64 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-4_H-768_A-12" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 import os
 
@@ -36,15 +36,3 @@ RESULT = {
     "last_hidden_state": last_hidden_state,
     "pooler_output": pooler_output,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(
-        os.path.join(output_dir, "last_hidden_state.npy"),
-        RESULT["last_hidden_state"].numpy(),
-    )
-    if RESULT["pooler_output"] is not None:
-        np.save(
-            os.path.join(output_dir, "pooler_output.npy"),
-            RESULT["pooler_output"].numpy(),
-        )

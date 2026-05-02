@@ -1,12 +1,11 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "tencent/Hunyuan-MT-7B" %}
+{% set device = "cuda:0" %}
 {% set source_text = "Detect and convert code comments from English to Chinese to ensure localization is accurate." %}
 {% set target_language = "Chinese" %}
 {% set max_new_tokens = 256 %}
 {% set temperature = 0.1 %}
 {% set top_p = 0.95 %}
 {% set repetition_penalty = 1.1 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/tencent__SEP__Hunyuan-MT-7B" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = """{{ source_text }}"""
@@ -15,13 +14,11 @@ max_new_tokens = {{ max_new_tokens }}
 temperature = {{ temperature }}
 top_p = {{ top_p }}
 repetition_penalty = {{ repetition_penalty }}
-output_dir = "{{ output_dir }}"
 from pathlib import Path
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 device = torch.device(device)
-output_dir = Path(output_dir)
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = AutoModelForCausalLM.from_pretrained(
     repo_id,
@@ -58,7 +55,3 @@ outputs = model.generate(
 
 output_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
 RESULT = {"translation": output_text}
-
-if __name__ == "__main__":
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

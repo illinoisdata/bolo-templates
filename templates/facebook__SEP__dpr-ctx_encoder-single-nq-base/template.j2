@@ -1,12 +1,10 @@
-{% set repo_id = repo_id | default("facebook/dpr-ctx_encoder-single-nq-base") %}
-{% set device = device | default("cuda:0") %}
+{% set repo_id = "facebook/dpr-ctx_encoder-single-nq-base" %}
+{% set device = "cuda:0" %}
 {% set context_text = context_text | default("The Eiffel Tower is located in Paris and is one of the most popular tourist attractions in the world.") %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__dpr-ctx_encoder-single-nq-base") %}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 context_text = {{ context_text | tojson }}
-output_dir = {{ output_dir | tojson }}
 
 import os
 
@@ -28,7 +26,3 @@ with torch.no_grad():
 context_embedding = outputs.pooler_output.detach().cpu()
 
 RESULT = {"context_embedding": context_embedding}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    torch.save(RESULT["context_embedding"], os.path.join(output_dir, "context_embedding.pt"))

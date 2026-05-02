@@ -1,12 +1,10 @@
 {% set repo_id = "vinai/vinai-translate-en2vi-v2" %}
 {% set device = "cuda:0" %}
 {% set input_text = "VinAI Translate provides advanced translation from English to Vietnamese." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/vinai__SEP__vinai-translate-en2vi-v2" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -14,7 +12,6 @@ import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
 device = torch.device(device)
-output_dir = Path(output_dir)
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
 tokenizer.src_lang = "en_XX"
@@ -44,7 +41,3 @@ generated_tokens = model.generate(
 translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

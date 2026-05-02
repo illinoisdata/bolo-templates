@@ -1,13 +1,11 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "microsoft/layoutlmv3-large" %}
+{% set device = "cuda:0" %}
 {% set doc_image_path = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
 {% set question = "What is the invoice number?" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__layoutlmv3-large" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 doc_image_path = "{{ doc_image_path }}"
 question = "{{ question }}"
-output_dir = "{{ output_dir }}"
 
 from io import BytesIO
 from pathlib import Path
@@ -80,8 +78,3 @@ answer_ids = input_ids_tensor[start_index : end_index + 1].tolist()
 answer = processor.tokenizer.decode(answer_ids, skip_special_tokens=True).strip()
 
 RESULT = {"answer": answer}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "answer.txt").write_text(RESULT["answer"], encoding="utf-8")

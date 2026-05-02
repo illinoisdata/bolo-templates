@@ -1,5 +1,5 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "GanymedeNil/text2vec-large-chinese" %}
+{% set device = "cuda:0" %}
 {% set reference_sentence = "今天天气很好，阳光明媚。" %}
 {% set comparison_sentence = "今天空气清新，适合户外散步。" %}
 
@@ -39,13 +39,3 @@ RESULT = {
     "sentence_embeddings": sentence_embeddings_list,
     "cosine_similarity": cosine_similarity,
 }
-
-if __name__ == "__main__":
-    from pathlib import Path
-    import json
-
-    output_dir = Path("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/GanymedeNil__SEP__text2vec-large-chinese")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "sentence_similarity.json").write_text(
-        json.dumps(RESULT, ensure_ascii=False, indent=2)
-    )

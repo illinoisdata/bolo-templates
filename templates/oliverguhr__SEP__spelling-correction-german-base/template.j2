@@ -1,21 +1,18 @@
-{% set repo_id = repo_id | default("oliverguhr/spelling-correction-german-base") %}
-{% set device = device | default("cuda:0") %}
+{% set repo_id = "oliverguhr/spelling-correction-german-base" %}
+{% set device = "cuda:0" %}
 {% set input_text = input_text | default("correct: das idst ein neuZr test") %}
 {% set max_length = max_length | default(256) %}
 {% set num_beams = num_beams | default(4) %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/oliverguhr__SEP__spelling-correction-german-base") %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = {{ input_text | tojson }}
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-
 
 model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
 model = model.to(device)
@@ -29,9 +26,3 @@ decoded_outputs = tokenizer.batch_decode(generated_tokens, skip_special_tokens=T
 corrected_text = decoded_outputs[0] if decoded_outputs else ""
 
 RESULT = {"corrected_text": corrected_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    text_path = output_path / "corrected_text.txt"
-    text_path.write_text(corrected_text, encoding="utf-8")

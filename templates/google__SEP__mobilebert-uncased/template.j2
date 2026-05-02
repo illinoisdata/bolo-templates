@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/mobilebert-uncased" %}
 {% set input_text = "HuggingFace is creating a <mask> that the community uses to solve NLP tasks." %}
 {% set top_k = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__mobilebert-uncased" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -48,9 +48,3 @@ for mask_index in mask_positions:
     })
 
 RESULT = {"mask_predictions": predictions}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    result_path = Path(output_dir) / "mask_predictions.json"
-    with open(result_path, "w", encoding="utf-8") as handle:
-        json.dump(RESULT["mask_predictions"], handle, ensure_ascii=False, indent=2)

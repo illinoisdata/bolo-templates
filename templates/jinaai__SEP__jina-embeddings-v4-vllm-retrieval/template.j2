@@ -1,12 +1,10 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "jinaai/jina-embeddings-v4-vllm-retrieval" %}
+{% set device = "cuda:0" %}
 {% set text_prompt = "Provide a concise, factual summary of the following input sentence." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/jinaai__SEP__jina-embeddings-v4-vllm-retrieval" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_prompt = "{{ text_prompt }}"
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -43,8 +41,3 @@ sum_hidden = weighted_hidden.sum(dim=1)
 valid_tokens = attention_mask.sum(dim=1, keepdim=True).clamp(min=1)
 pooled_embedding = (sum_hidden / valid_tokens).squeeze(0)
 RESULT = {"pooled_embedding": pooled_embedding.cpu()}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    torch.save(RESULT["pooled_embedding"], output_path / "pooled_embedding.pt")

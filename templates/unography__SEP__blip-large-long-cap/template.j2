@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "unography/blip-large-long-cap" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set max_length = 250 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/unography__SEP__blip-large-long-cap" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 from io import BytesIO
 from pathlib import Path
@@ -33,9 +33,3 @@ generated_ids = model.generate(**inputs, max_length=max_length)
 caption = processor.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"caption": caption}
-
-if __name__ == "__main__":
-    output_directory = Path(output_dir)
-    output_directory.mkdir(parents=True, exist_ok=True)
-    caption_path = output_directory / "caption.txt"
-    caption_path.write_text(RESULT["caption"], encoding="utf-8")

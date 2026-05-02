@@ -1,15 +1,15 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "IlyaGusev/rut5_base_headline_gen_telegram" %}
 {% set article_text = "Сенаторы обсуждают необходимость национального регулирования налогообложения глобальных интернет-компаний для защиты бюджета и справедливости" %}
 {% set max_input_length = 600 %}
 {% set max_output_length = 64 %}
 {% set num_beams = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/IlyaGusev__SEP__rut5_base_headline_gen_telegram" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 article_text = """{{ article_text }}"""
 max_input_length = {{ max_input_length }}
 max_output_length = {{ max_output_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 from pathlib import Path
@@ -41,9 +41,3 @@ generated_ids = model.generate(
 
 headline = tokenizer.decode(generated_ids[0], skip_special_tokens=True).strip()
 RESULT = {"headline": headline}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    headline_path = output_path / "headline.txt"
-    headline_path.write_text(RESULT["headline"], encoding="utf-8")

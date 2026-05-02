@@ -1,12 +1,10 @@
 {% set device = "cuda:0" %}
 {% set repo_id = "voidful/dpr-ctx_encoder-bert-base-multilingual" %}
 {% set context_text = "The Eiffel Tower is located in Paris, and it is a famous landmark in France." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/voidful__SEP__dpr-ctx_encoder-bert-base-multilingual" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 context_text = """{{ context_text }}"""
-output_dir = "{{ output_dir }}"
 
 import os
 import numpy as np
@@ -25,7 +23,3 @@ with torch.no_grad():
 
 embeddings = outputs.pooler_output
 RESULT = {"embeddings": embeddings.detach().cpu()}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "embeddings.npy"), RESULT["embeddings"].numpy())

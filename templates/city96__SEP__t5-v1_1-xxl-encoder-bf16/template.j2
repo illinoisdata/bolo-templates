@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "city96/t5-v1_1-xxl-encoder-bf16" %}
 {% set text_input = "An image of a cat sitting on a mat with a playful expression." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/city96__SEP__t5-v1_1-xxl-encoder-bf16" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -28,8 +28,3 @@ with torch.inference_mode():
 last_hidden_state = encoder_outputs.last_hidden_state.to(torch.float32).detach().cpu().numpy()
 
 RESULT = {"last_hidden_state": last_hidden_state}
-
-if __name__ == "__main__":
-    path = Path(output_dir)
-    path.mkdir(parents=True, exist_ok=True)
-    np.save(path / "last_hidden_state.npy", RESULT["last_hidden_state"])

@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "persiannlp/mt5-small-parsinlu-opus-translation_fa_en" %}
 {% set input_text = "ستایش خدای را که پروردگار جهانیان است." %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
@@ -28,8 +30,3 @@ decoded_outputs = tokenizer.batch_decode(generated_tokens, skip_special_tokens=T
 translated_text = decoded_outputs[0] if decoded_outputs else ""
 
 RESULT = {"translation": translated_text}
-
-if __name__ == "__main__":
-    output_dir = Path("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/persiannlp__SEP__mt5-small-parsinlu-opus-translation_fa_en")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

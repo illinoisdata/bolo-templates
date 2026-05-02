@@ -1,16 +1,14 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "allenai/macaw-large" %}
+{% set device = "cuda:0" %}
 {% set prompt_text = "What is the color of a cloudy sky?" %}
 {% set max_length = 64 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allenai__SEP__macaw-large" %}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 prompt_text = {{ prompt_text | tojson }}
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = {{ output_dir | tojson }}
 
 import os
 import torch
@@ -26,9 +24,3 @@ generated_ids = model.generate(**inputs, max_length=max_length, num_beams=num_be
 answer = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 RESULT = {"answer": answer}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    answer_path = os.path.join(output_dir, "answer.txt")
-    with open(answer_path, "w", encoding="utf-8") as f:
-        f.write(RESULT["answer"])

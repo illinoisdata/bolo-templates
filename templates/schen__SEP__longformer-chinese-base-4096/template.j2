@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "schen/longformer-chinese-base-4096" %}
 {% set text_input = "今天天气很好，适合处理长文本。" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/schen__SEP__longformer-chinese-base-4096" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -43,14 +43,3 @@ RESULT = {
     "prediction_text": prediction_text,
     "next_sentence_logits": next_sentence_logits,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "input_ids.json"), "w", encoding="utf-8") as json_file:
-        json.dump(RESULT["input_ids"], json_file, ensure_ascii=False)
-    with open(os.path.join(output_dir, "predicted_tokens.json"), "w", encoding="utf-8") as json_file:
-        json.dump(RESULT["predicted_tokens"], json_file, ensure_ascii=False)
-    with open(os.path.join(output_dir, "prediction_text.txt"), "w", encoding="utf-8") as text_file:
-        text_file.write(RESULT["prediction_text"])
-    with open(os.path.join(output_dir, "next_sentence_logits.json"), "w", encoding="utf-8") as json_file:
-        json.dump(RESULT["next_sentence_logits"], json_file)

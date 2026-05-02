@@ -1,4 +1,5 @@
-{% set repo_id = repo_id %}
+{% set device = "cuda:0" %}
+{% set repo_id = "Salesforce/moirai-1.0-R-base" %}
 repo_id = "{{ repo_id }}"
 
 from huggingface_hub import list_repo_files

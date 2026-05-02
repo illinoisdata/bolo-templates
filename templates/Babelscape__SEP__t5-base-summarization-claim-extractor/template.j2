@@ -1,11 +1,9 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "Babelscape/t5-base-summarization-claim-extractor" %}
+{% set device = "cuda:0" %}
 {% set summary_text = """Simone Biles made a triumphant return to the Olympic stage at the Paris 2024 Games, competing in the women's gymnastics qualifications. Overcoming a previous struggle with the 'twisties' that led to her withdrawal from events at the Tokyo 2020 Olympics, Biles dazzled with strong performances on all apparatus, helping the U.S. team secure a commanding lead in the qualifications. Her routines showcased her resilience and skill, drawing enthusiastic support from a star-studded audience.""" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Babelscape__SEP__t5-base-summarization-claim-extractor" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 summary_text = """Simone Biles made a triumphant return to the Olympic stage at the Paris 2024 Games, competing in the women's gymnastics qualifications. Overcoming a previous struggle with the 'twisties' that led to her withdrawal from events at the Tokyo 2020 Olympics, Biles dazzled with strong performances on all apparatus, helping the U.S. team secure a commanding lead in the qualifications. Her routines showcased her resilience and skill, drawing enthusiastic support from a star-studded audience."""
-output_dir = "{{ output_dir }}"
 from pathlib import Path
 import re
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -40,9 +38,3 @@ claims_list = [
 ]
 
 RESULT = {"claims_text": claims_text, "claims": claims_list}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "claims.txt").write_text(claims_text, encoding="utf-8")
-    (output_path / "claims_list.txt").write_text("\n".join(claims_list), encoding="utf-8")

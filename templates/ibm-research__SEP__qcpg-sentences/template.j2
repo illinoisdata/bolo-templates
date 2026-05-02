@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "ibm-research/qcpg-sentences" %}
 {% set input_text = "Will this approach work for generating diverse paraphrases?" %}
 {% set lexical = 0.3 %}
 {% set syntactic = 0.5 %}
@@ -5,7 +7,6 @@
 {% set max_length = 120 %}
 {% set num_beams = 4 %}
 {% set num_return_sequences = 1 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ibm-research__SEP__qcpg-sentences" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -16,7 +17,6 @@ semantic = {{ semantic }}
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 num_return_sequences = {{ num_return_sequences }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -57,10 +57,3 @@ generated_tokens = model.generate(
 generated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"generated_texts": generated_texts}
-
-if __name__ == "__main__":
-    path = Path(output_dir)
-    path.mkdir(parents=True, exist_ok=True)
-    (path / "generated_texts.txt").write_text(
-        "\n".join(RESULT["generated_texts"]), encoding="utf-8"
-    )

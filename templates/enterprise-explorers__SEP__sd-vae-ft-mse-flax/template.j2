@@ -1,12 +1,10 @@
-{% set repo_id = repo_id | default("enterprise-explorers/sd-vae-ft-mse-flax") %}
-{% set device = device | default("cuda:0") %}
+{% set repo_id = "enterprise-explorers/sd-vae-ft-mse-flax" %}
+{% set device = "cuda:0" %}
 {% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/enterprise-explorers__SEP__sd-vae-ft-mse-flax") %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-output_dir = "{{ output_dir }}"
 
 import io
 from pathlib import Path
@@ -19,11 +17,9 @@ from PIL import Image
 from diffusers import FlaxAutoencoderKL
 from jax import device_put
 
-
 def _is_url(path: str) -> bool:
     normalized = path.lower()
     return normalized.startswith("http://") or normalized.startswith("https://")
-
 
 def _load_image(path: str) -> Image.Image:
     if _is_url(path):
@@ -32,13 +28,11 @@ def _load_image(path: str) -> Image.Image:
         return Image.open(io.BytesIO(response.content)).convert("RGB")
     return Image.open(path).convert("RGB")
 
-
 def _prepare_pixel_values(image: Image.Image, size: int) -> jnp.ndarray:
     resized = image.resize((size, size), Image.LANCZOS)
     array = np.asarray(resized, dtype=np.float32) / 127.5 - 1.0
     array = np.transpose(array, (2, 0, 1))[None, ...]
     return jnp.array(array)
-
 
 def _select_jax_device(device_str: str):
     normalized = device_str.lower()
@@ -56,14 +50,12 @@ def _select_jax_device(device_str: str):
     cpus = [dev for dev in available_devices if dev.platform == "cpu"]
     return cpus[min(index, len(cpus) - 1)]
 
-
 def _to_pil_image(sample: jnp.ndarray) -> Image.Image:
     array = np.asarray(sample, dtype=np.float32)
     array = np.transpose(array, (1, 2, 0))
     array = np.clip((array + 1.0) / 2.0, 0.0, 1.0)
     array = (array * 255.0).round().astype(np.uint8)
     return Image.fromarray(array)
-
 
 vae, params = FlaxAutoencoderKL.from_pretrained(repo_id)
 
@@ -87,9 +79,3 @@ reconstruction = decoded.sample
 reconstructed_image = _to_pil_image(reconstruction[0])
 
 RESULT = {"reconstruction": reconstructed_image}
-
-if __name__ == "__main__":
-    output_root = Path(output_dir)
-    output_root.mkdir(parents=True, exist_ok=True)
-    reconstruction_path = output_root / "reconstruction.png"
-    RESULT["reconstruction"].save(reconstruction_path)

@@ -1,12 +1,11 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "Qwen/Qwen3-Reranker-0.6B" %}
+{% set device = "cuda:0" %}
 {% set instruction = "Given a web search query, retrieve relevant passages that answer the query" %}
 {% set queries = ["What is the capital of China?", "Explain gravity"] %}
 {% set documents = [
     "The capital of China is Beijing.",
     "Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun."
 ] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qwen__SEP__Qwen3-Reranker-0.6B" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -21,7 +20,6 @@ documents = [
     "{{ doc }}"{% if not loop.last %},{% endif %}
 {% endfor %}
 ]
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -31,7 +29,6 @@ import torch
 import torch.nn.functional as F
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-output_dir = Path(output_dir)
 device = torch.device(device)
 
 # Load tokenizer and model
@@ -79,9 +76,3 @@ log_probs = F.log_softmax(stacked_logits, dim=1)
 scores = log_probs[:, 1].exp().tolist()
 
 RESULT = {"rerank_scores": scores}
-
-if __name__ == "__main__":
-    output_dir.mkdir(parents=True, exist_ok=True)
-    result_path = output_dir / "rerank_scores.json"
-    with result_path.open("w", encoding="utf-8") as writer:
-        json.dump(RESULT["rerank_scores"], writer, ensure_ascii=False, indent=2)

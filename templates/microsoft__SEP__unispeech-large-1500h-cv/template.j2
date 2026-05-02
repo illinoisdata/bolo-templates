@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "microsoft/unispeech-large-1500h-cv" %}
 {% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__unispeech-large-1500h-cv" %}
 {% set target_sample_rate = 16000 %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
-output_dir = "{{ output_dir }}"
 target_sample_rate = {{ target_sample_rate }}
 
 import io
@@ -20,11 +20,9 @@ feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
 model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
 model.eval()
 
-
 def _is_url(source: str) -> bool:
     lowered = str(source).lower()
     return lowered.startswith("http://") or lowered.startswith("https://")
-
 
 def _load_audio(source: str):
     if _is_url(source):
@@ -38,14 +36,12 @@ def _load_audio(source: str):
         waveform = waveform.mean(axis=1)
     return waveform, sampling_rate
 
-
 def _resample_audio(waveform, current_rate):
     if current_rate == target_sample_rate:
         return waveform
     tensor_waveform = torch.from_numpy(waveform)
     resampled_waveform = F.resample(tensor_waveform, current_rate, target_sample_rate)
     return resampled_waveform.numpy()
-
 
 waveform, sampling_rate = _load_audio(audio_path)
 waveform = _resample_audio(waveform, sampling_rate)
@@ -61,7 +57,6 @@ inputs = {key: value.to(device) for key, value in inputs.items()}
 with torch.no_grad():
     outputs = model(**inputs)
 
-
 def _move_to_cpu(obj):
     if isinstance(obj, torch.Tensor):
         return obj.detach().cpu()
@@ -73,11 +68,4 @@ def _move_to_cpu(obj):
         return tuple(_move_to_cpu(value) for value in obj)
     return obj
 
-
 RESULT = {key: _move_to_cpu(value) for key, value in outputs.items()}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    for name, value in RESULT.items():
-        torch.save(value, output_path / f"{name}.pt")

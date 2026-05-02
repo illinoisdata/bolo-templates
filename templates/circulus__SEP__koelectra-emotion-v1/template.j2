@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "circulus/koelectra-emotion-v1" %}
 {% set text_input = "오늘 기분이 좋습니다. 날씨도 화창해요." %}
 {% set probability_threshold = 0.5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/circulus__SEP__koelectra-emotion-v1" %}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_input = {{ text_input | tojson }}
 probability_threshold = {{ probability_threshold }}
-output_dir = {{ output_dir | tojson }}
 
 import json
 import os
@@ -53,9 +53,3 @@ RESULT = {
     "label_probabilities": label_probabilities,
     "predicted_labels": predicted_labels,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    file_path = os.path.join(output_dir, "inference.json")
-    with open(file_path, "w", encoding="utf-8") as handle:
-        json.dump(RESULT, handle, ensure_ascii=False, indent=2)

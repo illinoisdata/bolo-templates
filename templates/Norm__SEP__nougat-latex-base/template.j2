@@ -1,16 +1,14 @@
-{% set repo_id = 'Norm/nougat-latex-base' %}
-{% set device = 'cuda:0' %}
+{% set repo_id = "Norm/nougat-latex-base" %}
+{% set device = "cuda:0" %}
 {% set image_path = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
 {% set max_length = 800 %}
 {% set num_beams = 5 %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Norm__SEP__nougat-latex-base' %}
 
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
 image_path = '{{ image_path }}'
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = '{{ output_dir }}'
 
 import os
 import torch
@@ -59,8 +57,3 @@ sequence = tokenizer.batch_decode(outputs.sequences)[0]
 sequence = sequence.replace(tokenizer.eos_token, '').replace(tokenizer.pad_token, '').replace(tokenizer.bos_token, '')
 
 RESULT = {'generated_latex': sequence}
-
-if __name__ == '__main__':
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, 'generated_latex.txt'), 'w') as f:
-        f.write(RESULT['generated_latex'])

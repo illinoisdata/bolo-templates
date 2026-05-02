@@ -1,12 +1,10 @@
 {% set repo_id = "google/pegasus-xsum" %}
 {% set device = "cuda:0" %}
 {% set input_text = "In the city of New York, the mayor addressed climate change initiatives that aim to reduce emissions and invest in public transit." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__pegasus-xsum" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -26,9 +24,3 @@ generated_tokens = model.generate(**inputs, max_new_tokens=128, num_beams=4, len
 summary = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
 
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    summary_path = output_path / "summary.txt"
-    summary_path.write_text(summary, encoding="utf-8")

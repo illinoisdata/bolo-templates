@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set input_text = "Sverige är ett [MASK] land." %}
 {% set top_k = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/KBLab__SEP__megatron-bert-large-swedish-cased-110k" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -56,10 +54,3 @@ for batch_index, sequence_index in mask_positions_list:
     )
 
 RESULT = {"fill_mask": fill_mask_results}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    result_file = output_path / "fill_mask_results.json"
-    with result_file.open("w", encoding="utf-8") as handle:
-        json.dump(RESULT, handle, ensure_ascii=False, indent=2)

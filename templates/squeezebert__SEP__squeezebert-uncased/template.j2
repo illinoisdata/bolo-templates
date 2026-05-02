@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "squeezebert/squeezebert-uncased" %}
 {%- set masked_text = "The quick brown fox jumps over the lazy [MASK]." -%}
 {%- set top_k = 5 -%}
-{%- set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/squeezebert__SEP__squeezebert-uncased" -%}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 masked_text = "{{ masked_text }}"
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -53,9 +53,3 @@ for mask_index in mask_positions:
     )
 
 RESULT = {"predictions": predictions}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "fill_mask_predictions.json")
-    with open(output_path, "w", encoding="utf-8") as file:
-        json.dump(RESULT["predictions"], file, ensure_ascii=False, indent=2)

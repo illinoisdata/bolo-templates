@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-az-en" %}
 {% set source_text = "Salam dunya!" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-az-en" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = "{{ source_text }}"
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -23,8 +23,3 @@ decoded_outputs = tokenizer.batch_decode(generated_tokens, skip_special_tokens=T
 translation = decoded_outputs[0] if len(decoded_outputs) == 1 else decoded_outputs
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

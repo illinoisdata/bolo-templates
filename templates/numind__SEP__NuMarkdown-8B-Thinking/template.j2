@@ -1,15 +1,15 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "numind/NuMarkdown-8B-Thinking" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set user_prompt = "Please convert the document image into Markdown format with detailed layout recovery." %}
 {% set max_new_tokens = 2048 %}
 {% set temperature = 0.7 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/numind__SEP__NuMarkdown-8B-Thinking" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 user_prompt = """{{ user_prompt }}"""
 max_new_tokens = {{ max_new_tokens }}
 temperature = {{ temperature }}
-output_dir = "{{ output_dir }}"
 
 import os
 from io import BytesIO
@@ -20,11 +20,9 @@ import torch
 from PIL import Image
 from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
 
-
 torch_device = torch.device(device)
 processor = AutoProcessor.from_pretrained(repo_id)
 model = Qwen2_5_VLForConditionalGeneration.from_pretrained(repo_id).to(torch_device)
-
 
 def _load_image(path: str) -> Image.Image:
     if path.startswith(("http://", "https://")):
@@ -32,7 +30,6 @@ def _load_image(path: str) -> Image.Image:
         response.raise_for_status()
         return Image.open(BytesIO(response.content)).convert("RGB")
     return Image.open(path).convert("RGB")
-
 
 def _extract_between(full_text: str, start_token: str, end_token: str) -> Optional[str]:
     start_index = full_text.find(start_token)
@@ -42,7 +39,6 @@ def _extract_between(full_text: str, start_token: str, end_token: str) -> Option
     if end_index == -1:
         return None
     return full_text[start_index + len(start_token) : end_index].strip()
-
 
 image = _load_image(image_path)
 messages = [
@@ -75,16 +71,3 @@ RESULT = {
     "reasoning_trace": reasoning_trace,
     "generated_markdown": generated_markdown,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    markdown_path = os.path.join(output_dir, "generated_markdown.md")
-    with open(markdown_path, "w", encoding="utf-8") as markdown_file:
-        markdown_file.write(RESULT["generated_markdown"])
-    raw_path = os.path.join(output_dir, "raw_output.txt")
-    with open(raw_path, "w", encoding="utf-8") as raw_file:
-        raw_file.write(RESULT["raw_output"])
-    if RESULT["reasoning_trace"] is not None:
-        reasoning_path = os.path.join(output_dir, "reasoning_trace.txt")
-        with open(reasoning_path, "w", encoding="utf-8") as thinking_file:
-            thinking_file.write(RESULT["reasoning_trace"])

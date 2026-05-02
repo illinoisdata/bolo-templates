@@ -1,13 +1,13 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "panggi/t5-base-indonesian-summarization-cased" %}
 {% set text_to_summarize = "Indonesia terus memperkuat ekonomi digital guna mendukung UMKM dan mendorong inklusi keuangan bagi masyarakat di daerah terpencil." %}
 {% set max_summary_length = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/panggi__SEP__t5-base-indonesian-summarization-cased" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_to_summarize = "{{ text_to_summarize }}"
 max_summary_length = {{ max_summary_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
@@ -33,8 +33,3 @@ summary_text = tokenizer.decode(
 ).strip()
 
 RESULT = {"summary": summary_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

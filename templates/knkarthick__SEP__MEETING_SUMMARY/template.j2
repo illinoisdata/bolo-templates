@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "knkarthick/MEETING_SUMMARY" %}
 {% set input_text = "The tower is 324 metres (1,063 ft) tall, about the same height as an 81-storey building, and the tallest structure in Paris. Its base is square, measuring 125 metres (410 ft) on each side." %}
 {% set max_output_length = 128 %}
 {% set min_output_length = 30 %}
 {% set num_beams = 6 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/knkarthick__SEP__MEETING_SUMMARY" %}
 {% set output_file_name = "summary.txt" %}
 
 repo_id = "{{ repo_id }}"
@@ -11,7 +12,6 @@ input_text = """{{ input_text }}"""
 max_output_length = {{ max_output_length }}
 min_output_length = {{ min_output_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 output_file_name = "{{ output_file_name }}"
 
 import os
@@ -42,9 +42,3 @@ summary_outputs = tokenizer.batch_decode(summary_tokens, skip_special_tokens=Tru
 summary_text = summary_outputs[0].strip()
 
 RESULT = {"summary": summary_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, output_file_name)
-    with open(output_path, "w", encoding="utf-8") as output_file:
-        output_file.write(RESULT["summary"])

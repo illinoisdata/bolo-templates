@@ -1,12 +1,10 @@
-{% set repo_id = repo_id | default("deepset/gelectra-base") %}
-{% set device = device | default("cuda:0") %}
+{% set repo_id = "deepset/gelectra-base" %}
+{% set device = "cuda:0" %}
 {% set text = text | default("Dies ist ein Beispielsatz.") %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/deepset__SEP__gelectra-base") %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import numpy as np
@@ -25,8 +23,3 @@ discriminator_logits = outputs.logits
 RESULT = {
     "discriminator_logits": discriminator_logits,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    discriminator_logits_array = RESULT["discriminator_logits"].detach().cpu().numpy()
-    np.save(os.path.join(output_dir, "discriminator_logits.npy"), discriminator_logits_array)

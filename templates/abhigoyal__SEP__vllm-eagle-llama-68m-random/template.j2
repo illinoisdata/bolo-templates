@@ -3,14 +3,12 @@
 {% set prompt = "Hello, how are you?" %}
 {% set max_new_tokens = 20 %}
 {% set temperature = 1.0 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/abhigoyal__SEP__vllm-eagle-llama-68m-random" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"
 max_new_tokens = {{ max_new_tokens }}
 temperature = {{ temperature }}
-output_dir = "{{ output_dir }}"
 
 import json
 import torch
@@ -35,10 +33,3 @@ with torch.no_grad():
 generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    import os
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(RESULT["generated_text"])

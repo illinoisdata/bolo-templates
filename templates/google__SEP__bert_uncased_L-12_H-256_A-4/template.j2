@@ -1,13 +1,11 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "google/bert_uncased_L-12_H-256_A-4" %}
+{% set device = "cuda:0" %}
 {% set text_input = text_input | default("The capital of France is [MASK].") %}
 {% set top_k = top_k | default(5) %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-12_H-256_A-4") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -51,9 +49,3 @@ for batch_index, seq_index in zip(mask_positions[0].tolist(), mask_positions[1].
     )
 
 RESULT = {"fill_mask": fill_mask_results}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    result_file = output_path / "fill_mask.json"
-    result_file.write_text(json.dumps(RESULT["fill_mask"], indent=2))

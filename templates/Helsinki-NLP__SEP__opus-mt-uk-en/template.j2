@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-uk-en" %}
 {% set translation_text = "Привіт, світ!" %}
 {% set max_new_tokens = 128 %}
 {% set num_beams = 6 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-uk-en" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 translation_text = "{{ translation_text }}"
 max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -31,10 +31,3 @@ decoded_translations = tokenizer.batch_decode(generated_tokens, skip_special_tok
 translation_output = decoded_translations[0] if len(decoded_translations) == 1 else decoded_translations
 
 RESULT = {"translation": translation_output}
-
-if __name__ == "__main__":
-    out_dir = Path(output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    translation_value = RESULT["translation"]
-    serialized_translation = translation_value if isinstance(translation_value, str) else "\n".join(translation_value)
-    (out_dir / "translation.txt").write_text(serialized_translation, encoding="utf-8")

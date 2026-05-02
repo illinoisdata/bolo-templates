@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/bert_uncased_L-6_H-512_A-8" %}
 {% set masked_text = "The capital of France is [MASK]." %}
 {% set top_k = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-6_H-512_A-8" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 masked_text = "{{ masked_text }}"
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -42,9 +42,3 @@ for batch_index, sequence_index in mask_token_positions:
     })
 
 RESULT = {"predictions": predictions}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    result_path = os.path.join(output_dir, "predictions.json")
-    with open(result_path, "w") as file:
-        json.dump(RESULT, file, indent=2)

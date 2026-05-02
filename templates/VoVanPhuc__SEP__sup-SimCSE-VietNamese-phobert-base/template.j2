@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "VoVanPhuc/sup-SimCSE-VietNamese-phobert-base" %}
 {% set sentences = [
   "Kẻ đánh bom đinh tồi tệ nhất nước Anh.",
   "Nghệ sĩ làm thiện nguyện phải minh bạch.",
@@ -8,19 +10,16 @@
   "Thái Lan thua giao hữu trước vòng loại World Cup.",
   "Cựu tuyển thủ Nguyễn Bảo Quân: May mắn ủng hộ futsal Việt Nam"
 ] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/VoVanPhuc__SEP__sup-SimCSE-VietNamese-phobert-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
 import numpy as np
 import torch
 from transformers import AutoModel, AutoTokenizer
-
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = AutoModel.from_pretrained(repo_id).to(device)
@@ -34,8 +33,3 @@ with torch.no_grad():
 
 embeddings = embeddings.cpu().numpy()
 RESULT = {"embeddings": embeddings}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    np.save(output_path / "embeddings.npy", RESULT["embeddings"])

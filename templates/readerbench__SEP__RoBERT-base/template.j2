@@ -1,12 +1,10 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "readerbench/RoBERT-base" %}
+{% set device = "cuda:0" %}
 {% set input_text = "Acesta este un exemplu de propoziție în limba română." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/readerbench__SEP__RoBERT-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -31,10 +29,3 @@ RESULT = {
     "last_hidden_state": last_hidden_state,
     "pooler_output": pooler_output,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    torch.save(RESULT["last_hidden_state"], output_path / "last_hidden_state.pt")
-    if RESULT["pooler_output"] is not None:
-        torch.save(RESULT["pooler_output"], output_path / "pooler_output.pt")

@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "uclanlp/plbart-base" %}
 {% set input_text = "Hello, world!" %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
 {% set num_return_sequences = 1 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/uclanlp__SEP__plbart-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -10,7 +11,6 @@ input_text = {{ input_text | tojson }}
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 num_return_sequences = {{ num_return_sequences }}
-output_dir = {{ output_dir | tojson }}
 
 import torch
 from pathlib import Path
@@ -35,12 +35,3 @@ with torch.no_grad():
 generated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_texts}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    text_file = output_path / "generated_text.txt"
-    with text_file.open("w", encoding="utf-8") as handle:
-        for text in RESULT["generated_text"]:
-            handle.write(text)
-            handle.write("\n")

@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/wav2vec2-large-robust" %}
 {% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
 {% set target_sample_rate = 16000 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__wav2vec2-large-robust" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
 target_sample_rate = {{ target_sample_rate }}
-output_dir = "{{ output_dir }}"
 
 import io
 import json
@@ -78,8 +78,3 @@ def to_numpy(obj):
 
 raw_outputs = dict(outputs)
 RESULT = {k: to_numpy(v) for k, v in raw_outputs.items()}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    np.savez(output_path / "outputs.npz", **RESULT)

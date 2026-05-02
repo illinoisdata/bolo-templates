@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "syssec-utd/py312-pylingual-v1-statement" %}
 {% set prompt = "summarize: The Transformers library allows developers to build powerful text generation models for natural language tasks." %}
 {% set max_length = 256 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/syssec-utd__SEP__py312-pylingual-v1-statement" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import torch
@@ -39,8 +39,3 @@ generated_texts = tokenizer.batch_decode(outputs, skip_special_tokens=True)
 generated_text = generated_texts[0] if generated_texts else ""
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(generated_text, encoding="utf-8")

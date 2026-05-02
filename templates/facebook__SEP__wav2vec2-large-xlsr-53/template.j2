@@ -64,11 +64,3 @@ for key, value in raw_outputs.items():
     processed_outputs[key] = numpy_value
 
 RESULT = {k: v for k, v in processed_outputs.items()}
-
-if __name__ == "__main__":
-    import os
-    os.makedirs("outputs", exist_ok=True)
-    for key, value in RESULT.items():
-        if value is None:
-            continue
-        np.save(os.path.join("outputs", f"{key}.npy"), value)

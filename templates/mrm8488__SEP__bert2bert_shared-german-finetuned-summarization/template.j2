@@ -1,12 +1,11 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "mrm8488/bert2bert_shared-german-finetuned-summarization" %}
+{% set device = "cuda:0" %}
 {% set text_input = "Der Bericht hebt hervor, dass neue Technologien die Forschung beschleunigen können." %}
 {% set tokenizer_max_length = 512 %}
 {% set generation_max_length = 64 %}
 {% set generation_min_length = 8 %}
 {% set generation_num_beams = 4 %}
 {% set generation_no_repeat_ngram_size = 3 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/mrm8488__SEP__bert2bert_shared-german-finetuned-summarization" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
@@ -15,7 +14,6 @@ generation_max_length = {{ generation_max_length }}
 generation_min_length = {{ generation_min_length }}
 generation_num_beams = {{ generation_num_beams }}
 generation_no_repeat_ngram_size = {{ generation_no_repeat_ngram_size }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -49,8 +47,3 @@ with torch.no_grad():
 
 summary = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0].strip()
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "EmbeddedLLM/bge-reranker-base-onnx-o3-cpu" %}
 {% set provider = "CPUExecutionProvider" %}
 {% set sentences = [
     "The llama (/ˈlɑːmə/) (Lama glama) is a domesticated South American camelid.",
@@ -9,14 +11,12 @@
     "What is a harimau?",
     "How to fly a kite?"
 ] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/EmbeddedLLM__SEP__bge-reranker-base-onnx-o3-cpu" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 provider = "{{ provider }}"
 sentences = {{ sentences }}
 queries = {{ queries }}
-output_dir = "{{ output_dir }}"
 
 from itertools import product
 import os
@@ -50,9 +50,3 @@ scores = logits.view(-1).cpu().numpy()
 
 sorted_pairs = sorted(zip(pairs, scores), key=lambda x: x[1], reverse=True)
 RESULT = {"pairs_with_scores": sorted_pairs}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(f"{output_dir}/pairs_with_scores.txt", "w") as f:
-        for pair, score in RESULT["pairs_with_scores"]:
-            f.write(f"{pair}\t{score}\n")

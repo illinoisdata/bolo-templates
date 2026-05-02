@@ -1,12 +1,10 @@
 {% set repo_id = "vikp/surya_layout" %}
 {% set device = "cuda:0" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/vikp__SEP__surya_layout" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoImageProcessor, AutoModelForSemanticSegmentation
 from PIL import Image
@@ -37,7 +35,3 @@ else:
     segmentation = np.asarray(segmentation)
 
 RESULT = {"segmentation_mask": segmentation}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "segmentation_mask.npy"), RESULT["segmentation_mask"])

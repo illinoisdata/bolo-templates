@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "microsoft/unilm-base-cased" %}
 {% set input_text = "The capital of France is [MASK]." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__unilm-base-cased" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 import json
 from pathlib import Path
 import torch
@@ -31,8 +31,3 @@ for score, token_id in zip(topk_scores, topk_indices):
     })
 
 RESULT = {"fill_mask": predictions}
-
-if __name__ == "__main__":
-    out_dir = Path(output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "fill_mask_results.json").write_text(json.dumps(RESULT["fill_mask"], indent=2))

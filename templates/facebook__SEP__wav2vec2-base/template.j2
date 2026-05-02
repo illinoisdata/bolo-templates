@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/wav2vec2-base" %}
 {% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
 {% set target_sampling_rate = 16000 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__wav2vec2-base" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
 target_sampling_rate = {{ target_sampling_rate }}
-output_dir = "{{ output_dir }}"
 
 import io
 import os
@@ -19,7 +19,6 @@ from transformers import AutoFeatureExtractor, AutoModelForPreTraining
 
 feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
 model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
-
 
 def _load_audio(source):
     is_remote = isinstance(source, str) and (source.startswith("http://") or source.startswith("https://"))
@@ -44,7 +43,3 @@ with torch.no_grad():
     outputs = model(**inputs)
 
 RESULT = {"outputs": outputs}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    torch.save(RESULT["outputs"], os.path.join(output_dir, "outputs.pt"))

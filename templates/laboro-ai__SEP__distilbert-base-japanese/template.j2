@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "laboro-ai/distilbert-base-japanese" %}
 {% set text = "これは日本語で書かれた短いテキストです。" %}
 {% set max_length = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/laboro-ai__SEP__distilbert-base-japanese" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -39,10 +39,3 @@ RESULT = {
     "cls_embedding": cls_embedding,
     "mean_embedding": mean_embedding,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    torch.save(RESULT["last_hidden_state"], output_path / "last_hidden_state.pt")
-    torch.save(RESULT["cls_embedding"], output_path / "cls_embedding.pt")
-    torch.save(RESULT["mean_embedding"], output_path / "mean_embedding.pt")

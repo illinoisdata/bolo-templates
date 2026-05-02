@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-ja-en" %}
 {% set input_text = "これは日本語から英語への翻訳テストです。" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-ja-en" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -23,10 +23,3 @@ decoded = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 translation_output = decoded[0] if len(decoded) == 1 else decoded
 
 RESULT = {"translation": translation_output}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    translation_file = output_path / "translation.txt"
-    serialized = translation_output if isinstance(translation_output, str) else "\n".join(translation_output)
-    translation_file.write_text(serialized, encoding="utf-8")

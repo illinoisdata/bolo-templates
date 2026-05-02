@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "bczhou/TinyLLaVA-3.1B-SigLIP" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/bczhou__SEP__TinyLLaVA-3.1B-SigLIP" %}
 {% set processor_id = "google/siglip-so400m-patch14-384" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-output_dir = "{{ output_dir }}"
 processor_id = "{{ processor_id }}"
 from pathlib import Path
 from urllib.parse import urlparse
@@ -34,8 +34,3 @@ with torch.inference_mode():
 
 embedding = model_outputs.last_hidden_state[:, 0, :].cpu()
 RESULT = {"image_embedding": embedding}
-
-if __name__ == "__main__":
-    destination = Path(output_dir)
-    destination.mkdir(parents=True, exist_ok=True)
-    torch.save(RESULT["image_embedding"], destination / "image_embedding.pt")

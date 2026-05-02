@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Qwen/Qwen3-Reranker-4B" %}
 {% set instruction = "Given a web search query, retrieve relevant passages that answer the query" %}
 {% set queries = ["What is the capital of China?", "Explain gravity"] %}
 {% set documents = ["The capital of China is Beijing.", "Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun."] %}
 {% set max_length = 8192 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qwen__SEP__Qwen3-Reranker-4B" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -10,7 +11,6 @@ instruction = {{ instruction | tojson }}
 queries = {{ queries | tojson }}
 documents = {{ documents | tojson }}
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -52,7 +52,6 @@ def format_instruction(instruction_value, query, doc):
         )
     )
 
-
 def process_inputs(pairs):
     inputs = tokenizer(
         pairs,
@@ -71,7 +70,6 @@ def process_inputs(pairs):
     )
     return {key: value.to(torch_device) for key, value in padded.items()}
 
-
 @torch.no_grad()
 def compute_scores(inputs):
     logits = model(**inputs).logits[:, -1, :]
@@ -81,7 +79,6 @@ def compute_scores(inputs):
     normalized = torch.nn.functional.log_softmax(stacked, dim=1)
     return normalized[:, 1].exp().tolist()
 
-
 token_true_id = tokenizer("yes", add_special_tokens=False).input_ids[0]
 token_false_id = tokenizer("no", add_special_tokens=False).input_ids[0]
 
@@ -90,10 +87,3 @@ inputs = process_inputs(pairs)
 scores = compute_scores(inputs)
 
 RESULT = {"scores": scores}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "scores.json").write_text(
-        json.dumps(RESULT["scores"], ensure_ascii=False, indent=2)
-    )

@@ -59,9 +59,3 @@ with torch.no_grad():
 
 # Post-process result
 RESULT = {"embeddings": embeddings}
-
-if __name__ == "__main__":
-    import os
-    output_dir = os.getenv("OUTPUT_DIR", ".")
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "embeddings.npy"), RESULT["embeddings"].numpy())

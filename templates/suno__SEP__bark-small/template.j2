@@ -1,9 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "suno/bark-small" %}
 {% set text_prompt = "Hello, I am sampling from Bark. Please describe the sun." %}
 {% set do_sample = true %}
 {% set temperature = 1.0 %}
 {% set top_k = 50 %}
 {% set top_p = 0.95 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/suno__SEP__bark-small" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -12,7 +13,6 @@ do_sample = {{ "True" if do_sample else "False" }}
 temperature = {{ temperature }}
 top_k = {{ top_k }}
 top_p = {{ top_p }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import numpy as np
@@ -42,8 +42,3 @@ RESULT = {
     "audio": speech_array,
     "sampling_rate": sampling_rate,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    wavfile.write(output_path / "speech.wav", sampling_rate, RESULT["audio"])

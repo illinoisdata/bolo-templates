@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "megagonlabs/t5-base-japanese-web" %}
 {% set prompt = "これはテスト文章です。要約してください。" %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/megagonlabs__SEP__t5-base-japanese-web" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -25,9 +25,3 @@ with torch.no_grad():
 decoded_output = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
 
 RESULT = {"generated_text": decoded_output}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(output_path, "w", encoding="utf-8") as output_file:
-        output_file.write(RESULT["generated_text"])

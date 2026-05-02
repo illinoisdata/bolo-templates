@@ -3,13 +3,11 @@
 {% set input_text = "Molo! Ndiyabulela." %}
 {% set max_new_tokens = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-xh-en" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 from pathlib import Path
 
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -32,9 +30,3 @@ with torch.no_grad():
 
 translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    translation_path = output_path / "translation.txt"
-    translation_path.write_text(translation, encoding="utf-8")

@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "diffusers/t5-nf4" %}
 {% set input_texts = ["The quick brown fox jumps over the lazy dog."] %}
 {% set max_length = 64 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/diffusers__SEP__t5-nf4" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_texts = {{ input_texts }}
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -49,8 +49,3 @@ with torch.inference_mode():
 
 last_hidden_state = outputs.last_hidden_state.detach().cpu()
 RESULT = {"last_hidden_state": last_hidden_state}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    np.save(output_path / "last_hidden_state.npy", RESULT["last_hidden_state"].numpy())

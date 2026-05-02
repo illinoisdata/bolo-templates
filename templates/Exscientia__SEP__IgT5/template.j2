@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Exscientia/IgT5" %}
 {% set input_sequences = ["V Q L A Q S G S E L R K P G A S V K V S C D T S G H S F T S N A I H W V R Q A P G Q G L E W M G W I N T D T G T P T Y A Q G F T G R F V F S L D T S A R T A Y L Q I S S L K A D D T A V F Y C A R E R D Y S Y F F D Y W G Q G T L V T V S S </s> E V V M T Q S P A S L S V S P G E R A T L S C R A R A S L G I S T D L A W Y Q Q R P G Q A P R L L I Y G A S T R A T G I P A R F S G S G S G T E F T L T I S S L Q S E D S A V Y Y C Q Q Y S N W P L T F G G G T K V E I K", "Q V Q L V E S G G G V V Q P G R S L R L S C A A S G F T F S N Y A M Y W V R Q A P G K G L E W V A V I S Y D G S N K Y Y A D S V K G R F T I S R D N S K N T L Y L Q M N S L R T E D T A V Y Y C A S G S D Y G D Y L L V Y W G Q G T L V T V S S </s> A L T Q P A S V S G S P G Q S I T I S C T G T S S D V G G Y N Y V S W Y Q Q H P G K A P K L M I Y D V S K R P S G V S N R F S G S K S G N T A S L T I S G L Q S E D E A D Y Y C N S L T S I S T W V F G G G T K L T V L"] %}
 {% set max_new_tokens = 64 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Exscientia__SEP__IgT5" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_sequences = {{ input_sequences }}
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import os
@@ -36,9 +36,3 @@ generated_sequences = tokenizer.batch_decode(
 )
 
 RESULT = {"generated_sequences": generated_sequences}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_sequences.txt")
-    with open(output_path, "w", encoding="utf-8") as output_file:
-        output_file.write("\n".join(RESULT["generated_sequences"]))

@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "microsoft/trocr-large-handwritten" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__trocr-large-handwritten" %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-output_dir = "{{ output_dir }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 
@@ -31,8 +31,3 @@ generated_ids = model.generate(pixel_values, max_length=max_length, num_beams=nu
 generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

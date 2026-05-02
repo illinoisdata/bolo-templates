@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "uclanlp/visualbert-nlvr2-coco-pre" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set text_prompt = "A single cat sits on a cozy rug." %}
 {% set max_length = 32 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/uclanlp__SEP__visualbert-nlvr2-coco-pre" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 text_prompt = "{{ text_prompt }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 import requests
 from pathlib import Path
@@ -24,14 +24,12 @@ processor = AutoProcessor.from_pretrained(repo_id)
 model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
 model.eval()
 
-
 def _load_image(source: str) -> Image.Image:
     if source.startswith("http://") or source.startswith("https://"):
         response = requests.get(source, stream=True)
         response.raise_for_status()
         return Image.open(response.raw).convert("RGB")
     return Image.open(source).convert("RGB")
-
 
 image = _load_image(image_path)
 inputs = processor(text=text_prompt, images=image, return_tensors="pt", padding="max_length", truncation=True, max_length=max_length)
@@ -47,9 +45,3 @@ RESULT = {
     "prediction_logits": prediction_logits,
     "seq_relationship_logits": seq_relationship_logits,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    for key, value in RESULT.items():
-        np.save(output_path / f"{key}.npy", value)

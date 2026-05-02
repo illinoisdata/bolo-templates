@@ -1,16 +1,14 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "monologg/koelectra-base-v3-goemotions" %}
+{% set device = "cuda:0" %}
 {% set input_text = "요즘 기분이 어떠세요?" %}
 {% set threshold = 0.5 %}
 {% set top_k = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/monologg__SEP__koelectra-base-v3-goemotions" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 threshold = {{ threshold }}
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -63,10 +61,3 @@ RESULT = {
     "threshold_predictions": threshold_predictions,
     "top_predictions": top_predictions,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "result.json").write_text(
-        json.dumps(RESULT, ensure_ascii=False, indent=2), encoding="utf-8"
-    )

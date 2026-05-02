@@ -1,2 +1,4 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Qdrant/bm25" %}
 from huggingface_hub import list_repo_files
 print(list_repo_files("Qdrant/bm25"))

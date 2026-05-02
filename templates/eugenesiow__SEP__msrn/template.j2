@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "eugenesiow/msrn" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/eugenesiow__SEP__msrn" %}
 {% set scale = 4 %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-output_dir = "{{ output_dir }}"
 scale = {{ scale }}
 
 import io
@@ -31,7 +31,6 @@ else:
 
 inputs = ImageLoader.load_image(image)
 
-
 def _move_to_device(payload, dst_device):
     if hasattr(payload, "to"):
         return payload.to(dst_device)
@@ -50,9 +49,3 @@ with torch.no_grad():
 predictions = _move_to_device(predictions, torch.device("cpu"))
 
 RESULT = {"super_resolved_image": predictions}
-
-if __name__ == "__main__":
-    output_dir_path = Path(output_dir)
-    output_dir_path.mkdir(parents=True, exist_ok=True)
-    destination = output_dir_path / "super_resolved_image.png"
-    ImageLoader.save_image(RESULT["super_resolved_image"], destination)

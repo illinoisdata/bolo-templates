@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "InternScience/StructTable-base" %}
 {% set table_image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/InternScience__SEP__StructTable-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 table_image_path = "{{ table_image_path }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoProcessor, Pix2StructForConditionalGeneration
 from PIL import Image
@@ -33,9 +33,3 @@ with torch.no_grad():
 latex_output = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 RESULT = {"latex": latex_output}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "latex_output.txt")
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(RESULT["latex"])

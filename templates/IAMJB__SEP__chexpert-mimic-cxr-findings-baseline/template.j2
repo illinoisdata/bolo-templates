@@ -1,5 +1,6 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "IAMJB/chexpert-mimic-cxr-findings-baseline" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/IAMJB__SEP__chexpert-mimic-cxr-findings-baseline" %}
 {% set generation_max_length = 128 %}
 {% set generation_num_beams = 2 %}
 {% set generation_num_return_sequences = 1 %}
@@ -7,7 +8,6 @@
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-output_dir = "{{ output_dir }}"
 generation_max_length = {{ generation_max_length }}
 generation_num_beams = {{ generation_num_beams }}
 generation_num_return_sequences = {{ generation_num_return_sequences }}
@@ -52,10 +52,3 @@ with torch.no_grad():
 generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
 RESULT = {"findings": generated_texts}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    for index, text in enumerate(RESULT["findings"]):
-        target_path = os.path.join(output_dir, f"findings_{index}.txt")
-        with open(target_path, "w", encoding="utf-8") as file:
-            file.write(text)

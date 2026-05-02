@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/byt5-base" %}
 {% set input_text = "Life is like a box of chocolates." %}
 {% set max_new_tokens = 128 %}
 {% set num_beams = 4 %}
 {% set num_return_sequences = 1 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__byt5-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -10,13 +11,11 @@ input_text = "{{ input_text }}"
 max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
 num_return_sequences = {{ num_return_sequences }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-
 
 target_device = torch.device(device)
 
@@ -44,11 +43,3 @@ with torch.no_grad():
 generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_texts}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    generated_output = RESULT["generated_text"]
-    content = "\n".join(generated_output) if isinstance(generated_output, list) else generated_output
-    output_file = output_path / "generated_text.txt"
-    output_file.write_text(content, encoding="utf-8")

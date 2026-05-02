@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "utrobinmv/t5_translate_en_ru_zh_small_1024" %}
 {% set text_to_translate = "translate to zh: The purpose of the development is to provide users with a personal synchronized interpreter." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/utrobinmv__SEP__t5_translate_en_ru_zh_small_1024" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_to_translate = "{{ text_to_translate }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -20,8 +20,3 @@ generated_tokens = model.generate(**batch)
 translated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"translation": translated_texts}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "translation.txt").write_text("\n".join(RESULT["translation"]), encoding="utf-8")

@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "sshleifer/distilbart-xsum-6-6" %}
 {% set input_text = "Researchers recently unveiled a novel distillation workflow that compresses large language models into faster, more efficient summarizers while retaining high quality outputs." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/sshleifer__SEP__distilbart-xsum-6-6" %}
 {% set max_output_length = 62 %}
 {% set num_beams = 6 %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""
-output_dir = "{{ output_dir }}"
 max_output_length = {{ max_output_length }}
 num_beams = {{ num_beams }}
 
@@ -40,9 +40,3 @@ summary = tokenizer.decode(
 )
 
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "summary.txt")
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(RESULT["summary"])

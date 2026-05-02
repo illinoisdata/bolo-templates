@@ -1,12 +1,10 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "Helsinki-NLP/opus-mt-eu-en" %}
+{% set device = "cuda:0" %}
 {% set input_text = input_text | default("Kaixo, nola zaude?") %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-eu-en") %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -27,8 +25,3 @@ translation = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
 
 # Build output dictionary
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "translation.txt"), "w", encoding="utf-8") as f:
-        f.write(RESULT["translation"])

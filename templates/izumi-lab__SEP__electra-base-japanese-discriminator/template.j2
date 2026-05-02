@@ -1,12 +1,10 @@
 {% set repo_id = "izumi-lab/electra-base-japanese-discriminator" %}
 {% set device = "cuda:0" %}
 {% set text = "東京大学で[MASK]の研究をしています。" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/izumi-lab__SEP__electra-base-japanese-discriminator" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModelForPreTraining
 import torch
@@ -25,8 +23,3 @@ probs = logits.sigmoid().squeeze().tolist()
 tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"].squeeze().tolist())
 
 RESULT = {"tokens": tokens, "probs": probs}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "result.json"), "w", encoding="utf-8") as f:
-        json.dump(RESULT, f, ensure_ascii=False, indent=4)

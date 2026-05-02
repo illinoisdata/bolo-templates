@@ -1,7 +1,7 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "datalab-to/surya_layout0" %}
 repo_id = "{{ repo_id }}"
 from huggingface_hub import HfApi
 api = HfApi()
 files = api.list_repo_files(repo_id)
 RESULT = {"files": files}
-if __name__ == "__main__":
-    pass

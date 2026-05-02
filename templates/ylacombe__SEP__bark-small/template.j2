@@ -1,12 +1,10 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "ylacombe/bark-small" %}
+{% set device = "cuda:0" %}
 {% set text_prompt = "Hello, I'm Bark, generating a warm spoken greeting." %}
-{% set output_dir = "/tmp/bark_small_output" %}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_prompt = {{ text_prompt | tojson }}
-output_dir = {{ output_dir | tojson }}
 
 from pathlib import Path
 
@@ -34,8 +32,3 @@ if sampling_rate is None:
     sampling_rate = 24000
 
 RESULT = {"speech": speech_array, "sampling_rate": sampling_rate}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    scipy.io.wavfile.write(output_path / "bark_speech.wav", RESULT["sampling_rate"], RESULT["speech"])

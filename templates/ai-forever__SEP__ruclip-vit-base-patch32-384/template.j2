@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "ai-forever/ruclip-vit-base-patch32-384" %}
 {% set text_input = "Красивый городской пейзаж летом" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ai-forever__SEP__ruclip-vit-base-patch32-384" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
 image_path = "{{ image_path }}"
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -43,9 +43,3 @@ RESULT = {
     "logits_per_image": logits_per_image,
     "logits_per_text": logits_per_text,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    result_path = os.path.join(output_dir, "result.json")
-    with open(result_path, "w", encoding="utf-8") as result_file:
-        json.dump(RESULT, result_file, ensure_ascii=False, indent=2)

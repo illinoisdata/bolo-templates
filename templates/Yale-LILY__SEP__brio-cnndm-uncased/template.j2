@@ -4,7 +4,6 @@
 {% set max_length = 142 %}
 {% set min_length = 56 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Yale-LILY__SEP__brio-cnndm-uncased" %}
 {% set output_file_name = "summary.txt" %}
 
 repo_id = "{{ repo_id }}"
@@ -13,7 +12,6 @@ input_text = """{{ input_text }}"""
 max_length = {{ max_length }}
 min_length = {{ min_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 output_file_name = "{{ output_file_name }}"
 
 import os
@@ -49,9 +47,3 @@ decoded = tokenizer.batch_decode(
 summary = decoded[0]
 
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, output_file_name)
-    with open(output_path, "w", encoding="utf-8") as outfile:
-        outfile.write(RESULT["summary"])

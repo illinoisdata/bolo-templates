@@ -19,7 +19,3 @@ generated_ids = model.generate(**inputs)
 generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    with open("generated_text.txt", "w") as f:
-        f.write(RESULT["generated_text"])

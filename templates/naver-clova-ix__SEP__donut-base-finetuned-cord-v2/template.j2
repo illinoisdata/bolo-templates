@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "naver-clova-ix/donut-base-finetuned-cord-v2" %}
 {% set doc_image_path = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
 {% set prompt = "<s_cord>" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/naver-clova-ix__SEP__donut-base-finetuned-cord-v2" %}
 {% set max_length = 256 %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 doc_image_path = "{{ doc_image_path }}"
 prompt = "{{ prompt }}"
-output_dir = "{{ output_dir }}"
 max_length = {{ max_length }}
 from pathlib import Path
 import os
@@ -33,7 +33,3 @@ generated_ids = model.generate(
 )
 generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 RESULT = {"predicted_text": generated_text}
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    result_path = Path(output_dir) / "predicted_text.txt"
-    result_path.write_text(RESULT["predicted_text"], encoding="utf-8")

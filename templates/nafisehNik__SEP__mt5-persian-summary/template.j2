@@ -1,4 +1,5 @@
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/nafisehNik__SEP__mt5-persian-summary" %}
+{% set device = "cuda:0" %}
+{% set repo_id = "nafisehNik/mt5-persian-summary" %}
 {% set input_text = "این یک متن نمونه برای خلاصه سازی اخبار فارسی است." %}
 {% set num_beams = 2 %}
 {% set max_output_length = 120 %}
@@ -9,7 +10,6 @@
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 input_text = "{{ input_text }}"
 num_beams = {{ num_beams }}
 max_output_length = {{ max_output_length }}
@@ -53,9 +53,3 @@ decoded = tokenizer.batch_decode(
 summary = decoded[0] if len(decoded) == 1 else decoded
 
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    summary_path = os.path.join(output_dir, "summary.txt")
-    with open(summary_path, "w", encoding="utf-8") as summary_file:
-        summary_file.write(RESULT["summary"])

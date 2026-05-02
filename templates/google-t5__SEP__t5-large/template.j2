@@ -1,13 +1,13 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google-t5/t5-large" %}
 {% set prompt_text = "translate English to German: The quick brown fox jumps over the lazy dog." %}
 {% set max_new_tokens = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google-t5__SEP__t5-large" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt_text = "{{ prompt_text }}"
 max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -31,10 +31,3 @@ generated_ids = model.generate(
 generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_texts}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    file_path = output_path / "generated_texts.txt"
-    with file_path.open("w", encoding="utf-8") as output_file:
-        output_file.write("\n".join(RESULT["generated_text"]))

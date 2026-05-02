@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set text = "Hugging Face is based in New York City." %}
 {% set entity_spans = [(0, 12), (25, 38)] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/studio-ousia__SEP__luke-large-finetuned-conll-2003" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 entity_spans = {{ entity_spans }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -58,9 +56,3 @@ for index, span in enumerate(entity_spans):
     })
 
 RESULT = {"entity_predictions": entity_predictions}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    result_path = os.path.join(output_dir, "entity_predictions.json")
-    with open(result_path, "w", encoding="utf-8") as file:
-        json.dump(RESULT, file, ensure_ascii=False, indent=2)

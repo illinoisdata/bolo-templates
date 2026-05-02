@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/pix2struct-base" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set prompt_text = "Describe the image in detail." %}
 {% set max_length = 256 %}
 {% set num_beams = 1 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__pix2struct-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -10,7 +11,6 @@ image_path = "{{ image_path }}"
 prompt_text = "{{ prompt_text }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from io import BytesIO
 from pathlib import Path
@@ -36,8 +36,3 @@ generated_texts = processor.tokenizer.batch_decode(generated_ids, skip_special_t
 caption = generated_texts[0]
 
 RESULT = {"generated_text": caption}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

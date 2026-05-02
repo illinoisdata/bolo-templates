@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-tc-big-en-tr" %}
 {% set src_text = ["I know Tom didn't want to eat that.", "On Sundays, we would get up early and go fishing."] %}
-{% set output_dir = "/tmp/opus_mt_translations" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 src_text = {{ src_text }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -23,8 +23,3 @@ with torch.no_grad():
 translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "translations.txt").write_text("\n".join(RESULT["translations"]), encoding="utf-8")

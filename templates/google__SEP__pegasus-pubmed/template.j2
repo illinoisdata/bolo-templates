@@ -5,7 +5,6 @@
 {% set min_length = 32 %}
 {% set num_beams = 8 %}
 {% set length_penalty = 0.8 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__pegasus-pubmed" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -14,7 +13,6 @@ max_length = {{ max_length }}
 min_length = {{ min_length }}
 num_beams = {{ num_beams }}
 length_penalty = {{ length_penalty }}
-output_dir = "{{ output_dir }}"
 
 import os
 from pathlib import Path
@@ -43,8 +41,3 @@ with torch.no_grad():
 summary_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"summary_text": summary_text}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    output_path = Path(output_dir) / "summary.txt"
-    output_path.write_text(RESULT["summary_text"], encoding="utf-8")

@@ -2,12 +2,10 @@
 {% set device = "cuda:0" %}
 {% set mask_prompt = "私は[MASK]が好きです。" %}
 {% set top_k = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/tohoku-nlp__SEP__bert-base-japanese-v3" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ mask_prompt }}"
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 from pathlib import Path
 import json
 import torch
@@ -46,9 +44,3 @@ for position in mask_positions:
         )
 
 RESULT = {"masked_predictions": masked_predictions}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    with open(output_path / "masked_predictions.json", "w", encoding="utf-8") as output_file:
-        json.dump(RESULT["masked_predictions"], output_file, ensure_ascii=False, indent=2)

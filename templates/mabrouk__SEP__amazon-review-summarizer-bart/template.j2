@@ -1,9 +1,8 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "mabrouk/amazon-review-summarizer-bart" %}
+{% set device = "cuda:0" %}
 {% set num_beams = 4 %}
 {% set min_length = 56 %}
 {% set max_length = 142 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/mabrouk__SEP__amazon-review-summarizer-bart" %}
 {% set review_text %}
 I really like this book. It takes a step-by-step approach to introduce the reader to the IBM Q Experience, to the basics underlying quantum computing, and to the reality of the noise involved in the current machines. This introduction is technical and shows the user how to use the IBM system either directly through the GUI on their website or by running Python code on one's own machine. The text provides examples of small exercises to try and stimulates ideas of new things to try. The IBM Q Exp Qiskit software modules are identified and introduced - Terra, Aer, Ignis, and Aqua, as well as the backends that one can choose to do the computing. The book ends with two great chapters on quantum algorithms.
 {% endset %}
@@ -13,7 +12,6 @@ review_text = """{{ review_text }}"""
 num_beams = {{ num_beams }}
 min_length = {{ min_length }}
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -40,9 +38,3 @@ summary_text = tokenizer.batch_decode(
 )[0]
 
 RESULT = {"summary": summary_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    summary_path = os.path.join(output_dir, "summary.txt")
-    with open(summary_path, "w", encoding="utf-8") as out_file:
-        out_file.write(RESULT["summary"])

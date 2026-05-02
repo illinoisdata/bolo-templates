@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Salesforce/codet5p-770m-py" %}
 {% set prompt = "def print_hello_world():" %}
 {% set max_length = 128 %}
 {% set num_return_sequences = 1 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Salesforce__SEP__codet5p-770m-py" %}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 prompt = {{ prompt | tojson }}
 max_length = {{ max_length }}
 num_return_sequences = {{ num_return_sequences }}
-output_dir = {{ output_dir | tojson }}
 
 import json
 import tempfile
@@ -51,9 +51,3 @@ generated_tokens = model.generate(
 decoded_outputs = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"generated_code": decoded_outputs}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    output_file = output_path / "generated_code.txt"
-    output_file.write_text("\n".join(RESULT["generated_code"]), encoding="utf-8")

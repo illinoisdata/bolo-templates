@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "castorini/monot5-base-msmarco-10k" %}
 {% set query = "What is the role of monot5 reranker?" %}
 {% set passage = "Monot5 reranker is fine-tuned on MS MARCO to produce accurate rankings for passages." %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/castorini__SEP__monot5-base-msmarco-10k" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -10,7 +11,6 @@ query = {{ query | tojson }}
 passage = {{ passage | tojson }}
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = {{ output_dir | tojson }}
 
 import os
 import torch
@@ -26,9 +26,3 @@ generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num
 generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(output_path, "w", encoding="utf-8") as output_file:
-        output_file.write("\n".join(RESULT["generated_text"]))

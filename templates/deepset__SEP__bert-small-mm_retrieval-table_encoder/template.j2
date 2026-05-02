@@ -1,12 +1,10 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "deepset/bert-small-mm_retrieval-table_encoder" %}
+{% set device = "cuda:0" %}
 {% set input_text = "Deep learning enables efficient retrieval embeddings." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/deepset__SEP__bert-small-mm_retrieval-table_encoder" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 
@@ -31,7 +29,3 @@ with torch.no_grad():
 
 embeddings = model_output.pooler_output.detach().cpu().numpy()
 RESULT = {"embeddings": embeddings}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "embeddings.npy"), RESULT["embeddings"])

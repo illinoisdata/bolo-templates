@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Salesforce/blip2-flan-t5-xl-coco" %}
 from transformers.models.blip_2 import modeling_blip_2
 import inspect
 from textwrap import shorten

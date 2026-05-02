@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-ca-en" %}
 {% set text_input = "El català és una llengua oficial." %}
 {% set max_length = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-ca-en" %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_input = {{ text_input | tojson }}
 max_length = {{ max_length }}
-output_dir = {{ output_dir | tojson }}
 
 from pathlib import Path
 
@@ -19,8 +19,3 @@ generated_ids = model.generate(**encoded, max_length=max_length, num_beams=4)
 translation = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    target_dir = Path(output_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-    (target_dir / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

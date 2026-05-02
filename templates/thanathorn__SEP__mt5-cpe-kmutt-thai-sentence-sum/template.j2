@@ -1,13 +1,13 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "thanathorn/mt5-cpe-kmutt-thai-sentence-sum" %}
 {% set input_text = "simplify: ถ้าพูดถึงขนมหวานในตำนานที่ชื่นใจที่สุดแล้วละก็ต้องไม่พ้น น้ำแข็งใส แน่เพราะว่าเป็นอะไรที่ชื่นใจสุด" %}
 {% set num_beams = 4 %}
 {% set max_new_tokens = 64 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/thanathorn__SEP__mt5-cpe-kmutt-thai-sentence-sum" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""
 num_beams = {{ num_beams }}
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -37,8 +37,3 @@ generated_tokens = model.generate(
 decoded = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 summary = decoded[0].strip()
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "ClueAI/PromptCLUE-base-v1-5" %}
 {% set text_input = "翻译成中文：\\nThis is a dialogue robot that can talk to people.\\n答案：" %}
 {% set sample_generation = False %}
 {% set max_input_length = 768 %}
@@ -5,7 +7,6 @@
 {% set num_beams = 4 %}
 {% set top_p = 0.8 %}
 {% set length_penalty = 0.6 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ClueAI__SEP__PromptCLUE-base-v1-5" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = {{ text_input | tojson }}
@@ -15,7 +16,6 @@ max_output_length = {{ max_output_length }}
 num_beams = {{ num_beams }}
 top_p = {{ top_p }}
 length_penalty = {{ length_penalty }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -57,9 +57,3 @@ decoded_sequences = tokenizer.batch_decode(generated_sequences, skip_special_tok
 generated_text = decoded_sequences[0].strip()
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    generated_file = output_path / "generated_text.txt"
-    generated_file.write_text(RESULT["generated_text"], encoding="utf-8")

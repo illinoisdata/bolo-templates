@@ -1,13 +1,11 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "juierror/text-to-sql-with-table-schema" %}
+{% set device = "cuda:0" %}
 {% set question = "get people name with age equal 25" %}
 {% set table_columns = ["id", "name", "age"] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/juierror__SEP__text-to-sql-with-table-schema" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 question = "{{ question }}"
 table_columns = {{ table_columns }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -34,9 +32,3 @@ generated_tokens = model.generate(
 sql = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
 
 RESULT = {"sql": sql}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    result_file = output_path / "result.sql.txt"
-    result_file.write_text(RESULT["sql"], encoding="utf-8")

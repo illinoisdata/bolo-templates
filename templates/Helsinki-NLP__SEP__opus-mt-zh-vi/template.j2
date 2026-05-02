@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-zh-vi" %}
 {% set input_text = "中国的首都是哪里？" %}
 {% set num_beams = 6 %}
 {% set max_length = 128 %}
@@ -37,8 +39,3 @@ with torch.inference_mode():
 translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    Path(output_path).mkdir(parents=True, exist_ok=True)
-    translation_path = Path(output_path) / "translation.txt"
-    translation_path.write_text(translation, encoding="utf-8")

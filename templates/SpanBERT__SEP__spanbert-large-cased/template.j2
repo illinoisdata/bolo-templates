@@ -1,13 +1,11 @@
-{% set repo_id = repo_id | default("SpanBERT/spanbert-large-cased") %}
-{% set device = device | default("cuda:0") %}
+{% set repo_id = "SpanBERT/spanbert-large-cased" %}
+{% set device = "cuda:0" %}
 {% set inference_text = inference_text | default("SpanBERT is a [MASK] of BERT.") %}
 {% set top_k = top_k | default(5) %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/SpanBERT__SEP__spanbert-large-cased") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 inference_text = {{ inference_text | tojson }}
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -45,9 +43,3 @@ for position in mask_positions:
     )
 
 RESULT = {"mask_predictions": mask_predictions}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    result_path = os.path.join(output_dir, "mask_predictions.json")
-    with open(result_path, "w", encoding="utf-8") as output_file:
-        json.dump(RESULT, output_file, ensure_ascii=False, indent=2)

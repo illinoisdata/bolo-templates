@@ -1,5 +1,5 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "sshleifer/distilbart-cnn-12-6" %}
+{% set device = "cuda:0" %}
 {% set input_text = input_text | default("The novel uses of AI in medicine were briefly described in the article, which also highlighted the challenges and the potential benefits of the new technology.") %}
 {% set max_summary_length = max_summary_length | default(142) %}
 {% set min_summary_length = min_summary_length | default(56) %}
@@ -7,7 +7,6 @@
 {% set length_penalty = length_penalty | default(2.0) %}
 {% set early_stopping = early_stopping | default(true) %}
 {% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/sshleifer__SEP__distilbart-cnn-12-6") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
@@ -17,7 +16,6 @@ num_beams = {{ num_beams }}
 length_penalty = {{ length_penalty }}
 early_stopping = {{ early_stopping }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
-output_dir = "{{ output_dir }}"
 import torch
 from pathlib import Path
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -44,8 +42,3 @@ summary_text = tokenizer.batch_decode(
     clean_up_tokenization_spaces=True,
 )[0]
 RESULT = {"summary": summary_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

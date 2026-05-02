@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "microsoft/kosmos-2-patch14-224" %}
 {% set prompt = '<grounding> An image of' %}
 {% set image = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
 {% set use_cache = True %}
@@ -44,12 +46,3 @@ RESULT = {
     'generated_text': processed_text,
     'entities': entities,
 }
-
-if __name__ == '__main__':
-    import json
-    from pathlib import Path
-
-    output_dir = Path('./')
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / 'generated_text.txt').write_text(RESULT['generated_text'], encoding='utf-8')
-    (output_dir / 'entities.json').write_text(json.dumps(RESULT['entities']), encoding='utf-8')

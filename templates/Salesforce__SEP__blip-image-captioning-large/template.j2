@@ -1,14 +1,12 @@
-{% set device = device %}
-{% set repo_id = repo_id %}
+{% set device = "cuda:0" %}
+{% set repo_id = "Salesforce/blip-image-captioning-large" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set prompt = "a photography of" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Salesforce__SEP__blip-image-captioning-large" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 prompt = "{{ prompt }}"
-output_dir = "{{ output_dir }}"
 
 from PIL import Image
 import requests
@@ -39,10 +37,3 @@ RESULT = {
     "conditional_caption": conditional_caption,
     "unconditional_caption": unconditional_caption
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "conditional_caption.txt"), "w") as f:
-        f.write(RESULT["conditional_caption"])
-    with open(os.path.join(output_dir, "unconditional_caption.txt"), "w") as f:
-        f.write(RESULT["unconditional_caption"])

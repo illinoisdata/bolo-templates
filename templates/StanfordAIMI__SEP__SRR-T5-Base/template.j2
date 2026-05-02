@@ -1,11 +1,10 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "StanfordAIMI/SRR-T5-Base" %}
+{% set device = "cuda:0" %}
 {% set input_text = "CHEST RADIOGRAPH PERFORMED ON ___  COMPARISON: Prior exam from ___.  CLINICAL HISTORY: Weakness, assess pneumonia.  FINDINGS: Frontal and lateral views of the chest were provided. Midline sternotomy wires are again noted. The heart is poorly assessed, though remains enlarged. There are at least small bilateral pleural effusions.  There may be mild interstitial edema. No pneumothorax. Bony structures are demineralized with kyphotic angulation in the lower T-spine again noted.  IMPRESSION: Limited exam with small bilateral effusions, cardiomegaly, and possible mild interstitial edema." %}
 {% set max_input_length = 512 %}
 {% set max_new_tokens = 286 %}
 {% set min_new_tokens = 120 %}
 {% set num_beams = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/StanfordAIMI__SEP__SRR-T5-Base" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
@@ -13,7 +12,6 @@ max_input_length = {{ max_input_length }}
 max_new_tokens = {{ max_new_tokens }}
 min_new_tokens = {{ min_new_tokens }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -48,9 +46,3 @@ decoded_report = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 decoded_report = decoded_report.replace("<pad>", "").strip()
 
 RESULT = {"structured_report": decoded_report}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "structured_report.txt")
-    with open(output_path, "w", encoding="utf-8") as writer:
-        writer.write(RESULT["structured_report"])

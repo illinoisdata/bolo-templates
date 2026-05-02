@@ -1,9 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "utrobinmv/t5_summary_en_ru_zh_base_2048" %}
 {%- set input_text = "Videos say approved vaccines are dangerous, but evidence shows otherwise." -%}
 {%- set prompt_prefix = "summary: " -%}
 {%- set max_new_tokens = 200 -%}
 {%- set num_beams = 4 -%}
 {%- set max_source_length = 2048 -%}
-{%- set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/utrobinmv__SEP__t5_summary_en_ru_zh_base_2048" -%}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = {{ input_text | tojson }}
@@ -11,7 +12,6 @@ prompt_prefix = {{ prompt_prefix | tojson }}
 max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
 max_source_length = {{ max_source_length }}
-output_dir = {{ output_dir | tojson }}
 
 from pathlib import Path
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -38,12 +38,3 @@ generated_tokens = model.generate(
 
 decoded_outputs = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 RESULT = {"summaries": decoded_outputs}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    summary_file = output_path / "summaries.txt"
-    with summary_file.open("w", encoding="utf-8") as writer:
-        for entry in RESULT["summaries"]:
-            writer.write(entry)
-            writer.write("\n")

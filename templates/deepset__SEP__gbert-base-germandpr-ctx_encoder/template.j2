@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "deepset/gbert-base-germandpr-ctx_encoder" %}
 {% set passage_text = "Die deutsche Hauptstadt Berlin hat eine reiche Geschichte, insbesondere im Kontext der deutschen Wiedervereinigung." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/deepset__SEP__gbert-base-germandpr-ctx_encoder" %}
 {% set max_length = 256 %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 passage_text = """{{ passage_text }}"""
-output_dir = "{{ output_dir }}"
 max_length = {{ max_length }}
 
 from pathlib import Path
@@ -43,9 +43,3 @@ embedding_tensor = embedding_tensor.squeeze(0).detach().cpu()
 passage_embedding = embedding_tensor.tolist()
 
 RESULT = {"passage_embedding": passage_embedding}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    with open(output_path / "passage_embedding.json", "w", encoding="utf-8") as outfile:
-        json.dump(RESULT["passage_embedding"], outfile, ensure_ascii=False, indent=2)

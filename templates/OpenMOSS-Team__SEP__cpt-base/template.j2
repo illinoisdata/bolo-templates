@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "OpenMOSS-Team/cpt-base" %}
 {% set input_text = "北京是中国的首都" %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/OpenMOSS-Team__SEP__cpt-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import os
@@ -26,11 +26,3 @@ generated_tokens = model.generate(**encoded, max_length=max_length, num_beams=nu
 generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    result_path = Path(output_dir) / "generated_text.txt"
-    with result_path.open("w", encoding="utf-8") as writer:
-        for entry in generated_text:
-            writer.write(entry)
-            writer.write("\n")

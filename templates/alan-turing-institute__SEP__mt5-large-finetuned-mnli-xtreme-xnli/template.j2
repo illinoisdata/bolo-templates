@@ -3,13 +3,11 @@
 {% set sequence_to_classify = "¿A quién vas a votar en 2020?" %}
 {% set candidate_labels = ["Europa", "salud pública", "política"] %}
 {% set hypothesis_template = "Este ejemplo es {}." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/alan-turing-institute__SEP__mt5-large-finetuned-mnli-xtreme-xnli" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sequence_to_classify = "{{ sequence_to_classify }}"
 candidate_labels = {{ candidate_labels }}
 hypothesis_template = "{{ hypothesis_template }}"
-output_dir = "{{ output_dir }}"
 from transformers import MT5ForConditionalGeneration, T5Tokenizer
 import json
 import os
@@ -47,11 +45,3 @@ RESULT = {
     "entailment_vs_contradiction_probabilities": entail_vs_contra_probas.detach().cpu().tolist(),
     "generated_sequences": generated.sequences.detach().cpu().tolist(),
 }
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "label_entailment_probabilities.json"), "w", encoding="utf-8") as fp:
-        json.dump(RESULT["label_entailment_probabilities"], fp, ensure_ascii=False)
-    with open(os.path.join(output_dir, "entailment_vs_contradiction_probabilities.json"), "w", encoding="utf-8") as fp:
-        json.dump(RESULT["entailment_vs_contradiction_probabilities"], fp)
-    with open(os.path.join(output_dir, "generated_sequences.json"), "w", encoding="utf-8") as fp:
-        json.dump(RESULT["generated_sequences"], fp)

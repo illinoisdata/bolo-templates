@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "InvokeAI/ip_adapter_sd_image_encoder" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/InvokeAI__SEP__ip_adapter_sd_image_encoder" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-output_dir = "{{ output_dir }}"
 
 from io import BytesIO
 from pathlib import Path
@@ -15,11 +15,9 @@ import torch
 from PIL import Image, ImageOps
 from transformers import AutoModel
 
-
 IMAGE_SIZE = 224
 CLIP_IMAGE_MEAN = np.array([0.48145466, 0.4578275, 0.40821073], dtype=np.float32)
 CLIP_IMAGE_STD = np.array([0.26862954, 0.26130258, 0.27577711], dtype=np.float32)
-
 
 def load_image(path: str) -> Image.Image:
     if path.startswith(("http://", "https://")):
@@ -27,7 +25,6 @@ def load_image(path: str) -> Image.Image:
         response.raise_for_status()
         return Image.open(BytesIO(response.content)).convert("RGB")
     return Image.open(path).convert("RGB")
-
 
 def preprocess(image: Image.Image) -> torch.Tensor:
     image = ImageOps.fit(
@@ -41,7 +38,6 @@ def preprocess(image: Image.Image) -> torch.Tensor:
     tensor = torch.from_numpy(normalized).permute(2, 0, 1).unsqueeze(0)
     return tensor
 
-
 model = AutoModel.from_pretrained(repo_id).to(device)
 model.eval()
 
@@ -53,10 +49,3 @@ with torch.no_grad():
 image_embedding = outputs.pooler_output.cpu().tolist()
 
 RESULT = {"image_embedding": image_embedding}
-
-
-if __name__ == "__main__":
-    output_dir_path = Path(output_dir)
-    output_dir_path.mkdir(parents=True, exist_ok=True)
-    with (output_dir_path / "image_embedding.json").open("w", encoding="utf-8") as out_file:
-        json.dump(RESULT["image_embedding"], out_file)

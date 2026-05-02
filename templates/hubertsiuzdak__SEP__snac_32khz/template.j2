@@ -1,12 +1,10 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "hubertsiuzdak/snac_32khz" %}
+{% set device = "cuda:0" %}
 {% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hubertsiuzdak__SEP__snac_32khz" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
-output_dir = "{{ output_dir }}"
 
 import io
 import os
@@ -52,13 +50,3 @@ RESULT = {
     "encoded_codes": encoded_codes,
     "reconstructed_audio": reconstructed_audio,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    codes_dir = os.path.join(output_dir, "codes")
-    os.makedirs(codes_dir, exist_ok=True)
-    for level_index, code_list in enumerate(RESULT["encoded_codes"]):
-        code_array = np.array(code_list, dtype=np.int64)
-        np.save(os.path.join(codes_dir, f"level_{level_index}.npy"), code_array)
-    reconstructed_audio_path = os.path.join(output_dir, "reconstructed_audio.wav")
-    sf.write(reconstructed_audio_path, RESULT["reconstructed_audio"], TARGET_SAMPLING_RATE)

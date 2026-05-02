@@ -1,15 +1,15 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "joaogante/tiny-random-gpt2-with-generation-config" %}
 {% set prompt_text = "Hello there! This is a short prompt to sample from the tiny GPT-2 model." %}
 {% set max_new_tokens = 40 %}
 {% set temperature = 0.8 %}
 {% set do_sample = true %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/joaogante__SEP__tiny-random-gpt2-with-generation-config" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt_text = "{{ prompt_text }}"
 max_new_tokens = {{ max_new_tokens }}
 temperature = {{ temperature }}
 do_sample = {{ do_sample }}
-output_dir = "{{ output_dir }}"
 
 import os
 from pathlib import Path
@@ -39,10 +39,3 @@ with torch.inference_mode():
 
 generated_text = tokenizer.decode(generated_outputs[0], skip_special_tokens=True)
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    output_file = output_path / "generated_text.txt"
-    with output_file.open("w", encoding="utf-8") as handle:
-        handle.write(RESULT["generated_text"])

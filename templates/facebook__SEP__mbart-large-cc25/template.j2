@@ -1,9 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/mbart-large-cc25" %}
 {% set src_text = "The quick brown fox jumps over the lazy dog." %}
 {% set src_lang = "en_XX" %}
 {% set target_lang = "ro_RO" %}
 {% set num_beams = 4 %}
 {% set max_length = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mbart-large-cc25/output" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 src_text = """{{ src_text }}"""
@@ -11,7 +12,6 @@ src_lang = "{{ src_lang }}"
 target_lang = "{{ target_lang }}"
 num_beams = {{ num_beams }}
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -43,9 +43,3 @@ with torch.inference_mode():
 
 translated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 RESULT = {"translated_text": translated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    destination = os.path.join(output_dir, "translated_text.txt")
-    with open(destination, "w", encoding="utf-8") as f:
-        f.write(RESULT["translated_text"])

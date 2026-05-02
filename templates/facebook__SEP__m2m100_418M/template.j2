@@ -3,19 +3,16 @@
 {% set source_text = "Life is like a box of chocolate." %}
 {% set source_lang = "en" %}
 {% set target_lang = "fr" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__m2m100_418M" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = """{{ source_text }}"""
 source_lang = "{{ source_lang }}"
 target_lang = "{{ target_lang }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-
 
 # 4. Load tokenizer/processor & model
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
@@ -36,8 +33,3 @@ translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True
 RESULT = {"translation": translations}
 
 # 8. Main guard
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    text_path = output_path / "translation.txt"
-    text_path.write_text("\n".join(RESULT["translation"]), encoding="utf-8")

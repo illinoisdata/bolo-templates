@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "tencent/HY-MT1.5-7B" %}
 {% set translation_input = "It's on the house." %}
 {% set target_language = "Chinese" %}
 {% set max_new_tokens = 256 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/tencent__SEP__HY-MT1.5-7B" %}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 translation_input = {{ translation_input | tojson }}
 target_language = {{ target_language | tojson }}
 max_new_tokens = {{ max_new_tokens }}
-output_dir = {{ output_dir | tojson }}
 
 from pathlib import Path
 import torch
@@ -43,8 +43,3 @@ generated_text = tokenizer.decode(
 translation = generated_text.strip()
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    Path(output_path, "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

@@ -7,7 +7,6 @@
 {% set max_target_length = 200 %}
 {% set num_beams = 5 %}
 {% set no_repeat_ngram_size = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/IlyaGusev__SEP__rut5_base_sum_gazeta" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -16,7 +15,6 @@ max_source_length = {{ max_source_length }}
 max_target_length = {{ max_target_length }}
 num_beams = {{ num_beams }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -51,9 +49,3 @@ summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 # Post-process & RESULT dict
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    summary_path = output_path / "summary.txt"
-    summary_path.write_text(RESULT["summary"], encoding="utf-8")

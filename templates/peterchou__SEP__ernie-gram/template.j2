@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set input_text = "在这个城市里，我想要[MASK]生活。" %}
 {% set top_k = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/peterchou__SEP__ernie-gram" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -54,9 +52,3 @@ for coordinate in mask_positions:
     )
 
 RESULT = {"input_text": input_text, "mask_predictions": mask_predictions}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    result_file = output_path / "mask_predictions.json"
-    result_file.write_text(json.dumps(RESULT, ensure_ascii=False, indent=2), encoding="utf-8")

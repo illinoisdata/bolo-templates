@@ -1,12 +1,10 @@
 {% set repo_id = "clue/roberta_chinese_base" %}
 {% set device = "cuda:0" %}
 {% set text_input = "这是一个用于测试的中文句子。" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/clue__SEP__roberta_chinese_base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -29,10 +27,3 @@ RESULT = {
     "last_hidden_state": last_hidden_state,
     "pooler_output": pooler_output,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    torch.save(RESULT["last_hidden_state"], output_path / "last_hidden_state.pt")
-    if RESULT["pooler_output"] is not None:
-        torch.save(RESULT["pooler_output"], output_path / "pooler_output.pt")

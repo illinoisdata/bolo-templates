@@ -1,9 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "circulus/kobart-chat-mixed-v2" %}
 {% set user_prompt = "안녕하세요! 오늘 어떤 대화를 나누고 싶으세요?" %}
 {% set max_new_tokens = 128 %}
 {% set temperature = 1.0 %}
 {% set do_sample = false %}
 {% set num_return_sequences = 1 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/circulus__SEP__kobart-chat-mixed-v2" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -12,7 +13,6 @@ max_new_tokens = {{ max_new_tokens }}
 temperature = {{ temperature }}
 do_sample = {{ "True" if do_sample else "False" }}
 num_return_sequences = {{ num_return_sequences }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -39,9 +39,3 @@ generated_texts = tokenizer.batch_decode(
 )
 
 RESULT = {"generated_texts": generated_texts}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    text_path = output_path / "generated_texts.txt"
-    text_path.write_text("\n".join(generated_texts), encoding="utf-8")

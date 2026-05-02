@@ -3,14 +3,12 @@
 {% set sentence_a = "Dnes je výborné počasí na procházku po parku." %}
 {% set sentence_b = "Večer si oblíbím dobrý film a uvařím si čaj." %}
 {% set max_length = 512 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Seznam__SEP__simcse-dist-mpnet-paracrawl-cs-en" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentence_a = "{{ sentence_a }}"
 sentence_b = "{{ sentence_b }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -41,8 +39,3 @@ similarity = torch.nn.functional.cosine_similarity(embeddings[0], embeddings[1],
 similarity_score = similarity.item()
 
 RESULT = {"similarity_score": similarity_score}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "similarity_score.txt").write_text(str(RESULT["similarity_score"]))

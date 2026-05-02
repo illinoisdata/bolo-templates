@@ -1,12 +1,10 @@
 {% set repo_id = "cahya/t5-base-indonesian-summarization-cased" %}
 {% set device = "cuda:0" %}
 {% set article_text = "Presiden Indonesia menyampaikan perkembangan penting dalam konferensi global terkait perubahan iklim." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/cahya__SEP__t5-base-indonesian-summarization-cased" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 article_text = """{{ article_text }}"""
-output_dir = "{{ output_dir }}"
 
 import os
 
@@ -51,9 +49,3 @@ summary_text = tokenizer.decode(
 )
 
 RESULT = {"summary_text": summary_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    summary_path = os.path.join(output_dir, "summary.txt")
-    with open(summary_path, "w", encoding="utf-8") as writer:
-        writer.write(summary_text)

@@ -1,12 +1,10 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "Qdrant/clip-ViT-B-32-text" %}
+{% set device = "cuda:0" %}
 {% set text_inputs = ["A photo of a cat.", "A dog in the park."] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qdrant__SEP__clip-ViT-B-32-text" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_inputs = {{ text_inputs | tojson }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -15,7 +13,6 @@ import numpy as np
 import onnxruntime
 from huggingface_hub import hf_hub_download
 from transformers import AutoTokenizer
-
 
 prepared_texts: list[str]
 if isinstance(text_inputs, str):
@@ -65,9 +62,3 @@ norms = np.where(norms == 0, 1e-12, norms)
 normalized_embeddings = (text_embeddings / norms).tolist()
 
 RESULT = {"sentence_embeddings": normalized_embeddings}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    embeddings_path = os.path.join(output_dir, "sentence_embeddings.json")
-    with open(embeddings_path, "w", encoding="utf-8") as writer:
-        json.dump(RESULT["sentence_embeddings"], writer)

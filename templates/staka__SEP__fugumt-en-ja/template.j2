@@ -1,12 +1,10 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "staka/fugumt-en-ja" %}
+{% set device = "cuda:0" %}
 {% set input_text = "This is a cat." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/staka__SEP__fugumt-en-ja" %}
 
 repo_id = """{{ repo_id }}"""
 device = """{{ device }}"""
 input_text = """{{ input_text }}"""
-output_dir = """{{ output_dir }}"""
 
 from pathlib import Path
 import torch
@@ -29,9 +27,3 @@ with torch.no_grad():
 
 translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    path = Path(output_dir)
-    path.mkdir(parents=True, exist_ok=True)
-    file_path = path / "translations.txt"
-    file_path.write_text("\n".join(RESULT["translations"]), encoding="utf-8")

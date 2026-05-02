@@ -1,12 +1,10 @@
 {% set repo_id = "UFNLP/gatortronS" %}
 {% set device = "cuda:0" %}
 {% set text = "Bone scan: Negative for distant metastasis." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/UFNLP__SEP__gatortronS" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModel
 import torch
@@ -26,8 +24,3 @@ RESULT = {
     "last_hidden_state": last_hidden_state,
     "pooler_output": pooler_output,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "last_hidden_state.npy"), RESULT["last_hidden_state"].cpu().detach().numpy())
-    np.save(os.path.join(output_dir, "pooler_output.npy"), RESULT["pooler_output"].cpu().detach().numpy())

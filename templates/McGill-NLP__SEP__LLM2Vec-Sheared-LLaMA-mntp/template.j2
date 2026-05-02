@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "McGill-NLP/LLM2Vec-Sheared-LLaMA-mntp" %}
 {% set text_left = "How much protein should a female eat" %}
 {% set text_right = "Definition of summit for English Language Learners." %}
 {% set max_length = 256 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/McGill-NLP__SEP__LLM2Vec-Sheared-LLaMA-mntp" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_left = "{{ text_left }}"
 text_right = "{{ text_right }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import json
@@ -58,21 +58,3 @@ RESULT = {
     "pairwise_similarity_matrix": similarity_matrix_list,
     "embeddings": pooled_embeddings.cpu().tolist(),
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "cosine_similarity_between_first_two.txt").write_text(
-        str(RESULT["cosine_similarity_between_first_two"])
-    )
-    with (
-        output_path / "pairwise_similarity_matrix.json"
-    ).open("w", encoding="utf-8") as matrix_file:
-        json.dump(
-            RESULT["pairwise_similarity_matrix"],
-            matrix_file,
-            ensure_ascii=False,
-            indent=2,
-        )
-    with (output_path / "embeddings.json").open("w", encoding="utf-8") as embeddings_file:
-        json.dump(RESULT["embeddings"], embeddings_file, ensure_ascii=False, indent=2)

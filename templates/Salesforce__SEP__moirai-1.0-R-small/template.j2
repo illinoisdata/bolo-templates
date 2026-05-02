@@ -76,10 +76,3 @@ RESULT = {
     "forecast_mean": forecast_mean,
     "forecast_samples": forecast_samples,
 }
-
-if __name__ == "__main__":
-    output_dir = os.environ.get("OUTPUT_DIR", "./output")
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "forecast.json")
-    with open(output_path, "w") as f:
-        json.dump(RESULT, f)

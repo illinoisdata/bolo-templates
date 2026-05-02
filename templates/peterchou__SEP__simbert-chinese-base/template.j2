@@ -1,12 +1,10 @@
 {% set repo_id = "peterchou/simbert-chinese-base" %}
 {% set device = "cuda:0" %}
 {% set text_inputs = ["这是一个用于 SimBERT 的示例句子。"] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/peterchou__SEP__simbert-chinese-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_inputs = {{ text_inputs }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -26,8 +24,3 @@ with torch.no_grad():
 cls_embeddings = model_outputs.last_hidden_state[:, 0, :].cpu().numpy()
 
 RESULT = {"cls_embeddings": cls_embeddings}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    np.save(output_path / "cls_embeddings.npy", RESULT["cls_embeddings"])

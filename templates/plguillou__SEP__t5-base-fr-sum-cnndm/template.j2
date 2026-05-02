@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "plguillou/t5-base-fr-sum-cnndm" %}
 {% set prefix = "summarize: " %}
 {% set max_length = 200 %}
 {% set min_length = 30 %}
@@ -5,7 +7,6 @@
 {% set length_penalty = 2.0 %}
 {% set num_beams = 4 %}
 {% set early_stopping = true %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/plguillou__SEP__t5-base-fr-sum-cnndm" %}
 {% set text -%}
 Apollo 11 est une mission du programme spatial américain Apollo au cours de laquelle, pour la première fois, des hommes se sont posés sur la Lune, le lundi 21 juillet 1969. L'agence spatiale américaine, la NASA, remplit ainsi l'objectif fixé par le président John F. Kennedy en 1961 de poser un équipage sur la Lune avant la fin de la décennie 1960. Il s'agissait de démontrer la supériorité des États-Unis sur l'Union soviétique qui avait été mise à mal par les succès soviétiques au début de l'ère spatiale dans le contexte de la guerre froide qui oppose alors ces deux pays. Ce défi est lancé alors que la NASA n'a pas encore placé en orbite un seul astronaute. Grâce à une mobilisation de moyens humains et financiers considérables, l'agence spatiale rattrape puis dépasse le programme spatial soviétique.
 {%- endset %}
@@ -19,7 +20,6 @@ no_repeat_ngram_size = {{ no_repeat_ngram_size }}
 length_penalty = {{ length_penalty }}
 num_beams = {{ num_beams }}
 early_stopping = {{ "True" if early_stopping else "False" }}
-output_dir = "{{ output_dir }}"
 text = """{{ text }}"""
 
 # Imports
@@ -51,8 +51,3 @@ token_ids = model.generate(
 # Post-process
 summary = tokenizer.batch_decode(token_ids, skip_special_tokens=True)[0]
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    output_path = Path(output_dir) / "summary.txt"
-    output_path.write_text(RESULT["summary"], encoding="utf-8")

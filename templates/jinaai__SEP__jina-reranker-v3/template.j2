@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "jinaai/jina-reranker-v3" %}
 {% set query = "What are the health benefits of green tea?" %}
 {% set documents = [
     "Green tea contains antioxidants called catechins that may help reduce inflammation and protect cells from damage.",
@@ -9,14 +11,12 @@
 ] %}
 {% set top_n = 3 %}
 {% set return_embeddings = false %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/jinaai__SEP__jina-reranker-v3" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query = "{{ query }}"
 documents = {{ documents }}
 top_n = {{ top_n }}
 return_embeddings = {{ return_embeddings }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -80,9 +80,3 @@ if top_n is not None:
     reranked_results = reranked_results[:top_n]
 
 RESULT = {"reranked_documents": reranked_results}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    result_path = os.path.join(output_dir, "rerank_results.json")
-    with open(result_path, "w", encoding="utf-8") as output_file:
-        json.dump(RESULT, output_file, ensure_ascii=False, indent=2)

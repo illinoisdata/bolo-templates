@@ -1,12 +1,10 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "facebook/vit-mae-large" %}
+{% set device = "cuda:0" %}
 {% set image_path = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__vit-mae-large' %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import numpy as np
@@ -42,12 +40,3 @@ RESULT = {
     "mask": mask,
     "ids_restore": ids_restore,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    # save loss
-    with open(os.path.join(output_dir, "loss.txt"), "w") as f:
-        f.write(str(RESULT["loss"]))
-    # save arrays
-    np.save(os.path.join(output_dir, "mask.npy"), RESULT["mask"])
-    np.save(os.path.join(output_dir, "ids_restore.npy"), RESULT["ids_restore"])

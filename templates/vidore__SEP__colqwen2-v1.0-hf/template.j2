@@ -1,15 +1,13 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "vidore/colqwen2-v1.0-hf" %}
+{% set device = "cuda:0" %}
 {% set image1_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set image2_path = "/u/yli77/projects/ML-code-generation/data/image2.jpeg" %}
 {% set queries = ["When was the United States Declaration of Independence proclaimed?", "Who printed the edition of Romeo and Juliet?"] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/vidore__SEP__colqwen2-v1.0-hf" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image1_path = "{{ image1_path }}"
 image2_path = "{{ image2_path }}"
 queries = {{ queries }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -47,10 +45,3 @@ with torch.no_grad():
 
 retrieval_scores = scores.detach().cpu().tolist()
 RESULT = {"retrieval_scores": retrieval_scores}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    scores_path = output_path / "retrieval_scores.json"
-    with scores_path.open("w", encoding="utf-8") as fd:
-        json.dump(RESULT["retrieval_scores"], fd)

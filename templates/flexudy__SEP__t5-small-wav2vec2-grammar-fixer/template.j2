@@ -8,7 +8,6 @@
 {% set repetition_penalty = 1.0 %}
 {% set length_penalty = 1.0 %}
 {% set early_stopping = True %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/flexudy__SEP__t5-small-wav2vec2-grammar-fixer" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -20,7 +19,6 @@ num_beams = {{ num_beams }}
 repetition_penalty = {{ repetition_penalty }}
 length_penalty = {{ length_penalty }}
 early_stopping = {{ early_stopping }}
-output_dir = "{{ output_dir }}"
 
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 import torch
@@ -54,9 +52,3 @@ generated_text = tokenizer.decode(
 )
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(output_path, "w") as f:
-        f.write(RESULT["generated_text"])

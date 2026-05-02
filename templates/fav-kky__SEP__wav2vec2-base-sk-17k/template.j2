@@ -1,8 +1,8 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "fav-kky/wav2vec2-base-sk-17k" %}
 {% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/fav-kky__SEP__wav2vec2-base-sk-17k" %}
 
 audio_path = "{{ audio_path }}"
-output_dir = "{{ output_dir }}"
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 
@@ -52,8 +52,3 @@ with torch.no_grad():
 last_hidden_state = outputs.last_hidden_state.detach().cpu()
 
 RESULT = {"last_hidden_state": last_hidden_state}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    save_path = Path(output_dir) / "last_hidden_state.npy"
-    np.save(str(save_path), RESULT["last_hidden_state"].numpy())

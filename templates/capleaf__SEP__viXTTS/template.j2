@@ -1,4 +1,5 @@
-{% set repo_id = repo_id %}
+{% set device = "cuda:0" %}
+{% set repo_id = "capleaf/viXTTS" %}
 repo_id = "{{ repo_id }}"
 from huggingface_hub import list_repo_files, hf_hub_download
 import json

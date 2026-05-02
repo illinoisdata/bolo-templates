@@ -7,7 +7,6 @@
 {% set no_repeat_ngram_size = 3 %}
 {% set length_penalty = 2.0 %}
 {% set early_stopping = True %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/kabita-choudhary__SEP__finetuned-bart-for-conversation-summary" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -18,7 +17,6 @@ min_length = {{ min_length }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
 length_penalty = {{ length_penalty }}
 early_stopping = {{ early_stopping }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import torch
@@ -49,8 +47,3 @@ summary = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
 # Build RESULT dict
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

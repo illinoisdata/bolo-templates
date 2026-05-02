@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Efficient-Large-Model/Llama-3-VILA1.5-8B-Fix" %}
 import pkgutil
 import transformers
 
@@ -5,6 +7,3 @@ modules = [finder.name for finder in pkgutil.iter_modules(transformers.models.__
 print(modules)
 
 RESULT = {"module_count": len(modules)}
-
-if __name__ == "__main__":
-    pass

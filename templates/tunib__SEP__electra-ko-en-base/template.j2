@@ -1,11 +1,9 @@
 {% set repo_id = "tunib/electra-ko-en-base" %}
 {% set device = "cuda:0" %}
 {% set input_text = "이 문장은 영어와 한국어를 모두 포함합니다. This sentence demonstrates bilingual support." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/tunib__SEP__electra-ko-en-base" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -35,12 +33,3 @@ RESULT = {
     "tokens": tokens,
     "prediction_ids": prediction_ids,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    tokens_path = os.path.join(output_dir, "tokens.json")
-    prediction_path = os.path.join(output_dir, "prediction_ids.json")
-    with open(tokens_path, "w", encoding="utf-8") as token_file:
-        json.dump(RESULT["tokens"], token_file, ensure_ascii=False, indent=2)
-    with open(prediction_path, "w", encoding="utf-8") as prediction_file:
-        json.dump(RESULT["prediction_ids"], prediction_file, indent=2)

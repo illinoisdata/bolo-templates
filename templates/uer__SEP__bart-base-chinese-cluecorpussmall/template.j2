@@ -1,5 +1,6 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "uer/bart-base-chinese-cluecorpussmall" %}
 {% set text_input = "中国的首都是[MASK]京" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/uer__SEP__bart-base-chinese-cluecorpussmall" %}
 {% set max_length = 50 %}
 {% set num_beams = 1 %}
 {% set do_sample = False %}
@@ -7,7 +8,6 @@
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
-output_dir = "{{ output_dir }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 do_sample = {{ do_sample }}
@@ -24,8 +24,3 @@ generated_ids = model.generate(**inputs, max_length=max_length, do_sample=do_sam
 decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 decoded_text = decoded[0] if decoded else ""
 RESULT = {"generated_text": decoded_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

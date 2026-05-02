@@ -1,12 +1,10 @@
 {% set repo_id = "facebook/roscoe-512-roberta-base" %}
 {% set device = "cuda:0" %}
 {% set sentences = ["This is a test sentence.", "This is another one."] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__roscoe-512-roberta-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences }}
-output_dir = "{{ output_dir }}"
 
 import os
 import json
@@ -22,8 +20,3 @@ embeddings = outputs.pooler_output
 embeddings = embeddings.cpu().tolist()
 
 RESULT = {"embeddings": embeddings}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "embeddings.json"), "w") as f:
-        json.dump(RESULT["embeddings"], f)

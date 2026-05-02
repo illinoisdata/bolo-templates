@@ -1,12 +1,10 @@
 {% set repo_id = "facebook/wav2vec2-large" %}
 {% set device = "cuda:0" %}
 {% set audio_filepath = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__wav2vec2-large" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_filepath = "{{ audio_filepath }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoFeatureExtractor, AutoModelForPreTraining
 import torch
@@ -55,7 +53,3 @@ with torch.no_grad():
 projected_states = outputs.projected_states.cpu().numpy()
 
 RESULT = {"projected_states": projected_states}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "projected_states.npy"), RESULT["projected_states"])

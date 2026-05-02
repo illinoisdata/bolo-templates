@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/t5-efficient-small" %}
 {% set prompt = "Translate English to German: The house is wonderful." %}
 {% set max_new_tokens = 64 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__t5-efficient-small" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = {{ prompt | tojson }}
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 import os
 
@@ -20,9 +20,3 @@ outputs = model.generate(**inputs, max_new_tokens=max_new_tokens)
 generated_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0].strip()
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(RESULT["generated_text"])

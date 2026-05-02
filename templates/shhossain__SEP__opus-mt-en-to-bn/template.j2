@@ -1,12 +1,10 @@
 {% set repo_id = "shhossain/opus-mt-en-to-bn" %}
 {% set device = "cuda:0" %}
 {% set text = "Will you come home tonight?" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/shhossain__SEP__opus-mt-en-to-bn" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
@@ -21,9 +19,3 @@ translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True
 translation = translations[0]
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    out_path = os.path.join(output_dir, "translation.txt")
-    with open(out_path, "w", encoding="utf-8") as f:
-        f.write(translation)

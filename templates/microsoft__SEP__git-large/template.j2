@@ -4,7 +4,6 @@
 {% set max_length = 20 %}
 {% set num_beams = 1 %}
 {% set num_return_sequences = 1 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__git-large" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -12,7 +11,6 @@ image_path = "{{ image_path }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 num_return_sequences = {{ num_return_sequences }}
-output_dir = "{{ output_dir }}"
 
 import os
 from pathlib import Path
@@ -45,10 +43,3 @@ generated_ids = model.generate(
 captions = processor.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
 RESULT = {"captions": captions}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_file = Path(output_dir) / "captions.txt"
-    with open(output_file, "w", encoding="utf-8") as f:
-        for caption in RESULT["captions"]:
-            f.write(caption + "\n")

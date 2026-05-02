@@ -1,12 +1,10 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "Helsinki-NLP/opus-tatoeba-en-ja" %}
+{% set device = "cuda:0" %}
 {% set input_text = "Hello, how are you today?" %}
-{% set output_dir = "/tmp" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -30,9 +28,3 @@ decoded = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 translation = decoded[0].strip()
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    translation_path = output_path / "translation.txt"
-    translation_path.write_text(RESULT["translation"], encoding="utf-8")

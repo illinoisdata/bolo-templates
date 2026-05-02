@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "myshell-ai/MeloTTS-Spanish" %}
 import transformers
 print("vits" in dir(transformers.models))
 print(getattr(transformers.models, "vits", None))

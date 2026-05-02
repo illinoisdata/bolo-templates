@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "nasa-impact/indus-sde-st-v0.2" %}
 {% set input_text_a = "NASA is preparing missions to study Martian sample return strategies." %}
 {% set input_text_b = "Martian sample return is a priority for NASA's scientific program." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/nasa-impact__SEP__indus-sde-st-v0.2" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text_a = "{{ input_text_a }}"
 input_text_b = "{{ input_text_b }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import json
@@ -14,7 +14,6 @@ import json
 import torch
 import torch.nn.functional as F
 from transformers import AutoModel, AutoTokenizer
-
 
 def mean_pooling(model_output, attention_mask):
     token_embeddings = model_output.last_hidden_state
@@ -26,7 +25,6 @@ def mean_pooling(model_output, attention_mask):
     sum_embeddings = torch.sum(token_embeddings * expanded_mask, dim=1)
     sum_mask = expanded_mask.sum(dim=1).clamp(min=1e-9)
     return sum_embeddings / sum_mask
-
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = AutoModel.from_pretrained(repo_id).to(device)
@@ -61,14 +59,3 @@ RESULT = {
     "sentence_embeddings": embedding_values,
     "similarity_score": similarity_score,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "similarity_score.txt").write_text(
-        str(RESULT["similarity_score"]), encoding="utf-8"
-    )
-    (output_path / "sentence_embeddings.json").write_text(
-        json.dumps(RESULT["sentence_embeddings"], ensure_ascii=False),
-        encoding="utf-8",
-    )

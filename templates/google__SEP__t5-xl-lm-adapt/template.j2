@@ -1,13 +1,13 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/t5-xl-lm-adapt" %}
 {% set prompt = "Translate English to German: The house is wonderful." %}
 {% set max_length = 128 %}
 {% set num_return_sequences = 1 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__t5-xl-lm-adapt" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"
 max_length = {{ max_length }}
 num_return_sequences = {{ num_return_sequences }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -22,9 +22,3 @@ generated_ids = model.generate(
 )
 generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 RESULT = {"generated_text": generated_texts}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    save_path = output_path / "generated.txt"
-    save_path.write_text("\n".join(RESULT["generated_text"]), encoding="utf-8")

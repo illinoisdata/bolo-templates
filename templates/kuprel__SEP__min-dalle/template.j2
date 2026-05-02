@@ -5,10 +5,8 @@
 {% set supercondition_factor = 32 %}
 {% set seed = -1 %}
 {% set is_seamless = False %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/kuprel__SEP__min-dalle" %}
-{% set device = device %}
-{% set repo_id = repo_id %}
-
+{% set device = "cuda:0" %}
+{% set repo_id = "kuprel/min-dalle" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"
@@ -18,7 +16,6 @@ top_k = {{ top_k }}
 supercondition_factor = {{ supercondition_factor }}
 seed = {{ seed }}
 is_seamless = {{ "True" if is_seamless else "False" }}
-output_dir = "{{ output_dir }}"
 models_root_dir = "./" + repo_id.replace("/", "_") + "_models"
 
 from pathlib import Path
@@ -50,9 +47,3 @@ image = model.generate_image(
 )
 
 RESULT = {"image": image}
-
-if __name__ == "__main__":
-    output_dir_path = Path(output_dir)
-    output_dir_path.mkdir(parents=True, exist_ok=True)
-    image_path = output_dir_path / "generated.png"
-    RESULT["image"].save(image_path)

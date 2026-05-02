@@ -1,9 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Einmalumdiewelt/T5-Base_GNAD" %}
 {% set text_input = "Die internationalen Klimaverhandlungen erstrecken sich über viele Staaten und treffen auf unterschiedliche Interessen." %}
 {% set summary_prefix = "summarize: " %}
 {% set min_length = 30 %}
 {% set max_length = 200 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Einmalumdiewelt__SEP__T5-Base_GNAD" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""
@@ -11,7 +12,6 @@ summary_prefix = "{{ summary_prefix }}"
 min_length = {{ min_length }}
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import torch
@@ -44,9 +44,3 @@ decoded = tokenizer.batch_decode(
 summary = decoded[0].strip()
 
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    summary_path = output_path / "summary.txt"
-    summary_path.write_text(RESULT["summary"], encoding="utf-8")

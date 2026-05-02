@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Qdrant/bge-small-en-v1.5-onnx-Q" %}
 {% set texts = ["The quick brown fox jumps over the lazy dog.", "A short sentence for embedding."] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qdrant__SEP__bge-small-en-v1.5-onnx-Q" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 texts = {{ texts }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import json
@@ -61,11 +61,3 @@ RESULT = {
     "embeddings": normalized_embeddings,
     "similarity_matrix": similarity_matrix,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    np.save(output_path / "embeddings.npy", RESULT["embeddings"])
-    (output_path / "similarity_matrix.json").write_text(
-        json.dumps(RESULT["similarity_matrix"].tolist())
-    )

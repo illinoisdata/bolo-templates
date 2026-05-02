@@ -1,12 +1,10 @@
 {% set device = "cuda:0" %}
 {% set repo_id = "Maltehb/aelaectra-danish-electra-small-cased" %}
 {% set text = "Dette er en prøve sætning." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Maltehb__SEP__aelaectra-danish-electra-small-cased" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import numpy as np
@@ -28,7 +26,3 @@ logits = logits.detach().cpu().numpy()
 
 # Post-process & build RESULT dict
 RESULT = {"logits": logits}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "logits.npy"), logits)

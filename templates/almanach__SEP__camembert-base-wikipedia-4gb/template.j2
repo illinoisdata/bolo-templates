@@ -1,5 +1,5 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "almanach/camembert-base-wikipedia-4gb" %}
+{% set device = "cuda:0" %}
 {% set text = "Le camembert est un fromage de <mask>!" %}
 
 repo_id = "{{ repo_id }}"
@@ -29,8 +29,3 @@ results = fill_mask(text)
 
 # Post-process & build RESULT dict
 RESULT = {"results": results}
-
-if __name__ == "__main__":
-    # Save results to disk as JSON
-    with open("results.json", "w") as f:
-        json.dump(RESULT, f)

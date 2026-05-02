@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/mbart-large-50-many-to-one-mmt" %}
 {% set source_sentence = "संयुक्त राष्ट्र के प्रमुख का कहना है कि सीरिया में कोई सैन्य समाधान नहीं है" %}
 {% set source_lang = "hi_IN" %}
 {% set target_lang = "en_XX" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mbart-large-50-many-to-one-mmt" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_sentence = """{{ source_sentence }}"""
 source_lang = "{{ source_lang }}"
 target_lang = "{{ target_lang }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import os
@@ -32,9 +32,3 @@ RESULT = {
     "decoded_sentences": decoded_sentences,
     "translation": translation,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "translation.txt")
-    with open(output_path, "w", encoding="utf-8") as writer:
-        writer.write(RESULT["translation"])

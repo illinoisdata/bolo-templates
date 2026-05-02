@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "linhphanff/semantic-base-vi" %}
 {% set sentences = [
     "Học sinh cần được hướng dẫn kỹ năng học tập.",
     "Thời tiết hôm nay thật đẹp và mát mẻ.",
@@ -10,11 +12,9 @@
     "Nhiều tuyến đường ở thành phố Hồ Chí Minh bị ngập nặng sau cơn mưa lớn.",
     "Sách là nguồn tri thức vô giá cho mỗi con người."
 ] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/linhphanff__SEP__semantic-base-vi" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences | tojson }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -32,8 +32,3 @@ with torch.no_grad():
     embeddings = outputs.pooler_output
 embedding_list = embeddings.cpu().tolist()
 RESULT = {"embeddings": embedding_list}
-
-if __name__ == "__main__":
-    out_path = Path(output_dir)
-    out_path.mkdir(parents=True, exist_ok=True)
-    (out_path / "embeddings.json").write_text(json.dumps(RESULT["embeddings"]))

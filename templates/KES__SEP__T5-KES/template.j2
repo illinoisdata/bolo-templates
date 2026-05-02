@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "KES/T5-KES" %}
 {% set text_input = "I am lived with my parenmts " %}
 {% set prefix = "grammar: " %}
 {% set num_beams = 4 %}
 {% set max_length = 512 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/KES__SEP__T5-KES" %}
 
 repo_id = "{{ repo_id }}"
 device = {{ device | tojson }}
@@ -10,7 +11,6 @@ text_input = {{ text_input | tojson }}
 prefix = {{ prefix | tojson }}
 num_beams = {{ num_beams }}
 max_length = {{ max_length }}
-output_dir = {{ output_dir | tojson }}
 
 from pathlib import Path
 
@@ -34,8 +34,3 @@ decoded_outputs = tokenizer.batch_decode(generated_ids, skip_special_tokens=True
 correction = decoded_outputs[0].strip() if decoded_outputs else ""
 
 RESULT = {"correction": correction}
-
-if __name__ == "__main__":
-    path = Path(output_dir)
-    path.mkdir(parents=True, exist_ok=True)
-    (path / "correction.txt").write_text(RESULT["correction"], encoding="utf-8")

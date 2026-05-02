@@ -1,9 +1,7 @@
 {% set repo_id = "nieche/chronos-bolt-small-fine-tuned-v3" %}
 {% set device = "cuda:0" %}
-{% set output_dir = "/tmp" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import T5ForConditionalGeneration
 import torch
@@ -12,6 +10,3 @@ import os
 model = T5ForConditionalGeneration.from_pretrained(repo_id)
 model.to(device)
 RESULT = {"loaded": True}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)

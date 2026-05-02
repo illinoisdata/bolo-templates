@@ -1,7 +1,8 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/hf-seamless-m4t-medium" %}
 {% set text_prompt = "Hello, this is a SeamlessM4T text-to-speech demo." %}
 {% set src_lang = "eng" %}
 {% set tgt_lang = "fra" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__hf-seamless-m4t-medium" %}
 {% set output_audio_filename = "text_to_speech.wav" %}
 {% set sampling_rate = 16000 %}
 
@@ -10,7 +11,6 @@ device = "{{ device }}"
 text_prompt = "{{ text_prompt }}"
 src_lang = "{{ src_lang }}"
 tgt_lang = "{{ tgt_lang }}"
-output_dir = "{{ output_dir }}"
 output_audio_filename = "{{ output_audio_filename }}"
 sampling_rate = {{ sampling_rate }}
 
@@ -40,9 +40,3 @@ def _write_wave(path: Path, data: np.ndarray, sample_rate: int) -> None:
         wave_file.setsampwidth(2)
         wave_file.setframerate(sample_rate)
         wave_file.writeframes(pcm_data.tobytes())
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    audio_path = output_path / output_audio_filename
-    _write_wave(audio_path, RESULT["generated_speech_waveform"], sampling_rate)

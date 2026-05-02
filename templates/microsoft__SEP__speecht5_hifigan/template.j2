@@ -1,12 +1,10 @@
 {% set repo_id = "microsoft/speecht5_hifigan" %}
 {% set device = "cuda:0" %}
 {% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__speecht5_hifigan" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
-output_dir = "{{ output_dir }}"
 
 from transformers.models.speecht5.modeling_speecht5 import SpeechT5HifiGan, SpeechT5HifiGanConfig
 from transformers.models.speecht5.feature_extraction_speecht5 import SpeechT5FeatureExtractor
@@ -57,8 +55,3 @@ audio = waveform.numpy()
 sampling_rate = config.sampling_rate
 
 RESULT = {"audio": audio, "sampling_rate": sampling_rate}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_audio_path = os.path.join(output_dir, "generated.wav")
-    sf.write(output_audio_path, RESULT["audio"], RESULT["sampling_rate"])

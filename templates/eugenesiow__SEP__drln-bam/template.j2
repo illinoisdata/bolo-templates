@@ -1,14 +1,12 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "eugenesiow/drln-bam" %}
+{% set device = "cuda:0" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set scale = 2 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/eugenesiow__SEP__drln-bam" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 scale = {{ scale }}
-output_dir = "{{ output_dir }}"
 
 from io import BytesIO
 from pathlib import Path
@@ -18,7 +16,6 @@ from PIL import Image
 import torch
 from super_image import DrlnModel, ImageLoader
 
-
 def _load_image_from_path_or_url(source: str) -> Image.Image:
     lower_source = source.lower()
     if lower_source.startswith("http://") or lower_source.startswith("https://"):
@@ -26,7 +23,6 @@ def _load_image_from_path_or_url(source: str) -> Image.Image:
         response.raise_for_status()
         return Image.open(BytesIO(response.content)).convert("RGB")
     return Image.open(source).convert("RGB")
-
 
 def _move_to_device(value, device_str: str):
     if isinstance(value, torch.Tensor):
@@ -36,7 +32,6 @@ def _move_to_device(value, device_str: str):
     if isinstance(value, (list, tuple)):
         return type(value)(_move_to_device(item, device_str) for item in value)
     return value
-
 
 def _extract_tensor_from_output(output):
     if isinstance(output, torch.Tensor):
@@ -52,7 +47,6 @@ def _extract_tensor_from_output(output):
             if tensor is not None:
                 return tensor
     return None
-
 
 def _tensor_to_image(tensor: torch.Tensor) -> Image.Image:
     tensor = tensor.detach().cpu()
@@ -70,7 +64,6 @@ def _tensor_to_image(tensor: torch.Tensor) -> Image.Image:
         array = array[:, :, 0]
     return Image.fromarray(array)
 
-
 image = _load_image_from_path_or_url(image_path)
 inputs = ImageLoader.load_image(image)
 model = DrlnModel.from_pretrained(repo_id, scale=scale).to(device)
@@ -85,9 +78,3 @@ if tensor_output is None:
 upscaled_image = _tensor_to_image(tensor_output)
 
 RESULT = {"upscaled_image": upscaled_image}
-
-if __name__ == "__main__":
-    save_dir = Path(output_dir)
-    save_dir.mkdir(parents=True, exist_ok=True)
-    artifact_path = save_dir / f"upscaled_image_{scale}x.png"
-    RESULT["upscaled_image"].save(artifact_path)

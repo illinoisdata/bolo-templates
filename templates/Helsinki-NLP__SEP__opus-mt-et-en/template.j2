@@ -1,11 +1,9 @@
 {% set repo_id = "Helsinki-NLP/opus-mt-et-en" %}
 {% set device = "cuda:0" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-et-en" %}
 {% set texts = ["Tere maailm!"] %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 texts = {{ texts }}
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -23,9 +21,3 @@ outputs = model.generate(**inputs)
 translations = tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "translations.txt"), "w", encoding="utf-8") as f:
-        for t in RESULT["translations"]:
-            f.write(t + "\n")

@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "monologg/kocharelectra-base-discriminator" %}
 {% set input_text = "The quick brown fox jumps over the lazy dog." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/monologg__SEP__kocharelectra-base-discriminator" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""
-output_dir = "{{ output_dir }}"
 
 import numpy as np
 import torch
@@ -42,10 +42,3 @@ if discriminator_logits_tensor is not None:
 RESULT = {"logits": logits}
 if discriminator_logits is not None:
     RESULT["discriminator_logits"] = discriminator_logits
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    np.save(output_path / "logits.npy", np.array(RESULT["logits"], dtype=np.float32))
-    if "discriminator_logits" in RESULT:
-        np.save(output_path / "discriminator_logits.npy", np.array(RESULT["discriminator_logits"], dtype=np.float32))

@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/wav2vec2-xls-r-300m" %}
 {% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__wav2vec2-xls-r-300m" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
-output_dir = "{{ output_dir }}"
 
 import io
 import json
@@ -20,8 +20,6 @@ from transformers import AutoFeatureExtractor, AutoModelForPreTraining
 
 # Resolve device and output directory objects after imports
 device = torch.device(device)
-output_dir = Path(output_dir)
-
 
 def _load_audio(source: str, target_sample_rate: int):
     parsed = urlparse(source)
@@ -41,7 +39,6 @@ def _load_audio(source: str, target_sample_rate: int):
         sample_rate = target_sample_rate
     return waveform, sample_rate
 
-
 feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
 model = AutoModelForPreTraining.from_pretrained(repo_id)
 model.to(device)
@@ -59,7 +56,6 @@ with torch.no_grad():
 last_hidden_state = outputs.hidden_states[-1].cpu()
 RESULT = {"last_hidden_state": last_hidden_state}
 
-
 def _save_output(name: str, value, directory: Path):
     if torch.is_tensor(value):
         np.save(str(directory / f"{name}.npy"), value.numpy())
@@ -73,9 +69,3 @@ def _save_output(name: str, value, directory: Path):
         return
     with open(directory / f"{name}.json", "w", encoding="utf-8") as handle:
         json.dump(value, handle)
-
-
-if __name__ == "__main__":
-    output_dir.mkdir(parents=True, exist_ok=True)
-    for output_name, output_value in RESULT.items():
-        _save_output(output_name, output_value, output_dir)

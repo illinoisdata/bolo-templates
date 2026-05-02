@@ -1,16 +1,14 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "lizhuang144/flan-t5-base-VG-factual-sg" %}
+{% set device = "cuda:0" %}
 {% set input_text = "A man playing guitar on a stage." %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/lizhuang144__SEP__flan-t5-base-VG-factual-sg" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
@@ -30,8 +28,3 @@ generated_ids = model.generate(**inputs, max_length=max_length, num_beams=num_be
 # Post-process & build RESULT dict
 generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "generated_text.txt"), "w") as f:
-        f.write(RESULT["generated_text"])

@@ -2,13 +2,11 @@
 {% set repo_id = "setu4993/LEALLA-small" %}
 {% set sentences_1 = ["This is a sentence.", "This is another sentence."] %}
 {% set sentences_2 = ["C'est une phrase.", "C'est une autre phrase."] %}
-{% set output_dir = "./outputs" %}
 
 device = "{{ device }}"
 repo_id = "{{ repo_id }}"
 sentences_1 = {{ sentences_1 }}
 sentences_2 = {{ sentences_2 }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -45,9 +43,3 @@ RESULT = {
     "embeddings_2": embeddings2,
     "similarity_matrix": similarity_matrix,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "embeddings_1.npy"), RESULT["embeddings_1"])
-    np.save(os.path.join(output_dir, "embeddings_2.npy"), RESULT["embeddings_2"])
-    np.save(os.path.join(output_dir, "similarity_matrix.npy"), RESULT["similarity_matrix"])

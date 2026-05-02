@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-en-eu" %}
 {% set text = "This is a test." %}
 {% set max_length = 512 %}
 {% set num_beams = 4 %}
@@ -20,7 +22,3 @@ decoded = tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)
 translation = decoded[0]
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    with open("translation.txt", "w", encoding="utf-8") as f:
-        f.write(RESULT["translation"])

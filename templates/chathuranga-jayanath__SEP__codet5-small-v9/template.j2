@@ -3,7 +3,6 @@
 {% set prompt = "Generate a Python function that calculates the Fibonacci sequence." %}
 {% set max_length = 256 %}
 {% set num_beams = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/chathuranga-jayanath__SEP__codet5-small-v9" %}
 {% set output_filename = "generated.txt" %}
 
 repo_id = "{{ repo_id }}"
@@ -11,7 +10,6 @@ device = "{{ device }}"
 prompt = "{{ prompt }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 output_filename = "{{ output_filename }}"
 
 from pathlib import Path
@@ -31,8 +29,3 @@ decoded_outputs = tokenizer.batch_decode(generated_tokens, skip_special_tokens=T
 generated_text = decoded_outputs[0] if decoded_outputs else ""
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir) / output_filename
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(RESULT["generated_text"], encoding="utf-8")

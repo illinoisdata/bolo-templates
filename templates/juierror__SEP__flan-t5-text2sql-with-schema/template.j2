@@ -34,8 +34,3 @@ outputs = model.generate(input_ids, num_beams=num_beams, top_k=top_k, max_length
 
 result = tokenizer.decode(outputs[0], skip_special_tokens=True)
 RESULT = {"sql_query": result}
-
-if __name__ == "__main__":
-    os.makedirs("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/juierror__SEP__flan-t5-text2sql-with-schema", exist_ok=True)
-    with open(os.path.join("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/juierror__SEP__flan-t5-text2sql-with-schema", "sql_query.txt"), "w") as f:
-        f.write(RESULT["sql_query"])

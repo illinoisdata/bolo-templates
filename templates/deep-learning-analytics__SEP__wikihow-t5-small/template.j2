@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "deep-learning-analytics/wikihow-t5-small" %}
 {% set text -%}
 Lack of fluids can lead to dry mouth, which is a leading cause of bad breath. Water
 can also dilute any chemicals in your mouth or gut that are causing bad breath., Studies show that
@@ -19,12 +21,10 @@ waistline, but it also produces chemicals called ketones, which contribute to ba
 problem, you must change your diet. Or, you can combat the smell in one of these ways:Drink lots of
 water to dilute the ketones.Chew sugarless gum or suck on sugarless mints.Chew mint leaves.
 {%- endset %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/deep-learning-analytics__SEP__wikihow-t5-small" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = """{{ text }}"""
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -65,9 +65,3 @@ summary = tokenizer.decode(
 )
 
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    summary_file = output_path / "summary.txt"
-    summary_file.write_text(RESULT["summary"], encoding="utf-8")

@@ -1,12 +1,10 @@
 {% set repo_id = "ddemszky/supervised_finetuning_hist0_is_question_switchboard_question_detection.json_bs32_lr0.000063" %}
 {% set device = "cuda:0" %}
 {% set text = "Are you coming to the meeting?" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ddemszky__SEP__supervised_finetuning_hist0_is_question_switchboard_question_detection.json_bs32_lr0.000063" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
@@ -27,9 +25,3 @@ prediction = int(torch.argmax(logits, dim=-1)[0].cpu())
 label = model.config.id2label[prediction]
 
 RESULT = {"label": label, "scores": probabilities}
-
-if __name__ == "__main__":
-    import os, json
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "result.json"), "w") as f:
-        json.dump(RESULT, f)

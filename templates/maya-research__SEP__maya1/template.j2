@@ -1,6 +1,7 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "maya-research/maya1" %}
 {% set prompt_description = prompt_description | default("Realistic male voice in the 30s age with American accent. Normal pitch, warm timbre, conversational pacing.") %}
 {% set prompt_text = prompt_text | default("Hello! This is Maya1 <laugh_harder> the best open source voice AI model with emotions.") %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/maya-research__SEP__maya1") %}
 {% set max_new_tokens = max_new_tokens | default(2048) %}
 {% set min_new_tokens = min_new_tokens | default(28) %}
 {% set temperature = temperature | default(0.4) %}
@@ -13,7 +14,6 @@ repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 prompt_description = {{ prompt_description | tojson }}
 prompt_text = {{ prompt_text | tojson }}
-output_dir = {{ output_dir | tojson }}
 max_new_tokens = {{ max_new_tokens }}
 min_new_tokens = {{ min_new_tokens }}
 temperature = {{ temperature }}
@@ -42,7 +42,6 @@ SOA_ID = 128261
 BOS_ID = 128000
 TEXT_EOT_ID = 128009
 
-
 def build_prompt(tokenizer, description: str, text: str) -> str:
     soh_token = tokenizer.decode([SOH_ID])
     eoh_token = tokenizer.decode([EOH_ID])
@@ -53,7 +52,6 @@ def build_prompt(tokenizer, description: str, text: str) -> str:
     formatted_text = f'<description="{description}"> {text}'
     prompt = soh_token + bos_token + formatted_text + eot_token + eoh_token + soa_token + sos_token
     return prompt
-
 
 def extract_snac_codes(token_ids: list[int]) -> list[int]:
     try:
@@ -66,7 +64,6 @@ def extract_snac_codes(token_ids: list[int]) -> list[int]:
         if SNAC_MIN_ID <= token_id <= SNAC_MAX_ID
     ]
     return snac_codes
-
 
 def unpack_snac_from_7(snac_tokens: list[int]) -> list[list[int]]:
     if snac_tokens and snac_tokens[-1] == CODE_END_TOKEN_ID:
@@ -90,7 +87,6 @@ def unpack_snac_from_7(snac_tokens: list[int]) -> list[list[int]]:
             (slots[6] - CODE_TOKEN_OFFSET) % 4096,
         ])
     return [l1, l2, l3]
-
 
 torch_device = torch.device(device)
 model_dtype = torch.bfloat16 if "cuda" in device else torch.float32
@@ -137,9 +133,3 @@ RESULT = {
     "audio_samples": audio_waveform,
     "sample_rate": snac_sample_rate,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    audio_path = output_path / "maya1_generated.wav"
-    sf.write(audio_path, RESULT["audio_samples"], snac_sample_rate)

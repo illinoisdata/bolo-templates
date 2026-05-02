@@ -1,9 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "deep-learning-analytics/GrammarCorrector" %}
 {% set text_input = "He are moving here." %}
 {% set num_return_sequences = 1 %}
 {% set max_length = 64 %}
 {% set num_beams = 4 %}
 {% set temperature = 1.5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/deep-learning-analytics__SEP__GrammarCorrector" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -12,7 +13,6 @@ num_return_sequences = {{ num_return_sequences }}
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 temperature = {{ temperature }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -46,11 +46,3 @@ decoded_outputs = tokenizer.batch_decode(
 )
 
 RESULT = {"corrected_texts": decoded_outputs}
-
-if __name__ == "__main__":
-    save_path = Path(output_dir)
-    save_path.mkdir(parents=True, exist_ok=True)
-    (save_path / "corrected_texts.txt").write_text(
-        "\n".join(RESULT["corrected_texts"]),
-        encoding="utf-8",
-    )

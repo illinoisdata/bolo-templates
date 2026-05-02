@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/bert_uncased_L-6_H-256_A-4" %}
 {% set text_prompt = "The capital of France is [MASK]." %}
 {% set top_k = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-6_H-256_A-4" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_prompt = "{{ text_prompt }}"
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -47,10 +47,3 @@ if mask_positions.numel() > 0:
         })
 
 RESULT = {"predictions": predictions}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    predictions_path = output_path / "predictions.json"
-    with predictions_path.open("w", encoding="utf-8") as writer:
-        json.dump(RESULT["predictions"], writer, ensure_ascii=False, indent=2)

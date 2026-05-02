@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set question = "A woman and a dog sitting together in a beach." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Salesforce__SEP__blip-itm-large-flickr" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 question = "{{ question }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import json
@@ -38,8 +36,3 @@ RESULT = {
     "itm_scores": itm_scores.detach().cpu().numpy().tolist(),
     "cosine_score": cosine_score.detach().cpu().numpy().tolist(),
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "result.json"), "w") as f:
-        json.dump(RESULT, f)

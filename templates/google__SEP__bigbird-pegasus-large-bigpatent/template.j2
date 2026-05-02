@@ -1,13 +1,13 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/bigbird-pegasus-large-bigpatent" %}
 {% set text_input = "Replace me by any text you'd like." %}
 {% set max_length = 256 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bigbird-pegasus-large-bigpatent" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -26,9 +26,3 @@ decoded_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=Tru
 summary = decoded_texts[0].strip()
 
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    summary_path = os.path.join(output_dir, "summary.txt")
-    with open(summary_path, "w", encoding="utf-8") as f:
-        f.write(RESULT["summary"])

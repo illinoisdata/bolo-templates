@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "microsoft/unispeech-sat-base" %}
 {% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__unispeech-sat-base" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
-output_dir = "{{ output_dir }}"
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse
@@ -23,7 +23,6 @@ def _is_url(path: str) -> bool:
     parsed = urlparse(path)
     return parsed.scheme in {"http", "https"}
 
-
 def _load_waveform(path: str) -> tuple[np.ndarray, int]:
     if _is_url(path):
         response = requests.get(path)
@@ -34,7 +33,6 @@ def _load_waveform(path: str) -> tuple[np.ndarray, int]:
     if waveform.ndim > 1:
         waveform = waveform.mean(axis=1)
     return waveform, sampling_rate
-
 
 waveform, sampling_rate = _load_waveform(audio_path)
 target_sampling_rate = feature_extractor.sampling_rate
@@ -55,8 +53,3 @@ logits_array = outputs.logits.detach().cpu().numpy()
 RESULT = {
     "logits": logits_array,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    np.save(output_path / "logits.npy", RESULT["logits"])

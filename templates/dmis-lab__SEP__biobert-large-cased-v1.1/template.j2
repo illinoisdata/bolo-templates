@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set input_text = "BioBERT has demonstrated strong performance on biomedical <mask> tasks." %}
 {% set top_k = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/dmis-lab__SEP__biobert-large-cased-v1.1" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -56,9 +54,3 @@ if mask_indices.numel() > 0:
         )
 
 RESULT = {"mask_predictions": mask_predictions}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = Path(output_dir) / "mask_predictions.json"
-    with output_path.open("w", encoding="utf-8") as handle:
-        json.dump(RESULT["mask_predictions"], handle, ensure_ascii=False, indent=2)

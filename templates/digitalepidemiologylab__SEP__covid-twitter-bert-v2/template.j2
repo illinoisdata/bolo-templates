@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "digitalepidemiologylab/covid-twitter-bert-v2" %}
 {% set input_sentence = "In places with a lot of people, it's a good idea to wear a [MASK]." %}
 {% set top_k = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/digitalepidemiologylab__SEP__covid-twitter-bert-v2" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_sentence = "{{ input_sentence }}"
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -51,9 +51,3 @@ for token_id, score in zip(topk_token_ids, topk_scores):
     )
 
 RESULT = {"fill_mask": results}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "fill_mask.json")
-    with open(output_path, "w", encoding="utf-8") as output_file:
-        json.dump(RESULT["fill_mask"], output_file, ensure_ascii=False, indent=4)

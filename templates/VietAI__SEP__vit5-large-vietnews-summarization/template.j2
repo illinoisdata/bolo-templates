@@ -1,12 +1,10 @@
-{% set device = device %}
-{% set repo_id = repo_id %}
+{% set device = "cuda:0" %}
+{% set repo_id = "VietAI/vit5-large-vietnews-summarization" %}
 {% set input_text = "vietnews: VietAI là tổ chức phi lợi nhuận với sứ mệnh ươm mầm tài năng về trí tuệ nhân tạo và xây dựng một cộng đồng các chuyên gia trong lĩnh vực trí tuệ nhân tạo đẳng cấp quốc tế tại Việt Nam." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/VietAI__SEP__vit5-large-vietnews-summarization" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -53,9 +51,3 @@ summaries = tokenizer.batch_decode(
 )
 
 RESULT = {"summaries": summaries}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    output_file = Path(output_dir) / "summaries.txt"
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write("\n".join(RESULT["summaries"]))

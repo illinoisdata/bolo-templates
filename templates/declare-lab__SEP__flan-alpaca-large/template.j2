@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "declare-lab/flan-alpaca-large" %}
 {% set prompt = "Write an email about an alpaca that likes flan" %}
 {% set max_new_tokens = 128 %}
 {% set do_sample = true %}
 {% set temperature = 0.7 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/declare-lab__SEP__flan-alpaca-large" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -10,7 +11,6 @@ prompt = "{{ prompt }}"
 max_new_tokens = {{ max_new_tokens }}
 do_sample = {{ "True" if do_sample else "False" }}
 temperature = {{ temperature }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -32,8 +32,3 @@ generated_ids = model.generate(
 
 generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

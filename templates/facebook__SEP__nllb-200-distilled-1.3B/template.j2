@@ -1,16 +1,14 @@
-{% set repo_id = 'facebook/nllb-200-distilled-1.3B' %}
-{% set device = 'cuda:0' %}
+{% set repo_id = "facebook/nllb-200-distilled-1.3B" %}
+{% set device = "cuda:0" %}
 {% set input_text = 'Hello, world!' %}
 {% set src_lang = 'eng_Latn' %}
 {% set tgt_lang = 'fra_Latn' %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__nllb-200-distilled-1.3B' %}
 
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
 input_text = '{{ input_text }}'
 src_lang = '{{ src_lang }}'
 tgt_lang = '{{ tgt_lang }}'
-output_dir = '{{ output_dir }}'
 
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import torch
@@ -29,9 +27,3 @@ generated_tokens = model.generate(**inputs, forced_bos_token_id=forced_bos_token
 translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {'translation': translation}
-
-if __name__ == '__main__':
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, 'translation.txt')
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(RESULT['translation'])

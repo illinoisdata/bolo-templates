@@ -1,12 +1,10 @@
 {% set repo_id = "sshleifer/distilbart-xsum-12-1" %}
 {% set device = "cuda:0" %}
 {% set input_text = "The Eiffel Tower is located in Paris and is one of the most famous landmarks in the world." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/sshleifer__SEP__distilbart-xsum-12-1" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""
-output_dir = "{{ output_dir }}"
 
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -19,11 +17,3 @@ outputs = model.generate(**inputs)
 
 summary = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
 RESULT = {"summary_text": summary}
-
-if __name__ == "__main__":
-    import os
-    import json
-
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "summary.json"), "w") as f:
-        json.dump(RESULT, f)

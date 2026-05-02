@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "lysandre/tiny-bert-random" %}
 {% set input_text = "The quick brown [MASK] jumps over the lazy dog." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/lysandre__SEP__tiny-bert-random" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import numpy as np
@@ -27,8 +27,3 @@ RESULT = {
     "mlm_logits": mlm_logits,
     "next_sentence_logits": next_sentence_logits,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "mlm_logits.npy"), RESULT["mlm_logits"])
-    np.save(os.path.join(output_dir, "next_sentence_logits.npy"), RESULT["next_sentence_logits"])

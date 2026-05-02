@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "fxmarty/pix2struct-tiny-random" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set max_new_tokens = 64 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/fxmarty__SEP__pix2struct-tiny-random" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 import os
 from io import BytesIO
@@ -42,9 +42,3 @@ generated_ids = model.generate(max_new_tokens=max_new_tokens, **encoder_kwargs)
 generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(RESULT["generated_text"])

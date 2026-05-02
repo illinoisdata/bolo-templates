@@ -4,7 +4,6 @@
 {% set prompt_image = "/u/yli77/projects/ML-code-generation/data/image2.jpeg" %}
 {% set prompt_mask = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
 {% set num_labels = 1 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/BAAI__SEP__seggpt-vit-large" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -12,7 +11,6 @@ image = "{{ image }}"
 prompt_image = "{{ prompt_image }}"
 prompt_mask = "{{ prompt_mask }}"
 num_labels = {{ num_labels }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -71,9 +69,3 @@ if isinstance(mask, torch.Tensor):
 mask = mask.astype(np.uint8)
 
 RESULT = {"mask": mask}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    mask_array = RESULT["mask"]
-    mask_image = Image.fromarray(mask_array)
-    mask_image.save(os.path.join(output_dir, "mask.png"))

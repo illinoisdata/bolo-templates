@@ -1,11 +1,9 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "Salesforce/codet5-small" %}
+{% set device = "cuda:0" %}
 {% set prompt = "def greet(user): print(f\"hello <extra_id_0>!\")" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Salesforce__SEP__codet5-small" %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 prompt = {{ prompt | tojson }}
-output_dir = {{ output_dir | tojson }}
 
 import torch
 from pathlib import Path
@@ -39,8 +37,3 @@ generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True
 generated_text = generated_texts[0]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "UrukHan/t5-russian-summarization" %}
 {% set input_texts = ["Запад после начала российской специальной операции по демилитаризации Украины ввел несколько раундов новых экономических санкций. В Кремле новые ограничения назвали серьезными, но отметили, что Россия готовилась к ним заранее."] %}
 {% set prefix = "summarize: " %}
 {% set max_length = 200 %}
@@ -6,7 +8,6 @@
 {% set length_penalty = 2.0 %}
 {% set no_repeat_ngram_size = 3 %}
 {% set early_stopping = true %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/UrukHan__SEP__t5-russian-summarization" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -18,7 +19,6 @@ num_beams = {{ num_beams }}
 length_penalty = {{ length_penalty }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
 early_stopping = {{ early_stopping }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -55,10 +55,3 @@ outputs = model.generate(
 summaries = tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
 RESULT = {"summaries": summaries}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "summaries.txt")
-    with open(output_path, "w", encoding="utf-8") as f:
-        for summary in RESULT["summaries"]:
-            f.write(summary + "\n")

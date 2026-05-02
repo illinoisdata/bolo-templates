@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "AntonV/mamba2-780m-hf" %}
 {% set input_text = "Hey how are you doing?" %}
 {% set max_new_tokens = 10 %}
 
@@ -21,8 +23,3 @@ output_ids = model.generate(input_ids, max_new_tokens=max_new_tokens)
 generated_texts = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
 
 RESULT = {"generated_texts": generated_texts}
-
-if __name__ == "__main__":
-    with open("generated_texts.txt", "w", encoding="utf-8") as f:
-        for text in RESULT["generated_texts"]:
-            f.write(text + "\n")

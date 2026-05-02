@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "microsoft/git-base" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set prompt = "" %}
 {% set max_new_tokens = 64 %}
 {% set num_return_sequences = 1 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__git-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -10,7 +11,6 @@ image_path = "{{ image_path }}"
 prompt = """{{ prompt }}"""
 max_new_tokens = {{ max_new_tokens }}
 num_return_sequences = {{ num_return_sequences }}
-output_dir = "{{ output_dir }}"
 
 import os
 from io import BytesIO
@@ -24,10 +24,8 @@ model = AutoModelForCausalLM.from_pretrained(repo_id)
 model = model.to(device)
 model.eval()
 
-
 def _is_url(path: str) -> bool:
     return path.startswith("http://") or path.startswith("https://")
-
 
 def _load_image(source: str) -> Image.Image:
     if _is_url(source):
@@ -35,7 +33,6 @@ def _load_image(source: str) -> Image.Image:
         response.raise_for_status()
         return Image.open(BytesIO(response.content)).convert("RGB")
     return Image.open(source).convert("RGB")
-
 
 image = _load_image(image_path)
 if prompt:
@@ -60,10 +57,3 @@ with torch.no_grad():
 captions = processor.batch_decode(generated, skip_special_tokens=True)
 
 RESULT = {"captions": captions}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    captions_path = os.path.join(output_dir, "captions.txt")
-    with open(captions_path, "w", encoding="utf-8") as outfile:
-        for caption in captions:
-            outfile.write(caption + "\n")

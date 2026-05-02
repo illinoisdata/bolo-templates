@@ -1,13 +1,11 @@
-{% set repo_id = repo_id | default("optimum/t5-small") %}
-{% set device = device | default("cuda:0") %}
+{% set repo_id = "optimum/t5-small" %}
+{% set device = "cuda:0" %}
 {% set input_text = input_text | default("My name is Eustache and I have a pet raccoon") %}
 {% set translation_prefix = translation_prefix | default("translate English to French: ") %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/optimum__SEP__t5-small") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""
 translation_prefix = """{{ translation_prefix }}"""
-output_dir = "{{ output_dir }}"
 execution_preference = "CUDAExecutionProvider" if device.lower().startswith("cuda") else "CPUExecutionProvider"
 
 import os
@@ -38,9 +36,3 @@ translation = tokenizer.batch_decode(
 )[0]
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "translation.txt")
-    with open(output_path, "w", encoding="utf-8") as file:
-        file.write(translation)

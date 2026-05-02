@@ -1,12 +1,10 @@
 {% set repo_id = "uclanlp/plbart-java-cs" %}
 {% set device = "cuda:0" %}
 {% set src_code = "public class Example { public static int add(int a, int b) { return a + b; } }" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/uclanlp__SEP__plbart-java-cs" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 src_code = "{{ src_code }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -20,9 +18,3 @@ generated_ids = model.generate(**inputs)
 generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    text_path = os.path.join(output_dir, "generated_text.txt")
-    with open(text_path, "w") as f:
-        f.write(RESULT["generated_text"])

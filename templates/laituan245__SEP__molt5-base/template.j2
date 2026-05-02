@@ -1,11 +1,9 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "laituan245/molt5-base" %}
+{% set device = "cuda:0" %}
 {% set input_text = input_text | default("translate English to German: The molecule is stable.") %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/laituan245__SEP__molt5-base") %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 input_text = {{ input_text | tojson }}
-output_dir = {{ output_dir | tojson }}
 
 from pathlib import Path
 import torch
@@ -24,8 +22,3 @@ with torch.no_grad():
 generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

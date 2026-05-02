@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "fazahmz/nps-tag-classifier" %}
 {% set text_input = "This is a sample text for multi-label classification inference." %}
 {% set threshold = 0.5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/fazahmz__SEP__nps-tag-classifier" %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_input = {{ text_input | tojson }}
 threshold = {{ threshold }}
-output_dir = {{ output_dir | tojson }}
 
 import json
 from pathlib import Path
@@ -55,9 +55,3 @@ RESULT = {
     "predicted_labels": predicted_labels,
     "label_probabilities": label_probabilities,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    with (output_path / "results.json").open("w", encoding="utf-8") as result_file:
-        json.dump(RESULT, result_file, ensure_ascii=False, indent=2)

@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-hi-en" %}
 {% set input_text = "यह एक परीक्षण वाक्य है।" %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-hi-en" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -43,9 +43,3 @@ translation = decoded_texts[0].strip()
 
 # Prepare RESULT dictionary
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    translation_path = output_path / "translation.txt"
-    translation_path.write_text(RESULT["translation"], encoding="utf-8")

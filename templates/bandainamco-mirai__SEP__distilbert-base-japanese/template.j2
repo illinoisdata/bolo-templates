@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "bandainamco-mirai/distilbert-base-japanese" %}
 {% set input_text = "吾輩は猫である。" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/bandainamco-mirai__SEP__distilbert-base-japanese" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -31,10 +31,3 @@ with torch.no_grad():
 last_hidden_state = outputs.last_hidden_state
 cls_embedding = last_hidden_state[:, 0, :].squeeze(0).cpu()
 RESULT = {"cls_embedding": cls_embedding.tolist()}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    for key, value in RESULT.items():
-        path = os.path.join(output_dir, f"{key}.json")
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(value, f, ensure_ascii=False)

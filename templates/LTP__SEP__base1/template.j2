@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "LTP/base1" %}
 {% set input_text = "他叫汤姆去拿外衣。" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/LTP__SEP__base1" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -12,8 +12,6 @@ from pathlib import Path
 import torch
 from huggingface_hub import hf_hub_download
 from transformers import AutoModelForTokenClassification, AutoTokenizer, ElectraConfig
-
-output_path = Path(output_dir)
 
 config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
 with open(config_file, "r", encoding="utf-8") as handle:
@@ -44,8 +42,3 @@ for token, label_id in zip(tokens, prediction_ids):
     cleaned_predictions.append({"token": token, "label": label})
 
 RESULT = {"token_classification": cleaned_predictions}
-
-if __name__ == "__main__":
-    output_path.mkdir(parents=True, exist_ok=True)
-    result_file = output_path / "token_classification.json"
-    result_file.write_text(json.dumps(RESULT["token_classification"], ensure_ascii=False, indent=2), encoding="utf-8")

@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "OpenVINO/bert-base-uncased-sst2-unstructured80-int8-ov" %}
 {% set input_text = "The movie was absolutely wonderful and the performances were brilliant." %}
 {% set top_k = 2 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/OpenVINO__SEP__bert-base-uncased-sst2-unstructured80-int8-ov" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -51,9 +51,3 @@ RESULT = {
     "probabilities": probabilities.tolist(),
     "top_k_predictions": top_k_predictions,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    result_path = os.path.join(output_dir, "result.json")
-    with open(result_path, "w", encoding="utf-8") as result_file:
-        json.dump(RESULT, result_file, ensure_ascii=False, indent=2)

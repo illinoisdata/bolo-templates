@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "allenai/scibert_scivocab_uncased" %}
 {% set text_input = "Scientific studies require models trained on domain-specific text." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allenai__SEP__scibert_scivocab_uncased" %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_input = {{ text_input | tojson }}
-output_dir = {{ output_dir | tojson }}
 
 import os
 import numpy as np
@@ -29,14 +29,3 @@ RESULT = {
     "last_hidden_state": last_hidden_state,
     "pooler_output": pooler_output,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    token_path = os.path.join(output_dir, "tokens.txt")
-    with open(token_path, "w", encoding="utf-8") as token_file:
-        token_file.write("\n".join(RESULT["tokens"]))
-    np.save(os.path.join(output_dir, "input_ids.npy"), np.array(RESULT["input_ids"], dtype=np.int64))
-    np.save(os.path.join(output_dir, "attention_mask.npy"), np.array(RESULT["attention_mask"], dtype=np.int64))
-    np.save(os.path.join(output_dir, "last_hidden_state.npy"), RESULT["last_hidden_state"])
-    if RESULT["pooler_output"] is not None:
-        np.save(os.path.join(output_dir, "pooler_output.npy"), RESULT["pooler_output"])

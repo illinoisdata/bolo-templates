@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "flexudy/t5-base-multi-sentence-doctor" %}
 {% set input_text = "repair_sentence: m a medical doct context: {That is my job I a}{or I save lives} </s>" %}
 {% set max_length = 32 %}
 {% set num_beams = 1 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/flexudy__SEP__t5-base-multi-sentence-doctor" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -27,9 +27,3 @@ generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num
 corrected_sentence = tokenizer.decode(generated_tokens[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
 
 RESULT = {"corrected_sentence": corrected_sentence}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    corrected_path = output_path / "corrected_sentence.txt"
-    corrected_path.write_text(RESULT["corrected_sentence"], encoding="utf-8")

@@ -1,15 +1,13 @@
-{% set repo_id = 'declare-lab/nora-long' %}
-{% set device = 'cuda:0' %}
+{% set repo_id = "declare-lab/nora-long" %}
+{% set device = "cuda:0" %}
 {% set instruction = 'Pick up the red block and place it on the table.' %}
 {% set image_path = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/declare-lab__SEP__nora-long' %}
 {% set max_new_tokens = 50 %}
 
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
 instruction = '{{ instruction }}'
 image_path = '{{ image_path }}'
-output_dir = '{{ output_dir }}'
 max_new_tokens = {{ max_new_tokens }}
 
 import os
@@ -45,8 +43,3 @@ result_text = processor.decode(outputs[0], skip_special_tokens=True)
 numbers = re.findall(r'-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?', result_text)
 actions = [float(number) for number in numbers]
 RESULT = {'actions': actions}
-
-if __name__ == '__main__':
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, 'actions.json'), 'w') as f:
-        json.dump(RESULT['actions'], f)

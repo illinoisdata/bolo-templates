@@ -1,11 +1,9 @@
 {% set repo_id = "facebook/mms-tts-cat" %}
 {% set device = "cuda:0" %}
 {% set text_input = "Catalan text-to-speech synthesis with expressive intonation." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mms-tts-cat" %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_input = {{ text_input | tojson }}
-output_dir = {{ output_dir | tojson }}
 
 from pathlib import Path
 
@@ -32,9 +30,3 @@ RESULT = {
     "waveform": waveform,
     "sampling_rate": sampling_rate,
 }
-
-if __name__ == "__main__":
-    save_path = Path(output_dir)
-    save_path.mkdir(parents=True, exist_ok=True)
-    waveform_file = save_path / "speech.wav"
-    wavfile.write(waveform_file.as_posix(), RESULT["sampling_rate"], RESULT["waveform"].astype(np.float32))

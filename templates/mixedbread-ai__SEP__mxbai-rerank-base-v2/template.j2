@@ -3,14 +3,12 @@
 {% set prompt = "Who wrote 'To Kill a Mockingbird'?" %}
 {% set max_new_tokens = 64 %}
 {% set temperature = 0.8 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/mixedbread-ai__SEP__mxbai-rerank-base-v2" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"
 max_new_tokens = {{ max_new_tokens }}
 temperature = {{ temperature }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -45,8 +43,3 @@ generated_text = tokenizer.decode(
 )
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(generated_text, encoding="utf-8")

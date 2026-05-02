@@ -1,10 +1,10 @@
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-tatoeba-en-tr" %}
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-tatoeba-en-tr" %}
 {% set source_text = "Hello, this is a test translation from English to Turkish." %}
 {% set max_length = 200 %}
 {% set num_beams = 6 %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 source_text = "{{ source_text }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
@@ -20,7 +20,3 @@ generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num
 translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 translation = translations[0] if translations else ""
 RESULT = {"translation": translation}
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

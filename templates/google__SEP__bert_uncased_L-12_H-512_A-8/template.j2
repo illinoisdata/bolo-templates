@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/bert_uncased_L-12_H-512_A-8" %}
 {% set input_text = "The capital of France is [MASK]." %}
 {% set top_k = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-12_H-512_A-8" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -50,10 +50,3 @@ for batch_index, mask_index in mask_positions.tolist():
         )
 
 RESULT = {"fill_mask_candidates": candidates}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    json_path = output_path / "fill_mask_candidates.json"
-    with json_path.open("w", encoding="utf-8") as file:
-        json.dump(RESULT["fill_mask_candidates"], file, ensure_ascii=False, indent=2)

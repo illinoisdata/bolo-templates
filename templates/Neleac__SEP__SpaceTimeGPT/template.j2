@@ -1,7 +1,6 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "Neleac/SpaceTimeGPT" %}
+{% set device = "cuda:0" %}
 {% set video_path = "/u/yli77/projects/ML-code-generation/data/video.avi" %}
-{% set output_dir = "/tmp" %}
 {% set min_length = 10 %}
 {% set max_length = 20 %}
 {% set num_beams = 4 %}
@@ -11,7 +10,6 @@
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 video_path = "{{ video_path }}"
-output_dir = "{{ output_dir }}"
 min_length = {{ min_length }}
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
@@ -91,8 +89,3 @@ with torch.no_grad():
 caption = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
 
 RESULT = {"caption": caption}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "caption.txt").write_text(RESULT["caption"], encoding="utf-8")

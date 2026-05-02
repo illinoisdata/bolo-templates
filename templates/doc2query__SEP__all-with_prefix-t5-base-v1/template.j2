@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "doc2query/all-with_prefix-t5-base-v1" %}
 {% set prefix = "answer2question" %}
 {% set input_text = "Python is an interpreted, high-level and general-purpose programming language. Python's design philosophy emphasizes code readability with its notable use of significant whitespace. Its language constructs and object-oriented approach aim to help programmers write clear, logical code for small and large-scale projects." %}
 {% set max_input_length = 384 %}
@@ -40,12 +42,3 @@ generated_tokens = model.generate(
 generated_queries = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"generated_queries": generated_queries}
-
-if __name__ == "__main__":
-    output_dir = Path("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/doc2query__SEP__all-with_prefix-t5-base-v1")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    queries_path = output_dir / "generated_queries.txt"
-    with queries_path.open("w", encoding="utf-8") as f:
-        for query in RESULT["generated_queries"]:
-            f.write(query)
-            f.write("\n")

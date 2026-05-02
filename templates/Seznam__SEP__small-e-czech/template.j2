@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Seznam/small-e-czech" %}
 {% set input_text = "Za hory, za doly, mé zlaté parohy" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Seznam__SEP__small-e-czech" %}
 {% set result_filename = "discriminator_probabilities.json" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 result_filename = "{{ result_filename }}"
 
 import json
@@ -27,8 +27,3 @@ RESULT = {
     "tokens": tokens,
     "probabilities": probabilities,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, result_filename), "w", encoding="utf-8") as f:
-        json.dump(RESULT, f, ensure_ascii=False, indent=2)

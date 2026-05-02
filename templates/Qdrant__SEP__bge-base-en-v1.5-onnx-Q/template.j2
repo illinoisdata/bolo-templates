@@ -3,13 +3,11 @@
 {% set device = "cuda:0" %}
 {% set texts = ["The quick brown fox jumps over the lazy dog.", "A fast auburn fox leaps above a sleepy canine."] %}
 {% set max_length = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Qdrant__SEP__bge-base-en-v1.5-onnx-Q" %}
 repo_id = "{{ repo_id }}"
 base_model = "{{ base_model }}"
 device = "{{ device }}"
 texts = {{ texts }}
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -45,9 +43,3 @@ pooled_embeddings = masked_sum / mask_denom
 embeddings = pooled_embeddings.cpu().tolist()
 
 RESULT = {"embeddings": embeddings}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "embeddings.json")
-    with open(output_path, "w", encoding="utf-8") as writer:
-        json.dump(RESULT["embeddings"], writer, ensure_ascii=False, indent=2)

@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set prompt_text = "a photography of" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Salesforce__SEP__blip-image-captioning-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 prompt_text = "{{ prompt_text }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import BlipProcessor, BlipForConditionalGeneration
 from PIL import Image
@@ -40,10 +38,3 @@ RESULT = {
     "conditional_caption": cond_caption,
     "unconditional_caption": uncond_caption,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "conditional_caption.txt"), "w") as f:
-        f.write(RESULT["conditional_caption"])
-    with open(os.path.join(output_dir, "unconditional_caption.txt"), "w") as f:
-        f.write(RESULT["unconditional_caption"])

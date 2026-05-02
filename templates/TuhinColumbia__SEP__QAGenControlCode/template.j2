@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "TuhinColumbia/QAGenControlCode" %}
 {% set input_text = "Generate a short question and answer pair about artificial intelligence policy." %}
 {% set max_new_tokens = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/TuhinColumbia__SEP__QAGenControlCode" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -34,10 +34,3 @@ generated_ids = model.generate(
 generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
 RESULT = {"generated_texts": generated_texts}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_texts.json").write_text(
-        json.dumps(RESULT["generated_texts"], ensure_ascii=False, indent=2)
-    )

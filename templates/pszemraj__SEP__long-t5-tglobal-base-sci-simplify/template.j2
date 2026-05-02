@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "pszemraj/long-t5-tglobal-base-sci-simplify" %}
 {% set text_input = "The Eiffel Tower is 324 metres tall and was the tallest structure in the world when it was built." %}
 {% set max_length = 256 %}
 {% set min_length = 32 %}
@@ -7,7 +9,6 @@
 {% set no_repeat_ngram_size = 3 %}
 {% set encoder_no_repeat_ngram_size = 3 %}
 {% set early_stopping = true %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/pszemraj__SEP__long-t5-tglobal-base-sci-simplify" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
@@ -19,7 +20,6 @@ repetition_penalty = {{ repetition_penalty }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
 encoder_no_repeat_ngram_size = {{ encoder_no_repeat_ngram_size }}
 early_stopping = {{ early_stopping }}
-output_dir = "{{ output_dir }}"
 from pathlib import Path
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -47,8 +47,3 @@ _generated = _model.generate(
 )
 _summary = _tokenizer.batch_decode(_generated, skip_special_tokens=True)[0].strip()
 RESULT = {"summary": _summary}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

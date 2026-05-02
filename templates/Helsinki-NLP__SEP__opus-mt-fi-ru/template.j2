@@ -1,11 +1,9 @@
-{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-fi-ru") %}
-{% set device = device | default("cuda:0") %}
+{% set repo_id = "Helsinki-NLP/opus-mt-fi-ru" %}
+{% set device = "cuda:0" %}
 {% set input_text = input_text | default("Tämä on testi.") %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-fi-ru") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
@@ -18,9 +16,3 @@ generated_tokens = model.generate(**encoded_input)
 translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"translation": translations}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    translation_file = output_path / "translation.txt"
-    translation_file.write_text("\n".join(RESULT["translation"]), encoding="utf-8")

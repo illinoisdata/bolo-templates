@@ -1,12 +1,10 @@
 {% set repo_id = "MingZhong/unieval-dialog" %}
 {% set device = "cuda:0" %}
 {% set input_text = "Conversation: Hello, how are you? Response: I'm doing well." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/MingZhong__SEP__unieval-dialog" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
@@ -20,8 +18,3 @@ outputs = model.generate(**inputs)
 evaluation = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
 
 RESULT = {"evaluation": evaluation}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "evaluation.txt"), "w") as f:
-        f.write(RESULT["evaluation"])

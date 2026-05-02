@@ -27,9 +27,3 @@ generated_tokens = model.generate(**tokenized, max_length=max_target_length)
 translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    output_dir = Path("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-en-trk")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_file = output_dir / "translation.txt"
-    output_file.write_text(RESULT["translation"], encoding="utf-8")

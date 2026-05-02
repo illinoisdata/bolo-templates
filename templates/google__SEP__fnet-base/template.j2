@@ -1,18 +1,17 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/fnet-base" %}
 {% set fill_mask_text = "Hello I'm a [MASK] model." %}
 {% set top_k = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__fnet-base" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 fill_mask_text = "{{ fill_mask_text }}"
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
 
 import torch
 from transformers import AutoModelForMaskedLM, AutoTokenizer
-
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
@@ -50,10 +49,3 @@ for mask_index in mask_positions:
         )
 
 RESULT = {"fill_mask_predictions": predictions}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "fill_mask_predictions.json").write_text(
-        json.dumps(RESULT["fill_mask_predictions"], indent=2)
-    )

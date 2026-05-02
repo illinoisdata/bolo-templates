@@ -1,12 +1,10 @@
 {% set repo_id = "Helsinki-NLP/opus-mt-en-hi" %}
 {% set device = "cuda:0" %}
 {% set text_input = "The quick brown fox jumps over the lazy dog." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-en-hi" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ text_input }}"""
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -35,10 +33,3 @@ generated = model.generate(
 translation = tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    translation_file = output_path / "translation.txt"
-    with translation_file.open("w", encoding="utf-8") as f:
-        f.write(RESULT["translation"])

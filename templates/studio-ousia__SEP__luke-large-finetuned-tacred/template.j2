@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "studio-ousia/luke-large-finetuned-tacred" %}
 {% set text = "Barack Obama was born in Honolulu." %}
 {% set entity_spans = [(0, 12), (25, 33)] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/studio-ousia__SEP__luke-large-finetuned-tacred" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 entity_spans = {{ entity_spans }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -34,15 +34,3 @@ RESULT = {
     "logits": logits[0].cpu().tolist(),
     "probabilities": probabilities[0].cpu().tolist(),
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    for key, value in RESULT.items():
-        if isinstance(value, str):
-            target_path = os.path.join(output_dir, f"{key}.txt")
-            with open(target_path, "w", encoding="utf-8") as output_file:
-                output_file.write(value)
-        else:
-            target_path = os.path.join(output_dir, f"{key}.json")
-            with open(target_path, "w", encoding="utf-8") as output_file:
-                json.dump(value, output_file, indent=2)

@@ -1,12 +1,10 @@
 {% set repo_id = "Helsinki-NLP/opus-mt-en-et" %}
 {% set device = "cuda:0" %}
 {% set texts = ["Hello, how are you?"] %}
-{% set output_dir = "./output" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 texts = {{ texts }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -20,9 +18,3 @@ generated_ids = model.generate(**inputs)
 translations = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "translations.txt"), "w", encoding="utf-8") as f:
-        for line in translations:
-            f.write(line + "\n")

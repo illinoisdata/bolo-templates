@@ -1,14 +1,12 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "airkingbd/dplm_150m" %}
+{% set device = "cuda:0" %}
 {% set input_sequences = ["MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQ"] %}
 {% set max_length = 512 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/airkingbd__SEP__dplm_150m" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_sequences = {{ input_sequences }}
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -35,8 +33,3 @@ logits = model_outputs.logits if hasattr(model_outputs, "logits") else model_out
 logits = logits.cpu()
 
 RESULT = {"logits": logits}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    torch.save(RESULT["logits"], output_path / "logits.pt")

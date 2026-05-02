@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "ibm-research/regen-disambiguation" %}
 {% set input_text = "Explain the process of photosynthesis in simple terms." %}
 {% set max_length = 200 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ibm-research__SEP__regen-disambiguation" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -21,8 +21,3 @@ generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num
 decoded_outputs = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 result_text = decoded_outputs[0].strip()
 RESULT = {"generated_text": result_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

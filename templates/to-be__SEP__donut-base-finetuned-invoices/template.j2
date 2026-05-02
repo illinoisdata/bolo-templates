@@ -1,16 +1,14 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "to-be/donut-base-finetuned-invoices" %}
+{% set device = "cuda:0" %}
 {% set document_image_path = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
 {% set max_length = 768 %}
 {% set num_beams = 1 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/to-be__SEP__donut-base-finetuned-invoices" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 document_image_path = "{{ document_image_path }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from io import BytesIO
 from pathlib import Path
@@ -44,8 +42,3 @@ with torch.no_grad():
 generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(generated_text, encoding="utf-8")

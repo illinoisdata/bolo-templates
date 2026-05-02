@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set question = "What object is the focus of the image?" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/uclanlp__SEP__visualbert-vqa-coco-pre" %}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 image_path = {{ image_path | tojson }}
 question = {{ question | tojson }}
-output_dir = {{ output_dir | tojson }}
 
 import json
 import os
@@ -42,10 +40,3 @@ RESULT = {
     "prediction_logits": prediction_logits.tolist(),
     "sequence_relationship_logits": sequence_relationship_logits.tolist(),
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    for key, payload in RESULT.items():
-        path = os.path.join(output_dir, f"{key}.json")
-        with open(path, "w") as handle:
-            json.dump(payload, handle)

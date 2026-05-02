@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "google/bert_uncased_L-2_H-512_A-8" %}
 {% set input_text = "The capital of France is [MASK]." %}
 {% set num_predictions = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/google__SEP__bert_uncased_L-2_H-512_A-8" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 num_predictions = {{ num_predictions }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -39,10 +39,3 @@ predictions = [
 ]
 
 RESULT = {"predictions": predictions}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    save_path = output_path / "masked_lm_predictions.json"
-    with save_path.open("w", encoding="utf-8") as writer:
-        json.dump(RESULT, writer, ensure_ascii=False, indent=2)

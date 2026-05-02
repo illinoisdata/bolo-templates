@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/vit-mae-base" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__vit-mae-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from urllib.parse import urlparse
@@ -52,15 +52,3 @@ RESULT = {
     "mask": mask_tensor,
     "ids_restore": ids_restore_tensor,
 }
-
-if __name__ == "__main__":
-    result_path = Path(output_dir)
-    result_path.mkdir(parents=True, exist_ok=True)
-    if RESULT["loss"] is not None:
-        (result_path / "loss.txt").write_text(str(RESULT["loss"]))
-    if RESULT["logits"] is not None:
-        np.save(result_path / "logits.npy", RESULT["logits"].numpy())
-    if RESULT["mask"] is not None:
-        np.save(result_path / "mask.npy", RESULT["mask"].numpy())
-    if RESULT["ids_restore"] is not None:
-        np.save(result_path / "ids_restore.npy", RESULT["ids_restore"].numpy())

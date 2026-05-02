@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "sonoisa/t5-base-japanese-title-generation" %}
 {% set article_text = "記事本文のサンプルです。日本語で書かれた記事の一部をここに置き換えて、モデルにタイトル生成を依頼します。" %}
 {% set tokenizer_max_length = 512 %}
 {% set generation_max_length = 64 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/sonoisa__SEP__t5-base-japanese-title-generation" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -10,7 +11,6 @@ article_text = """{{ article_text }}"""
 tokenizer_max_length = {{ tokenizer_max_length }}
 generation_max_length = {{ generation_max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -37,12 +37,3 @@ generated_ids = model.generate(
 generated_title = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"generated_title": generated_title}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    title_file = output_path / "generated_title.txt"
-    title_file.write_text(
-        RESULT["generated_title"],
-        encoding="utf-8",
-    )

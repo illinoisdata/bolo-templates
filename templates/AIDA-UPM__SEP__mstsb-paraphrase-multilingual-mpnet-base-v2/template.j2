@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "AIDA-UPM/mstsb-paraphrase-multilingual-mpnet-base-v2" %}
 {% set sentences = ["This is an example sentence.", "Esta es otra frase de ejemplo.", "最後の例文"] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/AIDA-UPM__SEP__mstsb-paraphrase-multilingual-mpnet-base-v2" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences }}
-output_dir = "{{ output_dir }}"
 from pathlib import Path
 
 import numpy as np
@@ -29,8 +29,3 @@ sentence_embeddings = sentence_embeddings.cpu()
 
 sentence_embeddings_list = sentence_embeddings.tolist()
 RESULT = {"sentence_embeddings": sentence_embeddings_list}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    np.save(output_path / "sentence_embeddings.npy", np.array(RESULT["sentence_embeddings"], dtype=np.float32))

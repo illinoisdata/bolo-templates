@@ -4,7 +4,6 @@
 {% set src_text = "私は猫が好きです。" %}
 {% set tgt_lang = "en" %}
 {% set tgt_text = "I like cats." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/qiyuw__SEP__WSPAlign-mbert-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -12,7 +11,6 @@ src_lang = "{{ src_lang }}"
 src_text = "{{ src_text }}"
 tgt_lang = "{{ tgt_lang }}"
 tgt_text = "{{ tgt_text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -38,8 +36,3 @@ end_index = torch.argmax(end_logits, dim=-1).item()
 answer_ids = inputs["input_ids"][0][start_index : end_index + 1]
 answer = tokenizer.decode(answer_ids)
 RESULT = {"answer": answer}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, f"answer_{src_lang}_{tgt_lang}.txt"), "w", encoding="utf-8") as f:
-        f.write(RESULT["answer"])

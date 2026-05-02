@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "DeepPavlov/distilrubert-small-cased-conversational" %}
 {% set text_input = "Привет, как дела?" %}
 {% set max_length = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/DeepPavlov__SEP__distilrubert-small-cased-conversational" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 import os
 
@@ -32,7 +32,3 @@ with torch.no_grad():
 sequence_output = outputs.last_hidden_state.detach().cpu()
 
 RESULT = {"last_hidden_state": sequence_output}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    torch.save(RESULT["last_hidden_state"], os.path.join(output_dir, "last_hidden_state.pt"))

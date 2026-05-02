@@ -8,7 +8,6 @@
 {% set num_return_sequences = 1 %}
 {% set length_penalty = 0.0 %}
 {% set decoder_start_token_id = 250058 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Babelscape__SEP__mrebel-large" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -20,14 +19,12 @@ num_beams = {{ num_beams }}
 num_return_sequences = {{ num_return_sequences }}
 length_penalty = {{ length_penalty }}
 decoder_start_token_id = {{ decoder_start_token_id }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
 from typing import Dict, List
 
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-
 
 def extract_triplets_typed(text: str) -> List[Dict[str, str]]:
     triplets: List[Dict[str, str]] = []
@@ -100,7 +97,6 @@ def extract_triplets_typed(text: str) -> List[Dict[str, str]]:
         )
     return triplets
 
-
 tokenizer = AutoTokenizer.from_pretrained(
     repo_id,
     src_lang=src_lang,
@@ -145,12 +141,3 @@ RESULT = {
     "decoded_predictions": decoded_preds,
     "typed_triplets": parsed_triplets,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    decoded_path = os.path.join(output_dir, "decoded_predictions.json")
-    with open(decoded_path, "w", encoding="utf-8") as decoded_file:
-        json.dump(decoded_preds, decoded_file, ensure_ascii=False, indent=2)
-    triplets_path = os.path.join(output_dir, "typed_triplets.json")
-    with open(triplets_path, "w", encoding="utf-8") as triplets_file:
-        json.dump(parsed_triplets, triplets_file, ensure_ascii=False, indent=2)

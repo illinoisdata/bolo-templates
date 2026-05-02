@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "MU-NLPC/whisper-small-audio-captioning" %}
 {% set audio_input = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/MU-NLPC__SEP__whisper-small-audio-captioning" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_input = "{{ audio_input }}"
-output_dir = "{{ output_dir }}"
 
 import io
 from pathlib import Path
@@ -25,7 +25,6 @@ model = WhisperForConditionalGeneration.from_pretrained(repo_id)
 model.to(device)
 model.eval()
 
-
 def _load_audio(path_or_url: str, target_sr: int):
     source = str(path_or_url)
     if source.startswith(("http://", "https://")):
@@ -43,7 +42,6 @@ def _load_audio(path_or_url: str, target_sr: int):
         sampling_rate = target_sr
     return audio, sampling_rate
 
-
 # Pre-process input
 audio, sampling_rate = _load_audio(audio_input, feature_extractor.sampling_rate)
 features = feature_extractor(audio, sampling_rate=sampling_rate, return_tensors="pt").input_features
@@ -59,8 +57,3 @@ with torch.inference_mode():
 # Post-process & build RESULT dict
 caption = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 RESULT = {"caption": caption}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "caption.txt").write_text(RESULT["caption"], encoding="utf-8")

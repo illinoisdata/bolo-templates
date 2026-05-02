@@ -15,12 +15,10 @@
 매년 교체할 수도 있고, 광장에서 보이는 정면엔 한글현판, 반대편엔 한자현판을 다는 아이디어도 가능한 것 아니냐”고 말했다.
 그러면서 “문화재 전문가들은 보수적일 수밖에 없지만 현판이란 게 요즘 말로는 ‘간판’인데 새 시대에 맞게 바꿔 다는 게 바람직하다”고 주장했다.
 {% endset %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/EbanLee__SEP__kobart-summary-v3" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text.strip() }}"""
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
@@ -52,8 +50,3 @@ summary_ids = model.generate(
 # Post-process and build RESULT
 summary_text = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
 RESULT = {"summary_text": summary_text}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    summary_file = Path(output_dir) / "summary_text.txt"
-    summary_file.write_text(RESULT["summary_text"], encoding="utf-8")

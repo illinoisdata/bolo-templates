@@ -1,5 +1,5 @@
-{% set repo_id = repo_id %}
-
+{% set device = "cuda:0" %}
+{% set repo_id = "NeelNanda/SoLU_6L768W_C4_Code" %}
 repo_id = "{{ repo_id }}"
 
 from huggingface_hub import list_repo_files
@@ -7,6 +7,3 @@ from huggingface_hub import list_repo_files
 files = list_repo_files(repo_id)
 
 RESULT = {"files": files}
-
-if __name__ == "__main__":
-    pass

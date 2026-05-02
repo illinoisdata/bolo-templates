@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set trimap_path = "/u/yli77/projects/ML-code-generation/data/image2.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hustvl__SEP__vitmatte-small-distinctions-646" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 trimap_path = "{{ trimap_path }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import requests
@@ -43,8 +41,3 @@ with torch.no_grad():
 alphas = outputs.alphas.squeeze().cpu().numpy()
 
 RESULT = {"alphas": alphas}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    alpha_img = Image.fromarray((alphas * 255).round().astype(np.uint8))
-    alpha_img.save(os.path.join(output_dir, "alphas.png"))

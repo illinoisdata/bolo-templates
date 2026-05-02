@@ -1,15 +1,15 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "optimum-internal-testing/tiny-random-encoder-decoder-gpt2-bert" %}
 {% set prompt = "Summarize the following text: Transformers enable flexible sequence-to-sequence modeling." %}
 {% set max_length = 32 %}
 {% set num_beams = 3 %}
 {% set early_stopping = true %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/optimum-internal-testing__SEP__tiny-random-encoder-decoder-gpt2-bert" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 early_stopping = {{ "True" if early_stopping else "False" }}
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import os
@@ -36,9 +36,3 @@ generated_tokens = model.generate(
 generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(RESULT["generated_text"])

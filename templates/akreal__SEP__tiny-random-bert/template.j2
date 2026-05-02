@@ -1,12 +1,10 @@
 {% set repo_id = "akreal/tiny-random-bert" %}
 {% set device = "cuda:0" %}
 {% set text_input = "The quick brown fox jumps over the lazy dog." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/akreal__SEP__tiny-random-bert" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -42,9 +40,3 @@ RESULT: Dict[str, Any] = {
     "predicted_tokens": predicted_tokens,
     "prediction_text": prediction_text,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    results_path = os.path.join(output_dir, "results.json")
-    with open(results_path, "w") as f:
-        json.dump(RESULT, f, indent=4)

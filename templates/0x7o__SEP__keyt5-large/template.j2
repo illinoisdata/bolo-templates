@@ -3,14 +3,12 @@
 {% set input_text = "Reuters сообщил об отмене 3,6 тыс. авиарейсов из-за «омикрона» и погоды\nНаибольшее число отмен авиарейсов 2 января пришлось на американские авиакомпании SkyWest и Southwest, у каждой — более 400 отмененных рейсов. При этом среди отмененных 2 января авиарейсов — более 2,1 тыс. рейсов в США. Также свыше 6400 рейсов были задержаны." %}
 {% set max_length = 64 %}
 {% set top_p = 1.0 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/0x7o__SEP__keyt5-large" %}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 input_text = {{ input_text | tojson }}
 max_length = {{ max_length }}
 top_p = {{ top_p }}
-output_dir = {{ output_dir | tojson }}
 
 import json
 from itertools import groupby
@@ -49,10 +47,3 @@ tokens = [token for token in normalized.split(";") if token]
 keywords = [key for key, _ in groupby(tokens)]
 
 RESULT = {"keywords": keywords}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    keywords_file = output_path / "keywords.json"
-    with keywords_file.open("w", encoding="utf-8") as handle:
-        json.dump(RESULT["keywords"], handle, ensure_ascii=False, indent=2)

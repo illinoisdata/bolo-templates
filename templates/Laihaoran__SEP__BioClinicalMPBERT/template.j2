@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Laihaoran/BioClinicalMPBERT" %}
 {% set input_text = "Patient presents with shortness of breath and abnormal vital signs; recommend further evaluation for potential cardiac issues." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Laihaoran__SEP__BioClinicalMPBERT" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 from transformers import AutoModel, AutoTokenizer
 import torch
 import numpy as np
@@ -22,7 +22,3 @@ last_hidden_state = model_outputs.last_hidden_state
 embedding = last_hidden_state[:, 0, :].squeeze(0).cpu().numpy()
 
 RESULT = {"embedding": embedding}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "embedding.npy"), RESULT["embedding"])

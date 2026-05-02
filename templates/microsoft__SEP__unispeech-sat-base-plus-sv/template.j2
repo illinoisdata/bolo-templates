@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "microsoft/unispeech-sat-base-plus-sv" %}
 {% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/microsoft__SEP__unispeech-sat-base-plus-sv" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
-output_dir = "{{ output_dir }}"
 
 import io
 from pathlib import Path
@@ -62,9 +62,3 @@ RESULT = {
     "embedding": embedding_array,
     "normalized_embedding": normalized_embedding_array,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    np.save(output_path / "embedding.npy", RESULT["embedding"])
-    np.save(output_path / "normalized_embedding.npy", RESULT["normalized_embedding"])

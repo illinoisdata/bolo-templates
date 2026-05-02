@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "emanjavacas/MacBERTh" %}
 {% set input_text = "The quick brown [MASK] jumps over the lazy dog." %}
 {% set top_k = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/emanjavacas__SEP__MacBERTh" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -39,11 +39,3 @@ RESULT = {
         for token, score in zip(candidate_tokens, candidate_scores)
     ]
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    candidate_file = output_path / "mask_candidates.txt"
-    with candidate_file.open("w", encoding="utf-8") as file:
-        for entry in RESULT["mask_candidates"]:
-            file.write(f"{entry['token']}: {entry['score']}\n")

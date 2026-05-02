@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-ROMANCE-en" %}
 {% set input_text = ["Hola, ¿cómo estás?"] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-ROMANCE-en" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = {{ input_text }}
-output_dir = "{{ output_dir }}"
 
 import os
 
@@ -19,10 +19,3 @@ encoding = encoding.to(device)
 generated_tokens = model.generate(**encoding, max_length=128, num_beams=4)
 translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    result_path = os.path.join(output_dir, "translations.txt")
-    with open(result_path, "w", encoding="utf-8") as handler:
-        for item in RESULT["translations"]:
-            handler.write(f"{item}\n")

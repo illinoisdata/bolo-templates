@@ -1,12 +1,11 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "fxmarty/speecht5-hifigan-tiny" %}
+{% set device = "cuda:0" %}
 {% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
 {% set sampling_rate = 16000 %}
 {% set mel_n_fft = 1024 %}
 {% set mel_win_length = 1024 %}
 {% set mel_hop_length = 256 %}
 {% set mel_n_mels = 80 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/fxmarty__SEP__speecht5-hifigan-tiny" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -16,7 +15,6 @@ mel_n_fft = {{ mel_n_fft }}
 mel_win_length = {{ mel_win_length }}
 mel_hop_length = {{ mel_hop_length }}
 mel_n_mels = {{ mel_n_mels }}
-output_dir = "{{ output_dir }}"
 
 from transformers import SpeechT5HifiGan
 
@@ -72,11 +70,3 @@ generated_audio = generated_audio.squeeze(0).cpu()
 
 # Build RESULT dict
 RESULT = {"generated_audio": generated_audio}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated.wav")
-    audio_out = RESULT["generated_audio"].numpy()
-    if audio_out.ndim > 1:
-        audio_out = audio_out.T
-    sf.write(output_path, audio_out, sampling_rate)

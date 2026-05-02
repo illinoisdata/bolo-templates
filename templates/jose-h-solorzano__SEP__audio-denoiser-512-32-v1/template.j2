@@ -1,5 +1,5 @@
 {% set repo_id = "jose-h-solorzano/audio-denoiser-512-32-v1" %}
-{% set device = "cpu" %}
+{% set device = "cuda:0" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 import audio_denoiser, pathlib
@@ -12,5 +12,3 @@ try:
 except Exception as exc:
     print("failed to read source", exc)
 RESULT = {"inspect": "done"}
-if __name__ == "__main__":
-    pass

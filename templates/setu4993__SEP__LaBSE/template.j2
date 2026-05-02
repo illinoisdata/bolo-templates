@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "setu4993/LaBSE" %}
 {% set english_sentences = ["dog", "Puppies are nice.", "I enjoy taking long walks along the beach with my dog."] %}
 {% set italian_sentences = ["cane", "I cuccioli sono carini.", "Mi piace fare lunghe passeggiate lungo la spiaggia con il mio cane."] %}
 {% set japanese_sentences = ["犬", "子犬はいいです", "私は犬と一緒にビーチを散歩するのが好きです"] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/setu4993__SEP__LaBSE" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 english_sentences = {{ english_sentences | tojson }}
 italian_sentences = {{ italian_sentences | tojson }}
 japanese_sentences = {{ japanese_sentences | tojson }}
-output_dir = "{{ output_dir }}"
 
 import os
 
@@ -21,7 +21,6 @@ tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = AutoModel.from_pretrained(repo_id)
 model.to(device)
 model.eval()
-
 
 def tokenize_batch(texts):
     tokenized = tokenizer(texts, return_tensors="pt", padding=True, truncation=True)
@@ -43,7 +42,6 @@ japanese_embeddings = japanese_outputs.pooler_output
 english_norm = F.normalize(english_embeddings, p=2, dim=1)
 italian_norm = F.normalize(italian_embeddings, p=2, dim=1)
 japanese_norm = F.normalize(japanese_embeddings, p=2, dim=1)
-
 
 def similarity(a, b):
     return torch.matmul(a, b.transpose(0, 1))
@@ -67,8 +65,3 @@ RESULT = {
     "english_japanese_similarity": english_japanese_similarity_np,
     "italian_japanese_similarity": italian_japanese_similarity_np,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    for name, array in RESULT.items():
-        np.save(os.path.join(output_dir, f"{name}.npy"), array)

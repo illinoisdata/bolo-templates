@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "unicamp-dl/InRanker-base" %}
 {% set query = "What is the best way to learn deep learning?" %}
 {% set docs = [
     "The capital of France is Paris",
@@ -5,21 +7,18 @@
 ] %}
 {% set generation_max_new_tokens = 16 %}
 {% set generation_num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/unicamp-dl__SEP__InRanker-base" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query = "{{ query }}"
 docs = {{ docs | tojson }}
 generation_max_new_tokens = {{ generation_max_new_tokens }}
 generation_num_beams = {{ generation_num_beams }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
 
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-
 
 device_obj = torch.device(device)
 
@@ -61,12 +60,3 @@ RESULT = {
     "decoded_outputs": normalized_outputs,
     "scored_docs": scored_docs,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    decoded_path = os.path.join(output_dir, "decoded_outputs.json")
-    scored_path = os.path.join(output_dir, "scored_docs.json")
-    with open(decoded_path, "w", encoding="utf-8") as decoded_file:
-        json.dump(RESULT["decoded_outputs"], decoded_file, ensure_ascii=False, indent=2)
-    with open(scored_path, "w", encoding="utf-8") as scored_file:
-        json.dump(RESULT["scored_docs"], scored_file, ensure_ascii=False, indent=2)

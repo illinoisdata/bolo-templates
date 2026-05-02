@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set pose_score_threshold = 0.3 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/usyd-community__SEP__vitpose-base-simple" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 pose_score_threshold = {{ pose_score_threshold }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import json
@@ -67,10 +65,3 @@ for person_pose in image_pose_result:
     pose_estimations.append(pose_dict)
 
 RESULT = {"pose_estimations": pose_estimations}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "pose_estimations.json").write_text(
-        json.dumps(RESULT["pose_estimations"], indent=2)
-    )

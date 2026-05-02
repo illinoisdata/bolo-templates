@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "classla/bcms-bertic" %}
 {% set text = "Primjer rečenice na bosanskom jeziku." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/classla__SEP__bcms-bertic" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import json
@@ -23,9 +23,3 @@ with torch.no_grad():
 
 logits = outputs.logits.cpu()
 RESULT = {"logits": logits.tolist()}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    save_path = os.path.join(output_dir, "logits.json")
-    with open(save_path, "w", encoding="utf-8") as handle:
-        json.dump(RESULT["logits"], handle)

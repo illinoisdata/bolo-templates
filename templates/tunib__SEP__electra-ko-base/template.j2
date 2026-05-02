@@ -1,12 +1,10 @@
-{% set device = device %}
-{% set repo_id = repo_id %}
+{% set device = "cuda:0" %}
+{% set repo_id = "tunib/electra-ko-base" %}
 {% set text_input = "한국어와 English가 섞인 예시 문장입니다." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/tunib__SEP__electra-ko-base" %}
 
 device = "{{ device }}"
 repo_id = "{{ repo_id }}"
 text_input = "{{ text_input }}"
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -26,8 +24,3 @@ model_output = model(**encoded_input)
 logits = model_output.logits.detach().cpu().tolist()
 
 RESULT = {"logits": logits}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "logits.json"), "w", encoding="utf-8") as fp:
-        json.dump(RESULT["logits"], fp)

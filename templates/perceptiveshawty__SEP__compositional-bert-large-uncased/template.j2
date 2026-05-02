@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "perceptiveshawty/compositional-bert-large-uncased" %}
 {% set text_input = "The quick brown fox jumps over the lazy dog." %}
 {% set max_length = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/perceptiveshawty__SEP__compositional-bert-large-uncased" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 import os
 
@@ -38,9 +38,3 @@ if pooled_output is not None:
 RESULT = {"last_hidden_state": sequence_output}
 if pooled_output is not None:
     RESULT["pooled_output"] = pooled_output
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    for key, value in RESULT.items():
-        path = os.path.join(output_dir, f"{key}.npy")
-        np.save(path, value.numpy())

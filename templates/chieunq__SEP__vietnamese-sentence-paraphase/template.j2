@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "chieunq/vietnamese-sentence-paraphase" %}
 {% set input_text = "Thật tự hào khi là sinh viên trường Đại học Công nghệ" %}
 {% set max_length = 64 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/chieunq__SEP__vietnamese-sentence-paraphase" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -32,9 +32,3 @@ paraphrased_text = tokenizer.decode(
 )
 
 RESULT = {"paraphrased_text": paraphrased_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    text_file = output_path / "paraphrased_text.txt"
-    text_file.write_text(RESULT["paraphrased_text"], encoding="utf-8")

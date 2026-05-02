@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "TencentGameMate/chinese-wav2vec2-base" %}
 {% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/TencentGameMate__SEP__chinese-wav2vec2-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
-output_dir = "{{ output_dir }}"
 
 import io
 from pathlib import Path
@@ -16,10 +16,8 @@ import torch
 import torchaudio.functional as F
 from transformers import AutoFeatureExtractor, AutoModelForPreTraining
 
-
 def _is_url(path: str) -> bool:
     return path.startswith("http://") or path.startswith("https://")
-
 
 def _load_audio(path: str):
     if _is_url(path):
@@ -31,7 +29,6 @@ def _load_audio(path: str):
         waveform, sampling_rate = sf.read(path)
     return waveform, sampling_rate
 
-
 def _prepare_waveform(waveform, sampling_rate: int, target_rate: int):
     if waveform.ndim > 1:
         waveform = waveform.mean(axis=1)
@@ -42,7 +39,6 @@ def _prepare_waveform(waveform, sampling_rate: int, target_rate: int):
         waveform = resampled.numpy()
         sampling_rate = target_rate
     return waveform, sampling_rate
-
 
 feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
 model = AutoModelForPreTraining.from_pretrained(repo_id)
@@ -62,8 +58,3 @@ with torch.no_grad():
 RESULT = {
     "last_hidden_state": last_hidden_state,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    np.save(output_path / "last_hidden_state.npy", RESULT["last_hidden_state"].numpy())

@@ -1,12 +1,10 @@
 {% set repo_id = "facebook/blenderbot-90M" %}
 {% set device = "cuda:0" %}
 {% set user_prompt = "Hello! I'm trying out BlenderBot. What's on your mind today?" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__blenderbot-90M" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 user_prompt = "{{ user_prompt }}"
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -35,8 +33,3 @@ decoded_responses = tokenizer.batch_decode(generated_tokens, skip_special_tokens
 response_text = decoded_responses[0].strip() if decoded_responses else ""
 
 RESULT = {"generated_text": response_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

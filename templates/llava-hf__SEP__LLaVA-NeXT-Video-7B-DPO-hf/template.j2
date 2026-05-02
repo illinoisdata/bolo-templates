@@ -1,6 +1,5 @@
-{% set repo_id = 'llava-hf/LLaVA-NeXT-Video-7B-DPO-hf' %}
-{% set device = 'cuda:0' %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/llava-hf__SEP__LLaVA-NeXT-Video-7B-DPO-hf' %}
+{% set repo_id = "llava-hf/LLaVA-NeXT-Video-7B-DPO-hf" %}
+{% set device = "cuda:0" %}
 {% set video_path = '/u/yli77/projects/ML-code-generation/data/video.avi' %}
 {% set user_text = 'Describe what is happening in this video.' %}
 {% set num_frames = 8 %}
@@ -11,7 +10,6 @@
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 video_path = "{{ video_path }}"
 user_text = "{{ user_text }}"
 num_frames = {{ num_frames }}
@@ -27,7 +25,6 @@ import torch
 import numpy as np
 import av
 from transformers import LlavaNextVideoProcessor, LlavaNextVideoForConditionalGeneration
-
 
 def read_video_pyav(container, indices):
     """
@@ -82,9 +79,3 @@ generate_ids = model.generate(**inputs, max_new_tokens=gen_max_new_tokens, do_sa
 # Post-process & build RESULT dict
 generated_text = processor.decode(generate_ids[0][2:], skip_special_tokens=skip_special_tokens)
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_file = output_dir / "generated_text.txt"
-    output_file.write_text(RESULT["generated_text"], encoding="utf-8")

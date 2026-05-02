@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Seznam/retromae-small-cs" %}
 {% set text_inputs = ["Dnes je výborné počasí na procházku po parku.", "Večer si oblíbím dobrý film a uvařím si čaj."] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Seznam__SEP__retromae-small-cs" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_inputs = {{ text_inputs | tojson }}
-output_dir = "{{ output_dir }}"
 
 import json
 import os
@@ -31,9 +31,3 @@ with torch.no_grad():
 cls_embeddings = outputs.last_hidden_state[:, 0].cpu()
 
 RESULT = {"cls_embeddings": cls_embeddings.tolist()}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    embeddings_path = os.path.join(output_dir, "cls_embeddings.json")
-    with open(embeddings_path, "w", encoding="utf-8") as f:
-        json.dump(RESULT["cls_embeddings"], f)

@@ -2,13 +2,11 @@
 {% set device = "cuda:0" %}
 {% set image1_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
 {% set image2_path = "/u/yli77/projects/ML-code-generation/data/image2.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/deepmind__SEP__optical-flow-perceiver" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image1_path = "{{ image1_path }}"
 image2_path = "{{ image2_path }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import PerceiverForOpticalFlow
 import torch
@@ -53,7 +51,3 @@ flow = outputs.logits.detach().cpu().numpy()
 
 # Result dictionary
 RESULT = {"flow": flow}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    np.save(Path(output_dir) / "flow.npy", RESULT["flow"])

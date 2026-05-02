@@ -1,6 +1,5 @@
 {% set repo_id = "slauw87/bart_summarisation" %}
 {% set device = "cuda:0" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/slauw87__SEP__bart_summarisation" %}
 {% set text_input -%}
 Sugi: I am tired of everything in my life.
 Tommy: What? How happy you life is! I do envy you.
@@ -11,13 +10,11 @@ Tommy: Maybe you are right.
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input.strip() }}"""
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
 import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
@@ -53,8 +50,3 @@ decoded = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 summary = decoded[0].strip()
 
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

@@ -1,5 +1,5 @@
-{% set repo_id = repo_id if repo_id is defined else "hfl/chinese-electra-small-discriminator" %}
-{% set device = device if device is defined else "cuda:0" %}
+{% set repo_id = "hfl/chinese-electra-small-discriminator" %}
+{% set device = "cuda:0" %}
 {% set text = text if text is defined else "我爱自然语言处理。" %}
 {% set threshold = threshold if threshold is defined else 0.5 %}
 
@@ -31,9 +31,3 @@ RESULT = {
     "probabilities": probabilities.cpu().tolist(),
     "predictions": predictions.cpu().tolist(),
 }
-
-if __name__ == "__main__":
-    output_dir = os.getenv("OUTPUT_DIR", ".")
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "results.json"), "w") as f:
-        json.dump(RESULT, f, ensure_ascii=False, indent=2)

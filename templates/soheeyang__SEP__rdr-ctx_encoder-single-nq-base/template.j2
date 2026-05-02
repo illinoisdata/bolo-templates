@@ -1,12 +1,10 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "soheeyang/rdr-ctx_encoder-single-nq-base" %}
+{% set device = "cuda:0" %}
 {% set context_text = "A passage describing the Retriever context for Natural Questions" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/soheeyang__SEP__rdr-ctx_encoder-single-nq-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 context_text = "{{ context_text }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -29,9 +27,3 @@ with torch.no_grad():
 context_embedding = outputs.pooler_output.detach().cpu()
 
 RESULT = {"context_embedding": context_embedding}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    embedding_path = output_path / "context_embedding.npy"
-    np.save(embedding_path, RESULT["context_embedding"].numpy())

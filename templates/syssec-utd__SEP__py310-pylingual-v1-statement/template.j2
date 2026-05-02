@@ -1,12 +1,10 @@
 {% set repo_id = "syssec-utd/py310-pylingual-v1-statement" %}
 {% set device = "cuda:0" %}
 {% set input_text = "The quick brown fox jumps over the lazy dog." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/syssec-utd__SEP__py310-pylingual-v1-statement" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -20,8 +18,3 @@ outputs = model.generate(**inputs)
 
 generated_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "generated_text.txt"), "w") as f:
-        f.write(RESULT["generated_text"])

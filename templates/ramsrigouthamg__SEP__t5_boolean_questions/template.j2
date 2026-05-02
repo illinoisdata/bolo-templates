@@ -1,13 +1,13 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "ramsrigouthamg/t5_boolean_questions" %}
 {% set question_text = "Is it true that the Earth is flat?" %}
 {% set max_length = 32 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ramsrigouthamg__SEP__t5_boolean_questions" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 question_text = "{{ question_text }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -26,9 +26,3 @@ generated_ids = model.generate(**encoded_inputs, max_length=max_length, num_beam
 generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    text_output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(text_output_path, "w", encoding="utf-8") as handle:
-        handle.write(RESULT["generated_text"])

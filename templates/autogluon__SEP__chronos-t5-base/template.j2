@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "autogluon/chronos-t5-base" %}
 {% set input_text = "Historical time series data points for forecasting guidance." %}
 {% set max_length = 64 %}
 {% set num_return_sequences = 1 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/autogluon__SEP__chronos-t5-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_length = {{ max_length }}
 num_return_sequences = {{ num_return_sequences }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -32,9 +32,3 @@ with torch.no_grad():
 forecasts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"forecasts": forecasts}
-
-if __name__ == "__main__":
-    output_root = Path(output_dir)
-    output_root.mkdir(parents=True, exist_ok=True)
-    forecast_file = output_root / "forecasts.txt"
-    forecast_file.write_text("\n".join(forecasts), encoding="utf-8")

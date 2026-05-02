@@ -1,11 +1,10 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "facebook/mbart-large-50" %}
+{% set device = "cuda:0" %}
 {% set src_text = "UN Chief Says There Is No Military Solution in Syria" %}
 {% set src_lang = "en_XX" %}
 {% set tgt_lang = "ro_RO" %}
 {% set max_length = 200 %}
 {% set num_beams = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mbart-large-50" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -14,7 +13,6 @@ src_lang = "{{ src_lang }}"
 tgt_lang = "{{ tgt_lang }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -31,8 +29,3 @@ generated_tokens = model.generate(**inputs, forced_bos_token_id=forced_bos_token
 translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "translation.txt"), "w", encoding="utf-8") as f:
-        f.write(translation)

@@ -2,12 +2,10 @@
 {% set device = "cuda:0" %}
 {% set source_text = "Здравейте! Как сте?" %}
 {% set max_length = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-bg-it" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = "{{ source_text }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 import os
 
@@ -23,9 +21,3 @@ generated_tokens = model.generate(**model_inputs, max_length=max_length)
 translation = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "translation.txt")
-    with open(output_path, "w", encoding="utf-8") as file:
-        file.write(RESULT["translation"])

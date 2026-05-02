@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "IlyaGusev/news_tg_rubert" %}
 {% set text = "Сегодня [MASK] хорошая погода." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/IlyaGusev__SEP__news_tg_rubert" %}
 {% set top_k = 5 %}
 
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 top_k = {{ top_k }}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -46,8 +46,3 @@ if mask_indices.shape[0] > 0:
         })
 
 RESULT = {"predictions": predictions}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir) / "predictions.json"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(RESULT, ensure_ascii=False, indent=2), encoding="utf-8")

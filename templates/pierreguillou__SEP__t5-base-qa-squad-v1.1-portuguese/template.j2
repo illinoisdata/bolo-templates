@@ -1,9 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "pierreguillou/t5-base-qa-squad-v1.1-portuguese" %}
 {% set question = "Quando foi descoberta a Covid-19?" %}
 {% set context = "A pandemia de COVID-19, também conhecida como pandemia de coronavírus, é uma pandemia em curso de COVID-19, uma doença respiratória aguda causada pelo coronavírus da síndrome respiratória aguda grave 2 (SARS-CoV-2). A doença foi identificada pela primeira vez em Wuhan, na província de Hubei, República Popular da China, em 1 de dezembro de 2019, mas o primeiro caso foi reportado em 31 de dezembro do mesmo ano." %}
 {% set max_target_length = 32 %}
 {% set num_beams = 1 %}
 {% set early_stopping = true %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/pierreguillou__SEP__t5-base-qa-squad-v1.1-portuguese" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -12,7 +13,6 @@ context = "{{ context }}"
 max_target_length = {{ max_target_length }}
 num_beams = {{ num_beams }}
 early_stopping = {{ early_stopping }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -40,8 +40,3 @@ predicted_answer = tokenizer.decode(
 ).strip()
 
 RESULT = {"answer": predicted_answer}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "answer.txt").write_text(RESULT["answer"], encoding="utf-8")

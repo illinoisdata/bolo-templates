@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/vit-mae-huge" %}
 {% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__vit-mae-huge" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-output_dir = "{{ output_dir }}"
 
 import os
 from pathlib import Path
@@ -21,11 +21,9 @@ model = AutoModelForPreTraining.from_pretrained(repo_id)
 model.to(device)
 model.eval()
 
-
 def _is_url(path: str) -> bool:
     parsed = urlparse(path)
     return parsed.scheme in {"http", "https"}
-
 
 def _load_image(path: str) -> Image.Image:
     if _is_url(path):
@@ -35,7 +33,6 @@ def _load_image(path: str) -> Image.Image:
     else:
         image = Image.open(path)
     return image.convert("RGB")
-
 
 image = _load_image(image_path)
 inputs = processor(images=image, return_tensors="pt")
@@ -55,13 +52,3 @@ RESULT = {
     "ids_restore": ids_restore_tensor,
     "loss": loss_tensor,
 }
-
-
-if __name__ == "__main__":
-    result_dir = Path(output_dir)
-    result_dir.mkdir(parents=True, exist_ok=True)
-    np.save(result_dir / "reconstructed_pixels.npy", RESULT["reconstructed_pixels"].numpy())
-    np.save(result_dir / "mask.npy", RESULT["mask"].numpy())
-    np.save(result_dir / "ids_restore.npy", RESULT["ids_restore"].numpy())
-    if RESULT["loss"] is not None:
-        np.save(result_dir / "loss.npy", RESULT["loss"].numpy())

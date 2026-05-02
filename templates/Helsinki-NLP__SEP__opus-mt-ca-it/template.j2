@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Helsinki-NLP/opus-mt-ca-it" %}
 {% set input_text = "Bon dia! Com estàs avui?" %}
 {% set num_beams = 4 %}
 {% set max_length = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-ca-it" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 num_beams = {{ num_beams }}
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import os
@@ -22,9 +22,3 @@ generated_tokens = model.generate(**encoding, num_beams=num_beams, max_length=ma
 translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    result_path = os.path.join(output_dir, "translation.txt")
-    with open(result_path, "w", encoding="utf-8") as file:
-        file.write(RESULT["translation"])

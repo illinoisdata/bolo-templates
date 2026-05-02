@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "LIA-AvignonUniversity/IWSLT2022-tamasheq-only" %}
 {% set audio_file = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/LIA-AvignonUniversity__SEP__IWSLT2022-tamasheq-only" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_file = "{{ audio_file }}"
-output_dir = "{{ output_dir }}"
 
 import os
 from io import BytesIO
@@ -17,11 +17,9 @@ import torch
 import torchaudio
 from transformers import AutoFeatureExtractor, AutoModelForPreTraining
 
-
 def _is_url(source: str) -> bool:
     parsed = urlparse(source)
     return parsed.scheme in {"http", "https"}
-
 
 def _load_audio(source: str):
     if _is_url(source):
@@ -35,7 +33,6 @@ def _load_audio(source: str):
         waveform = waveform.mean(axis=1)
     return waveform, sample_rate
 
-
 def _resample_audio(waveform, orig_sr: int, target_sr: int):
     tensor = torch.from_numpy(waveform).float()
     if tensor.dim() == 1:
@@ -43,7 +40,6 @@ def _resample_audio(waveform, orig_sr: int, target_sr: int):
     resampler = torchaudio.transforms.Resample(orig_sr, target_sr)
     resampled = resampler(tensor)
     return resampled.squeeze(0).numpy()
-
 
 _feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
 _model = AutoModelForPreTraining.from_pretrained(repo_id)
@@ -73,9 +69,3 @@ for _attr in ("projected_states", "projected_quantized_states", "quantized_state
         _result_items[_attr] = _value.detach().cpu()
 
 RESULT = _result_items
-
-if __name__ == "__main__":
-    _dir = Path(output_dir)
-    _dir.mkdir(parents=True, exist_ok=True)
-    for _key, _value in RESULT.items():
-        torch.save(_value, _dir / f"{_key}.pt")

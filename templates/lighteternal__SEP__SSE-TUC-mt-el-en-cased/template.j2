@@ -1,9 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "lighteternal/SSE-TUC-mt-el-en-cased" %}
 {% set prompt_text = "Ο όρος τεχνητή νοημοσύνη αναφέρεται στον κλάδο της πληροφορικής ο οποίος ασχολείται με τη σχεδίαση και την υλοποίηση υπολογιστικών συστημάτων που μιμούνται στοιχεία της ανθρώπινης συμπεριφοράς ." %}
 {% set max_length = 200 %}
 {% set num_beams = 5 %}
 {% set num_return_sequences = 1 %}
 {% set early_stopping = true %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/lighteternal__SEP__SSE-TUC-mt-el-en-cased" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -12,7 +13,6 @@ max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 num_return_sequences = {{ num_return_sequences }}
 early_stopping = {{ early_stopping }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -45,10 +45,3 @@ with torch.inference_mode():
 # Post-process & build RESULT dict
 translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    translations_path = os.path.join(output_dir, "translations.txt")
-    with open(translations_path, "w", encoding="utf-8") as writer:
-        for translation in RESULT["translations"]:
-            writer.write(f"{translation}\n")

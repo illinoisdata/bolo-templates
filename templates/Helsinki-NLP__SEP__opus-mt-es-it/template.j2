@@ -1,16 +1,14 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "Helsinki-NLP/opus-mt-es-it" %}
+{% set device = "cuda:0" %}
 {% set source_text = "Hola, ¿cómo estás?" %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-es-it" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = """{{ source_text }}"""
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -27,9 +25,3 @@ generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num
 translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0].strip()
 
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    translation_path = os.path.join(output_dir, "translation.txt")
-    with open(translation_path, "w", encoding="utf-8") as file:
-        file.write(RESULT["translation"])

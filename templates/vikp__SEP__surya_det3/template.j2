@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "vikp/surya_det3" %}
 repo_id = "{{ repo_id }}"
 from huggingface_hub import snapshot_download
 import os

@@ -1,16 +1,14 @@
-{% set repo_id = repo_id | default("usyd-community/vitpose-plus-base") %}
-{% set device = device | default("cuda:0") %}
+{% set repo_id = "usyd-community/vitpose-plus-base" %}
+{% set device = "cuda:0" %}
 {% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
 {% set dataset_index = dataset_index | default(0) %}
 {% set keypoint_threshold = keypoint_threshold | default(0.3) %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/usyd-community__SEP__vitpose-plus-base") %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 dataset_index = {{ dataset_index }}
 keypoint_threshold = {{ keypoint_threshold }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -53,9 +51,3 @@ for person_pose in pose_result:
     )
 
 RESULT = {"pose_annotations": pose_annotations}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    output_file = Path(output_dir) / "pose_annotations.json"
-    with open(output_file, "w", encoding="utf-8") as fout:
-        json.dump(RESULT["pose_annotations"], fout, ensure_ascii=False, indent=2)

@@ -3,14 +3,12 @@
 {% set input_text = "아버지가 방에 들어가신다.</s>" %}
 {% set max_length = 50 %}
 {% set num_beams = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/KETI-AIR__SEP__ke-t5-small" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
@@ -26,8 +24,3 @@ outputs = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
 generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    with open(Path(output_dir) / "generated_text.txt", "w", encoding="utf-8") as f:
-        f.write(RESULT["generated_text"])

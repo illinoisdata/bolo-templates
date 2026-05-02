@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/blenderbot-1B-distill" %}
 {% set user_text = "Hello there! What would you like to discuss today?" %}
 {% set max_new_tokens = 60 %}
 {% set temperature = 0.7 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__blenderbot-1B-distill" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -10,7 +11,6 @@ user_text = "{{ user_text }}"
 max_new_tokens = {{ max_new_tokens }}
 temperature = {{ temperature }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 
@@ -36,9 +36,3 @@ generated_tokens = model.generate(**inputs, **generate_kwargs)
 generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    text_output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(text_output_path, "w", encoding="utf-8") as fout:
-        fout.write(RESULT["generated_text"])

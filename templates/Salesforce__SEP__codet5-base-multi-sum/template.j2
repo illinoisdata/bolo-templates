@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Salesforce/codet5-base-multi-sum" %}
 {% set code_input = """def svg_to_image(string, size=None):
     if isinstance(string, unicode):
         string = string.encode('utf-8')
@@ -10,7 +12,6 @@
 {% set no_repeat_ngram_size = 3 %}
 {% set early_stopping = True %}
 {% set tokenizer_repo_id = "Salesforce/codet5-base" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Salesforce__SEP__codet5-base-multi-sum" %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 code_input = {{ code_input | tojson }}
@@ -20,7 +21,6 @@ length_penalty = {{ length_penalty }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
 early_stopping = {{ "True" if early_stopping else "False" }}
 tokenizer_repo_id = {{ tokenizer_repo_id | tojson }}
-output_dir = {{ output_dir | tojson }}
 
 from pathlib import Path
 
@@ -47,8 +47,3 @@ generated_ids = model.generate(
 )
 summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "summary.txt").write_text(RESULT["summary"], encoding="utf-8")

@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "patrickvonplaten/tiny-wav2vec2-no-tokenizer" %}
 {% set audio_path = '/u/yli77/projects/ML-code-generation/data/audio.wav' %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/patrickvonplaten__SEP__tiny-wav2vec2-no-tokenizer' %}
 {% set target_sampling_rate = 16000 %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
-output_dir = "{{ output_dir }}"
 target_sampling_rate = {{ target_sampling_rate }}
 
 import io
@@ -27,7 +27,6 @@ model.eval()
 def _is_url(path: str) -> bool:
     parsed = urlparse(path)
     return parsed.scheme in ("http", "https")
-
 
 def _read_audio(path: str):
     if _is_url(path):
@@ -61,10 +60,3 @@ with torch.no_grad():
 
 last_hidden_state = outputs.last_hidden_state[0].cpu().numpy()
 RESULT = {"last_hidden_state": last_hidden_state}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    for key, value in RESULT.items():
-        target_file = output_path / f"{key}.npy"
-        np.save(target_file, value)

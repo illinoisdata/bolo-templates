@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "hfl/chinese-electra-180g-small-discriminator" %}
 {% set text = "这是一个用于测试的中文输入。" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hfl__SEP__chinese-electra-180g-small-discriminator" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import json
@@ -22,7 +22,3 @@ with torch.no_grad():
 
 logits = outputs.logits
 RESULT = {"logits": logits.cpu().tolist()}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    (Path(output_dir) / "logits.json").write_text(json.dumps(RESULT["logits"], ensure_ascii=False))

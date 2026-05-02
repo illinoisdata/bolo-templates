@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "facebook/mcontriever" %}
 {% set texts = ["How does Contriever encode a sentence?", "Retrieve dense embeddings for similarity search."] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/facebook__SEP__mcontriever" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 texts = {{ texts }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -28,7 +28,3 @@ if pooled_output is None:
 embeddings = pooled_output.detach().cpu().numpy()
 
 RESULT = {"embeddings": embeddings}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    np.save(Path(output_dir) / "embeddings.npy", RESULT["embeddings"])

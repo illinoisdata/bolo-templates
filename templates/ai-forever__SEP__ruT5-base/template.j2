@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "ai-forever/ruT5-base" %}
 {% set input_text = 'Сделай краткое резюме следующего текста.' %}
 {% set max_length = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ai-forever__SEP__ruT5-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -39,8 +39,3 @@ with torch.no_grad():
 generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir) / "generated_text.txt"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(RESULT["generated_text"], encoding="utf-8")

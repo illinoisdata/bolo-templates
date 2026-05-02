@@ -4,7 +4,6 @@
 {% set max_input_length = 128 %}
 {% set max_new_tokens = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-en-jap" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -12,7 +11,6 @@ input_text = "{{ input_text }}"
 max_input_length = {{ max_input_length }}
 max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -42,11 +40,3 @@ generated_tokens = model.generate(
 translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    translations_path = output_path / "translations.txt"
-    with translations_path.open("w", encoding="utf-8") as writer:
-        for translation in RESULT["translations"]:
-            writer.write(f"{translation}\n")

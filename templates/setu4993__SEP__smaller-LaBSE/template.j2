@@ -1,19 +1,18 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "setu4993/smaller-LaBSE" %}
 {% set sentences_anchor = ["dog", "Puppies are nice.", "I enjoy taking long walks along the beach with my dog."] %}
 {% set sentences_target = ["cane", "I cuccioli sono carini.", "Mi piace fare lunghe passeggiate lungo la spiaggia con il mio cane."] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/setu4993__SEP__smaller-LaBSE" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences_anchor = {{ sentences_anchor }}
 sentences_target = {{ sentences_target }}
-output_dir = "{{ output_dir }}"
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 from pathlib import Path
 from transformers import AutoModel, AutoTokenizer
-
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = AutoModel.from_pretrained(repo_id)
@@ -48,10 +47,3 @@ RESULT = {
     "normalized_target_embeddings": normalized_target_embeddings,
     "similarity_matrix": similarity_matrix,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    for key, tensor in RESULT.items():
-        array = tensor.detach().cpu().numpy()
-        np.save(output_path / f"{key}.npy", array)

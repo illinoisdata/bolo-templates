@@ -1,12 +1,10 @@
-{% set device = device %}
-{% set repo_id = repo_id %}
+{% set device = "cuda:0" %}
+{% set repo_id = "circulus/kobart-correct-v1" %}
 {% set text = "This is a test sentence." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/circulus__SEP__kobart-correct-v1" %}
 
 device = "{{ device }}"
 repo_id = "{{ repo_id }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -19,8 +17,3 @@ generated_ids = model.generate(**inputs)
 corrected_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 RESULT = {"corrected_text": corrected_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "corrected_text.txt"), "w", encoding="utf-8") as f:
-        f.write(RESULT["corrected_text"])

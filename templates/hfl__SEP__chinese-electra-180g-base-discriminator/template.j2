@@ -1,13 +1,11 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "hfl/chinese-electra-180g-base-discriminator" %}
+{% set device = "cuda:0" %}
 {% set input_text = "今天天气很好。我今天心情不错。" %}
 {% set max_length = 128 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hfl__SEP__chinese-electra-180g-base-discriminator" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -40,9 +38,3 @@ RESULT = {
     "replaced_token_logits": result_logits,
     "replaced_token_probabilities": result_probabilities,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    torch.save(RESULT["replaced_token_logits"], output_path / "replaced_token_logits.pt")
-    torch.save(RESULT["replaced_token_probabilities"], output_path / "replaced_token_probabilities.pt")

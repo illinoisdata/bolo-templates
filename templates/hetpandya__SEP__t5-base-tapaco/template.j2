@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "hetpandya/t5-base-tapaco" %}
 {% set prefix = "paraphrase: " %}
 {% set sentence = "The house will be cleaned by me every Saturday." %}
 {% set n_predictions = 5 %}
@@ -5,7 +7,6 @@
 {% set max_length = 256 %}
 {% set top_p = 0.98 %}
 {% set early_stopping = True %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hetpandya__SEP__t5-base-tapaco" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -16,7 +17,6 @@ top_k = {{ top_k }}
 max_length = {{ max_length }}
 top_p = {{ top_p }}
 early_stopping = {{ early_stopping }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -47,10 +47,3 @@ for output in model_outputs:
         outputs.append(gen)
 
 RESULT = {"paraphrases": outputs}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "paraphrases.txt")
-    with open(output_path, "w") as f:
-        for sent in RESULT["paraphrases"]:
-            f.write(sent + "\n")

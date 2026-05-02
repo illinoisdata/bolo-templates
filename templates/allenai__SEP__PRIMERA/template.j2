@@ -1,9 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "allenai/PRIMERA" %}
 {% set text_input = "Multi-document summarization requires the model to condense diverse viewpoints into one coherent narrative. Document one introduces the research setting and the objective of combining multiple sources. Document two details experimental results that extend those findings. The summary should capture both the high-level motivation and the key outcomes." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allenai__SEP__PRIMERA" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -37,8 +37,3 @@ decoded_summaries = tokenizer.batch_decode(generated_tokens, skip_special_tokens
 summary_text = decoded_summaries[0]
 
 RESULT = {"summary": summary_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "summary.txt").write_text(summary_text, encoding="utf-8")

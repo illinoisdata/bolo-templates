@@ -1,12 +1,10 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "SZTAKI-HLT/hubert-base-cc" %}
+{% set device = "cuda:0" %}
 {% set text_input = "Ez egy példamondat a modellhez." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/SZTAKI-HLT__SEP__hubert-base-cc" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -30,8 +28,3 @@ with torch.no_grad():
 
 last_hidden_state = outputs.last_hidden_state.cpu()
 RESULT = {"last_hidden_state": last_hidden_state}
-
-if __name__ == "__main__":
-    out_path = Path(output_dir)
-    out_path.mkdir(parents=True, exist_ok=True)
-    torch.save(RESULT["last_hidden_state"], out_path / "last_hidden_state.pt")

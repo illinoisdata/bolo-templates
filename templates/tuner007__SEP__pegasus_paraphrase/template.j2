@@ -5,7 +5,6 @@
 {% set num_return_sequences = 10 %}
 {% set max_length = 60 %}
 {% set temperature = 1.5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/tuner007__SEP__pegasus_paraphrase" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -14,7 +13,6 @@ num_beams = {{ num_beams }}
 num_return_sequences = {{ num_return_sequences }}
 max_length = {{ max_length }}
 temperature = {{ temperature }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -31,9 +29,3 @@ generated = model.generate(**inputs, max_length=max_length, num_beams=num_beams,
 paraphrases = tokenizer.batch_decode(generated, skip_special_tokens=True)
 
 RESULT = {"paraphrases": paraphrases}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "paraphrases.txt"), "w") as f:
-        for paraphrase in RESULT["paraphrases"]:
-            f.write(paraphrase + "\n")

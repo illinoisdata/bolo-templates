@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "UBC-NLP/turjuman" %}
 {% set src_text = "Translate into Arabic: The weather is nice today." %}
 {% set max_new_tokens = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/UBC-NLP__SEP__turjuman" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 src_text = """{{ src_text }}"""
 max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -37,10 +37,3 @@ generated_tokens = model.generate(
 translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"translations": translations}
-
-if __name__ == "__main__":
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    (Path(output_dir) / "translations.txt").write_text(
-        "\n".join(RESULT["translations"]),
-        encoding="utf-8",
-    )

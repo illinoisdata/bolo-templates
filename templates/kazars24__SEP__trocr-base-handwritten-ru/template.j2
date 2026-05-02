@@ -1,12 +1,10 @@
-{% set repo_id = 'kazars24/trocr-base-handwritten-ru' %}
-{% set device = 'cuda:0' %}
+{% set repo_id = "kazars24/trocr-base-handwritten-ru" %}
+{% set device = "cuda:0" %}
 {% set image_path = '/u/yli77/projects/ML-code-generation/data/doc.jpeg' %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/kazars24__SEP__trocr-base-handwritten-ru' %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 from PIL import Image
@@ -29,8 +27,3 @@ generated_ids = model.generate(pixel_values)
 generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "generated_text.txt"), "w") as f:
-        f.write(RESULT["generated_text"])

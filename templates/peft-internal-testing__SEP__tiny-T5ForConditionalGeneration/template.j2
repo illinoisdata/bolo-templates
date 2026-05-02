@@ -1,8 +1,9 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "peft-internal-testing/tiny-T5ForConditionalGeneration" %}
 {% set prompt = "translate English to French: The house is wonderful." %}
 {% set max_new_tokens = 32 %}
 {% set num_beams = 1 %}
 {% set use_cache = False %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/peft-internal-testing__SEP__tiny-T5ForConditionalGeneration" %}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
@@ -10,7 +11,6 @@ prompt = {{ prompt | tojson }}
 max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
 use_cache = {{ use_cache }}
-output_dir = {{ output_dir | tojson }}
 
 from pathlib import Path
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -25,8 +25,3 @@ generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens, num_beam
 generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    destination = Path(output_dir)
-    destination.mkdir(parents=True, exist_ok=True)
-    (destination / "generated_text.txt").write_text(generated_text, encoding="utf-8")

@@ -1,11 +1,9 @@
 {% set repo_id = "prajjwal1/bert-medium" %}
 {% set device = "cuda:0" %}
 {% set text_input = "The quick brown fox jumps over the lazy dog." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/prajjwal1__SEP__bert-medium" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -28,9 +26,3 @@ pooled_output = outputs.pooler_output.cpu() if outputs.pooler_output is not None
 RESULT = {"sequence_output": sequence_output}
 if pooled_output is not None:
     RESULT["pooled_output"] = pooled_output
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    for key, value in RESULT.items():
-        torch.save(value, output_path / f"{key}.pt")

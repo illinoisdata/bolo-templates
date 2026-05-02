@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "NlpHUST/vi-electra-small" %}
 {% set text_input = "Thế giới ML phát triển nhanh chóng." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/NlpHUST__SEP__vi-electra-small" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import json
@@ -27,13 +27,3 @@ RESULT = {
     "tokens": tokens,
     "discriminator_logits": discriminator_logits,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    tokens_path = output_path / "tokens.txt"
-    with tokens_path.open("w", encoding="utf-8") as token_file:
-        token_file.write("\n".join(RESULT["tokens"]))
-    logits_path = output_path / "discriminator_logits.json"
-    with logits_path.open("w", encoding="utf-8") as logits_file:
-        json.dump(RESULT["discriminator_logits"], logits_file)

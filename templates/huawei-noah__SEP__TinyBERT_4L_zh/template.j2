@@ -1,11 +1,11 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "huawei-noah/TinyBERT_4L_zh" %}
 {% set text_input = "今天天气[MASK]" %}
 {% set top_k = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/huawei-noah__SEP__TinyBERT_4L_zh" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
 top_k = {{ top_k }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -63,10 +63,3 @@ if mask_token_id is not None:
         )
 
 RESULT = {"predictions": predictions}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    save_path = output_path / "predictions.json"
-    with save_path.open("w", encoding="utf-8") as fwrite:
-        json.dump(RESULT["predictions"], fwrite, ensure_ascii=False, indent=2)

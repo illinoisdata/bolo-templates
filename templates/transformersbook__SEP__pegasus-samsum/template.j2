@@ -1,5 +1,6 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "transformersbook/pegasus-samsum" %}
 {% set input_text = "Today's meeting concluded with a plan to address the feature gaps next sprint, the support team is handling the critical bug fixes, and the design review will follow once the prototype is stabilized." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/transformersbook__SEP__pegasus-samsum" %}
 {% set max_length = 128 %}
 {% set min_length = 30 %}
 {% set num_beams = 4 %}
@@ -8,7 +9,6 @@
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-output_dir = "{{ output_dir }}"
 max_length = {{ max_length }}
 min_length = {{ min_length }}
 num_beams = {{ num_beams }}
@@ -37,9 +37,3 @@ generated_ids = model.generate(
 summary = tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)[0]
 
 RESULT = {"summary": summary}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    summary_path = os.path.join(output_dir, "summary.txt")
-    with open(summary_path, "w", encoding="utf-8") as summary_file:
-        summary_file.write(RESULT["summary"])

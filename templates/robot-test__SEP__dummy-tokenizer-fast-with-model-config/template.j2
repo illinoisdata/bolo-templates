@@ -1,8 +1,8 @@
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/robot-test__SEP__dummy-tokenizer-fast-with-model-config" %}
+{% set device = "cuda:0" %}
+{% set repo_id = "robot-test/dummy-tokenizer-fast-with-model-config" %}
 {% set input_text = "The quick brown fox jumps over the lazy dog." %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-output_dir = "{{ output_dir }}"
 input_text = "{{ input_text }}"
 
 import json
@@ -17,13 +17,3 @@ input_ids = encoded["input_ids"]
 tokens = tokenizer.convert_ids_to_tokens(input_ids)
 
 RESULT = {"input_ids": input_ids, "tokens": tokens}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    ids_path = output_path / "input_ids.json"
-    tokens_path = output_path / "tokens.json"
-    with ids_path.open("w", encoding="utf-8") as f:
-        json.dump(RESULT["input_ids"], f)
-    with tokens_path.open("w", encoding="utf-8") as f:
-        json.dump(RESULT["tokens"], f)

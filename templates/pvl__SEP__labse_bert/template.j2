@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "pvl/labse_bert" %}
 {% set sentences = ["This framework generates embeddings for each input sentence", "Sentences are passed as a list of string.", "The quick brown fox jumps over the lazy dog."] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/pvl__SEP__labse_bert" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences | tojson }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import json
@@ -29,7 +29,6 @@ encoded_input = encoded_input.to(device)
 with torch.no_grad():
     model_output = model(**encoded_input)
 
-
 def mean_pooling(model_output, attention_mask: torch.Tensor) -> torch.Tensor:
     token_embeddings = getattr(model_output, "last_hidden_state", model_output[0])
     input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
@@ -37,13 +36,7 @@ def mean_pooling(model_output, attention_mask: torch.Tensor) -> torch.Tensor:
     sum_mask = torch.clamp(input_mask_expanded.sum(dim=1), min=1e-9)
     return sum_embeddings / sum_mask
 
-
 sentence_embeddings = mean_pooling(model_output, encoded_input["attention_mask"])
 sentence_embeddings = sentence_embeddings.cpu().tolist()
 
 RESULT = {"sentence_embeddings": sentence_embeddings}
-
-if __name__ == "__main__":
-    output_root = Path(output_dir)
-    output_root.mkdir(parents=True, exist_ok=True)
-    (output_root / "sentence_embeddings.json").write_text(json.dumps(RESULT["sentence_embeddings"]))

@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "valhalla/t5-small-qa-qg-hl" %}
 {% set input_text = "generate question:  42  is the answer to life, the universe and everything. " %}
 {% set max_new_tokens = 64 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/valhalla__SEP__t5-small-qa-qg-hl" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_new_tokens = {{ max_new_tokens }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -28,8 +28,3 @@ with torch.no_grad():
 generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(RESULT["generated_text"])

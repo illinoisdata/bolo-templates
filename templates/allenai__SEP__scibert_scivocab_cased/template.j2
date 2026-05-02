@@ -40,10 +40,3 @@ RESULT = {
     "last_hidden_state": last_hidden_state,
     "pooler_output": pooler_output,
 }
-
-if __name__ == "__main__":
-    output_dir = Path(output_path)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    np.save(output_dir / "last_hidden_state.npy", RESULT["last_hidden_state"])
-    if RESULT["pooler_output"] is not None:
-        np.save(output_dir / "pooler_output.npy", RESULT["pooler_output"])

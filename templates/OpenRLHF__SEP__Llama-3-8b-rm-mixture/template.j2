@@ -1,12 +1,10 @@
-{% set repo_id = 'OpenRLHF/Llama-3-8b-rm-mixture' %}
-{% set device = 'cuda:0' %}
+{% set repo_id = "OpenRLHF/Llama-3-8b-rm-mixture" %}
+{% set device = "cuda:0" %}
 {% set text = 'Transformers are amazing!' %}
-{% set output_dir = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/OpenRLHF__SEP__Llama-3-8b-rm-mixture' %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 import os
 import json
@@ -29,8 +27,3 @@ with torch.no_grad():
         reward_values = logits.tolist()
 
 RESULT = {"reward_scores": reward_values}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "reward.json"), "w") as f:
-        json.dump(RESULT["reward_scores"], f)

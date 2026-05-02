@@ -1,5 +1,5 @@
-{% set repo_id = repo_id %}
-{% set device = device %}
+{% set repo_id = "sander-wood/text-to-music" %}
+{% set device = "cuda:0" %}
 {% set text_input = "This is a traditional Irish dance music." %}
 {% set max_length = 1024 %}
 {% set top_p = 0.9 %}
@@ -52,9 +52,3 @@ output_ids = model.generate(**generate_kwargs)
 decoded_outputs = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
 
 RESULT = {"generated_abc": decoded_outputs}
-
-if __name__ == "__main__":
-    output_dir = Path(output_path)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_file = output_dir / "generated_abc.txt"
-    output_file.write_text("\n\n".join(RESULT["generated_abc"]), encoding="utf-8")

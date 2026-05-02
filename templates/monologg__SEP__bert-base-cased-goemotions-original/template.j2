@@ -1,14 +1,12 @@
-{% set repo_id = repo_id | default("monologg/bert-base-cased-goemotions-original") %}
-{% set device = device | default("cuda:0") %}
+{% set repo_id = "monologg/bert-base-cased-goemotions-original" %}
+{% set device = "cuda:0" %}
 {% set text = text | default("I feel happy and excited today.") %}
 {% set threshold = threshold | default(0.5) %}
-{% set output_dir = output_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/monologg__SEP__bert-base-cased-goemotions-original") %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 threshold = {{ threshold }}
-output_dir = "{{ output_dir }}"
 
 import os
 import json
@@ -31,8 +29,3 @@ labels = [model.config.id2label[i] for i, p in enumerate(probs) if p > threshold
 scores = [p.item() for p in probs if p > threshold]
 
 RESULT = {"labels": labels, "scores": scores}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "results.json"), "w") as f:
-        json.dump(RESULT, f)

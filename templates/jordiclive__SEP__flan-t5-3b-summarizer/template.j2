@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "jordiclive/flan-t5-3b-summarizer" %}
 {% set prompt = "Produce an article summary of the following news article:" %}
 {% set raw_document = "The economic landscape has shifted dramatically over the past few quarters, with inflation peaking and then gradually easing. The latest data shows that consumer prices are stabilizing, yet uncertainty lingers across labor markets and international trade tensions continue to influence central bank policies." %}
 {% set max_length = 200 %}
@@ -7,7 +9,6 @@
 {% set no_repeat_ngram_size = 3 %}
 {% set early_stopping = true %}
 {% set max_input_length = 512 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/jordiclive__SEP__flan-t5-3b-summarizer" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -20,7 +21,6 @@ length_penalty = {{ length_penalty }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
 early_stopping = {{ early_stopping }}
 max_input_length = {{ max_input_length }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 
@@ -58,9 +58,3 @@ generated_texts = tokenizer.batch_decode(
 summary_text = generated_texts[0].strip()
 
 RESULT = {"summary": summary_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    summary_file = output_path / "summary.txt"
-    summary_file.write_text(RESULT["summary"], encoding="utf-8")

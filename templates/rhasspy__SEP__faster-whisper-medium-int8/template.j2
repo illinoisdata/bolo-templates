@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "rhasspy/faster-whisper-medium-int8" %}
 {% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
 {% set language = "en" %}
 {% set beam_size = 5 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/rhasspy__SEP__faster-whisper-medium-int8" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
 language = "{{ language }}"
 beam_size = {{ beam_size }}
-output_dir = "{{ output_dir }}"
 
 import io
 import json
@@ -47,9 +47,3 @@ segments = _transcribe(audio_source)
 text = "".join([segment.text for segment in segments])
 segments_data = [{"start": segment.start, "end": segment.end, "text": segment.text} for segment in segments]
 RESULT = {"text": text, "segments": segments_data}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "transcription.txt").write_text(RESULT["text"], encoding="utf-8")
-    (output_path / "segments.json").write_text(json.dumps(RESULT["segments"]), encoding="utf-8")

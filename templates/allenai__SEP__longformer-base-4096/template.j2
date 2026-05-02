@@ -1,13 +1,11 @@
 {% set repo_id = "allenai/longformer-base-4096" %}
 {% set device = "cuda:0" %}
 {% set text = "Longformer excels at modeling <mask> documents." %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allenai__SEP__longformer-base-4096" %}
 {% set top_k = 5 %}
 
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text = {{ text | tojson }}
-output_dir = {{ output_dir | tojson }}
 top_k = {{ top_k }}
 
 from transformers import AutoTokenizer, AutoModelForMaskedLM
@@ -54,9 +52,3 @@ for batch_idx, seq_idx in zip(batch_indices.tolist(), sequence_indices.tolist())
     )
 
 RESULT = {"mask_predictions": mask_predictions}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "mask_predictions.json")
-    with open(output_path, "w", encoding="utf-8") as writer:
-        json.dump(RESULT["mask_predictions"], writer, ensure_ascii=False, indent=2)

@@ -1,12 +1,10 @@
 {% set repo_id = "Helsinki-NLP/opus-mt-en-vi" %}
 {% set device = "cuda:0" %}
 {% set source_text = "Hello, how are you?" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-en-vi" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = """{{ source_text }}"""
-output_dir = "{{ output_dir }}"
 
 import os
 from pathlib import Path
@@ -52,14 +50,3 @@ translation_output = (
 )
 
 RESULT = {"translation": translation_output}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = Path(output_dir) / "translation.txt"
-    serialization_target = translation_output
-    if isinstance(serialization_target, list):
-        serialization_target = "\n".join(str(element) for element in serialization_target)
-    else:
-        serialization_target = str(serialization_target)
-    with open(output_path, "w", encoding="utf-8") as writer:
-        writer.write(serialization_target)

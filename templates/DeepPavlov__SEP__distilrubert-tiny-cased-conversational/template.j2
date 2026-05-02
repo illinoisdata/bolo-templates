@@ -1,10 +1,10 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "DeepPavlov/distilrubert-tiny-cased-conversational" %}
 {% set text = ["Привет, как дела?"] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/DeepPavlov__SEP__distilrubert-tiny-cased-conversational" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = {{ text }}
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModel
 import torch
@@ -28,9 +28,3 @@ RESULT = {
     "hidden_states": hidden_states,
     "attentions": attentions,
 }
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "last_hidden_state.npy"), last_hidden_state)
-    np.save(os.path.join(output_dir, "hidden_states.npy"), hidden_states)
-    np.save(os.path.join(output_dir, "attentions.npy"), attentions)

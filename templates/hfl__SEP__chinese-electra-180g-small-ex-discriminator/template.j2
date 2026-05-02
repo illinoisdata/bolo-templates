@@ -1,12 +1,10 @@
 {% set repo_id = "hfl/chinese-electra-180g-small-ex-discriminator" %}
 {% set device = "cuda:0" %}
 {% set text = "这是一个示例句子，用于测试模型的推理。" %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hfl__SEP__chinese-electra-180g-small-ex-discriminator" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-output_dir = "{{ output_dir }}"
 
 from transformers import AutoTokenizer, AutoModelForPreTraining
 import torch
@@ -27,10 +25,3 @@ tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
 probabilities = torch.sigmoid(outputs.logits)[0].cpu().tolist()
 
 RESULT = {"tokens": tokens, "probabilities": probabilities}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, "tokens.txt"), "w", encoding="utf-8") as f:
-        f.write(" ".join(RESULT["tokens"]))
-    with open(os.path.join(output_dir, "probabilities.txt"), "w") as f:
-        f.write("\n".join(str(p) for p in RESULT["probabilities"]))

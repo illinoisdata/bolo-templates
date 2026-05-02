@@ -3,14 +3,12 @@
 {% set text_input = "안녕하세요! 오늘 하루가 어떠신가요?" %}
 {% set max_new_tokens = 64 %}
 {% set num_beams = 4 %}
-{% set output_dir = "./output" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"
 max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 import os
 import torch
@@ -35,9 +33,3 @@ generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True
 generated_text = generated_texts[0] if generated_texts else ""
 
 RESULT = {"generated_text": generated_text}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "generated_text.txt")
-    with open(output_path, "w", encoding="utf-8") as output_file:
-        output_file.write(RESULT["generated_text"])

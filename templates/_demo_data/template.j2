@@ -1,0 +1,21 @@
+{{ extra_vars }}
+{{ import_body }}
+
+REPO_ID = "{{ repo_id }}"
+INPUT_DATA = "{{ input_data }}"
+OUTPUT_DATA = "{{ output_data }}"
+DEVICE = "{{ device }}"
+
+def preprocess(input_data):
+{{ preprocess_body | indent(4, true) }}
+
+def infer(data, repo_id, device):
+{{ infer_body | indent(4, true) }}
+
+def postprocess(output_data):
+{{ postprocess_body | indent(4, true) }}
+
+if __name__ == "__main__":
+    data = preprocess(INPUT_DATA)
+    result = infer(data, REPO_ID, DEVICE)
+    postprocess(result, OUTPUT_DATA)

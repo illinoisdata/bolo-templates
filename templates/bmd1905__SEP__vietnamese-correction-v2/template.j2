@@ -15,13 +15,11 @@
     "kinh tế viet nam dang dứng truoc 1 thoi ky đổi mơi chưa tung có tienf lệ trong lịch sử"
 ] %}
 {% set max_length = 512 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/bmd1905__SEP__vietnamese-correction-v2" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_samples = {{ text_samples | tojson }}
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 
 import os
 
@@ -43,10 +41,3 @@ generated_tokens = model.generate(**inputs, max_length=max_length)
 corrected_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"corrected_texts": corrected_texts}
-
-if __name__ == "__main__":
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "corrected_texts.txt")
-    with open(output_path, "w", encoding="utf-8") as file:
-        for text in RESULT["corrected_texts"]:
-            file.write(text + "\n")

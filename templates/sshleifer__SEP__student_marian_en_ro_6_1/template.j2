@@ -1,3 +1,5 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "sshleifer/student_marian_en_ro_6_1" %}
 {% set input_text = "This is a test." %}
 {% set num_beams = 6 %}
 {% set max_length = 512 %}
@@ -25,11 +27,3 @@ generated_tokens = model.generate(**inputs, num_beams=num_beams, max_length=max_
 # Post-process output
 translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 RESULT = {"translation": translation}
-
-if __name__ == "__main__":
-    import os
-    from pathlib import Path
-
-    output_dir = Path(os.environ.get("OUTPUT_DIR", "."))
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "translation.txt").write_text(RESULT["translation"], encoding="utf-8")

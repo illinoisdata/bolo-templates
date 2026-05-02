@@ -1,12 +1,12 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "hellonlp/promcse-bert-base-zh" %}
 {% set input_sentence = "武汉是一个美丽的城市。" %}
 {% set candidate_sentences = ["你好吗", "你怎么样", "我吃了一个苹果", "你过得好吗", "你还好吗", "你现在好吗", "你吃饭了吗"] %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/hellonlp__SEP__promcse-bert-base-zh" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_sentence = "{{ input_sentence }}"
 candidate_sentences = {{ candidate_sentences }}
-output_dir = "{{ output_dir }}"
 
 import json
 from pathlib import Path
@@ -47,12 +47,3 @@ RESULT = {
         for sentence, score in zip(candidate_sentences, similarity_scores)
     ]
 }
-
-if __name__ == "__main__":
-    destination = Path(output_dir)
-    destination.mkdir(parents=True, exist_ok=True)
-    output_path = destination / "similarities.json"
-    output_path.write_text(
-        json.dumps(RESULT["similarities"], ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )

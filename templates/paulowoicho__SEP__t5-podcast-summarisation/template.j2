@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "paulowoicho/t5-podcast-summarisation" %}
 {% set input_text = "The podcast transcript explores lessons learned from a recent engineering expedition, highlighting teamwork, unexpected challenges, and how every member contributed to solving complex problems. This summary should capture the most actionable insights." %}
 {% set min_length = 30 %}
 {% set max_length = 200 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/paulowoicho__SEP__t5-podcast-summarisation" %}
 {% set task_prefix = "summarize: " %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""
 min_length = {{ min_length }}
 max_length = {{ max_length }}
-output_dir = "{{ output_dir }}"
 task_prefix = "{{ task_prefix }}"
 
 from pathlib import Path
@@ -39,8 +39,3 @@ generated_ids = model.generate(
 summary_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
 
 RESULT = {"summary_text": summary_text}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir) / "summary.txt"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(RESULT["summary_text"], encoding="utf-8")

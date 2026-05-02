@@ -3,14 +3,12 @@
 {% set user_message = "Hello, how are you?" %}
 {% set max_new_tokens = 128 %}
 {% set temperature = 0.7 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/havenhq__SEP__mamba-chat" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 user_message = "{{ user_message }}"
 max_new_tokens = {{ max_new_tokens }}
 temperature = {{ temperature }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 import json
@@ -50,8 +48,3 @@ generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 assistant_response = generated_text.split("<|assistant|>")[-1].strip()
 
 RESULT = {"generated_text": assistant_response}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(RESULT["generated_text"], encoding="utf-8")

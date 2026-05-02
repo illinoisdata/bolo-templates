@@ -1,14 +1,14 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "QizhiPei/biot5-plus-base" %}
 {% set input_text = "Summarize the role of mitochondria in a single sentence." %}
 {% set max_new_tokens = 128 %}
 {% set num_beams = 4 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/QizhiPei__SEP__biot5-plus-base" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""
 max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 
 from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -31,10 +31,3 @@ generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 RESULT = {
     "generated_text": generated_text,
 }
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_text.txt").write_text(
-        RESULT["generated_text"], encoding="utf-8"
-    )

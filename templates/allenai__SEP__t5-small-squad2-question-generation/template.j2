@@ -1,11 +1,10 @@
-{% set device = device %}
-{% set repo_id = repo_id %}
+{% set device = "cuda:0" %}
+{% set repo_id = "allenai/t5-small-squad2-question-generation" %}
 {% set input_text = "He thanked all fellow bloggers and organizations that showed support during the conference." %}
 {% set max_length = 64 %}
 {% set num_beams = 4 %}
 {% set no_repeat_ngram_size = 3 %}
 {% set early_stopping = True %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allenai__SEP__t5-small-squad2-question-generation" %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -14,7 +13,6 @@ max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
 early_stopping = {{ early_stopping }}
-output_dir = "{{ output_dir }}"
 
 import torch
 from pathlib import Path
@@ -46,11 +44,3 @@ generated_questions = tokenizer.batch_decode(
 )
 
 RESULT = {"generated_questions": generated_questions}
-
-if __name__ == "__main__":
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    (output_path / "generated_questions.txt").write_text(
-        "\n".join(RESULT["generated_questions"]),
-        encoding="utf-8",
-    )

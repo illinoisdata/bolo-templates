@@ -1,13 +1,13 @@
+{% set device = "cuda:0" %}
+{% set repo_id = "Michau/t5-base-en-generate-headline" %}
 {% set article_text = "President campaigns modernizes messaging with concise daily briefs." %}
 {% set max_length = 64 %}
 {% set num_beams = 3 %}
-{% set output_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Michau__SEP__t5-base-en-generate-headline" %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 article_text = """President campaigns modernizes messaging with concise daily briefs."""
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-output_dir = "{{ output_dir }}"
 prompt_prefix = "headline: "
 
 from pathlib import Path
@@ -34,8 +34,3 @@ generated_ids = model.generate(
 decoded_headline = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"headline": decoded_headline}
-
-if __name__ == "__main__":
-    target_dir = Path(output_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-    (target_dir / "headline.txt").write_text(RESULT["headline"], encoding="utf-8")
