@@ -8,6 +8,8 @@
 
 3. Add `repo_id` and `device` at the header of the template if such variables are not presented / have wrong default values, since we have observed that some templates do not have default values for these two variables defined at header. 
 
+4. Add the original `README.md` file back.
+
 ### Scripts
 
 - `remove_old_output.py` for Task 1.
