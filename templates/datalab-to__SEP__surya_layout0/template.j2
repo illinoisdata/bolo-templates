@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "datalab-to/surya_layout0" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("datalab-to/surya_layout0") %}
 repo_id = "{{ repo_id }}"
 from huggingface_hub import HfApi
 api = HfApi()

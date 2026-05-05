@@ -1,9 +1,8 @@
-{% set repo_id = "DDDSSS/translation_en-zh" %}
-{% set device = "cuda:0" %}
-{% set texts = ["Hello, world!", "How are you?"] %}
-{% set max_length = 512 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("DDDSSS/translation_en-zh") %}
+{% set device = device | default("cuda:0") %}
+{% set texts = texts | default(["Hello, world!", "How are you?"]) %}
+{% set max_length = max_length | default(512) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 texts = {{ texts | tojson }}

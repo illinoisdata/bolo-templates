@@ -1,8 +1,7 @@
-{% set repo_id = "Salesforce/codet5-base" %}
-{% set device = "cuda:0" %}
-{% set text = "def greet(user): print(f'hello <extra_id_0>!')" %}
-{% set max_length = 8 %}
-
+{% set repo_id = repo_id | default("Salesforce/codet5-base") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("def greet(user): print(f'hello <extra_id_0>!')") %}
+{% set max_length = max_length | default(8) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

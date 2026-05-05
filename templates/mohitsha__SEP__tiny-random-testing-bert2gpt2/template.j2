@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "mohitsha/tiny-random-testing-bert2gpt2" %}
-{% set prompt = "The quick brown fox jumps over the lazy dog." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("mohitsha/tiny-random-testing-bert2gpt2") %}
+{% set prompt = prompt | default("The quick brown fox jumps over the lazy dog.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

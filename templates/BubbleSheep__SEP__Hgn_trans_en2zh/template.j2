@@ -1,7 +1,6 @@
-{% set repo_id = "BubbleSheep/Hgn_trans_en2zh" %}
-{% set device = "cuda:0" %}
-{% set input_text = "The weather is nice today." %}
-
+{% set repo_id = repo_id | default("BubbleSheep/Hgn_trans_en2zh") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("The weather is nice today.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

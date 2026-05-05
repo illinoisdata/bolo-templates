@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "airkingbd/dplm_650m" %}
-{% set sequence = "ACDEFGHIKLMNPQRSTVWY" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("airkingbd/dplm_650m") %}
+{% set sequence = sequence | default("ACDEFGHIKLMNPQRSTVWY") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sequence = "{{ sequence }}"

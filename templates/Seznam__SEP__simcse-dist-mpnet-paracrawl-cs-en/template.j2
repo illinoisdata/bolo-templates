@@ -1,9 +1,8 @@
-{% set repo_id = "Seznam/simcse-dist-mpnet-paracrawl-cs-en" %}
-{% set device = "cuda:0" %}
-{% set sentence_a = "Dnes je výborné počasí na procházku po parku." %}
-{% set sentence_b = "Večer si oblíbím dobrý film a uvařím si čaj." %}
-{% set max_length = 512 %}
-
+{% set repo_id = repo_id | default("Seznam/simcse-dist-mpnet-paracrawl-cs-en") %}
+{% set device = device | default("cuda:0") %}
+{% set sentence_a = sentence_a | default("Dnes je výborné počasí na procházku po parku.") %}
+{% set sentence_b = sentence_b | default("Večer si oblíbím dobrý film a uvařím si čaj.") %}
+{% set max_length = max_length | default(512) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentence_a = "{{ sentence_a }}"

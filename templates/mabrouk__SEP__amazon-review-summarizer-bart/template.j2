@@ -1,8 +1,8 @@
-{% set repo_id = "mabrouk/amazon-review-summarizer-bart" %}
-{% set device = "cuda:0" %}
-{% set num_beams = 4 %}
-{% set min_length = 56 %}
-{% set max_length = 142 %}
+{% set repo_id = repo_id | default("mabrouk/amazon-review-summarizer-bart") %}
+{% set device = device | default("cuda:0") %}
+{% set num_beams = num_beams | default(4) %}
+{% set min_length = min_length | default(56) %}
+{% set max_length = max_length | default(142) %}
 {% set review_text %}
 I really like this book. It takes a step-by-step approach to introduce the reader to the IBM Q Experience, to the basics underlying quantum computing, and to the reality of the noise involved in the current machines. This introduction is technical and shows the user how to use the IBM system either directly through the GUI on their website or by running Python code on one's own machine. The text provides examples of small exercises to try and stimulates ideas of new things to try. The IBM Q Exp Qiskit software modules are identified and introduced - Terra, Aer, Ignis, and Aqua, as well as the backends that one can choose to do the computing. The book ends with two great chapters on quantum algorithms.
 {% endset %}

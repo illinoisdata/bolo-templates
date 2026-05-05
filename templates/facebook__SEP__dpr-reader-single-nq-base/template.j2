@@ -1,9 +1,8 @@
-{% set repo_id = "facebook/dpr-reader-single-nq-base" %}
-{% set device = "cuda:0" %}
-{% set questions = ["What is love?"] %}
-{% set titles = ["Haddaway"] %}
-{% set texts = ["'What Is Love' is a song recorded by the artist Haddaway"] %}
-
+{% set repo_id = repo_id | default("facebook/dpr-reader-single-nq-base") %}
+{% set device = device | default("cuda:0") %}
+{% set questions = questions | default(["What is love?"]) %}
+{% set titles = titles | default(["Haddaway"]) %}
+{% set texts = texts | default(["'What Is Love' is a song recorded by the artist Haddaway"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 questions = {{ questions }}

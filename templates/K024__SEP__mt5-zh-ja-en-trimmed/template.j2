@@ -1,9 +1,8 @@
-{% set repo_id = "K024/mt5-zh-ja-en-trimmed" %}
-{% set device = "cuda:0" %}
-{% set sentence = "ja2zh: 吾輩は猫である。名前はまだ無い。" %}
-{% set max_length = 100 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("K024/mt5-zh-ja-en-trimmed") %}
+{% set device = device | default("cuda:0") %}
+{% set sentence = sentence | default("ja2zh: 吾輩は猫である。名前はまだ無い。") %}
+{% set max_length = max_length | default(100) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentence = "{{ sentence }}"

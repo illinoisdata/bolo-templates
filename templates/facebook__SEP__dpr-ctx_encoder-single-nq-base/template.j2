@@ -1,5 +1,5 @@
-{% set repo_id = "facebook/dpr-ctx_encoder-single-nq-base" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("facebook/dpr-ctx_encoder-single-nq-base") %}
+{% set device = device | default("cuda:0") %}
 {% set context_text = context_text | default("The Eiffel Tower is located in Paris and is one of the most popular tourist attractions in the world.") %}
 
 repo_id = {{ repo_id | tojson }}

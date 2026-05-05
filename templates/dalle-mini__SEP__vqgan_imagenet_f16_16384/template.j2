@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "dalle-mini/vqgan_imagenet_f16_16384" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("dalle-mini/vqgan_imagenet_f16_16384") %}
 repo_id = "{{ repo_id }}"
 import transformers
 import pkgutil

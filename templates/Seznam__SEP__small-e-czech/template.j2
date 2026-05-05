@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Seznam/small-e-czech" %}
-{% set input_text = "Za hory, za doly, mé zlaté parohy" %}
-{% set result_filename = "discriminator_probabilities.json" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Seznam/small-e-czech") %}
+{% set input_text = input_text | default("Za hory, za doly, mé zlaté parohy") %}
+{% set result_filename = result_filename | default("discriminator_probabilities.json") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

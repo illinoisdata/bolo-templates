@@ -1,5 +1,5 @@
-{% set repo_id = "eugenesiow/edsr-base" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("eugenesiow/edsr-base") %}
+{% set device = device | default("cuda:0") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 

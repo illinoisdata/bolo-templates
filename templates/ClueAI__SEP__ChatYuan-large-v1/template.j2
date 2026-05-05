@@ -1,12 +1,11 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ClueAI/ChatYuan-large-v1" %}
-{% set prompt = "用户：帮我写一个请假条，我因为新冠不舒服，需要请假3天，请领导批准\\n小元：" %}
-{% set max_input_length = 768 %}
-{% set max_new_tokens = 512 %}
-{% set sample_generation = true %}
-{% set temperature = 0.7 %}
-{% set top_p = 1.0 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ClueAI/ChatYuan-large-v1") %}
+{% set prompt = prompt | default("用户：帮我写一个请假条，我因为新冠不舒服，需要请假3天，请领导批准\\n小元：") %}
+{% set max_input_length = max_input_length | default(768) %}
+{% set max_new_tokens = max_new_tokens | default(512) %}
+{% set sample_generation = sample_generation | default(true) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(1.0) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

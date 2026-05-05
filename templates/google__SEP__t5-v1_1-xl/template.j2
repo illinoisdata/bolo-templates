@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/t5-v1_1-xl" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/t5-v1_1-xl") %}
 {% set prompt = prompt | default("translate English to French: The house is wonderful.") %}
 {% set max_length = max_length | default(256) %}
 {% set num_return_sequences = num_return_sequences | default(1) %}

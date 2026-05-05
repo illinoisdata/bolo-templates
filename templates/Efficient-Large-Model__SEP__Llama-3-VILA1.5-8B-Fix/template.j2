@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Efficient-Large-Model/Llama-3-VILA1.5-8B-Fix" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Efficient-Large-Model/Llama-3-VILA1.5-8B-Fix") %}
 import pkgutil
 import transformers
 

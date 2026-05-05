@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Salesforce/blip2-opt-2.7b-coco" %}
-{% set placeholder = "debug" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Salesforce/blip2-opt-2.7b-coco") %}
+{% set placeholder = placeholder | default("debug") %}
 placeholder = "{{ placeholder }}"
 
 import inspect

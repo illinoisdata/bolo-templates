@@ -1,7 +1,7 @@
-{% set repo_id = "allenai/scibert_scivocab_cased" %}
-{% set device = "cuda:0" %}
-{% set text_input = "Trained on scientific literature, SciBERT excels at domain-specific tasks." %}
-{% set output_path = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allenai__SEP__scibert_scivocab_cased" %}
+{% set repo_id = repo_id | default("allenai/scibert_scivocab_cased") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("Trained on scientific literature, SciBERT excels at domain-specific tasks.") %}
+{% set output_path = output_path | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allenai__SEP__scibert_scivocab_cased") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""

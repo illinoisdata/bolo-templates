@@ -1,13 +1,12 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "doc2query/all-with_prefix-t5-base-v1" %}
-{% set prefix = "answer2question" %}
-{% set input_text = "Python is an interpreted, high-level and general-purpose programming language. Python's design philosophy emphasizes code readability with its notable use of significant whitespace. Its language constructs and object-oriented approach aim to help programmers write clear, logical code for small and large-scale projects." %}
-{% set max_input_length = 384 %}
-{% set max_output_length = 64 %}
-{% set do_sample = true %}
-{% set top_p = 0.95 %}
-{% set num_return_sequences = 5 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("doc2query/all-with_prefix-t5-base-v1") %}
+{% set prefix = prefix | default("answer2question") %}
+{% set input_text = input_text | default("Python is an interpreted, high-level and general-purpose programming language. Python's design philosophy emphasizes code readability with its notable use of significant whitespace. Its language constructs and object-oriented approach aim to help programmers write clear, logical code for small and large-scale projects.") %}
+{% set max_input_length = max_input_length | default(384) %}
+{% set max_output_length = max_output_length | default(64) %}
+{% set do_sample = do_sample | default(true) %}
+{% set top_p = top_p | default(0.95) %}
+{% set num_return_sequences = num_return_sequences | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prefix = "{{ prefix }}"

@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "trl-internal-testing/tiny-T5ForConditionalGeneration" %}
-{% set prompt = "summarize: The quick brown fox jumps over the lazy dog and the story of its journey to the mountain." %}
-{% set max_new_tokens = 64 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("trl-internal-testing/tiny-T5ForConditionalGeneration") %}
+{% set prompt = prompt | default("summarize: The quick brown fox jumps over the lazy dog and the story of its journey to the mountain.") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

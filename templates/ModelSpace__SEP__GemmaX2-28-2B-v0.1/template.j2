@@ -1,7 +1,6 @@
-{% set repo_id = "ModelSpace/GemmaX2-28-2B-v0.1" %}
-{% set device = "cuda:0" %}
-{% set text = "Translate this from Chinese to English:\nChinese: 我爱机器翻译\nEnglish:" %}
-
+{% set repo_id = repo_id | default("ModelSpace/GemmaX2-28-2B-v0.1") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Translate this from Chinese to English:\nChinese: 我爱机器翻译\nEnglish:") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = """{{ text }}"""

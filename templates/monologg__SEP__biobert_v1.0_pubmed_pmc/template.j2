@@ -1,7 +1,6 @@
-{% set repo_id = "monologg/biobert_v1.0_pubmed_pmc" %}
-{% set device = "cuda:0" %}
-{% set text_input = "The patient presented with signs of pulmonary embolism and subsequent clinical observations were carefully documented." %}
-
+{% set repo_id = repo_id | default("monologg/biobert_v1.0_pubmed_pmc") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("The patient presented with signs of pulmonary embolism and subsequent clinical observations were carefully documented.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

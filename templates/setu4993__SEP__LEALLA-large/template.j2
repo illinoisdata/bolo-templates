@@ -1,8 +1,7 @@
-{% set repo_id = "setu4993/LEALLA-large" %}
-{% set device = "cuda:0" %}
-{% set sentences_a = ["dog", "Puppies are nice.", "I enjoy taking long walks along the beach with my dog."] %}
-{% set sentences_b = ["cane", "I cuccioli sono carini.", "Mi piace fare lunghe passeggiate lungo la spiaggia con il mio cane."] %}
-
+{% set repo_id = repo_id | default("setu4993/LEALLA-large") %}
+{% set device = device | default("cuda:0") %}
+{% set sentences_a = sentences_a | default(["dog", "Puppies are nice.", "I enjoy taking long walks along the beach with my dog."]) %}
+{% set sentences_b = sentences_b | default(["cane", "I cuccioli sono carini.", "Mi piace fare lunghe passeggiate lungo la spiaggia con il mio cane."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences_a = {{ sentences_a | tojson }}

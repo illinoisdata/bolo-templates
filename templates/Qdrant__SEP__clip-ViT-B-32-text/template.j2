@@ -1,7 +1,6 @@
-{% set repo_id = "Qdrant/clip-ViT-B-32-text" %}
-{% set device = "cuda:0" %}
-{% set text_inputs = ["A photo of a cat.", "A dog in the park."] %}
-
+{% set repo_id = repo_id | default("Qdrant/clip-ViT-B-32-text") %}
+{% set device = device | default("cuda:0") %}
+{% set text_inputs = text_inputs | default(["A photo of a cat.", "A dog in the park."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_inputs = {{ text_inputs | tojson }}

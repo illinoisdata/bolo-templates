@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "lidiya/bart-large-xsum-samsum" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("lidiya/bart-large-xsum-samsum") %}
 {% set conversation = """Hannah: Hey, do you have Betty's number?
 Amanda: Lemme check
 Amanda: Sorry, can't find it.
@@ -13,10 +13,9 @@ Amanda: Just text him 🙂
 Hannah: Urgh.. Alright
 Hannah: Bye
 Amanda: Bye bye""" %}
-{% set max_length = 60 %}
-{% set min_length = 11 %}
-{% set num_beams = 6 %}
-
+{% set max_length = max_length | default(60) %}
+{% set min_length = min_length | default(11) %}
+{% set num_beams = num_beams | default(6) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 conversation = """{{ conversation }}"""

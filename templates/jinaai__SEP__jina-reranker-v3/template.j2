@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "jinaai/jina-reranker-v3" %}
-{% set query = "What are the health benefits of green tea?" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("jinaai/jina-reranker-v3") %}
+{% set query = query | default("What are the health benefits of green tea?") %}
 {% set documents = [
     "Green tea contains antioxidants called catechins that may help reduce inflammation and protect cells from damage.",
     "El precio del café ha aumentado un 20% este año debido a problemas en la cadena de suministro.",
@@ -9,8 +9,8 @@
     "绿茶富含儿茶素等抗氧化剂，可以降低心脏病风险，还有助于控制体重。",
     "Le thé vert est riche en antioxydants et peut améliorer la fonction cérébrale.",
 ] %}
-{% set top_n = 3 %}
-{% set return_embeddings = false %}
+{% set top_n = top_n | default(3) %}
+{% set return_embeddings = return_embeddings | default(false) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query = "{{ query }}"

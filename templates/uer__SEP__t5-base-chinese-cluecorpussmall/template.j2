@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "uer/t5-base-chinese-cluecorpussmall" %}
-{% set text_input = "作为电子extra0的平台，京东绝对是领先者。" %}
-{% set max_length = 128 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("uer/t5-base-chinese-cluecorpussmall") %}
+{% set text_input = text_input | default("作为电子extra0的平台，京东绝对是领先者。") %}
+{% set max_length = max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

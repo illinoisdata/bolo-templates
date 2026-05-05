@@ -1,7 +1,6 @@
-{% set repo_id = "clue/roberta_chinese_base" %}
-{% set device = "cuda:0" %}
-{% set text_input = "这是一个用于测试的中文句子。" %}
-
+{% set repo_id = repo_id | default("clue/roberta_chinese_base") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("这是一个用于测试的中文句子。") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

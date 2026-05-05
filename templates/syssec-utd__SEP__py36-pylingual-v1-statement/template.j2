@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "syssec-utd/py36-pylingual-v1-statement" %}
-{% set input_text = "Write a Python function to compute the factorial of a number." %}
-{% set max_new_tokens = 128 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("syssec-utd/py36-pylingual-v1-statement") %}
+{% set input_text = input_text | default("Write a Python function to compute the factorial of a number.") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set num_beams = num_beams | default(4) %}
 input_text = "{{ input_text }}"
 max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}

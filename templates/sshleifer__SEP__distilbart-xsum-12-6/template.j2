@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "sshleifer/distilbart-xsum-12-6" %}
-{% set input_text = "The Transformers library provides state-of-the-art models for summarization tasks." %}
-{% set max_length = 142 %}
-{% set min_length = 56 %}
-{% set num_beams = 6 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("sshleifer/distilbart-xsum-12-6") %}
+{% set input_text = input_text | default("The Transformers library provides state-of-the-art models for summarization tasks.") %}
+{% set max_length = max_length | default(142) %}
+{% set min_length = min_length | default(56) %}
+{% set num_beams = num_beams | default(6) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

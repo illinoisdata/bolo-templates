@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "bczhou/TinyLLaVA-3.1B-SigLIP" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set processor_id = "google/siglip-so400m-patch14-384" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("bczhou/TinyLLaVA-3.1B-SigLIP") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set processor_id = processor_id | default("google/siglip-so400m-patch14-384") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

@@ -1,6 +1,6 @@
-{% set repo_id = "Qdrant/Splade_PP_en_v1" %}
-{% set device = "cuda:0" %}
-{% set input_texts = ["A curious cat is resting on the windowsill.", "A dog is running through the park on a sunny day."] %}
+{% set repo_id = repo_id | default("Qdrant/Splade_PP_en_v1") %}
+{% set device = device | default("cuda:0") %}
+{% set input_texts = input_texts | default(["A curious cat is resting on the windowsill.", "A dog is running through the park on a sunny day."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_texts = {{ input_texts }}

@@ -1,9 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Salesforce/mixqg-large" %}
-{% set context = "In the late 17th century, Robert Boyle proved that air is necessary for combustion." %}
-{% set answer = "Robert Boyle" %}
-{% set max_length = 64 %}
-{% set num_beams = 4 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Salesforce/mixqg-large") %}
+{% set context = context | default("In the late 17th century, Robert Boyle proved that air is necessary for combustion.") %}
+{% set answer = answer | default("Robert Boyle") %}
+{% set max_length = max_length | default(64) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 context = "{{ context }}"

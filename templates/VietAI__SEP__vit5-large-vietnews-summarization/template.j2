@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "VietAI/vit5-large-vietnews-summarization" %}
-{% set input_text = "vietnews: VietAI là tổ chức phi lợi nhuận với sứ mệnh ươm mầm tài năng về trí tuệ nhân tạo và xây dựng một cộng đồng các chuyên gia trong lĩnh vực trí tuệ nhân tạo đẳng cấp quốc tế tại Việt Nam." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("VietAI/vit5-large-vietnews-summarization") %}
+{% set input_text = input_text | default("vietnews: VietAI là tổ chức phi lợi nhuận với sứ mệnh ươm mầm tài năng về trí tuệ nhân tạo và xây dựng một cộng đồng các chuyên gia trong lĩnh vực trí tuệ nhân tạo đẳng cấp quốc tế tại Việt Nam.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

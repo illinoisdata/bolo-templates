@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "microsoft/unilm-base-cased" %}
-{% set input_text = "The capital of France is [MASK]." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("microsoft/unilm-base-cased") %}
+{% set input_text = input_text | default("The capital of France is [MASK].") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

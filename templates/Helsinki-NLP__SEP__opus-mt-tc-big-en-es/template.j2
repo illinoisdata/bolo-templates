@@ -1,7 +1,6 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-tc-big-en-es" %}
-{% set device = "cuda:0" %}
-{% set src_text = ["A wasp stung him and he had an allergic reaction.", "I love nature."] %}
-
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-en-es") %}
+{% set device = device | default("cuda:0") %}
+{% set src_text = src_text | default(["A wasp stung him and he had an allergic reaction.", "I love nature."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 src_text = {{ src_text }}

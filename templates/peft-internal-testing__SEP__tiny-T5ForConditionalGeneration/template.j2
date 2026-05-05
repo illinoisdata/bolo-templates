@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "peft-internal-testing/tiny-T5ForConditionalGeneration" %}
-{% set prompt = "translate English to French: The house is wonderful." %}
-{% set max_new_tokens = 32 %}
-{% set num_beams = 1 %}
-{% set use_cache = False %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("peft-internal-testing/tiny-T5ForConditionalGeneration") %}
+{% set prompt = prompt | default("translate English to French: The house is wonderful.") %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
+{% set num_beams = num_beams | default(1) %}
+{% set use_cache = use_cache | default(False) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 prompt = {{ prompt | tojson }}

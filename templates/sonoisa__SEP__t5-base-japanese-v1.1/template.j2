@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "sonoisa/t5-base-japanese-v1.1" %}
-{% set input_text = "これは日本語テキスト生成のサンプルです。続きの文章を生成してください。" %}
-{% set max_length = 128 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("sonoisa/t5-base-japanese-v1.1") %}
+{% set input_text = input_text | default("これは日本語テキスト生成のサンプルです。続きの文章を生成してください。") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = {{ input_text | tojson }}

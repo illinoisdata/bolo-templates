@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Unbabel/gec-t5_small" %}
-{% set sentence = "I like to swimming" %}
-{% set max_length = 128 %}
-{% set num_beams = 5 %}
-{% set early_stopping = True %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Unbabel/gec-t5_small") %}
+{% set sentence = sentence | default("I like to swimming") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(5) %}
+{% set early_stopping = early_stopping | default(True) %}
 sentence = "{{ sentence }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}

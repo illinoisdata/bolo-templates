@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "digit82/kobart-summarization" %}
-{% set input_text = "A concise summary of the following text is requested." %}
-{% set extra_generation_kwargs = {} %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("digit82/kobart-summarization") %}
+{% set input_text = input_text | default("A concise summary of the following text is requested.") %}
+{% set extra_generation_kwargs = extra_generation_kwargs | default({}) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

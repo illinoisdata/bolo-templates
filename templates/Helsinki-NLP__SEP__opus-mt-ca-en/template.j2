@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-ca-en" %}
-{% set text_input = "El català és una llengua oficial." %}
-{% set max_length = 128 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-ca-en") %}
+{% set text_input = text_input | default("El català és una llengua oficial.") %}
+{% set max_length = max_length | default(128) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_input = {{ text_input | tojson }}

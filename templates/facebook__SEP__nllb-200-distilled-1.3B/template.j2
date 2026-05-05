@@ -1,9 +1,8 @@
-{% set repo_id = "facebook/nllb-200-distilled-1.3B" %}
-{% set device = "cuda:0" %}
-{% set input_text = 'Hello, world!' %}
-{% set src_lang = 'eng_Latn' %}
-{% set tgt_lang = 'fra_Latn' %}
-
+{% set repo_id = repo_id | default("facebook/nllb-200-distilled-1.3B") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('Hello, world!') %}
+{% set src_lang = src_lang | default('eng_Latn') %}
+{% set tgt_lang = tgt_lang | default('fra_Latn') %}
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
 input_text = '{{ input_text }}'

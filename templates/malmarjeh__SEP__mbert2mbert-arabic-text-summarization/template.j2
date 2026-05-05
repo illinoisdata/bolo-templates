@@ -1,13 +1,12 @@
-{% set repo_id = "malmarjeh/mbert2mbert-arabic-text-summarization" %}
-{% set device = "cuda:0" %}
-{% set text = "شهدت مدينة طرابلس، مساء أمس الأربعاء، احتجاجات شعبية وأعمال شغب لليوم الثالث على التوالي، وذلك بسبب تردي الوضع المعيشي والاقتصادي. واندلعت مواجهات عنيفة وعمليات كر وفر ما بين الجيش اللبناني والمحتجين استمرت لساعات، إثر محاولة فتح الطرقات المقطوعة، ما أدى إلى إصابة العشرات من الطرفين." %}
-{% set pad_token_id = None %}
-{% set num_beams = 3 %}
-{% set repetition_penalty = 3.0 %}
-{% set max_length = 200 %}
-{% set length_penalty = 1.0 %}
-{% set no_repeat_ngram_size = 3 %}
-
+{% set repo_id = repo_id | default("malmarjeh/mbert2mbert-arabic-text-summarization") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("شهدت مدينة طرابلس، مساء أمس الأربعاء، احتجاجات شعبية وأعمال شغب لليوم الثالث على التوالي، وذلك بسبب تردي الوضع المعيشي والاقتصادي. واندلعت مواجهات عنيفة وعمليات كر وفر ما بين الجيش اللبناني والمحتجين استمرت لساعات، إثر محاولة فتح الطرقات المقطوعة، ما أدى إلى إصابة العشرات من الطرفين.") %}
+{% set pad_token_id = pad_token_id | default(None) %}
+{% set num_beams = num_beams | default(3) %}
+{% set repetition_penalty = repetition_penalty | default(3.0) %}
+{% set max_length = max_length | default(200) %}
+{% set length_penalty = length_penalty | default(1.0) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

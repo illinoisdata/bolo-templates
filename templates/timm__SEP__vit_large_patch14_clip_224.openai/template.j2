@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "timm/vit_large_patch14_clip_224.openai" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set prompts = ["a photo of a cat", "a photo of a dog", "a photo of an astronaut"] %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("timm/vit_large_patch14_clip_224.openai") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set prompts = prompts | default(["a photo of a cat", "a photo of a dog", "a photo of an astronaut"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "circulus/kobart-trans-polite-v2" %}
-{% set text_input = "안녕하세요. 오늘 하루 어떠세요?" %}
-{% set max_new_tokens = 128 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("circulus/kobart-trans-polite-v2") %}
+{% set text_input = text_input | default("안녕하세요. 오늘 하루 어떠세요?") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_input = {{ text_input | tojson }}

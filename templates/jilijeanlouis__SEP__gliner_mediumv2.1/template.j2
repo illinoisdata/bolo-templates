@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "jilijeanlouis/gliner_mediumv2.1" %}
-{% set text = "This example uses GLiNER token classification inference." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("jilijeanlouis/gliner_mediumv2.1") %}
+{% set text = text | default("This example uses GLiNER token classification inference.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

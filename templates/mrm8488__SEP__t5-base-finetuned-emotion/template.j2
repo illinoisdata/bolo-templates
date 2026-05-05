@@ -1,8 +1,7 @@
-{% set repo_id = "mrm8488/t5-base-finetuned-emotion" %}
-{% set device = "cuda:0" %}
-{% set text = "I wish you were here but it is impossible" %}
-{% set max_length = 2 %}
-
+{% set repo_id = repo_id | default("mrm8488/t5-base-finetuned-emotion") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("I wish you were here but it is impossible") %}
+{% set max_length = max_length | default(2) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

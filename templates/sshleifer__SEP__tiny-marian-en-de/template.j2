@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "sshleifer/tiny-marian-en-de" %}
-{% set input_text = "Hello, world! This is a short translation test." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("sshleifer/tiny-marian-en-de") %}
+{% set input_text = input_text | default("Hello, world! This is a short translation test.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

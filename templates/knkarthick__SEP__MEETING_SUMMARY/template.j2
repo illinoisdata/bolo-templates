@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "knkarthick/MEETING_SUMMARY" %}
-{% set input_text = "The tower is 324 metres (1,063 ft) tall, about the same height as an 81-storey building, and the tallest structure in Paris. Its base is square, measuring 125 metres (410 ft) on each side." %}
-{% set max_output_length = 128 %}
-{% set min_output_length = 30 %}
-{% set num_beams = 6 %}
-{% set output_file_name = "summary.txt" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("knkarthick/MEETING_SUMMARY") %}
+{% set input_text = input_text | default("The tower is 324 metres (1,063 ft) tall, about the same height as an 81-storey building, and the tallest structure in Paris. Its base is square, measuring 125 metres (410 ft) on each side.") %}
+{% set max_output_length = max_output_length | default(128) %}
+{% set min_output_length = min_output_length | default(30) %}
+{% set num_beams = num_beams | default(6) %}
+{% set output_file_name = output_file_name | default("summary.txt") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

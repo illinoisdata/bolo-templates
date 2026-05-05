@@ -1,9 +1,8 @@
-{% set repo_id = "valhalla/t5-small-qg-prepend" %}
-{% set device = "cuda:0" %}
-{% set input_text = "generate a question about the benefits of transfer learning in natural language processing." %}
-{% set max_length = 64 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("valhalla/t5-small-qg-prepend") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("generate a question about the benefits of transfer learning in natural language processing.") %}
+{% set max_length = max_length | default(64) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

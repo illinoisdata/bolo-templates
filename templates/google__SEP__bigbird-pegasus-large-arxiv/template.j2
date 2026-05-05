@@ -1,7 +1,6 @@
-{% set repo_id = "google/bigbird-pegasus-large-arxiv" %}
-{% set device = "cuda:0" %}
-{% set text = "Replace me by any text you'd like." %}
-
+{% set repo_id = repo_id | default("google/bigbird-pegasus-large-arxiv") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Replace me by any text you'd like.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ibm-research/regen-disambiguation" %}
-{% set input_text = "Explain the process of photosynthesis in simple terms." %}
-{% set max_length = 200 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ibm-research/regen-disambiguation") %}
+{% set input_text = input_text | default("Explain the process of photosynthesis in simple terms.") %}
+{% set max_length = max_length | default(200) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

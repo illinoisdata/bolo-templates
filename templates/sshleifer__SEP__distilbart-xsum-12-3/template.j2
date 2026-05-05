@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "sshleifer/distilbart-xsum-12-3" %}
-{% set input_text = "Scientists have shared a detailed report describing how climate change is altering migratory patterns of birds across the Northern Hemisphere, prompting conservationists to call for emergency action to protect key breeding habitats." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("sshleifer/distilbart-xsum-12-3") %}
+{% set input_text = input_text | default("Scientists have shared a detailed report describing how climate change is altering migratory patterns of birds across the Northern Hemisphere, prompting conservationists to call for emergency action to protect key breeding habitats.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "UBC-NLP/AraT5v2-base-1024" %}
-{% set input_text = "عاصمة ألمانيا هي <extra_id_0>" %}
-{% set max_length = 64 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("UBC-NLP/AraT5v2-base-1024") %}
+{% set input_text = input_text | default("عاصمة ألمانيا هي <extra_id_0>") %}
+{% set max_length = max_length | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

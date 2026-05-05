@@ -1,7 +1,6 @@
-{% set repo_id = "dbmdz/bert-base-turkish-uncased" %}
-{% set device = "cuda:0" %}
-{% set text = "Merhaba dünya" %}
-
+{% set repo_id = repo_id | default("dbmdz/bert-base-turkish-uncased") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Merhaba dünya") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

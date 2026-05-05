@@ -1,2 +1,2 @@
-{% set repo_id = "piddnad/ddcolor_paper_tiny" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("piddnad/ddcolor_paper_tiny") %}
+{% set device = device | default("cuda:0") %}

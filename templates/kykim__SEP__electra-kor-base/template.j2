@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "kykim/electra-kor-base" %}
-{% set sample_text = "이것은 Electra 기반 모델 테스트 문장입니다." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("kykim/electra-kor-base") %}
+{% set sample_text = sample_text | default("이것은 Electra 기반 모델 테스트 문장입니다.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sample_text = "{{ sample_text }}"

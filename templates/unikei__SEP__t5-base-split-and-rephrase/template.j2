@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "unikei/t5-base-split-and-rephrase" %}
-{% set complex_sentence = "Cystic Fibrosis (CF) is an autosomal recessive disorder that affects multiple organs, which is common in the Caucasian population, symptomatically affecting 1 in 2500 newborns in the UK, and more than 80,000 individuals globally." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("unikei/t5-base-split-and-rephrase") %}
+{% set complex_sentence = complex_sentence | default("Cystic Fibrosis (CF) is an autosomal recessive disorder that affects multiple organs, which is common in the Caucasian population, symptomatically affecting 1 in 2500 newborns in the UK, and more than 80,000 individuals globally.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 complex_sentence = "{{ complex_sentence }}"

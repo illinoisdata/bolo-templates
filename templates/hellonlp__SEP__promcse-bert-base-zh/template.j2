@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "hellonlp/promcse-bert-base-zh" %}
-{% set input_sentence = "武汉是一个美丽的城市。" %}
-{% set candidate_sentences = ["你好吗", "你怎么样", "我吃了一个苹果", "你过得好吗", "你还好吗", "你现在好吗", "你吃饭了吗"] %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("hellonlp/promcse-bert-base-zh") %}
+{% set input_sentence = input_sentence | default("武汉是一个美丽的城市。") %}
+{% set candidate_sentences = candidate_sentences | default(["你好吗", "你怎么样", "我吃了一个苹果", "你过得好吗", "你还好吗", "你现在好吗", "你吃饭了吗"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_sentence = "{{ input_sentence }}"

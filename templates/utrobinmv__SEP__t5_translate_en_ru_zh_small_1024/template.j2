@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "utrobinmv/t5_translate_en_ru_zh_small_1024" %}
-{% set text_to_translate = "translate to zh: The purpose of the development is to provide users with a personal synchronized interpreter." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("utrobinmv/t5_translate_en_ru_zh_small_1024") %}
+{% set text_to_translate = text_to_translate | default("translate to zh: The purpose of the development is to provide users with a personal synchronized interpreter.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_to_translate = "{{ text_to_translate }}"

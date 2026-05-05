@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "vidore/colpali-v1.2-hf" %}
-{% set query_text = "Summarize the key focus of the document content." %}
-{% set document_image = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
-{% set results_dir = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/vidore__SEP__colpali-v1.2-hf" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("vidore/colpali-v1.2-hf") %}
+{% set query_text = query_text | default("Summarize the key focus of the document content.") %}
+{% set document_image = document_image | default("/u/yli77/projects/ML-code-generation/data/doc.jpeg") %}
+{% set results_dir = results_dir | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/vidore__SEP__colpali-v1.2-hf") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query_text = "{{ query_text }}"

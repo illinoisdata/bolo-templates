@@ -1,9 +1,8 @@
-{% set repo_id = "megalaa/en-cop-mul-norm-group-greekified" %}
-{% set device = "cuda:0" %}
-{% set input_text = "The quick brown fox jumps over the lazy dog." %}
-{% set max_length = 128 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("megalaa/en-cop-mul-norm-group-greekified") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("The quick brown fox jumps over the lazy dog.") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

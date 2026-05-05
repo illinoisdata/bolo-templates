@@ -1,9 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-ru-fi" %}
-{% set input_text = "Привет, мир!" %}
-{% set max_length = 512 %}
-{% set num_beams = 6 %}
-{% set max_new_tokens = 128 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-ru-fi") %}
+{% set input_text = input_text | default("Привет, мир!") %}
+{% set max_length = max_length | default(512) %}
+{% set num_beams = num_beams | default(6) %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

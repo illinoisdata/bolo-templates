@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "liam168/trans-opus-mt-en-zh" %}
-{% set text_input = "I like to study Data Science and Machine Learning." %}
-{% set max_length = 512 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("liam168/trans-opus-mt-en-zh") %}
+{% set text_input = text_input | default("I like to study Data Science and Machine Learning.") %}
+{% set max_length = max_length | default(512) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

@@ -1,8 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-pl-de" %}
-{% set input_text = "Przykładowe zdanie po polsku do przetłumaczenia." %}
-{% set max_length = 256 %}
-{% set num_beams = 4 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-pl-de") %}
+{% set input_text = input_text | default("Przykładowe zdanie po polsku do przetłumaczenia.") %}
+{% set max_length = max_length | default(256) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

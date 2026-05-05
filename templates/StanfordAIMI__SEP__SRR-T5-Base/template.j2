@@ -1,10 +1,10 @@
-{% set repo_id = "StanfordAIMI/SRR-T5-Base" %}
-{% set device = "cuda:0" %}
-{% set input_text = "CHEST RADIOGRAPH PERFORMED ON ___  COMPARISON: Prior exam from ___.  CLINICAL HISTORY: Weakness, assess pneumonia.  FINDINGS: Frontal and lateral views of the chest were provided. Midline sternotomy wires are again noted. The heart is poorly assessed, though remains enlarged. There are at least small bilateral pleural effusions.  There may be mild interstitial edema. No pneumothorax. Bony structures are demineralized with kyphotic angulation in the lower T-spine again noted.  IMPRESSION: Limited exam with small bilateral effusions, cardiomegaly, and possible mild interstitial edema." %}
-{% set max_input_length = 512 %}
-{% set max_new_tokens = 286 %}
-{% set min_new_tokens = 120 %}
-{% set num_beams = 5 %}
+{% set repo_id = repo_id | default("StanfordAIMI/SRR-T5-Base") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("CHEST RADIOGRAPH PERFORMED ON ___  COMPARISON: Prior exam from ___.  CLINICAL HISTORY: Weakness, assess pneumonia.  FINDINGS: Frontal and lateral views of the chest were provided. Midline sternotomy wires are again noted. The heart is poorly assessed, though remains enlarged. There are at least small bilateral pleural effusions.  There may be mild interstitial edema. No pneumothorax. Bony structures are demineralized with kyphotic angulation in the lower T-spine again noted.  IMPRESSION: Limited exam with small bilateral effusions, cardiomegaly, and possible mild interstitial edema.") %}
+{% set max_input_length = max_input_length | default(512) %}
+{% set max_new_tokens = max_new_tokens | default(286) %}
+{% set min_new_tokens = min_new_tokens | default(120) %}
+{% set num_beams = num_beams | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

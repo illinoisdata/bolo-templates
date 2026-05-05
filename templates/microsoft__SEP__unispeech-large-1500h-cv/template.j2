@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "microsoft/unispeech-large-1500h-cv" %}
-{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set target_sample_rate = 16000 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("microsoft/unispeech-large-1500h-cv") %}
+{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
+{% set target_sample_rate = target_sample_rate | default(16000) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"

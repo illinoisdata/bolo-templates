@@ -1,7 +1,6 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-fr-de" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Ceci est un exemple de phrase en français." %}
-
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-fr-de") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Ceci est un exemple de phrase en français.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

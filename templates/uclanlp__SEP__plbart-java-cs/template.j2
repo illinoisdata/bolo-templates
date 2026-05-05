@@ -1,7 +1,6 @@
-{% set repo_id = "uclanlp/plbart-java-cs" %}
-{% set device = "cuda:0" %}
-{% set src_code = "public class Example { public static int add(int a, int b) { return a + b; } }" %}
-
+{% set repo_id = repo_id | default("uclanlp/plbart-java-cs") %}
+{% set device = device | default("cuda:0") %}
+{% set src_code = src_code | default("public class Example { public static int add(int a, int b) { return a + b; } }") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 src_code = "{{ src_code }}"

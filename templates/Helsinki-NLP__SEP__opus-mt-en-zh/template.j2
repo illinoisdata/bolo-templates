@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-en-zh" %}
-{% set input_text = "The quick brown fox jumps over the lazy dog." %}
-{% set target_language = "zho" %}
-{% set max_new_tokens = 64 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-en-zh") %}
+{% set input_text = input_text | default("The quick brown fox jumps over the lazy dog.") %}
+{% set target_language = target_language | default("zho") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 input_text = {{ input_text | tojson }}

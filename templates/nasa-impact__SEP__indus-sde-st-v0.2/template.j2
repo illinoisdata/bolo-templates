@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "nasa-impact/indus-sde-st-v0.2" %}
-{% set input_text_a = "NASA is preparing missions to study Martian sample return strategies." %}
-{% set input_text_b = "Martian sample return is a priority for NASA's scientific program." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("nasa-impact/indus-sde-st-v0.2") %}
+{% set input_text_a = input_text_a | default("NASA is preparing missions to study Martian sample return strategies.") %}
+{% set input_text_b = input_text_b | default("Martian sample return is a priority for NASA's scientific program.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text_a = "{{ input_text_a }}"

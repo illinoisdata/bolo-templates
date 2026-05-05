@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "impresso-project/nel-mgenre-multilingual" %}
-{% set input_strings = ["Le 0ctobre 1894, [START] Dreyfvs [END] est arrêté à Paris, accusé d'espionnage pour l'Allemagne — un événement qui déchira la société française pendant des années."] %}
-{% set max_new_tokens = 64 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("impresso-project/nel-mgenre-multilingual") %}
+{% set input_strings = input_strings | default(["Le 0ctobre 1894, [START] Dreyfvs [END] est arrêté à Paris, accusé d'espionnage pour l'Allemagne — un événement qui déchira la société française pendant des années."]) %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_strings = {{ input_strings }}

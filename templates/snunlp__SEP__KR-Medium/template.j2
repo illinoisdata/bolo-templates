@@ -1,7 +1,6 @@
-{% set repo_id = "snunlp/KR-Medium" %}
-{% set device = "cuda:0" %}
-{% set text_input = "오늘 기분이 어떠신가요?" %}
-
+{% set repo_id = repo_id | default("snunlp/KR-Medium") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("오늘 기분이 어떠신가요?") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

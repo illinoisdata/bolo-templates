@@ -1,5 +1,5 @@
-{% set repo_id = "Salesforce/codet5p-770m" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("Salesforce/codet5p-770m") %}
+{% set device = device | default("cuda:0") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 

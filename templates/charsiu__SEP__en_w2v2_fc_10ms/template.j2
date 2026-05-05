@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "charsiu/en_w2v2_fc_10ms" %}
-{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("charsiu/en_w2v2_fc_10ms") %}
+{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"

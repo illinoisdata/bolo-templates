@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/mobilebert-uncased" %}
-{% set input_text = "HuggingFace is creating a <mask> that the community uses to solve NLP tasks." %}
-{% set top_k = 5 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/mobilebert-uncased") %}
+{% set input_text = input_text | default("HuggingFace is creating a <mask> that the community uses to solve NLP tasks.") %}
+{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

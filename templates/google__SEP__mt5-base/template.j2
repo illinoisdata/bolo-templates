@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/mt5-base" %}
-{% set text = "translate English to German: Hello, world!" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/mt5-base") %}
+{% set text = text | default("translate English to German: Hello, world!") %}
 device = "{{ device }}"
 repo_id = "{{ repo_id }}"
 text = "{{ text }}"

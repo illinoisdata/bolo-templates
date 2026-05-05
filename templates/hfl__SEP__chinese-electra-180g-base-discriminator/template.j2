@@ -1,7 +1,7 @@
-{% set repo_id = "hfl/chinese-electra-180g-base-discriminator" %}
-{% set device = "cuda:0" %}
-{% set input_text = "今天天气很好。我今天心情不错。" %}
-{% set max_length = 128 %}
+{% set repo_id = repo_id | default("hfl/chinese-electra-180g-base-discriminator") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("今天天气很好。我今天心情不错。") %}
+{% set max_length = max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

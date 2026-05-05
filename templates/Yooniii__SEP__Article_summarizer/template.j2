@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Yooniii/Article_summarizer" %}
-{% set input_text = "The recent summit brought together leaders from across the globe to address climate policy and economic recovery." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Yooniii/Article_summarizer") %}
+{% set input_text = input_text | default("The recent summit brought together leaders from across the globe to address climate policy and economic recovery.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

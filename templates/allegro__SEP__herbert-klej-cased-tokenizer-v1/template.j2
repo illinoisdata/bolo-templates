@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "allegro/herbert-klej-cased-tokenizer-v1" %}
-{% set input_text = "Kto ma lepszą sztukę, ma lepszy rząd – to jasne." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("allegro/herbert-klej-cased-tokenizer-v1") %}
+{% set input_text = input_text | default("Kto ma lepszą sztukę, ma lepszy rząd – to jasne.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

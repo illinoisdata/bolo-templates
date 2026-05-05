@@ -1,5 +1,5 @@
-{% set repo_id = "sshleifer/distilbart-cnn-12-6" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("sshleifer/distilbart-cnn-12-6") %}
+{% set device = device | default("cuda:0") %}
 {% set input_text = input_text | default("The novel uses of AI in medicine were briefly described in the article, which also highlighted the challenges and the potential benefits of the new technology.") %}
 {% set max_summary_length = max_summary_length | default(142) %}
 {% set min_summary_length = min_summary_length | default(56) %}

@@ -1,7 +1,6 @@
-{% set repo_id = "facebook/mms-tts-orm" %}
-{% set device = "cuda:0" %}
-{% set text_input = "Nagaa fi galatooma, jechoota Oromootti gargaaramuuf!" %}
-
+{% set repo_id = repo_id | default("facebook/mms-tts-orm") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("Nagaa fi galatooma, jechoota Oromootti gargaaramuuf!") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

@@ -1,5 +1,5 @@
-{% set repo_id = "oliverguhr/spelling-correction-german-base" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("oliverguhr/spelling-correction-german-base") %}
+{% set device = device | default("cuda:0") %}
 {% set input_text = input_text | default("correct: das idst ein neuZr test") %}
 {% set max_length = max_length | default(256) %}
 {% set num_beams = num_beams | default(4) %}

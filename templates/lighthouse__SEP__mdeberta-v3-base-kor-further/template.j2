@@ -1,6 +1,6 @@
-{% set repo_id = "lighthouse/mdeberta-v3-base-kor-further" %}
-{% set device = "cuda:0" %}
-{% set text = "한국어 테스트 문장입니다." %}
+{% set repo_id = repo_id | default("lighthouse/mdeberta-v3-base-kor-further") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("한국어 테스트 문장입니다.") %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text = {{ text | tojson }}

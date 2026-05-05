@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "vinai/vinai-translate-en2vi" %}
-{% set input_text = "The quick brown fox jumps over the lazy dog." %}
-{% set max_new_tokens = 128 %}
-{% set num_beams = 5 %}
-{% set source_lang = "en_XX" %}
-{% set target_lang = "vi_VN" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("vinai/vinai-translate-en2vi") %}
+{% set input_text = input_text | default("The quick brown fox jumps over the lazy dog.") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set num_beams = num_beams | default(5) %}
+{% set source_lang = source_lang | default("en_XX") %}
+{% set target_lang = target_lang | default("vi_VN") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

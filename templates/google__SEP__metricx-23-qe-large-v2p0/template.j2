@@ -1,11 +1,10 @@
-{% set repo_id = "google/metricx-23-qe-large-v2p0" %}
-{% set tokenizer_repo = "google/mt5-large" %}
-{% set device = "cuda:0" %}
-{% set source_text = "The cat is on the mat." %}
-{% set hypothesis_text = "Die Katze liegt auf der Matte." %}
-{% set max_input_length = 1024 %}
-{% set max_new_tokens = 10 %}
-
+{% set repo_id = repo_id | default("google/metricx-23-qe-large-v2p0") %}
+{% set tokenizer_repo = tokenizer_repo | default("google/mt5-large") %}
+{% set device = device | default("cuda:0") %}
+{% set source_text = source_text | default("The cat is on the mat.") %}
+{% set hypothesis_text = hypothesis_text | default("Die Katze liegt auf der Matte.") %}
+{% set max_input_length = max_input_length | default(1024) %}
+{% set max_new_tokens = max_new_tokens | default(10) %}
 repo_id = "{{ repo_id }}"
 tokenizer_repo = "{{ tokenizer_repo }}"
 device = "{{ device }}"

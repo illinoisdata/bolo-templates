@@ -1,5 +1,5 @@
-{% set repo_id = "Falconsai/text_summarization" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("Falconsai/text_summarization") %}
+{% set device = device | default("cuda:0") %}
 {% set input_text = input_text | default("Hugging Face: Revolutionizing Natural Language Processing Introduction In the rapidly evolving field of Natural Language Processing (NLP), Hugging Face has emerged as a prominent and innovative force. This article will explore the story and significance of Hugging Face, a company that has made remarkable contributions to NLP and AI as a whole. From its inception to its role in democratizing AI, Hugging Face has left an indelible mark on the industry.") %}
 {% set prefix = prefix | default("summarize: ") %}
 {% set early_stopping = early_stopping | default(true) %}

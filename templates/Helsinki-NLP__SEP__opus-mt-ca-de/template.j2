@@ -1,9 +1,8 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-ca-de" %}
-{% set device = "cuda:0" %}
-{% set source_text = "Bon dia! Avui és un bon dia per aprendre alguna cosa nova." %}
-{% set max_length = 128 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-ca-de") %}
+{% set device = device | default("cuda:0") %}
+{% set source_text = source_text | default("Bon dia! Avui és un bon dia per aprendre alguna cosa nova.") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = "{{ source_text }}"

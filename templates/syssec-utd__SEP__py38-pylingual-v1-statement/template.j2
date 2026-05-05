@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "syssec-utd/py38-pylingual-v1-statement" %}
-{% set input_text = "summarize: The pylingual statement model rewrites technical content with an emphasis on clarity for multilingual audiences." %}
-{% set max_new_tokens = 200 %}
-{% set num_beams = 4 %}
-{% set temperature = 1.0 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("syssec-utd/py38-pylingual-v1-statement") %}
+{% set input_text = input_text | default("summarize: The pylingual statement model rewrites technical content with an emphasis on clarity for multilingual audiences.") %}
+{% set max_new_tokens = max_new_tokens | default(200) %}
+{% set num_beams = num_beams | default(4) %}
+{% set temperature = temperature | default(1.0) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/bert_uncased_L-6_H-768_A-12" %}
-{% set text_inputs = ["The quick brown fox jumps over the lazy dog.", "Transformers enable easy model reuse."] %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/bert_uncased_L-6_H-768_A-12") %}
+{% set text_inputs = text_inputs | default(["The quick brown fox jumps over the lazy dog.", "Transformers enable easy model reuse."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_inputs = {{ text_inputs }}

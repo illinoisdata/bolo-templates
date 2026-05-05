@@ -1,9 +1,8 @@
-{% set repo_id = "monologg/koelectra-base-v3-goemotions" %}
-{% set device = "cuda:0" %}
-{% set input_text = "요즘 기분이 어떠세요?" %}
-{% set threshold = 0.5 %}
-{% set top_k = 5 %}
-
+{% set repo_id = repo_id | default("monologg/koelectra-base-v3-goemotions") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("요즘 기분이 어떠세요?") %}
+{% set threshold = threshold | default(0.5) %}
+{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

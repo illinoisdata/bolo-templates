@@ -1,9 +1,8 @@
-{% set repo_id = "hallisky/bart-base-toxic-antiexpert" %}
-{% set device = "cuda:0" %}
-{% set prompt = "The discussion reinforced how essential accountability and transparency are when confronting toxic behavior." %}
-{% set max_new_tokens = 64 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("hallisky/bart-base-toxic-antiexpert") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default("The discussion reinforced how essential accountability and transparency are when confronting toxic behavior.") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

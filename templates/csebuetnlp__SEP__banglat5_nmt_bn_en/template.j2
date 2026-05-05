@@ -1,8 +1,8 @@
-{% set repo_id = "csebuetnlp/banglat5_nmt_bn_en" %}
-{% set device = "cuda:0" %}
-{% set source_text = "আমি একটি প্রকল্পের উপর কাজ করছি এবং ইংরেজিতে অনুবাদ করতে চাই।" %}
-{% set max_length = 128 %}
-{% set num_beams = 4 %}
+{% set repo_id = repo_id | default("csebuetnlp/banglat5_nmt_bn_en") %}
+{% set device = device | default("cuda:0") %}
+{% set source_text = source_text | default("আমি একটি প্রকল্পের উপর কাজ করছি এবং ইংরেজিতে অনুবাদ করতে চাই।") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = "{{ source_text }}"

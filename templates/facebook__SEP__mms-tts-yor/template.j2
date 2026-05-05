@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/mms-tts-yor" %}
-{% set text_input = "Ẹ̀kúnrẹ́rẹ́ ìtàn kan nípa ìrìn àjò ayé Yoruba" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/mms-tts-yor") %}
+{% set text_input = text_input | default("Ẹ̀kúnrẹ́rẹ́ ìtàn kan nípa ìrìn àjò ayé Yoruba") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

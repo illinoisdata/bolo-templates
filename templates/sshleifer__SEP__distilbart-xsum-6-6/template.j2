@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "sshleifer/distilbart-xsum-6-6" %}
-{% set input_text = "Researchers recently unveiled a novel distillation workflow that compresses large language models into faster, more efficient summarizers while retaining high quality outputs." %}
-{% set max_output_length = 62 %}
-{% set num_beams = 6 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("sshleifer/distilbart-xsum-6-6") %}
+{% set input_text = input_text | default("Researchers recently unveiled a novel distillation workflow that compresses large language models into faster, more efficient summarizers while retaining high quality outputs.") %}
+{% set max_output_length = max_output_length | default(62) %}
+{% set num_beams = num_beams | default(6) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

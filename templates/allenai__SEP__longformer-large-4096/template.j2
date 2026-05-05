@@ -1,7 +1,6 @@
-{% set repo_id = "allenai/longformer-large-4096" %}
-{% set device = "cuda:0" %}
-{% set text = "Longformer is a transformer model for long documents." %}
-
+{% set repo_id = repo_id | default("allenai/longformer-large-4096") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Longformer is a transformer model for long documents.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

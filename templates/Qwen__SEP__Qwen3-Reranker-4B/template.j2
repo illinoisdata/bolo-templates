@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Qwen/Qwen3-Reranker-4B" %}
-{% set instruction = "Given a web search query, retrieve relevant passages that answer the query" %}
-{% set queries = ["What is the capital of China?", "Explain gravity"] %}
-{% set documents = ["The capital of China is Beijing.", "Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun."] %}
-{% set max_length = 8192 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Qwen/Qwen3-Reranker-4B") %}
+{% set instruction = instruction | default("Given a web search query, retrieve relevant passages that answer the query") %}
+{% set queries = queries | default(["What is the capital of China?", "Explain gravity"]) %}
+{% set documents = documents | default(["The capital of China is Beijing.", "Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun."]) %}
+{% set max_length = max_length | default(8192) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 instruction = {{ instruction | tojson }}

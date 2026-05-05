@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/t5-base-lm-adapt" %}
-{% set input_text = "summarize: Transfer learning enables a model to leverage pretraining on large corpora before adapting to downstream tasks with limited data." %}
-{% set max_new_tokens = 64 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/t5-base-lm-adapt") %}
+{% set input_text = input_text | default("summarize: Transfer learning enables a model to leverage pretraining on large corpora before adapting to downstream tasks with limited data.") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

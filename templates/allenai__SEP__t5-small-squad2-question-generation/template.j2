@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "allenai/t5-small-squad2-question-generation" %}
-{% set input_text = "He thanked all fellow bloggers and organizations that showed support during the conference." %}
-{% set max_length = 64 %}
-{% set num_beams = 4 %}
-{% set no_repeat_ngram_size = 3 %}
-{% set early_stopping = True %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("allenai/t5-small-squad2-question-generation") %}
+{% set input_text = input_text | default("He thanked all fellow bloggers and organizations that showed support during the conference.") %}
+{% set max_length = max_length | default(64) %}
+{% set num_beams = num_beams | default(4) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
+{% set early_stopping = early_stopping | default(True) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

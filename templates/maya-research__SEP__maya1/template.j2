@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "maya-research/maya1" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("maya-research/maya1") %}
 {% set prompt_description = prompt_description | default("Realistic male voice in the 30s age with American accent. Normal pitch, warm timbre, conversational pacing.") %}
 {% set prompt_text = prompt_text | default("Hello! This is Maya1 <laugh_harder> the best open source voice AI model with emotions.") %}
 {% set max_new_tokens = max_new_tokens | default(2048) %}

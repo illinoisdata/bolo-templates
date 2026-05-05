@@ -1,7 +1,6 @@
-{% set repo_id = "prithivida/formal_to_informal_styletransfer" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Good afternoon, I hope you are doing well." %}
-
+{% set repo_id = repo_id | default("prithivida/formal_to_informal_styletransfer") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Good afternoon, I hope you are doing well.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

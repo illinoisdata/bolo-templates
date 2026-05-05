@@ -1,8 +1,8 @@
-{% set repo_id = "facebook/wav2vec2-large-lv60" %}
-{% set device = "cuda:0" %}
-{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set target_sample_rate = 16000 %}
-{% set projected_states_filename = "projected_states.npy" %}
+{% set repo_id = repo_id | default("facebook/wav2vec2-large-lv60") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
+{% set target_sample_rate = target_sample_rate | default(16000) %}
+{% set projected_states_filename = projected_states_filename | default("projected_states.npy") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"

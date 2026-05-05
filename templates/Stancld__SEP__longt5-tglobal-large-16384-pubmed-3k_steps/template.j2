@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Stancld/longt5-tglobal-large-16384-pubmed-3k_steps" %}
-{% set text_to_summarize = "Anxiety affects quality of life in those living with Parkinson's disease more so than cognitive status, motor deficits, apathy, and depression." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Stancld/longt5-tglobal-large-16384-pubmed-3k_steps") %}
+{% set text_to_summarize = text_to_summarize | default("Anxiety affects quality of life in those living with Parkinson's disease more so than cognitive status, motor deficits, apathy, and depression.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_to_summarize = """{{ text_to_summarize }}"""

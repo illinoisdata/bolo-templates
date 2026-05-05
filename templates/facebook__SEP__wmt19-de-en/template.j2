@@ -1,7 +1,6 @@
-{% set repo_id = "facebook/wmt19-de-en" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Maschinelles Lernen ist großartig, oder?" %}
-
+{% set repo_id = repo_id | default("facebook/wmt19-de-en") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Maschinelles Lernen ist großartig, oder?") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "microsoft/dit-base" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set mask_probability = 0.15 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("microsoft/dit-base") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set mask_probability = mask_probability | default(0.15) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

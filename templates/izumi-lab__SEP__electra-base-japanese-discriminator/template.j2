@@ -1,7 +1,6 @@
-{% set repo_id = "izumi-lab/electra-base-japanese-discriminator" %}
-{% set device = "cuda:0" %}
-{% set text = "東京大学で[MASK]の研究をしています。" %}
-
+{% set repo_id = repo_id | default("izumi-lab/electra-base-japanese-discriminator") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("東京大学で[MASK]の研究をしています。") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

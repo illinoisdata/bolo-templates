@@ -1,8 +1,7 @@
-{% set repo_id = "google/byt5-xl" %}
-{% set device = "cuda:0" %}
-{% set source_text = "Life is like a box of chocolates." %}
-{% set max_length = 128 %}
-
+{% set repo_id = repo_id | default("google/byt5-xl") %}
+{% set device = device | default("cuda:0") %}
+{% set source_text = source_text | default("Life is like a box of chocolates.") %}
+{% set max_length = max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = "{{ source_text }}"

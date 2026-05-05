@@ -1,13 +1,12 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ibm-research/qcpg-sentences" %}
-{% set input_text = "Will this approach work for generating diverse paraphrases?" %}
-{% set lexical = 0.3 %}
-{% set syntactic = 0.5 %}
-{% set semantic = 0.8 %}
-{% set max_length = 120 %}
-{% set num_beams = 4 %}
-{% set num_return_sequences = 1 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ibm-research/qcpg-sentences") %}
+{% set input_text = input_text | default("Will this approach work for generating diverse paraphrases?") %}
+{% set lexical = lexical | default(0.3) %}
+{% set syntactic = syntactic | default(0.5) %}
+{% set semantic = semantic | default(0.8) %}
+{% set max_length = max_length | default(120) %}
+{% set num_beams = num_beams | default(4) %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "allenai/unifiedqa-v2-t5-large-1363200" %}
-{% set text_prompt = "Answer the following question: What is the capital of France?" %}
-{% set max_length = 200 %}
-{% set num_beams = 5 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("allenai/unifiedqa-v2-t5-large-1363200") %}
+{% set text_prompt = text_prompt | default("Answer the following question: What is the capital of France?") %}
+{% set max_length = max_length | default(200) %}
+{% set num_beams = num_beams | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_prompt = "{{ text_prompt }}"

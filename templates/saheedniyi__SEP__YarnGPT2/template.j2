@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "saheedniyi/YarnGPT2" %}
-{% set text = "The election was won by businessman and politician, Moshood Abiola, but Babangida annulled the results, citing concerns over national security." %}
-{% set temperature = 0.7 %}
-{% set max_new_tokens = 256 %}
-{% set repetition_penalty = 1.1 %}
-{% set do_sample = true %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("saheedniyi/YarnGPT2") %}
+{% set text = text | default("The election was won by businessman and politician, Moshood Abiola, but Babangida annulled the results, citing concerns over national security.") %}
+{% set temperature = temperature | default(0.7) %}
+{% set max_new_tokens = max_new_tokens | default(256) %}
+{% set repetition_penalty = repetition_penalty | default(1.1) %}
+{% set do_sample = do_sample | default(true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

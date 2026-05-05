@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "wasmdashai/vits-ar" %}
-{% set text = "السلام عليكم ورحمة الله وبركاتة  ما الجديد ؟" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("wasmdashai/vits-ar") %}
+{% set text = text | default("السلام عليكم ورحمة الله وبركاتة  ما الجديد ؟") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = """{{ text }}"""

@@ -1,7 +1,6 @@
-{% set repo_id = "syssec-utd/py310-pylingual-v1-statement" %}
-{% set device = "cuda:0" %}
-{% set input_text = "The quick brown fox jumps over the lazy dog." %}
-
+{% set repo_id = repo_id | default("syssec-utd/py310-pylingual-v1-statement") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("The quick brown fox jumps over the lazy dog.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

@@ -1,10 +1,9 @@
-{% set repo_id = "ThomasNLG/t5-qg_squad1-en" %}
-{% set device = "cuda:0" %}
-{% set answer_text = "Paris" %}
-{% set context_text = "Paris is the capital of France, known for the Eiffel Tower and the Seine River." %}
-{% set max_length = 64 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("ThomasNLG/t5-qg_squad1-en") %}
+{% set device = device | default("cuda:0") %}
+{% set answer_text = answer_text | default("Paris") %}
+{% set context_text = context_text | default("Paris is the capital of France, known for the Eiffel Tower and the Seine River.") %}
+{% set max_length = max_length | default(64) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 answer_text = "{{ answer_text }}"

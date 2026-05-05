@@ -1,9 +1,9 @@
-{% set repo_id = "bigscience/T0_3B" %}
-{% set device = "cuda:0" %}
-{% set input_prompt = "Is this review positive or negative? Review: this is the best cast iron skillet you will ever buy" %}
-{% set max_length = 128 %}
-{% set num_return_sequences = 1 %}
-{% set temperature = 1.0 %}
+{% set repo_id = repo_id | default("bigscience/T0_3B") %}
+{% set device = device | default("cuda:0") %}
+{% set input_prompt = input_prompt | default("Is this review positive or negative? Review: this is the best cast iron skillet you will ever buy") %}
+{% set max_length = max_length | default(128) %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
+{% set temperature = temperature | default(1.0) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_prompt = "{{ input_prompt }}"

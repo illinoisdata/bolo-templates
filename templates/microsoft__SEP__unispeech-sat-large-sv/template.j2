@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "microsoft/unispeech-sat-large-sv" %}
-{% set input_audio = '/u/yli77/projects/ML-code-generation/data/audio.wav' %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("microsoft/unispeech-sat-large-sv") %}
+{% set input_audio = input_audio | default('/u/yli77/projects/ML-code-generation/data/audio.wav') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_audio = "{{ input_audio }}"

@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "QizhiPei/biot5-plus-base" %}
-{% set input_text = "Summarize the role of mitochondria in a single sentence." %}
-{% set max_new_tokens = 128 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("QizhiPei/biot5-plus-base") %}
+{% set input_text = input_text | default("Summarize the role of mitochondria in a single sentence.") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

@@ -1,7 +1,6 @@
-{% set repo_id = "stanford-nlpxed/uptake-model" %}
-{% set device = "cuda:0" %}
-{% set input_text = "The patient is showing signs of improvement." %}
-
+{% set repo_id = repo_id | default("stanford-nlpxed/uptake-model") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("The patient is showing signs of improvement.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

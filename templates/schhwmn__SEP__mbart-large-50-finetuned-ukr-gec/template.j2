@@ -1,10 +1,9 @@
-{% set repo_id = "schhwmn/mbart-large-50-finetuned-ukr-gec" %}
-{% set device = "cuda:0" %}
-{% set text = 'я й не думав що комп\'ютерна лінгвістика це легкоо.' %}
-{% set num_beams = 5 %}
-{% set max_length = 200 %}
-{% set early_stopping = true %}
-
+{% set repo_id = repo_id | default("schhwmn/mbart-large-50-finetuned-ukr-gec") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('я й не думав що комп\'ютерна лінгвістика це легкоо.') %}
+{% set num_beams = num_beams | default(5) %}
+{% set max_length = max_length | default(200) %}
+{% set early_stopping = early_stopping | default(true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

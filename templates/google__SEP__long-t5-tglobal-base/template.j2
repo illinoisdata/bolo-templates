@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/long-t5-tglobal-base" %}
-{% set input_text = "Summarize the following text about climate change mitigation in a few concise sentences." %}
-{% set max_new_tokens = 128 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/long-t5-tglobal-base") %}
+{% set input_text = input_text | default("Summarize the following text about climate change mitigation in a few concise sentences.") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

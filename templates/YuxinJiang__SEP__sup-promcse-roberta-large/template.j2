@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "YuxinJiang/sup-promcse-roberta-large" %}
-{% set sentence_inputs = ["A woman is reading a book.", "A man is playing a guitar."] %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("YuxinJiang/sup-promcse-roberta-large") %}
+{% set sentence_inputs = sentence_inputs | default(["A woman is reading a book.", "A man is playing a guitar."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentence_inputs = {{ sentence_inputs }}

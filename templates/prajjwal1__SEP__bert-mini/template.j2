@@ -1,7 +1,6 @@
-{% set repo_id = "prajjwal1/bert-mini" %}
-{% set device = "cuda:0" %}
-{% set text = "The quick brown fox jumps over the lazy dog." %}
-
+{% set repo_id = repo_id | default("prajjwal1/bert-mini") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("The quick brown fox jumps over the lazy dog.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

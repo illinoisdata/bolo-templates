@@ -1,12 +1,11 @@
-{% set repo_id = "fabiochiu/t5-small-medium-title-generation" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Many financial institutions started building conversational AI, prior to the Covid19 pandemic, as part of a digital transformation initiative." %}
-{% set max_input_length = 512 %}
-{% set num_beams = 8 %}
-{% set do_sample = True %}
-{% set min_length = 10 %}
-{% set max_length = 64 %}
-
+{% set repo_id = repo_id | default("fabiochiu/t5-small-medium-title-generation") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Many financial institutions started building conversational AI, prior to the Covid19 pandemic, as part of a digital transformation initiative.") %}
+{% set max_input_length = max_input_length | default(512) %}
+{% set num_beams = num_beams | default(8) %}
+{% set do_sample = do_sample | default(True) %}
+{% set min_length = min_length | default(10) %}
+{% set max_length = max_length | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

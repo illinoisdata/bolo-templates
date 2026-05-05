@@ -1,8 +1,7 @@
-{% set repo_id = "circulus/canvers-ko2en-v2" %}
-{% set device = "cuda:0" %}
-{% set text_input = "안녕하세요. 영어로 번역을 위한 예시 문장입니다." %}
-{% set max_new_tokens = 256 %}
-
+{% set repo_id = repo_id | default("circulus/canvers-ko2en-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("안녕하세요. 영어로 번역을 위한 예시 문장입니다.") %}
+{% set max_new_tokens = max_new_tokens | default(256) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""

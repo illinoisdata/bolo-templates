@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "AgentPublic/dpr-ctx_encoder-fr_qa-camembert" %}
-{% set query_text = "Quelle ville abrite la Tour Eiffel ?" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("AgentPublic/dpr-ctx_encoder-fr_qa-camembert") %}
+{% set query_text = query_text | default("Quelle ville abrite la Tour Eiffel ?") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query_text = "{{ query_text }}"

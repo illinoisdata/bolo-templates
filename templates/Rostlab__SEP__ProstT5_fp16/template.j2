@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Rostlab/ProstT5_fp16" %}
-{% set text_prompt = "Describe a prosthetic intervention for a patient with lower limb amputation." %}
-{% set max_length = 128 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Rostlab/ProstT5_fp16") %}
+{% set text_prompt = text_prompt | default("Describe a prosthetic intervention for a patient with lower limb amputation.") %}
+{% set max_length = max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_prompt = "{{ text_prompt }}"

@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "hyunwoongko/ctrlsum-cnndm" %}
-{% set article = "The article describes the latest advancements in the tech industry." %}
-{% set max_length = 128 %}
-{% set min_length = 12 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("hyunwoongko/ctrlsum-cnndm") %}
+{% set article = article | default("The article describes the latest advancements in the tech industry.") %}
+{% set max_length = max_length | default(128) %}
+{% set min_length = min_length | default(12) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 article = "{{ article }}"

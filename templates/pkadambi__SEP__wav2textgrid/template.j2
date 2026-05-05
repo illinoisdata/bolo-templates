@@ -1,7 +1,7 @@
-{% set repo_id = "pkadambi/wav2textgrid" %}
-{% set device = "cuda:0" %}
-{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set sampling_rate = 16000 %}
+{% set repo_id = repo_id | default("pkadambi/wav2textgrid") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
+{% set sampling_rate = sampling_rate | default(16000) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"

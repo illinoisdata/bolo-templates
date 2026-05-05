@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-sk-en" %}
-{% set input_text = "Ahoj, ako sa máš?" %}
-{% set max_new_tokens = 64 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-sk-en") %}
+{% set input_text = input_text | default("Ahoj, ako sa máš?") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

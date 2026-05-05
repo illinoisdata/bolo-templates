@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ai-forever/RuM2M100-418M" %}
-{% set text_input = "прийдя в МГТУ я был удивлен никого необноружив там…" %}
-{% set src_lang = "ru" %}
-{% set tgt_lang = "ru" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ai-forever/RuM2M100-418M") %}
+{% set text_input = text_input | default("прийдя в МГТУ я был удивлен никого необноружив там…") %}
+{% set src_lang = src_lang | default("ru") %}
+{% set tgt_lang = tgt_lang | default("ru") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

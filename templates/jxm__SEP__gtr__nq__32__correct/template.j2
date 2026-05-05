@@ -1,9 +1,8 @@
-{% set repo_id = "jxm/gtr__nq__32__correct" %}
-{% set base_model = "t5-base" %}
-{% set device = "cuda:0" %}
-{% set text = "This is a smple text with som errrors." %}
-{% set max_new_tokens = 32 %}
-
+{% set repo_id = repo_id | default("jxm/gtr__nq__32__correct") %}
+{% set base_model = base_model | default("t5-base") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("This is a smple text with som errrors.") %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
 repo_id = "{{ repo_id }}"
 base_model = "{{ base_model }}"
 device = "{{ device }}"

@@ -1,8 +1,7 @@
-{% set repo_id = "allenai/tk-instruct-3b-def-pos" %}
-{% set device = "cuda:0" %}
-{% set instruction_text = "Definition: return the currency of the given country. Now complete the following example - Input: India. Output:" %}
-{% set max_length = 64 %}
-
+{% set repo_id = repo_id | default("allenai/tk-instruct-3b-def-pos") %}
+{% set device = device | default("cuda:0") %}
+{% set instruction_text = instruction_text | default("Definition: return the currency of the given country. Now complete the following example - Input: India. Output:") %}
+{% set max_length = max_length | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 instruction_text = "{{ instruction_text }}"

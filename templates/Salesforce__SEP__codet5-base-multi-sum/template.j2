@@ -1,17 +1,17 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Salesforce/codet5-base-multi-sum" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Salesforce/codet5-base-multi-sum") %}
 {% set code_input = """def svg_to_image(string, size=None):
     if isinstance(string, unicode):
         string = string.encode('utf-8')
     if size is None:
         size = (1, 1)
     return string""" %}
-{% set max_length = 128 %}
-{% set num_beams = 5 %}
-{% set length_penalty = 2.0 %}
-{% set no_repeat_ngram_size = 3 %}
-{% set early_stopping = True %}
-{% set tokenizer_repo_id = "Salesforce/codet5-base" %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(5) %}
+{% set length_penalty = length_penalty | default(2.0) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
+{% set early_stopping = early_stopping | default(True) %}
+{% set tokenizer_repo_id = tokenizer_repo_id | default("Salesforce/codet5-base") %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 code_input = {{ code_input | tojson }}

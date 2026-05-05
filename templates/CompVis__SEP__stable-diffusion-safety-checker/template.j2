@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "CompVis/stable-diffusion-safety-checker" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("CompVis/stable-diffusion-safety-checker") %}
 import pathlib
 import transformers
 

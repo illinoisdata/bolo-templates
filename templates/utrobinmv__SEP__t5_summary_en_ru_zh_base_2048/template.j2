@@ -1,10 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "utrobinmv/t5_summary_en_ru_zh_base_2048" %}
-{%- set input_text = "Videos say approved vaccines are dangerous, but evidence shows otherwise." -%}
-{%- set prompt_prefix = "summary: " -%}
-{%- set max_new_tokens = 200 -%}
-{%- set num_beams = 4 -%}
-{%- set max_source_length = 2048 -%}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("utrobinmv/t5_summary_en_ru_zh_base_2048") %}
+{% set input_text = input_text | default("Videos say approved vaccines are dangerous, but evidence shows otherwise.") %}
+{% set prompt_prefix = prompt_prefix | default("summary: ") %}
+{% set max_new_tokens = max_new_tokens | default(200) %}
+{% set num_beams = num_beams | default(4) %}
+{% set max_source_length = max_source_length | default(2048) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = {{ input_text | tojson }}

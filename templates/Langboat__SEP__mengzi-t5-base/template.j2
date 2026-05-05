@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Langboat/mengzi-t5-base" %}
-{% set text_input = "翻译以下中文：今天的天气晴朗，想让模型用更优美的语言表达。" %}
-{% set max_length = 128 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Langboat/mengzi-t5-base") %}
+{% set text_input = text_input | default("翻译以下中文：今天的天气晴朗，想让模型用更优美的语言表达。") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

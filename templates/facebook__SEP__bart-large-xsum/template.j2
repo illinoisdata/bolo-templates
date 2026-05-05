@@ -1,7 +1,6 @@
-{% set repo_id = "facebook/bart-large-xsum" %}
-{% set device = "cuda:0" %}
-{% set text = "The Mona Lisa is a half-length portrait painting by the Italian artist Leonardo da Vinci that hangs in the Louvre in Paris." %}
-
+{% set repo_id = repo_id | default("facebook/bart-large-xsum") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("The Mona Lisa is a half-length portrait painting by the Italian artist Leonardo da Vinci that hangs in the Louvre in Paris.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

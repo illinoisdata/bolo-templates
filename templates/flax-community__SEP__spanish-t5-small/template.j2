@@ -1,7 +1,6 @@
-{% set repo_id = "flax-community/spanish-t5-small" %}
-{% set device = "cuda:0" %}
-{% set text = "Érase un vez un" %}
-
+{% set repo_id = repo_id | default("flax-community/spanish-t5-small") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Érase un vez un") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

@@ -1,12 +1,11 @@
-{% set repo_id = "juierror/flan-t5-text2sql-with-schema" %}
-{% set device = "cuda:0" %}
-{% set question = "get people name with age equal 25" %}
-{% set table = ["id", "name", "age"] %}
-{% set input_max_length = 512 %}
-{% set num_beams = 10 %}
-{% set top_k = 10 %}
-{% set generation_max_length = 700 %}
-
+{% set repo_id = repo_id | default("juierror/flan-t5-text2sql-with-schema") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default("get people name with age equal 25") %}
+{% set table = table | default(["id", "name", "age"]) %}
+{% set input_max_length = input_max_length | default(512) %}
+{% set num_beams = num_beams | default(10) %}
+{% set top_k = top_k | default(10) %}
+{% set generation_max_length = generation_max_length | default(700) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 question = "{{ question }}"

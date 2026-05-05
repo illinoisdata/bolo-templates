@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "pvl/labse_bert" %}
-{% set sentences = ["This framework generates embeddings for each input sentence", "Sentences are passed as a list of string.", "The quick brown fox jumps over the lazy dog."] %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("pvl/labse_bert") %}
+{% set sentences = sentences | default(["This framework generates embeddings for each input sentence", "Sentences are passed as a list of string.", "The quick brown fox jumps over the lazy dog."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences | tojson }}

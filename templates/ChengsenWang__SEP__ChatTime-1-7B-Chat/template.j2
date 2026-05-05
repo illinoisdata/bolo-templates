@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ChengsenWang/ChatTime-1-7B-Chat" %}
-{% set prompt = "Forecast the next 24 steps of the time series based on historical context and describe the expected trend." %}
-{% set max_new_tokens = 256 %}
-{% set temperature = 0.2 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ChengsenWang/ChatTime-1-7B-Chat") %}
+{% set prompt = prompt | default("Forecast the next 24 steps of the time series based on historical context and describe the expected trend.") %}
+{% set max_new_tokens = max_new_tokens | default(256) %}
+{% set temperature = temperature | default(0.2) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/pegasus-cnn_dailymail" %}
-{% set input_text = "The government is set to introduce new policies that could reshape how citizens access public services, emphasizing digital transformation and reduced bureaucracy." %}
-{% set num_beams = 4 %}
-{% set max_length = 128 %}
-{% set min_length = 32 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/pegasus-cnn_dailymail") %}
+{% set input_text = input_text | default("The government is set to introduce new policies that could reshape how citizens access public services, emphasizing digital transformation and reduced bureaucracy.") %}
+{% set num_beams = num_beams | default(4) %}
+{% set max_length = max_length | default(128) %}
+{% set min_length = min_length | default(32) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

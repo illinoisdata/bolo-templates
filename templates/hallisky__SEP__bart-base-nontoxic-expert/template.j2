@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "hallisky/bart-base-nontoxic-expert" %}
-{% set text = "This is a toxic example sentence that needs rewriting into a non-toxic form." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("hallisky/bart-base-nontoxic-expert") %}
+{% set text = text | default("This is a toxic example sentence that needs rewriting into a non-toxic form.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

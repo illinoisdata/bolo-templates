@@ -1,9 +1,8 @@
-{% set repo_id = "grammarly/coedit-large" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Fix grammatical errors in this sentence: When I grow up, I start to understand what he said is quite right." %}
-{% set max_length = 256 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("grammarly/coedit-large") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Fix grammatical errors in this sentence: When I grow up, I start to understand what he said is quite right.") %}
+{% set max_length = max_length | default(256) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

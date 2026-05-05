@@ -1,10 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Einmalumdiewelt/T5-Base_GNAD" %}
-{% set text_input = "Die internationalen Klimaverhandlungen erstrecken sich über viele Staaten und treffen auf unterschiedliche Interessen." %}
-{% set summary_prefix = "summarize: " %}
-{% set min_length = 30 %}
-{% set max_length = 200 %}
-{% set num_beams = 4 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Einmalumdiewelt/T5-Base_GNAD") %}
+{% set text_input = text_input | default("Die internationalen Klimaverhandlungen erstrecken sich über viele Staaten und treffen auf unterschiedliche Interessen.") %}
+{% set summary_prefix = summary_prefix | default("summarize: ") %}
+{% set min_length = min_length | default(30) %}
+{% set max_length = max_length | default(200) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""

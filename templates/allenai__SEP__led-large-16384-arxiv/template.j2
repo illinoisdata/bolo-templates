@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "allenai/led-large-16384-arxiv" %}
-{% set text_input = "Solar researchers studied the 155-day periodicity in sunspot data and developed methods to confirm if the peak was a true cycle." %}
-{% set max_length = 512 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("allenai/led-large-16384-arxiv") %}
+{% set text_input = text_input | default("Solar researchers studied the 155-day periodicity in sunspot data and developed methods to confirm if the peak was a true cycle.") %}
+{% set max_length = max_length | default(512) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""

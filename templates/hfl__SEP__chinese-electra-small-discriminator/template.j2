@@ -1,8 +1,7 @@
-{% set repo_id = "hfl/chinese-electra-small-discriminator" %}
-{% set device = "cuda:0" %}
-{% set text = text if text is defined else "我爱自然语言处理。" %}
-{% set threshold = threshold if threshold is defined else 0.5 %}
-
+{% set repo_id = repo_id | default("hfl/chinese-electra-small-discriminator") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default(text if text is defined else "我爱自然语言处理。") %}
+{% set threshold = threshold | default(threshold if threshold is defined else 0.5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

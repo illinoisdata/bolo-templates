@@ -1,5 +1,5 @@
-{% set repo_id = "autogluon/chronos-t5-large" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("autogluon/chronos-t5-large") %}
+{% set device = device | default("cuda:0") %}
 {% set context = context | default([1,2,3,4,5,6,7,8,9,10]) %}
 {% set prediction_length = prediction_length | default(64) %}
 {% set num_samples = num_samples | default(20) %}

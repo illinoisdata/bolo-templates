@@ -1,9 +1,8 @@
-{% set repo_id = "Norm/nougat-latex-base" %}
-{% set device = "cuda:0" %}
-{% set image_path = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
-{% set max_length = 800 %}
-{% set num_beams = 5 %}
-
+{% set repo_id = repo_id | default("Norm/nougat-latex-base") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yli77/projects/ML-code-generation/data/image1.jpeg') %}
+{% set max_length = max_length | default(800) %}
+{% set num_beams = num_beams | default(5) %}
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
 image_path = '{{ image_path }}'

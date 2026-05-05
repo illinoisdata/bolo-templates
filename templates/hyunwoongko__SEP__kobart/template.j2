@@ -1,9 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "hyunwoongko/kobart" %}
-{% set prompt = "한국어로 간단한 인사말을 생성해 주세요." %}
-{% set max_new_tokens = 64 %}
-{% set num_beams = 4 %}
-{% set temperature = 1.0 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("hyunwoongko/kobart") %}
+{% set prompt = prompt | default("한국어로 간단한 인사말을 생성해 주세요.") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set num_beams = num_beams | default(4) %}
+{% set temperature = temperature | default(1.0) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

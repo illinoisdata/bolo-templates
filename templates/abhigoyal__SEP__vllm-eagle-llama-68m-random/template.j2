@@ -1,9 +1,8 @@
-{% set repo_id = "abhigoyal/vllm-eagle-llama-68m-random" %}
-{% set device = "cuda:0" %}
-{% set prompt = "Hello, how are you?" %}
-{% set max_new_tokens = 20 %}
-{% set temperature = 1.0 %}
-
+{% set repo_id = repo_id | default("abhigoyal/vllm-eagle-llama-68m-random") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default("Hello, how are you?") %}
+{% set max_new_tokens = max_new_tokens | default(20) %}
+{% set temperature = temperature | default(1.0) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

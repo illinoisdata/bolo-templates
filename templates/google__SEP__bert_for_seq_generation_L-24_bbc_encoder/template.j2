@@ -1,7 +1,6 @@
-{% set repo_id = "google/bert_for_seq_generation_L-24_bbc_encoder" %}
-{% set device = "cuda:0" %}
-{% set text = "Hello, world!" %}
-
+{% set repo_id = repo_id | default("google/bert_for_seq_generation_L-24_bbc_encoder") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Hello, world!") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

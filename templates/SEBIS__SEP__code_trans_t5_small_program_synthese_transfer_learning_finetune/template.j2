@@ -1,10 +1,9 @@
-{% set repo_id = "SEBIS/code_trans_t5_small_program_synthese_transfer_learning_finetune" %}
-{% set device = "cuda:0" %}
-{% set prompt = "you are given an array of numbers a and a number b , compute the difference of elements in a and b" %}
-{% set prefix = "program synthesis: " %}
-{% set max_length = 512 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("SEBIS/code_trans_t5_small_program_synthese_transfer_learning_finetune") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default("you are given an array of numbers a and a number b , compute the difference of elements in a and b") %}
+{% set prefix = prefix | default("program synthesis: ") %}
+{% set max_length = max_length | default(512) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

@@ -1,5 +1,5 @@
-{% set repo_id = "jjzha/jobspanbert-base-cased" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("jjzha/jobspanbert-base-cased") %}
+{% set device = device | default("cuda:0") %}
 {% set mask_prompt = mask_prompt | default("JobSpanBERT specializes in extracting [MASK] from job postings.") %}
 {% set top_k = top_k | default(5) %}
 

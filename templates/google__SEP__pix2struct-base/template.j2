@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/pix2struct-base" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set prompt_text = "Describe the image in detail." %}
-{% set max_length = 256 %}
-{% set num_beams = 1 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/pix2struct-base") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set prompt_text = prompt_text | default("Describe the image in detail.") %}
+{% set max_length = max_length | default(256) %}
+{% set num_beams = num_beams | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

@@ -1,7 +1,6 @@
-{% set repo_id = "circulus/kobart-trans-dialect-v2" %}
-{% set device = "cuda:0" %}
-{% set text = "안녕하세요, 만나서 반갑습니다." %}
-
+{% set repo_id = repo_id | default("circulus/kobart-trans-dialect-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("안녕하세요, 만나서 반갑습니다.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

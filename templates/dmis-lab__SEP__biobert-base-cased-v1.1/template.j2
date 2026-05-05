@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "dmis-lab/biobert-base-cased-v1.1" %}
-{% set text = "The patient was diagnosed with [MASK]." %}
-{% set top_k = 5 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("dmis-lab/biobert-base-cased-v1.1") %}
+{% set text = text | default("The patient was diagnosed with [MASK].") %}
+{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

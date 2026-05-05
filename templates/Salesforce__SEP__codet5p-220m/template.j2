@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Salesforce/codet5p-220m" %}
-{% set prompt = "def print_hello_world():<extra_id_0>" %}
-{% set max_length = 64 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Salesforce/codet5p-220m") %}
+{% set prompt = prompt | default("def print_hello_world():<extra_id_0>") %}
+{% set max_length = max_length | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

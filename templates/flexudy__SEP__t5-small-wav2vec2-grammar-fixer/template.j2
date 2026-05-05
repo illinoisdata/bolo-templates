@@ -1,14 +1,13 @@
-{% set repo_id = "flexudy/t5-small-wav2vec2-grammar-fixer" %}
-{% set device = "cuda:0" %}
-{% set input_text = "WHEN ARE YOU COMING TOMORROW I AM ASKING BECAUSE OF THE MONEY YOU OWE ME PLEASE GIVE IT TO ME I AM WAITING YOU HAVE BEEN AVOIDING ME SINCE TWO THOUSAND AND THREE" %}
-{% set prefix = "fix: { " %}
-{% set suffix = " } </s>" %}
-{% set max_length = 256 %}
-{% set num_beams = 4 %}
-{% set repetition_penalty = 1.0 %}
-{% set length_penalty = 1.0 %}
-{% set early_stopping = True %}
-
+{% set repo_id = repo_id | default("flexudy/t5-small-wav2vec2-grammar-fixer") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("WHEN ARE YOU COMING TOMORROW I AM ASKING BECAUSE OF THE MONEY YOU OWE ME PLEASE GIVE IT TO ME I AM WAITING YOU HAVE BEEN AVOIDING ME SINCE TWO THOUSAND AND THREE") %}
+{% set prefix = prefix | default("fix: { ") %}
+{% set suffix = suffix | default(" } </s>") %}
+{% set max_length = max_length | default(256) %}
+{% set num_beams = num_beams | default(4) %}
+{% set repetition_penalty = repetition_penalty | default(1.0) %}
+{% set length_penalty = length_penalty | default(1.0) %}
+{% set early_stopping = early_stopping | default(True) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

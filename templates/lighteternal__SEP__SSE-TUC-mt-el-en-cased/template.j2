@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "lighteternal/SSE-TUC-mt-el-en-cased" %}
-{% set prompt_text = "Ο όρος τεχνητή νοημοσύνη αναφέρεται στον κλάδο της πληροφορικής ο οποίος ασχολείται με τη σχεδίαση και την υλοποίηση υπολογιστικών συστημάτων που μιμούνται στοιχεία της ανθρώπινης συμπεριφοράς ." %}
-{% set max_length = 200 %}
-{% set num_beams = 5 %}
-{% set num_return_sequences = 1 %}
-{% set early_stopping = true %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("lighteternal/SSE-TUC-mt-el-en-cased") %}
+{% set prompt_text = prompt_text | default("Ο όρος τεχνητή νοημοσύνη αναφέρεται στον κλάδο της πληροφορικής ο οποίος ασχολείται με τη σχεδίαση και την υλοποίηση υπολογιστικών συστημάτων που μιμούνται στοιχεία της ανθρώπινης συμπεριφοράς .") %}
+{% set max_length = max_length | default(200) %}
+{% set num_beams = num_beams | default(5) %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
+{% set early_stopping = early_stopping | default(true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt_text = """{{ prompt_text }}"""

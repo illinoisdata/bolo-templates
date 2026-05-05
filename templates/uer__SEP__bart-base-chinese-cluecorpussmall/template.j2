@@ -1,10 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "uer/bart-base-chinese-cluecorpussmall" %}
-{% set text_input = "中国的首都是[MASK]京" %}
-{% set max_length = 50 %}
-{% set num_beams = 1 %}
-{% set do_sample = False %}
-{% set num_return_sequences = 1 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("uer/bart-base-chinese-cluecorpussmall") %}
+{% set text_input = text_input | default("中国的首都是[MASK]京") %}
+{% set max_length = max_length | default(50) %}
+{% set num_beams = num_beams | default(1) %}
+{% set do_sample = do_sample | default(False) %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

@@ -1,8 +1,7 @@
-{% set repo_id = "allenai/longformer-base-4096" %}
-{% set device = "cuda:0" %}
-{% set text = "Longformer excels at modeling <mask> documents." %}
-{% set top_k = 5 %}
-
+{% set repo_id = repo_id | default("allenai/longformer-base-4096") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Longformer excels at modeling <mask> documents.") %}
+{% set top_k = top_k | default(5) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text = {{ text | tojson }}

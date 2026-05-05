@@ -1,7 +1,6 @@
-{% set repo_id = "patrickvonplaten/t5-tiny-random" %}
-{% set device = "cuda:0" %}
-{% set input_text = "The quick brown fox jumps over the lazy dog." %}
-
+{% set repo_id = repo_id | default("patrickvonplaten/t5-tiny-random") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("The quick brown fox jumps over the lazy dog.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

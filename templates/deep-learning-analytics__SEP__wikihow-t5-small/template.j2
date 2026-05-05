@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "deep-learning-analytics/wikihow-t5-small" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("deep-learning-analytics/wikihow-t5-small") %}
 {% set text -%}
 Lack of fluids can lead to dry mouth, which is a leading cause of bad breath. Water
 can also dilute any chemicals in your mouth or gut that are causing bad breath., Studies show that

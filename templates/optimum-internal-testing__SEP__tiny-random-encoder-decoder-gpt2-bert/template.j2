@@ -1,9 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "optimum-internal-testing/tiny-random-encoder-decoder-gpt2-bert" %}
-{% set prompt = "Summarize the following text: Transformers enable flexible sequence-to-sequence modeling." %}
-{% set max_length = 32 %}
-{% set num_beams = 3 %}
-{% set early_stopping = true %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("optimum-internal-testing/tiny-random-encoder-decoder-gpt2-bert") %}
+{% set prompt = prompt | default("Summarize the following text: Transformers enable flexible sequence-to-sequence modeling.") %}
+{% set max_length = max_length | default(32) %}
+{% set num_beams = num_beams | default(3) %}
+{% set early_stopping = early_stopping | default(true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

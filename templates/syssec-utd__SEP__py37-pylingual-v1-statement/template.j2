@@ -1,11 +1,10 @@
-{% set repo_id = "syssec-utd/py37-pylingual-v1-statement" %}
-{% set device = "cuda:0" %}
-{% set input_text = "def fact(n): return 1 if n <= 1 else n * fact(n-1)" %}
-{% set max_length = 200 %}
-{% set num_beams = 4 %}
-{% set early_stopping = True %}
-{% set no_repeat_ngram_size = 3 %}
-
+{% set repo_id = repo_id | default("syssec-utd/py37-pylingual-v1-statement") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("def fact(n): return 1 if n <= 1 else n * fact(n-1)") %}
+{% set max_length = max_length | default(200) %}
+{% set num_beams = num_beams | default(4) %}
+{% set early_stopping = early_stopping | default(True) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

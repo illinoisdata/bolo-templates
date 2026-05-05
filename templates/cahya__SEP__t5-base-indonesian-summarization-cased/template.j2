@@ -1,7 +1,6 @@
-{% set repo_id = "cahya/t5-base-indonesian-summarization-cased" %}
-{% set device = "cuda:0" %}
-{% set article_text = "Presiden Indonesia menyampaikan perkembangan penting dalam konferensi global terkait perubahan iklim." %}
-
+{% set repo_id = repo_id | default("cahya/t5-base-indonesian-summarization-cased") %}
+{% set device = device | default("cuda:0") %}
+{% set article_text = article_text | default("Presiden Indonesia menyampaikan perkembangan penting dalam konferensi global terkait perubahan iklim.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 article_text = """{{ article_text }}"""

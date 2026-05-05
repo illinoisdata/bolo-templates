@@ -1,8 +1,7 @@
-{% set repo_id = "roborovski/superprompt-v1" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Expand the following prompt to add more detail: A man in a suit walking down the street" %}
-{% set max_new_tokens = 77 %}
-
+{% set repo_id = repo_id | default("roborovski/superprompt-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Expand the following prompt to add more detail: A man in a suit walking down the street") %}
+{% set max_new_tokens = max_new_tokens | default(77) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

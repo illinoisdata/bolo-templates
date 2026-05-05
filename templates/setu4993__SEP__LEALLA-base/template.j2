@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "setu4993/LEALLA-base" %}
-{% set sentences = ["A cat sits by the window.", "Birds are singing in the trees."] %}
-{% set comparison_sentences = ["The feline rests near the glass.", "Woodland melodies surround the park."] %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("setu4993/LEALLA-base") %}
+{% set sentences = sentences | default(["A cat sits by the window.", "Birds are singing in the trees."]) %}
+{% set comparison_sentences = comparison_sentences | default(["The feline rests near the glass.", "Woodland melodies surround the park."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences }}

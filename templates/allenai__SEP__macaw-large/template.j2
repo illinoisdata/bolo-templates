@@ -1,9 +1,8 @@
-{% set repo_id = "allenai/macaw-large" %}
-{% set device = "cuda:0" %}
-{% set prompt_text = "What is the color of a cloudy sky?" %}
-{% set max_length = 64 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("allenai/macaw-large") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt_text = prompt_text | default("What is the color of a cloudy sky?") %}
+{% set max_length = max_length | default(64) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 prompt_text = {{ prompt_text | tojson }}

@@ -1,8 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ramsrigouthamg/t5_boolean_questions" %}
-{% set question_text = "Is it true that the Earth is flat?" %}
-{% set max_length = 32 %}
-{% set num_beams = 4 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ramsrigouthamg/t5_boolean_questions") %}
+{% set question_text = question_text | default("Is it true that the Earth is flat?") %}
+{% set max_length = max_length | default(32) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 question_text = "{{ question_text }}"

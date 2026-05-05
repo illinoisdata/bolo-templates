@@ -1,5 +1,5 @@
-{% set repo_id = "google/byt5-small" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("google/byt5-small") %}
+{% set device = device | default("cuda:0") %}
 {% set input_texts = input_texts | default(["Life is like a box of chocolates."]) %}
 {% set max_length = max_length | default(64) %}
 {% set num_return_sequences = num_return_sequences | default(1) %}

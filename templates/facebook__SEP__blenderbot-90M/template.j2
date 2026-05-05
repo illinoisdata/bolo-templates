@@ -1,7 +1,6 @@
-{% set repo_id = "facebook/blenderbot-90M" %}
-{% set device = "cuda:0" %}
-{% set user_prompt = "Hello! I'm trying out BlenderBot. What's on your mind today?" %}
-
+{% set repo_id = repo_id | default("facebook/blenderbot-90M") %}
+{% set device = device | default("cuda:0") %}
+{% set user_prompt = user_prompt | default("Hello! I'm trying out BlenderBot. What's on your mind today?") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 user_prompt = "{{ user_prompt }}"

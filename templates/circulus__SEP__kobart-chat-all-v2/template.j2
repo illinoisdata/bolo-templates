@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "circulus/kobart-chat-all-v2" %}
-{% set prompt = "안녕하세요! 무엇을 도와드릴까요?" %}
-{% set max_new_tokens = 64 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("circulus/kobart-chat-all-v2") %}
+{% set prompt = prompt | default("안녕하세요! 무엇을 도와드릴까요?") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

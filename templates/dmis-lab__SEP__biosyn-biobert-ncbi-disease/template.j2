@@ -1,6 +1,6 @@
-{% set repo_id = "dmis-lab/biosyn-biobert-ncbi-disease" %}
-{% set device = "cuda:0" %}
-{% set text_input = "The patient showed symptoms of an emerging respiratory disease." %}
+{% set repo_id = repo_id | default("dmis-lab/biosyn-biobert-ncbi-disease") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("The patient showed symptoms of an emerging respiratory disease.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

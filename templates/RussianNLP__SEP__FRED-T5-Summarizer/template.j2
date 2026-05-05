@@ -1,13 +1,12 @@
-{% set repo_id = "RussianNLP/FRED-T5-Summarizer" %}
-{% set device = "cuda:0" %}
-{% set input_text = '<LM> Сократи текст.\n В деревне, затерянной среди зелёных холмов, жил старик по имени Иван. Его жизнь протекала медленно и размеренно. Каждое утро Иван выходил на поля, чтобы заботиться о своём скромном участке земли. Он выращивал картофель и морковь, которые были его главным источником пищи. Вечера старик проводил у камина, читая книги и вспоминая молодость. Жизнь в деревне была тяжёлая, но Иван находил в ней простые радости.' %}
-{% set num_beams = 5 %}
-{% set min_new_tokens = 17 %}
-{% set max_new_tokens = 200 %}
-{% set do_sample = True %}
-{% set no_repeat_ngram_size = 4 %}
-{% set top_p = 0.9 %}
-
+{% set repo_id = repo_id | default("RussianNLP/FRED-T5-Summarizer") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('<LM> Сократи текст.\n В деревне, затерянной среди зелёных холмов, жил старик по имени Иван. Его жизнь протекала медленно и размеренно. Каждое утро Иван выходил на поля, чтобы заботиться о своём скромном участке земли. Он выращивал картофель и морковь, которые были его главным источником пищи. Вечера старик проводил у камина, читая книги и вспоминая молодость. Жизнь в деревне была тяжёлая, но Иван находил в ней простые радости.') %}
+{% set num_beams = num_beams | default(5) %}
+{% set min_new_tokens = min_new_tokens | default(17) %}
+{% set max_new_tokens = max_new_tokens | default(200) %}
+{% set do_sample = do_sample | default(True) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(4) %}
+{% set top_p = top_p | default(0.9) %}
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
 input_text = '''{{ input_text }}'''

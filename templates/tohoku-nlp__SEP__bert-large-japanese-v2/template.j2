@@ -1,8 +1,7 @@
-{% set repo_id = "tohoku-nlp/bert-large-japanese-v2" %}
-{% set device = "cuda:0" %}
-{% set text_input = "東北大学で[MASK]の研究をしています。" %}
-{% set top_k = 5 %}
-
+{% set repo_id = repo_id | default("tohoku-nlp/bert-large-japanese-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("東北大学で[MASK]の研究をしています。") %}
+{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

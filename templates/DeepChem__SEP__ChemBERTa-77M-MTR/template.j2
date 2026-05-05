@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "DeepChem/ChemBERTa-77M-MTR" %}
-{% set input_smiles = "CCO" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("DeepChem/ChemBERTa-77M-MTR") %}
+{% set input_smiles = input_smiles | default("CCO") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_smiles = "{{ input_smiles }}"

@@ -1,9 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ramsrigouthamg/t5_sentence_paraphraser" %}
-{% set input_text = "paraphrase: The quick brown fox jumps over the lazy dog." %}
-{% set max_new_tokens = 64 %}
-{% set num_beams = 4 %}
-{% set early_stopping = True %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ramsrigouthamg/t5_sentence_paraphraser") %}
+{% set input_text = input_text | default("paraphrase: The quick brown fox jumps over the lazy dog.") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set num_beams = num_beams | default(4) %}
+{% set early_stopping = early_stopping | default(True) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

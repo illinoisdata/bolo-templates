@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/wav2vec2-xls-r-1b" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/wav2vec2-xls-r-1b") %}
 {% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
 
 repo_id = "{{ repo_id }}"

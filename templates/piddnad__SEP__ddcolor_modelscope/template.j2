@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "piddnad/ddcolor_modelscope" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("piddnad/ddcolor_modelscope") %}
 repo_id = "{{ repo_id }}"
 
 from huggingface_hub import hf_hub_download

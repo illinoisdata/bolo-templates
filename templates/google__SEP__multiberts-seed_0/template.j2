@@ -1,8 +1,7 @@
-{% set repo_id = "google/multiberts-seed_0" %}
-{% set device = "cuda:0" %}
-{% set text = "The capital of France is [MASK]." %}
-{% set top_k = 5 %}
-
+{% set repo_id = repo_id | default("google/multiberts-seed_0") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("The capital of France is [MASK].") %}
+{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

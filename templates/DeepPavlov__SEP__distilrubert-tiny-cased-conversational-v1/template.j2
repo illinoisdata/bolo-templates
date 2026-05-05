@@ -1,7 +1,6 @@
-{% set repo_id = "DeepPavlov/distilrubert-tiny-cased-conversational-v1" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Привет, как [MASK]?" %}
-
+{% set repo_id = repo_id | default("DeepPavlov/distilrubert-tiny-cased-conversational-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Привет, как [MASK]?") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

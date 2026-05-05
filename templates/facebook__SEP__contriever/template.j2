@@ -1,7 +1,6 @@
-{% set repo_id = "facebook/contriever" %}
-{% set device = "cuda:0" %}
-{% set sentences = ["Where was Marie Curie born?", "Maria Sklodowska, later known as Marie Curie, was born on November 7, 1867.", "Born in Paris on 15 May 1859, Pierre Curie was the son of Eugène Curie, a doctor of French Catholic origin from Alsace."] %}
-
+{% set repo_id = repo_id | default("facebook/contriever") %}
+{% set device = device | default("cuda:0") %}
+{% set sentences = sentences | default(["Where was Marie Curie born?", "Maria Sklodowska, later known as Marie Curie, was born on November 7, 1867.", "Born in Paris on 15 May 1859, Pierre Curie was the son of Eugène Curie, a doctor of French Catholic origin from Alsace."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences }}

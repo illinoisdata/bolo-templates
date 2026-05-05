@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-tc-big-en-tr" %}
-{% set src_text = ["I know Tom didn't want to eat that.", "On Sundays, we would get up early and go fishing."] %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-en-tr") %}
+{% set src_text = src_text | default(["I know Tom didn't want to eat that.", "On Sundays, we would get up early and go fishing."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 src_text = {{ src_text }}

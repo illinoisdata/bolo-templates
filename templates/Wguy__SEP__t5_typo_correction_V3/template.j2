@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Wguy/t5_typo_correction_V3" %}
-{% set input_text = "Ths is a smaple text with typos for correction." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Wguy/t5_typo_correction_V3") %}
+{% set input_text = input_text | default("Ths is a smaple text with typos for correction.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

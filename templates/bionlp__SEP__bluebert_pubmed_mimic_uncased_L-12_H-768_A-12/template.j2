@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "bionlp/bluebert_pubmed_mimic_uncased_L-12_H-768_A-12" %}
-{% set input_text = "Patient has been admitted with persistent cough and requires further evaluation." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("bionlp/bluebert_pubmed_mimic_uncased_L-12_H-768_A-12") %}
+{% set input_text = input_text | default("Patient has been admitted with persistent cough and requires further evaluation.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

@@ -1,7 +1,6 @@
-{% set repo_id = "readerbench/RoBERT-base" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Acesta este un exemplu de propoziție în limba română." %}
-
+{% set repo_id = repo_id | default("readerbench/RoBERT-base") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Acesta este un exemplu de propoziție în limba română.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

@@ -1,10 +1,9 @@
-{% set repo_id = "chancharikm/qwen2.5-vl-7b-cam-motion" %}
-{% set device = "cuda:0" %}
-{% set video_input_path = "/u/yli77/projects/ML-code-generation/data/video.avi" %}
-{% set question_text = "Describe the camera motion in this video." %}
-{% set max_new_tokens = 128 %}
-{% set fps = 8.0 %}
-
+{% set repo_id = repo_id | default("chancharikm/qwen2.5-vl-7b-cam-motion") %}
+{% set device = device | default("cuda:0") %}
+{% set video_input_path = video_input_path | default("/u/yli77/projects/ML-code-generation/data/video.avi") %}
+{% set question_text = question_text | default("Describe the camera motion in this video.") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set fps = fps | default(8.0) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 video_input_path = "{{ video_input_path }}"

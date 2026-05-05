@@ -1,7 +1,6 @@
-{% set repo_id = "staka/fugumt-en-ja" %}
-{% set device = "cuda:0" %}
-{% set input_text = "This is a cat." %}
-
+{% set repo_id = repo_id | default("staka/fugumt-en-ja") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("This is a cat.") %}
 repo_id = """{{ repo_id }}"""
 device = """{{ device }}"""
 input_text = """{{ input_text }}"""

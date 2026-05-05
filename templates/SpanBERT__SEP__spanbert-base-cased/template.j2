@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "SpanBERT/spanbert-base-cased" %}
-{% set input_text = "SpanBERT spans the [MASK] between entity mentions." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("SpanBERT/spanbert-base-cased") %}
+{% set input_text = input_text | default("SpanBERT spans the [MASK] between entity mentions.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

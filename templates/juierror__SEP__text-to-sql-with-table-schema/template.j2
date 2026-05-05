@@ -1,7 +1,7 @@
-{% set repo_id = "juierror/text-to-sql-with-table-schema" %}
-{% set device = "cuda:0" %}
-{% set question = "get people name with age equal 25" %}
-{% set table_columns = ["id", "name", "age"] %}
+{% set repo_id = repo_id | default("juierror/text-to-sql-with-table-schema") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default("get people name with age equal 25") %}
+{% set table_columns = table_columns | default(["id", "name", "age"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 question = "{{ question }}"

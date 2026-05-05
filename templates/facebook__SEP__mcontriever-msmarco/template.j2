@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/mcontriever-msmarco" %}
-{% set text_inputs = ["What makes Contriever well-suited for dense retrieval?", "Describe how mContriever represents queries and passages."] %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/mcontriever-msmarco") %}
+{% set text_inputs = text_inputs | default(["What makes Contriever well-suited for dense retrieval?", "Describe how mContriever represents queries and passages."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_inputs = {{ text_inputs }}

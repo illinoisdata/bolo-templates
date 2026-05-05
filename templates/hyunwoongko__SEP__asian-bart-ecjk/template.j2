@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "hyunwoongko/asian-bart-ecjk" %}
-{% set input_text = "Translate the following sentence into Korean: Hello, world!" %}
-{% set max_length = 256 %}
-{% set num_beams = 5 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("hyunwoongko/asian-bart-ecjk") %}
+{% set input_text = input_text | default("Translate the following sentence into Korean: Hello, world!") %}
+{% set max_length = max_length | default(256) %}
+{% set num_beams = num_beams | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

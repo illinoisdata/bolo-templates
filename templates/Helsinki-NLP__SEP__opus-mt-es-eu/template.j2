@@ -1,10 +1,9 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-es-eu" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Hola, ¿cómo estás? Espero que tengas un buen día." %}
-{% set max_length = 128 %}
-{% set num_beams = 4 %}
-{% set save_filename = "translation.txt" %}
-
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-es-eu") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Hola, ¿cómo estás? Espero que tengas un buen día.") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(4) %}
+{% set save_filename = save_filename | default("translation.txt") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

@@ -1,9 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "joaogante/tiny-random-gpt2-with-generation-config" %}
-{% set prompt_text = "Hello there! This is a short prompt to sample from the tiny GPT-2 model." %}
-{% set max_new_tokens = 40 %}
-{% set temperature = 0.8 %}
-{% set do_sample = true %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("joaogante/tiny-random-gpt2-with-generation-config") %}
+{% set prompt_text = prompt_text | default("Hello there! This is a short prompt to sample from the tiny GPT-2 model.") %}
+{% set max_new_tokens = max_new_tokens | default(40) %}
+{% set temperature = temperature | default(0.8) %}
+{% set do_sample = do_sample | default(true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt_text = "{{ prompt_text }}"

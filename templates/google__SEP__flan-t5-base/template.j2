@@ -1,5 +1,5 @@
-{% set repo_id = "google/flan-t5-base" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("google/flan-t5-base") %}
+{% set device = device | default("cuda:0") %}
 {% set input_text = input_text | default("translate English to German: How old are you?") %}
 
 repo_id = {{ repo_id | tojson }}

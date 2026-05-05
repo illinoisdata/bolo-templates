@@ -1,8 +1,8 @@
-{% set repo_id = "czearing/story-to-title" %}
-{% set device = "cuda:0" %}
-{% set story_text = "A young screenwriter discovers a haunted notebook that writes award-winning film titles, yet each success comes at a personal cost." %}
-{% set max_length = 60 %}
-{% set num_beams = 4 %}
+{% set repo_id = repo_id | default("czearing/story-to-title") %}
+{% set device = device | default("cuda:0") %}
+{% set story_text = story_text | default("A young screenwriter discovers a haunted notebook that writes award-winning film titles, yet each success comes at a personal cost.") %}
+{% set max_length = max_length | default(60) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 story_text = """{{ story_text }}"""

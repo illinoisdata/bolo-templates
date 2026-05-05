@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "state-spaces/mamba2-2.7b" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("state-spaces/mamba2-2.7b") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 

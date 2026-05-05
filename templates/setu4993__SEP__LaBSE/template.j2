@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "setu4993/LaBSE" %}
-{% set english_sentences = ["dog", "Puppies are nice.", "I enjoy taking long walks along the beach with my dog."] %}
-{% set italian_sentences = ["cane", "I cuccioli sono carini.", "Mi piace fare lunghe passeggiate lungo la spiaggia con il mio cane."] %}
-{% set japanese_sentences = ["犬", "子犬はいいです", "私は犬と一緒にビーチを散歩するのが好きです"] %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("setu4993/LaBSE") %}
+{% set english_sentences = english_sentences | default(["dog", "Puppies are nice.", "I enjoy taking long walks along the beach with my dog."]) %}
+{% set italian_sentences = italian_sentences | default(["cane", "I cuccioli sono carini.", "Mi piace fare lunghe passeggiate lungo la spiaggia con il mio cane."]) %}
+{% set japanese_sentences = japanese_sentences | default(["犬", "子犬はいいです", "私は犬と一緒にビーチを散歩するのが好きです"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 english_sentences = {{ english_sentences | tojson }}

@@ -1,5 +1,5 @@
-{% set repo_id = "ai4bharat/IndicBART" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("ai4bharat/IndicBART") %}
+{% set device = device | default("cuda:0") %}
 {% set input_text = input_text | default("Hello, how are you? </s> <2en>") %}
 {% set target_lang = target_lang | default("<2hi>") %}
 {% set num_beams = num_beams | default(4) %}

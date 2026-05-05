@@ -1,6 +1,6 @@
-{% set repo_id = "tunib/electra-ko-en-base" %}
-{% set device = "cuda:0" %}
-{% set input_text = "이 문장은 영어와 한국어를 모두 포함합니다. This sentence demonstrates bilingual support." %}
+{% set repo_id = repo_id | default("tunib/electra-ko-en-base") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("이 문장은 영어와 한국어를 모두 포함합니다. This sentence demonstrates bilingual support.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "MU-NLPC/whisper-small-audio-captioning" %}
-{% set audio_input = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("MU-NLPC/whisper-small-audio-captioning") %}
+{% set audio_input = audio_input | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_input = "{{ audio_input }}"

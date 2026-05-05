@@ -1,7 +1,6 @@
-{% set repo_id = "beomi/KcELECTRA-base-v2022" %}
-{% set device = "cuda:0" %}
-{% set input_text = "한국어 ELECTRA 모델을 테스트하기 위한 문장입니다." %}
-
+{% set repo_id = repo_id | default("beomi/KcELECTRA-base-v2022") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("한국어 ELECTRA 모델을 테스트하기 위한 문장입니다.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

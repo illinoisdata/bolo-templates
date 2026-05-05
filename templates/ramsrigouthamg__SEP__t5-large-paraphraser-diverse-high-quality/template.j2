@@ -1,11 +1,10 @@
-{% set repo_id = "ramsrigouthamg/t5-large-paraphraser-diverse-high-quality" %}
-{% set device = "cuda:0" %}
-{% set text = "Once, a group of frogs were roaming around the forest in search of water." %}
-{% set max_length = 128 %}
-{% set num_beams = 15 %}
-{% set num_return_sequences = 3 %}
-{% set early_stopping = true %}
-
+{% set repo_id = repo_id | default("ramsrigouthamg/t5-large-paraphraser-diverse-high-quality") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Once, a group of frogs were roaming around the forest in search of water.") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(15) %}
+{% set num_return_sequences = num_return_sequences | default(3) %}
+{% set early_stopping = early_stopping | default(true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

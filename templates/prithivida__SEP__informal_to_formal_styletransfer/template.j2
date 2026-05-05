@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "prithivida/informal_to_formal_styletransfer" %}
-{% set informal_input = "hey, can u send me the notes quickly? i'm swamped rn." %}
-{% set max_new_tokens = 128 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("prithivida/informal_to_formal_styletransfer") %}
+{% set informal_input = informal_input | default("hey, can u send me the notes quickly? i'm swamped rn.") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 informal_input = "{{ informal_input }}"

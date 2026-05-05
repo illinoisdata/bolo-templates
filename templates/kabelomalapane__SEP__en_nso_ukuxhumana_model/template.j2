@@ -1,9 +1,9 @@
-{% set repo_id = "kabelomalapane/en_nso_ukuxhumana_model" %}
-{% set device = "cuda:0" %}
-{% set source_text = "Hello, how are you today?" %}
-{% set num_beams = 4 %}
-{% set max_input_length = 128 %}
-{% set max_generation_length = 128 %}
+{% set repo_id = repo_id | default("kabelomalapane/en_nso_ukuxhumana_model") %}
+{% set device = device | default("cuda:0") %}
+{% set source_text = source_text | default("Hello, how are you today?") %}
+{% set num_beams = num_beams | default(4) %}
+{% set max_input_length = max_input_length | default(128) %}
+{% set max_generation_length = max_generation_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = "{{ source_text }}"

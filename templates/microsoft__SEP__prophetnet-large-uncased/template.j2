@@ -1,9 +1,8 @@
-{% set repo_id = "microsoft/prophetnet-large-uncased" %}
-{% set device = "cuda:0" %}
-{% set source_text = "the us state department said wednesday it had received no formal word from bolivia that it was expelling the us ambassador there but said the charges made against him are baseless" %}
-{% set max_length = 142 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("microsoft/prophetnet-large-uncased") %}
+{% set device = device | default("cuda:0") %}
+{% set source_text = source_text | default("the us state department said wednesday it had received no formal word from bolivia that it was expelling the us ambassador there but said the charges made against him are baseless") %}
+{% set max_length = max_length | default(142) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = """{{ source_text }}"""

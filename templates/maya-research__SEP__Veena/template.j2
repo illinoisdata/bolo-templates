@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "maya-research/Veena" %}
-{% set text_input = "Today I learned about a new technology that uses artificial intelligence to generate human-like voices." %}
-{% set speaker = "kavya" %}
-{% set temperature = 0.4 %}
-{% set top_p = 0.9 %}
-{% set output_filename = "veena_output.wav" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("maya-research/Veena") %}
+{% set text_input = text_input | default("Today I learned about a new technology that uses artificial intelligence to generate human-like voices.") %}
+{% set speaker = speaker | default("kavya") %}
+{% set temperature = temperature | default(0.4) %}
+{% set top_p = top_p | default(0.9) %}
+{% set output_filename = output_filename | default("veena_output.wav") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""

@@ -1,9 +1,8 @@
-{% set repo_id = "mrm8488/t5-base-finetuned-question-generation-ap" %}
-{% set device = "cuda:0" %}
-{% set answer = "Manuel" %}
-{% set context = "Manuel has created RuPERTa-base with the support of HF-Transformers and Google" %}
-{% set max_length = 64 %}
-
+{% set repo_id = repo_id | default("mrm8488/t5-base-finetuned-question-generation-ap") %}
+{% set device = device | default("cuda:0") %}
+{% set answer = answer | default("Manuel") %}
+{% set context = context | default("Manuel has created RuPERTa-base with the support of HF-Transformers and Google") %}
+{% set max_length = max_length | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 answer = "{{ answer }}"

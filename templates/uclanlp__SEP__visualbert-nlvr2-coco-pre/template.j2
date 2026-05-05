@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "uclanlp/visualbert-nlvr2-coco-pre" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set text_prompt = "A single cat sits on a cozy rug." %}
-{% set max_length = 32 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("uclanlp/visualbert-nlvr2-coco-pre") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set text_prompt = text_prompt | default("A single cat sits on a cozy rug.") %}
+{% set max_length = max_length | default(32) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

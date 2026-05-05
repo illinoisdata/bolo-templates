@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/wmt19-en-de" %}
-{% set text_input = "Machine learning is great, isn't it?" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/wmt19-en-de") %}
+{% set text_input = text_input | default("Machine learning is great, isn't it?") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ text_input }}"

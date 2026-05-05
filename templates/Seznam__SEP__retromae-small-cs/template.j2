@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Seznam/retromae-small-cs" %}
-{% set text_inputs = ["Dnes je výborné počasí na procházku po parku.", "Večer si oblíbím dobrý film a uvařím si čaj."] %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Seznam/retromae-small-cs") %}
+{% set text_inputs = text_inputs | default(["Dnes je výborné počasí na procházku po parku.", "Večer si oblíbím dobrý film a uvařím si čaj."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_inputs = {{ text_inputs | tojson }}

@@ -1,14 +1,13 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "mrm8488/t5-base-finetuned-summarize-news" %}
-{% set text="After the sound and the fury, weeks of demonstrations and anguished calls for racial justice, the man whose death gave rise to an international movement, and whose last words — “I can’t breathe” — have been a rallying cry, will be laid to rest on Tuesday at a private funeral in Houston." %}
-{% set prefix="summarize: " %}
-{% set max_input_length=512 %}
-{% set max_length=150 %}
-{% set min_length=30 %}
-{% set num_beams=4 %}
-{% set length_penalty=2.0 %}
-{% set no_repeat_ngram_size=3 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("mrm8488/t5-base-finetuned-summarize-news") %}
+{% set text = text | default("After the sound and the fury, weeks of demonstrations and anguished calls for racial justice, the man whose death gave rise to an international movement, and whose last words — “I can’t breathe” — have been a rallying cry, will be laid to rest on Tuesday at a private funeral in Houston.") %}
+{% set prefix = prefix | default("summarize: ") %}
+{% set max_input_length = max_input_length | default(512) %}
+{% set max_length = max_length | default(150) %}
+{% set min_length = min_length | default(30) %}
+{% set num_beams = num_beams | default(4) %}
+{% set length_penalty = length_penalty | default(2.0) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

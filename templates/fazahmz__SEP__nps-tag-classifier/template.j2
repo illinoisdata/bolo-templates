@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "fazahmz/nps-tag-classifier" %}
-{% set text_input = "This is a sample text for multi-label classification inference." %}
-{% set threshold = 0.5 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("fazahmz/nps-tag-classifier") %}
+{% set text_input = text_input | default("This is a sample text for multi-label classification inference.") %}
+{% set threshold = threshold | default(0.5) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_input = {{ text_input | tojson }}

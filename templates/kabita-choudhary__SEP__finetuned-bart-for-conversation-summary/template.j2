@@ -1,13 +1,12 @@
-{% set repo_id = "kabita-choudhary/finetuned-bart-for-conversation-summary" %}
-{% set device = "cuda:0" %}
-{% set text = "John: Hi Jane, did you complete the report? Jane: Yes, I sent it yesterday. John: Great, thanks!" %}
-{% set num_beams = 4 %}
-{% set max_length = 142 %}
-{% set min_length = 56 %}
-{% set no_repeat_ngram_size = 3 %}
-{% set length_penalty = 2.0 %}
-{% set early_stopping = True %}
-
+{% set repo_id = repo_id | default("kabita-choudhary/finetuned-bart-for-conversation-summary") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("John: Hi Jane, did you complete the report? Jane: Yes, I sent it yesterday. John: Great, thanks!") %}
+{% set num_beams = num_beams | default(4) %}
+{% set max_length = max_length | default(142) %}
+{% set min_length = min_length | default(56) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
+{% set length_penalty = length_penalty | default(2.0) %}
+{% set early_stopping = early_stopping | default(True) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

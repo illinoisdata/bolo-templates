@@ -1,7 +1,7 @@
-{% set repo_id = "tohoku-nlp/bert-base-japanese-v3" %}
-{% set device = "cuda:0" %}
-{% set mask_prompt = "私は[MASK]が好きです。" %}
-{% set top_k = 5 %}
+{% set repo_id = repo_id | default("tohoku-nlp/bert-base-japanese-v3") %}
+{% set device = device | default("cuda:0") %}
+{% set mask_prompt = mask_prompt | default("私は[MASK]が好きです。") %}
+{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ mask_prompt }}"

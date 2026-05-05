@@ -1,7 +1,6 @@
-{% set repo_id = "aubmindlab/araelectra-base-discriminator" %}
-{% set device = "cuda:0" %}
-{% set input_text = "هذا نص عربي تجريبي" %}
-
+{% set repo_id = repo_id | default("aubmindlab/araelectra-base-discriminator") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("هذا نص عربي تجريبي") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

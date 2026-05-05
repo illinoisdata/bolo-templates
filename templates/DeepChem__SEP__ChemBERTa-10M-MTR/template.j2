@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "DeepChem/ChemBERTa-10M-MTR" %}
-{% set text_input = "The molecule exhibits hydrogen bonding and interacts with solvents." %}
-{% set max_length = 256 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("DeepChem/ChemBERTa-10M-MTR") %}
+{% set text_input = text_input | default("The molecule exhibits hydrogen bonding and interacts with solvents.") %}
+{% set max_length = max_length | default(256) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_input = {{ text_input | tojson }}

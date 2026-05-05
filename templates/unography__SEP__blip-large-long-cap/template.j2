@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "unography/blip-large-long-cap" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set max_length = 250 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("unography/blip-large-long-cap") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set max_length = max_length | default(250) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

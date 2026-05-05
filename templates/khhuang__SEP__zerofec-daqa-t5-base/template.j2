@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "khhuang/zerofec-daqa-t5-base" %}
-{% set question = "What is Night of the Living Dead?" %}
-{% set context = "Night of the Living Dead is a 1968 American independent horror film , directed by George A." %}
-{% set max_length = 64 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("khhuang/zerofec-daqa-t5-base") %}
+{% set question = question | default("What is Night of the Living Dead?") %}
+{% set context = context | default("Night of the Living Dead is a 1968 American independent horror film , directed by George A.") %}
+{% set max_length = max_length | default(64) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 question = "{{ question }}"

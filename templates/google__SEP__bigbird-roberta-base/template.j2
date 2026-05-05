@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/bigbird-roberta-base" %}
-{% set input_text = "Replace me by any text you'd like." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/bigbird-roberta-base") %}
+{% set input_text = input_text | default("Replace me by any text you'd like.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

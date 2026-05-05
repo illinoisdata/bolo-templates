@@ -1,9 +1,8 @@
-{% set repo_id = "declare-lab/nora-long" %}
-{% set device = "cuda:0" %}
-{% set instruction = 'Pick up the red block and place it on the table.' %}
-{% set image_path = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
-{% set max_new_tokens = 50 %}
-
+{% set repo_id = repo_id | default("declare-lab/nora-long") %}
+{% set device = device | default("cuda:0") %}
+{% set instruction = instruction | default('Pick up the red block and place it on the table.') %}
+{% set image_path = image_path | default('/u/yli77/projects/ML-code-generation/data/image1.jpeg') %}
+{% set max_new_tokens = max_new_tokens | default(50) %}
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
 instruction = '{{ instruction }}'

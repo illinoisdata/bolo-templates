@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "unum-cloud/uform-gen" %}
-{% set prompt = "[cap] Summarize the visual content of the image." %}
-{% set max_new_tokens = 128 %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("unum-cloud/uform-gen") %}
+{% set prompt = prompt | default("[cap] Summarize the visual content of the image.") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

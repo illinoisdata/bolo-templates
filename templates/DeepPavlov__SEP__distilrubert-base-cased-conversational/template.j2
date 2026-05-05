@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "DeepPavlov/distilrubert-base-cased-conversational" %}
-{% set text_input = "Привет, как у тебя дела?" %}
-{% set max_length = 128 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("DeepPavlov/distilrubert-base-cased-conversational") %}
+{% set text_input = text_input | default("Привет, как у тебя дела?") %}
+{% set max_length = max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "sshleifer/distilbart-xsum-1-1" %}
-{% set input_text = "The council approved a new climate resilience fund to help coastal communities rebuild after the storm surge that eroded miles of shoreline." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("sshleifer/distilbart-xsum-1-1") %}
+{% set input_text = input_text | default("The council approved a new climate resilience fund to help coastal communities rebuild after the storm surge that eroded miles of shoreline.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

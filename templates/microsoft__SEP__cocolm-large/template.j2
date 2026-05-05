@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "microsoft/cocolm-large" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("microsoft/cocolm-large") %}
 repo_id = "{{ repo_id }}"
 
 from huggingface_hub import list_repo_files

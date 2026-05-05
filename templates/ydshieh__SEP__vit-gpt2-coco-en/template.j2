@@ -1,8 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ydshieh/vit-gpt2-coco-en" %}
-{% set image_path = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
-{% set max_length = 16 %}
-{% set num_beams = 4 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ydshieh/vit-gpt2-coco-en") %}
+{% set image_path = image_path | default('/u/yli77/projects/ML-code-generation/data/image1.jpeg') %}
+{% set max_length = max_length | default(16) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

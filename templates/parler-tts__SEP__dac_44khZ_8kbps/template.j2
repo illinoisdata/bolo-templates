@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "parler-tts/dac_44khZ_8kbps" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("parler-tts/dac_44khZ_8kbps") %}
 repo_id = "{{ repo_id }}"
 import inspect
 import os

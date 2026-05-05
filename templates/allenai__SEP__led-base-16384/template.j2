@@ -1,9 +1,9 @@
-{% set repo_id = "allenai/led-base-16384" %}
-{% set device = "cuda:0" %}
-{% set input_text = "LED excels at long-document summarization by mixing global and local attention patterns, enabling efficient reasoning over sequences of up to 16,384 tokens." %}
-{% set max_input_length = 4096 %}
-{% set max_new_tokens = 256 %}
-{% set num_beams = 4 %}
+{% set repo_id = repo_id | default("allenai/led-base-16384") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("LED excels at long-document summarization by mixing global and local attention patterns, enabling efficient reasoning over sequences of up to 16,384 tokens.") %}
+{% set max_input_length = max_input_length | default(4096) %}
+{% set max_new_tokens = max_new_tokens | default(256) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

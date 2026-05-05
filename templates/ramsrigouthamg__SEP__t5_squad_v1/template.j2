@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ramsrigouthamg/t5_squad_v1" %}
-{% set question = "What is the capital of France?" %}
-{% set context = "Paris is the capital of France, known for its art, cuisine, and fashion." %}
-{% set max_length = 64 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ramsrigouthamg/t5_squad_v1") %}
+{% set question = question | default("What is the capital of France?") %}
+{% set context = context | default("Paris is the capital of France, known for its art, cuisine, and fashion.") %}
+{% set max_length = max_length | default(64) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 question = "{{ question }}"

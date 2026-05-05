@@ -1,9 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "IlyaGusev/rut5_base_headline_gen_telegram" %}
-{% set article_text = "Сенаторы обсуждают необходимость национального регулирования налогообложения глобальных интернет-компаний для защиты бюджета и справедливости" %}
-{% set max_input_length = 600 %}
-{% set max_output_length = 64 %}
-{% set num_beams = 5 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("IlyaGusev/rut5_base_headline_gen_telegram") %}
+{% set article_text = article_text | default("Сенаторы обсуждают необходимость национального регулирования налогообложения глобальных интернет-компаний для защиты бюджета и справедливости") %}
+{% set max_input_length = max_input_length | default(600) %}
+{% set max_output_length = max_output_length | default(64) %}
+{% set num_beams = num_beams | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 article_text = """{{ article_text }}"""

@@ -1,12 +1,11 @@
-{% set repo_id = "ramsrigouthamg/t5_paraphraser" %}
-{% set device = "cuda:0" %}
-{% set prompt = "Which course should I take to get started in data science?" %}
-{% set prefix = "paraphrase: " %}
-{% set max_length = 256 %}
-{% set num_return_sequences = 5 %}
-{% set top_k = 120 %}
-{% set top_p = 0.98 %}
-
+{% set repo_id = repo_id | default("ramsrigouthamg/t5_paraphraser") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default("Which course should I take to get started in data science?") %}
+{% set prefix = prefix | default("paraphrase: ") %}
+{% set max_length = max_length | default(256) %}
+{% set num_return_sequences = num_return_sequences | default(5) %}
+{% set top_k = top_k | default(120) %}
+{% set top_p = top_p | default(0.98) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

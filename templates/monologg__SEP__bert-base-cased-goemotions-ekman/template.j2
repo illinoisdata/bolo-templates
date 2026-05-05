@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "monologg/bert-base-cased-goemotions-ekman" %}
-{% set text_input = "I feel grateful for the progress I've made today." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("monologg/bert-base-cased-goemotions-ekman") %}
+{% set text_input = text_input | default("I feel grateful for the progress I've made today.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

@@ -1,10 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ilsilfverskiold/tech-keywords-extractor" %}
-{% set text_input = "If a task raises an exception, or a worker process dies, Celery will by default lose the job. So if you happen to reboot or redeploy, any running jobs with be lost to the sands of time." %}
-{% set max_length = 128 %}
-{% set min_length = 12 %}
-{% set num_beams = 4 %}
-{% set result_filename = "keywords.txt" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ilsilfverskiold/tech-keywords-extractor") %}
+{% set text_input = text_input | default("If a task raises an exception, or a worker process dies, Celery will by default lose the job. So if you happen to reboot or redeploy, any running jobs with be lost to the sands of time.") %}
+{% set max_length = max_length | default(128) %}
+{% set min_length = min_length | default(12) %}
+{% set num_beams = num_beams | default(4) %}
+{% set result_filename = result_filename | default("keywords.txt") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""

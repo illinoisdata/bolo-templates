@@ -1,8 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/mgenre-wiki" %}
-{% set input_sentences = ["[START] Einstein [END] era un fisico tedesco."] %}
-{% set num_beams = 5 %}
-{% set num_return_sequences = 5 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/mgenre-wiki") %}
+{% set input_sentences = input_sentences | default(["[START] Einstein [END] era un fisico tedesco."]) %}
+{% set num_beams = num_beams | default(5) %}
+{% set num_return_sequences = num_return_sequences | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_sentences = {{ input_sentences }}

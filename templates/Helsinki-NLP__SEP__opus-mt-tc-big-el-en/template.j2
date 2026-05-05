@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-tc-big-el-en" %}
-{% set input_texts = ["Το σχολείο μας έχει εννιά τάξεις.", "Άρχισε να τρέχει."] %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-el-en") %}
+{% set input_texts = input_texts | default(["Το σχολείο μας έχει εννιά τάξεις.", "Άρχισε να τρέχει."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_texts = {{ input_texts }}

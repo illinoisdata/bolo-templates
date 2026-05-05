@@ -1,9 +1,9 @@
-{% set repo_id = "microsoft/codereviewer" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Review the following Python function for potential issues and improvements." %}
-{% set max_length = 512 %}
-{% set generation_max_length = 256 %}
-{% set num_beams = 4 %}
+{% set repo_id = repo_id | default("microsoft/codereviewer") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Review the following Python function for potential issues and improvements.") %}
+{% set max_length = max_length | default(512) %}
+{% set generation_max_length = generation_max_length | default(256) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

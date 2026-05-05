@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "AIDA-UPM/mstsb-paraphrase-multilingual-mpnet-base-v2" %}
-{% set sentences = ["This is an example sentence.", "Esta es otra frase de ejemplo.", "最後の例文"] %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("AIDA-UPM/mstsb-paraphrase-multilingual-mpnet-base-v2") %}
+{% set sentences = sentences | default(["This is an example sentence.", "Esta es otra frase de ejemplo.", "最後の例文"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences }}

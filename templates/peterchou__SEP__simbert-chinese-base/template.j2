@@ -1,7 +1,6 @@
-{% set repo_id = "peterchou/simbert-chinese-base" %}
-{% set device = "cuda:0" %}
-{% set text_inputs = ["这是一个用于 SimBERT 的示例句子。"] %}
-
+{% set repo_id = repo_id | default("peterchou/simbert-chinese-base") %}
+{% set device = device | default("cuda:0") %}
+{% set text_inputs = text_inputs | default(["这是一个用于 SimBERT 的示例句子。"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_inputs = {{ text_inputs }}

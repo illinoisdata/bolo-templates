@@ -1,8 +1,7 @@
-{% set repo_id = "GanymedeNil/text2vec-large-chinese" %}
-{% set device = "cuda:0" %}
-{% set reference_sentence = "今天天气很好，阳光明媚。" %}
-{% set comparison_sentence = "今天空气清新，适合户外散步。" %}
-
+{% set repo_id = repo_id | default("GanymedeNil/text2vec-large-chinese") %}
+{% set device = device | default("cuda:0") %}
+{% set reference_sentence = reference_sentence | default("今天天气很好，阳光明媚。") %}
+{% set comparison_sentence = comparison_sentence | default("今天空气清新，适合户外散步。") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 reference_sentence = "{{ reference_sentence }}"

@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/mms-tts-ind" %}
-{% set tts_text = "Halo! Ini adalah demo teks-to-speech dalam bahasa Indonesia." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/mms-tts-ind") %}
+{% set tts_text = tts_text | default("Halo! Ini adalah demo teks-to-speech dalam bahasa Indonesia.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ tts_text }}"

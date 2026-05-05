@@ -1,5 +1,5 @@
-{% set repo_id = "philschmid/flan-t5-base-samsum" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("philschmid/flan-t5-base-samsum") %}
+{% set device = device | default("cuda:0") %}
 {% set conversation = conversation | default("Person A: The meeting is scheduled for tomorrow at 9 AM, do you have the agenda ready?\nPerson B: I am finalizing the budget review and will share it right after lunch.\nPerson A: Great, and can you also summarize the client feedback so we can prepare priorities?\nPerson B: Sure, the feedback praised the prototype, but they want faster loading and clearer navigation.") %}
 {% set prompt_prefix = prompt_prefix | default("summarize: ") %}
 {% set output_filename = output_filename | default("summary.txt") %}

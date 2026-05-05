@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "deep-learning-analytics/automatic-title-generation" %}
-{% set text = "summarize: A dataset of scientific paper abstracts is used to automatically generate concise, informative paper titles." %}
-{% set max_length = 64 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("deep-learning-analytics/automatic-title-generation") %}
+{% set text = text | default("summarize: A dataset of scientific paper abstracts is used to automatically generate concise, informative paper titles.") %}
+{% set max_length = max_length | default(64) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

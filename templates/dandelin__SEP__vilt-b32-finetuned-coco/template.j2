@@ -1,8 +1,7 @@
-{% set repo_id = "dandelin/vilt-b32-finetuned-coco" %}
-{% set device = "cuda:0" %}
-{% set image = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set texts = ["An image of two cats chilling on a couch", "A football player scoring a goal"] %}
-
+{% set repo_id = repo_id | default("dandelin/vilt-b32-finetuned-coco") %}
+{% set device = device | default("cuda:0") %}
+{% set image = image | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set texts = texts | default(["An image of two cats chilling on a couch", "A football player scoring a goal"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image = "{{ image }}"

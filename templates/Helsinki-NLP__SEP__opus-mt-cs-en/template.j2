@@ -1,6 +1,6 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-cs-en" %}
-{% set device = "cuda:0" %}
-{% set source_text = "Dobrý den! Toto je test překladu." %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-cs-en") %}
+{% set device = device | default("cuda:0") %}
+{% set source_text = source_text | default("Dobrý den! Toto je test překladu.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = {{ source_text | tojson }}

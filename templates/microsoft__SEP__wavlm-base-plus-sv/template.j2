@@ -1,7 +1,6 @@
-{% set repo_id = "microsoft/wavlm-base-plus-sv" %}
-{% set device = "cuda:0" %}
-{% set audio_filepath = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-
+{% set repo_id = repo_id | default("microsoft/wavlm-base-plus-sv") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_filepath = audio_filepath | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_filepath = "{{ audio_filepath }}"

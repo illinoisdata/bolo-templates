@@ -1,8 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ETH-CVG/lightglue_superpoint" %}
-{% set image_path_1 = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set image_path_2 = "/u/yli77/projects/ML-code-generation/data/image2.jpeg" %}
-{% set matching_threshold = 0.2 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ETH-CVG/lightglue_superpoint") %}
+{% set image_path_1 = image_path_1 | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set image_path_2 = image_path_2 | default("/u/yli77/projects/ML-code-generation/data/image2.jpeg") %}
+{% set matching_threshold = matching_threshold | default(0.2) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path_1 = "{{ image_path_1 }}"

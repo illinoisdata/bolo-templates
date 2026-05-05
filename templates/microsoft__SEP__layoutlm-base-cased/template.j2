@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "microsoft/layoutlm-base-cased" %}
-{% set document_words = ["Hello", "world"] %}
-{% set bounding_boxes = [[0, 0, 0, 0], [0, 0, 0, 0]] %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("microsoft/layoutlm-base-cased") %}
+{% set document_words = document_words | default(["Hello", "world"]) %}
+{% set bounding_boxes = bounding_boxes | default([[0, 0, 0, 0], [0, 0, 0, 0]]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 document_words = {{ document_words }}

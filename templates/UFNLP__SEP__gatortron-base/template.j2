@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "UFNLP/gatortron-base" %}
-{% set text_input = "Bone scan: Negative for distant metastasis." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("UFNLP/gatortron-base") %}
+{% set text_input = text_input | default("Bone scan: Negative for distant metastasis.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""

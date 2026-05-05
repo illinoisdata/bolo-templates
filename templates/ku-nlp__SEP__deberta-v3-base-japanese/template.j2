@@ -1,6 +1,6 @@
-{% set repo_id = "ku-nlp/deberta-v3-base-japanese" %}
-{% set device = "cuda:0" %}
-{% set sentences = ["京都大学で自然言語処理を研究する。", "I research NLP at Kyoto University.", "int main() { printf(\"Hello, world!\"); return 0; }"] %}
+{% set repo_id = repo_id | default("ku-nlp/deberta-v3-base-japanese") %}
+{% set device = device | default("cuda:0") %}
+{% set sentences = sentences | default(["京都大学で自然言語処理を研究する。", "I research NLP at Kyoto University.", "int main() { printf(\"Hello, world!\"); return 0; }"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences }}

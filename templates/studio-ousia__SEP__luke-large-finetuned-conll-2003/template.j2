@@ -1,8 +1,7 @@
-{% set repo_id = "studio-ousia/luke-large-finetuned-conll-2003" %}
-{% set device = "cuda:0" %}
-{% set text = "Hugging Face is based in New York City." %}
-{% set entity_spans = [(0, 12), (25, 38)] %}
-
+{% set repo_id = repo_id | default("studio-ousia/luke-large-finetuned-conll-2003") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Hugging Face is based in New York City.") %}
+{% set entity_spans = entity_spans | default([(0, 12), (25, 38)]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

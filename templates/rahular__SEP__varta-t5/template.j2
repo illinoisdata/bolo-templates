@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "rahular/varta-t5" %}
-{% set text_input = "summarize: Generate a concise summary in English for this Indic languages news article." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("rahular/varta-t5") %}
+{% set text_input = text_input | default("summarize: Generate a concise summary in English for this Indic languages news article.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""

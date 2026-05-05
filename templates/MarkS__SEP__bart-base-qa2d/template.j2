@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "MarkS/bart-base-qa2d" %}
-{% set input_text = "question: what day is it today? answer: Tuesday" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("MarkS/bart-base-qa2d") %}
+{% set input_text = input_text | default("question: what day is it today? answer: Tuesday") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

@@ -1,9 +1,8 @@
-{% set repo_id = "havenhq/mamba-chat" %}
-{% set device = "cuda:0" %}
-{% set user_message = "Hello, how are you?" %}
-{% set max_new_tokens = 128 %}
-{% set temperature = 0.7 %}
-
+{% set repo_id = repo_id | default("havenhq/mamba-chat") %}
+{% set device = device | default("cuda:0") %}
+{% set user_message = user_message | default("Hello, how are you?") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set temperature = temperature | default(0.7) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 user_message = "{{ user_message }}"

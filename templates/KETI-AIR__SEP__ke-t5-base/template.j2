@@ -1,9 +1,8 @@
-{% set repo_id = "KETI-AIR/ke-t5-base" %}
-{% set device = "cuda:0" %}
-{% set input_text = "summarize: The quick brown fox jumps over the lazy dog and then considers the lessons it learned." %}
-{% set max_new_tokens = 64 %}
-{% set num_return_sequences = 1 %}
-
+{% set repo_id = repo_id | default("KETI-AIR/ke-t5-base") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("summarize: The quick brown fox jumps over the lazy dog and then considers the lessons it learned.") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

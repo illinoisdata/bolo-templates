@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "patrickvonplaten/led-large-16384-pubmed" %}
-{% set text_input = "Anxiety affects quality of life in those living with Parkinson's disease more so than overall cognitive status, motor deficits, apathy, and depression. Recent research suggests anxiety rather than depression is the most prominent mood disorder in PD patients. This model is fine-tuned on PubMed abstracts to provide concise summaries for long scientific texts." %}
-{% set num_beams = 4 %}
-{% set min_length = 100 %}
-{% set max_length = 256 %}
-{% set early_stopping = true %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("patrickvonplaten/led-large-16384-pubmed") %}
+{% set text_input = text_input | default("Anxiety affects quality of life in those living with Parkinson's disease more so than overall cognitive status, motor deficits, apathy, and depression. Recent research suggests anxiety rather than depression is the most prominent mood disorder in PD patients. This model is fine-tuned on PubMed abstracts to provide concise summaries for long scientific texts.") %}
+{% set num_beams = num_beams | default(4) %}
+{% set min_length = min_length | default(100) %}
+{% set max_length = max_length | default(256) %}
+{% set early_stopping = early_stopping | default(true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

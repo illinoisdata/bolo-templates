@@ -1,8 +1,7 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-tc-big-en-bg" %}
-{% set device = "cuda:0" %}
-{% set src_text = ["2001 is the year when the 21st century begins.", "This is Copacabana!"] %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-en-bg") %}
+{% set device = device | default("cuda:0") %}
+{% set src_text = src_text | default(["2001 is the year when the 21st century begins.", "This is Copacabana!"]) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 src_text = {{ src_text }}

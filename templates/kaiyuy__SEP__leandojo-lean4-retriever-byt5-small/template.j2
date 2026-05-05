@@ -1,7 +1,6 @@
-{% set repo_id = "kaiyuy/leandojo-lean4-retriever-byt5-small" %}
-{% set device = "cuda:0" %}
-{% set texts = ['Example sentence to embed.', 'Another example.'] %}
-
+{% set repo_id = repo_id | default("kaiyuy/leandojo-lean4-retriever-byt5-small") %}
+{% set device = device | default("cuda:0") %}
+{% set texts = texts | default(['Example sentence to embed.', 'Another example.']) %}
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
 texts = {{ texts }}

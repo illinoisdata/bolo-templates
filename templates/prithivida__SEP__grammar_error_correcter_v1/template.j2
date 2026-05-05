@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "prithivida/grammar_error_correcter_v1" %}
-{% set text_input = "This sentence has a error in grammar." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("prithivida/grammar_error_correcter_v1") %}
+{% set text_input = text_input | default("This sentence has a error in grammar.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

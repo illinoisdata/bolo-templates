@@ -1,8 +1,7 @@
-{% set repo_id = "Salesforce/blip-image-captioning-base" %}
-{% set device = "cuda:0" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set prompt_text = "a photography of" %}
-
+{% set repo_id = repo_id | default("Salesforce/blip-image-captioning-base") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set prompt_text = prompt_text | default("a photography of") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "paust/pko-t5-base" %}
-{% set input_texts = ['qa question: 당신의 이름은 무엇인가요?'] %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("paust/pko-t5-base") %}
+{% set input_texts = input_texts | default(['qa question: 당신의 이름은 무엇인가요?']) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_texts = {{ input_texts }}

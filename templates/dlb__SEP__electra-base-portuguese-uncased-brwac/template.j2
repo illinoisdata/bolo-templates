@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "dlb/electra-base-portuguese-uncased-brwac" %}
-{% set repo_value = repo_id %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("dlb/electra-base-portuguese-uncased-brwac") %}
+{% set repo_value = repo_value | default(repo_id) %}
 repo_id = "{{ repo_value }}"
 
 from huggingface_hub import hf_hub_download

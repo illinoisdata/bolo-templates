@@ -1,12 +1,12 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "plguillou/t5-base-fr-sum-cnndm" %}
-{% set prefix = "summarize: " %}
-{% set max_length = 200 %}
-{% set min_length = 30 %}
-{% set no_repeat_ngram_size = 3 %}
-{% set length_penalty = 2.0 %}
-{% set num_beams = 4 %}
-{% set early_stopping = true %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("plguillou/t5-base-fr-sum-cnndm") %}
+{% set prefix = prefix | default("summarize: ") %}
+{% set max_length = max_length | default(200) %}
+{% set min_length = min_length | default(30) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
+{% set length_penalty = length_penalty | default(2.0) %}
+{% set num_beams = num_beams | default(4) %}
+{% set early_stopping = early_stopping | default(true) %}
 {% set text -%}
 Apollo 11 est une mission du programme spatial américain Apollo au cours de laquelle, pour la première fois, des hommes se sont posés sur la Lune, le lundi 21 juillet 1969. L'agence spatiale américaine, la NASA, remplit ainsi l'objectif fixé par le président John F. Kennedy en 1961 de poser un équipage sur la Lune avant la fin de la décennie 1960. Il s'agissait de démontrer la supériorité des États-Unis sur l'Union soviétique qui avait été mise à mal par les succès soviétiques au début de l'ère spatiale dans le contexte de la guerre froide qui oppose alors ces deux pays. Ce défi est lancé alors que la NASA n'a pas encore placé en orbite un seul astronaute. Grâce à une mobilisation de moyens humains et financiers considérables, l'agence spatiale rattrape puis dépasse le programme spatial soviétique.
 {%- endset %}

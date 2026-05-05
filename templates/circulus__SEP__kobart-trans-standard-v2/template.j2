@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "circulus/kobart-trans-standard-v2" %}
-{% set text = "안녕하세요. 이 문장을 영어로 번역해주세요." %}
-{% set max_length = 128 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("circulus/kobart-trans-standard-v2") %}
+{% set text = text | default("안녕하세요. 이 문장을 영어로 번역해주세요.") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

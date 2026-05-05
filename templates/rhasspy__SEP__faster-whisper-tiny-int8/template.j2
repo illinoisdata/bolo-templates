@@ -1,5 +1,5 @@
-{% set repo_id = "rhasspy/faster-whisper-tiny-int8" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("rhasspy/faster-whisper-tiny-int8") %}
+{% set device = device | default("cuda:0") %}
 {% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
 
 repo_id = "{{ repo_id }}"

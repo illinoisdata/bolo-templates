@@ -1,6 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "tchewik/isanlp_rst_v3" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("tchewik/isanlp_rst_v3") %}
 repo_id = "{{ repo_id }}"
 
 import json

@@ -1,8 +1,7 @@
-{% set repo_id = "microsoft/git-large-textcaps" %}
-{% set device = "cuda:0" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set max_new_tokens = 128 %}
-
+{% set repo_id = repo_id | default("microsoft/git-large-textcaps") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

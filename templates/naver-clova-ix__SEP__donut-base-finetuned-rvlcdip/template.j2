@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "naver-clova-ix/donut-base-finetuned-rvlcdip" %}
-{% set document_image = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
-{% set max_length = 64 %}
-{% set num_beams = 1 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("naver-clova-ix/donut-base-finetuned-rvlcdip") %}
+{% set document_image = document_image | default("/u/yli77/projects/ML-code-generation/data/doc.jpeg") %}
+{% set max_length = max_length | default(64) %}
+{% set num_beams = num_beams | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 document_image = "{{ document_image }}"

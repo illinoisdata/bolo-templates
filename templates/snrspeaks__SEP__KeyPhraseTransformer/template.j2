@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "snrspeaks/KeyPhraseTransformer" %}
-{% set input_text = "extract keyphrases from this text: Machine learning transforms vast data into actionable insights." %}
-{% set max_length = 64 %}
-{% set num_beams = 4 %}
-{% set repetition_penalty = 1.0 %}
-{% set length_penalty = 1.0 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("snrspeaks/KeyPhraseTransformer") %}
+{% set input_text = input_text | default("extract keyphrases from this text: Machine learning transforms vast data into actionable insights.") %}
+{% set max_length = max_length | default(64) %}
+{% set num_beams = num_beams | default(4) %}
+{% set repetition_penalty = repetition_penalty | default(1.0) %}
+{% set length_penalty = length_penalty | default(1.0) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

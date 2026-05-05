@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Qdrant/paraphrase-multilingual-MiniLM-L12-v2-onnx-Q" %}
-{% set text_inputs = ["The quick brown fox jumps over the lazy dog.", "A fast brown fox leaps over a sleepy dog."] %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Qdrant/paraphrase-multilingual-MiniLM-L12-v2-onnx-Q") %}
+{% set text_inputs = text_inputs | default(["The quick brown fox jumps over the lazy dog.", "A fast brown fox leaps over a sleepy dog."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_inputs = {{ text_inputs|tojson }}

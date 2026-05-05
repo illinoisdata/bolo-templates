@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "deepset/bert-small-mm_retrieval-passage_encoder" %}
-{% set text_passage = "In dense passage retrieval tasks, context passages are embedded by specialized encoders to facilitate efficient nearest-neighbor search." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("deepset/bert-small-mm_retrieval-passage_encoder") %}
+{% set text_passage = text_passage | default("In dense passage retrieval tasks, context passages are embedded by specialized encoders to facilitate efficient nearest-neighbor search.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_passage = """{{ text_passage }}"""

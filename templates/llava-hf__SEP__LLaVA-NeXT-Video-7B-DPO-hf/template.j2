@@ -1,13 +1,12 @@
-{% set repo_id = "llava-hf/LLaVA-NeXT-Video-7B-DPO-hf" %}
-{% set device = "cuda:0" %}
-{% set video_path = '/u/yli77/projects/ML-code-generation/data/video.avi' %}
-{% set user_text = 'Describe what is happening in this video.' %}
-{% set num_frames = 8 %}
-{% set torch_dtype_str = 'float16' %}
-{% set gen_max_new_tokens = 100 %}
-{% set do_sample = False %}
-{% set skip_special_tokens = True %}
-
+{% set repo_id = repo_id | default("llava-hf/LLaVA-NeXT-Video-7B-DPO-hf") %}
+{% set device = device | default("cuda:0") %}
+{% set video_path = video_path | default('/u/yli77/projects/ML-code-generation/data/video.avi') %}
+{% set user_text = user_text | default('Describe what is happening in this video.') %}
+{% set num_frames = num_frames | default(8) %}
+{% set torch_dtype_str = torch_dtype_str | default('float16') %}
+{% set gen_max_new_tokens = gen_max_new_tokens | default(100) %}
+{% set do_sample = do_sample | default(False) %}
+{% set skip_special_tokens = skip_special_tokens | default(True) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 video_path = "{{ video_path }}"

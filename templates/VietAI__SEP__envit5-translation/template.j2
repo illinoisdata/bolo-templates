@@ -1,13 +1,12 @@
-{% set repo_id = "VietAI/envit5-translation" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("VietAI/envit5-translation") %}
+{% set device = device | default("cuda:0") %}
 {% set source_texts = [
     "vi: VietAI là tổ chức phi lợi nhuận với sứ mệnh ươm mầm tài năng về trí tuệ nhân tạo và xây dựng một cộng đồng các chuyên gia trong lĩnh vực trí tuệ nhân tạo đẳng cấp quốc tế tại Việt Nam.",
     "vi: Theo báo cáo mới nhất của Linkedin về danh sách việc làm triển vọng với mức lương hấp dẫn năm 2020, các chức danh công việc liên quan đến AI như Chuyên gia AI (Artificial Intelligence Specialist), Kỹ sư ML (Machine Learning Engineer) đều xếp thứ hạng cao.",
     "en: Our teams aspire to make discoveries that impact everyone, and core to our approach is sharing our research and tools to fuel progress in the field.",
     "en: We're on a journey to advance and democratize artificial intelligence through open source and open science."
 ] %}
-{% set max_length = 512 %}
-
+{% set max_length = max_length | default(512) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_texts = {{ source_texts | tojson }}

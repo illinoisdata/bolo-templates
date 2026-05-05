@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/bert_uncased_L-6_H-512_A-8" %}
-{% set masked_text = "The capital of France is [MASK]." %}
-{% set top_k = 5 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/bert_uncased_L-6_H-512_A-8") %}
+{% set masked_text = masked_text | default("The capital of France is [MASK].") %}
+{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 masked_text = "{{ masked_text }}"

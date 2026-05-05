@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "laboro-ai/distilbert-base-japanese" %}
-{% set text = "これは日本語で書かれた短いテキストです。" %}
-{% set max_length = 128 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("laboro-ai/distilbert-base-japanese") %}
+{% set text = text | default("これは日本語で書かれた短いテキストです。") %}
+{% set max_length = max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

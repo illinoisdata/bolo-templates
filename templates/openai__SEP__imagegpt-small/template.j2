@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "openai/imagegpt-small" %}
-{% set batch_size = 8 %}
-{% set temperature = 1.0 %}
-{% set top_k = 40 %}
-{% set do_sample = True %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("openai/imagegpt-small") %}
+{% set batch_size = batch_size | default(8) %}
+{% set temperature = temperature | default(1.0) %}
+{% set top_k = top_k | default(40) %}
+{% set do_sample = do_sample | default(True) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 batch_size = {{ batch_size }}

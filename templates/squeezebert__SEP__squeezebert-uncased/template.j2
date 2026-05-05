@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "squeezebert/squeezebert-uncased" %}
-{%- set masked_text = "The quick brown fox jumps over the lazy [MASK]." -%}
-{%- set top_k = 5 -%}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("squeezebert/squeezebert-uncased") %}
+{% set masked_text = masked_text | default("The quick brown fox jumps over the lazy [MASK].") %}
+{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 masked_text = "{{ masked_text }}"

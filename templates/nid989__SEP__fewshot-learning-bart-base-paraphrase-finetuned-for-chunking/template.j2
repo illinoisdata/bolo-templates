@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "nid989/fewshot-learning-bart-base-paraphrase-finetuned-for-chunking" %}
-{% set input_text = "Chunk the following sentence using paraphrasing: The quick brown fox jumps over the lazy dog." %}
-{% set max_length = 128 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("nid989/fewshot-learning-bart-base-paraphrase-finetuned-for-chunking") %}
+{% set input_text = input_text | default("Chunk the following sentence using paraphrasing: The quick brown fox jumps over the lazy dog.") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

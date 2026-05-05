@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Searchium-ai/clip4clip-webvid150k" %}
-{% set text_query = "a cinematic drone shot of a coastline" %}
-{% set video_path = "/u/yli77/projects/ML-code-generation/data/video.avi" %}
-{% set max_video_frames = 16 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Searchium-ai/clip4clip-webvid150k") %}
+{% set text_query = text_query | default("a cinematic drone shot of a coastline") %}
+{% set video_path = video_path | default("/u/yli77/projects/ML-code-generation/data/video.avi") %}
+{% set max_video_frames = max_video_frames | default(16) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_query = "{{ text_query }}"

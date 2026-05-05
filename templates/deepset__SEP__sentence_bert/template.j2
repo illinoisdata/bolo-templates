@@ -1,7 +1,6 @@
-{% set repo_id = "deepset/sentence_bert" %}
-{% set device = "cuda:0" %}
-{% set sentences = ["This is an example sentence for embedding.", "Here is another sentence to embed."] %}
-
+{% set repo_id = repo_id | default("deepset/sentence_bert") %}
+{% set device = device | default("cuda:0") %}
+{% set sentences = sentences | default(["This is an example sentence for embedding.", "Here is another sentence to embed."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences }}

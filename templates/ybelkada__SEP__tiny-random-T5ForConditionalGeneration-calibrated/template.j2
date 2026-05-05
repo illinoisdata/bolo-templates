@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ybelkada/tiny-random-T5ForConditionalGeneration-calibrated" %}
-{% set prompt = "translate English to German: The house is wonderful." %}
-{% set max_new_tokens = 32 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ybelkada/tiny-random-T5ForConditionalGeneration-calibrated") %}
+{% set prompt = prompt | default("translate English to German: The house is wonderful.") %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

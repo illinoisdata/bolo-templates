@@ -1,7 +1,7 @@
-{% set repo_id = "facebook/nougat-base" %}
-{% set device = "cuda:0" %}
-{% set document_image_path = '/u/yli77/projects/ML-code-generation/data/doc.jpeg' %}
-{% set max_new_tokens = 1024 %}
+{% set repo_id = repo_id | default("facebook/nougat-base") %}
+{% set device = device | default("cuda:0") %}
+{% set document_image_path = document_image_path | default('/u/yli77/projects/ML-code-generation/data/doc.jpeg') %}
+{% set max_new_tokens = max_new_tokens | default(1024) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 document_image_path = "{{ document_image_path }}"

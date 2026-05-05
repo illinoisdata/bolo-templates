@@ -1,8 +1,7 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-nl-en" %}
-{% set device = "cuda:0" %}
-{% set source_text = "Dit is een voorbeeldzin om te vertalen." %}
-{% set max_new_tokens = 128 %}
-
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-nl-en") %}
+{% set device = device | default("cuda:0") %}
+{% set source_text = source_text | default("Dit is een voorbeeldzin om te vertalen.") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = "{{ source_text }}"

@@ -1,5 +1,5 @@
-{% set repo_id = "jinaai/jina-colbert-v1-en" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("jinaai/jina-colbert-v1-en") %}
+{% set device = device | default("cuda:0") %}
 {% set text_inputs = (text_inputs | default(["How to use ColBERT for indexing long documents?"])) %}
 {% set max_length = (max_length | default(128)) %}
 

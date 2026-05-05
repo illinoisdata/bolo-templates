@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "declare-lab/flan-alpaca-gpt4-xl" %}
-{% set prompt = "Write a short email thanking a friend for sharing flan with an alpaca." %}
-{% set max_length = 128 %}
-{% set num_beams = 1 %}
-{% set do_sample = false %}
-{% set temperature = 1.0 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("declare-lab/flan-alpaca-gpt4-xl") %}
+{% set prompt = prompt | default("Write a short email thanking a friend for sharing flan with an alpaca.") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(1) %}
+{% set do_sample = do_sample | default(false) %}
+{% set temperature = temperature | default(1.0) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

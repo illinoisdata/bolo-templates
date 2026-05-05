@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "chieunq/vietnamese-sentence-paraphase" %}
-{% set input_text = "Thật tự hào khi là sinh viên trường Đại học Công nghệ" %}
-{% set max_length = 64 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("chieunq/vietnamese-sentence-paraphase") %}
+{% set input_text = input_text | default("Thật tự hào khi là sinh viên trường Đại học Công nghệ") %}
+{% set max_length = max_length | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

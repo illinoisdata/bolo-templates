@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "NHNDQ/nllb-finetuned-en2ko" %}
-{% set text_input = "The quick brown fox jumps over the lazy dog." %}
-{% set target_language = "kor_Hang" %}
-{% set source_language = "eng_Latn" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("NHNDQ/nllb-finetuned-en2ko") %}
+{% set text_input = text_input | default("The quick brown fox jumps over the lazy dog.") %}
+{% set target_language = target_language | default("kor_Hang") %}
+{% set source_language = source_language | default("eng_Latn") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

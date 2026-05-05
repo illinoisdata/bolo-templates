@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "vinai/vinai-translate-vi2en-v2" %}
-{% set input_text = "Tôi thích khám phá trí tuệ nhân tạo." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("vinai/vinai-translate-vi2en-v2") %}
+{% set input_text = input_text | default("Tôi thích khám phá trí tuệ nhân tạo.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

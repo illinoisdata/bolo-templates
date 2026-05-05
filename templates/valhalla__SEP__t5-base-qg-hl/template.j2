@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "valhalla/t5-base-qg-hl" %}
-{% set input_text = "<hl> 42 <hl> is the answer to life, the universe and everything. </s>" %}
-{% set max_new_tokens = 64 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("valhalla/t5-base-qg-hl") %}
+{% set input_text = input_text | default("<hl> 42 <hl> is the answer to life, the universe and everything. </s>") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

@@ -1,8 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "naver-clova-ix/donut-base-finetuned-cord-v2" %}
-{% set doc_image_path = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
-{% set prompt = "<s_cord>" %}
-{% set max_length = 256 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("naver-clova-ix/donut-base-finetuned-cord-v2") %}
+{% set doc_image_path = doc_image_path | default("/u/yli77/projects/ML-code-generation/data/doc.jpeg") %}
+{% set prompt = prompt | default("<s_cord>") %}
+{% set max_length = max_length | default(256) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 doc_image_path = "{{ doc_image_path }}"

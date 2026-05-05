@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "jxm/vec2text__openai_ada002__msmarco__msl128__corrector" %}
-{% set input_text = "Correct this sentence: Thsi exampel contains errors to be fixed." %}
-{% set max_new_tokens = 64 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("jxm/vec2text__openai_ada002__msmarco__msl128__corrector") %}
+{% set input_text = input_text | default("Correct this sentence: Thsi exampel contains errors to be fixed.") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

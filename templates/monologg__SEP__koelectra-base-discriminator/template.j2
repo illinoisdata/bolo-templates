@@ -1,7 +1,6 @@
-{% set repo_id = "monologg/koelectra-base-discriminator" %}
-{% set device = "cuda:0" %}
-{% set input_text = "나는 방금 밥을 먹었다." %}
-
+{% set repo_id = repo_id | default("monologg/koelectra-base-discriminator") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("나는 방금 밥을 먹었다.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

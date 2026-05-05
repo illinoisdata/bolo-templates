@@ -1,6 +1,6 @@
-{% set repo_id = "google/t5-efficient-tiny" %}
-{% set device = "cuda:0" %}
-{% set input_text = "translate English to German: HuggingFace transformers are incredible." %}
+{% set repo_id = repo_id | default("google/t5-efficient-tiny") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("translate English to German: HuggingFace transformers are incredible.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

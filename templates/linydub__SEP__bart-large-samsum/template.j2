@@ -1,5 +1,5 @@
-{% set repo_id = "linydub/bart-large-samsum" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("linydub/bart-large-samsum") %}
+{% set device = device | default("cuda:0") %}
 {% set input_text = """Henry: Hey, is Nate coming over to watch the movie tonight?
 Kevin: Yea, he said he'll be arriving a bit later at around 7 since he gets off of work at 6. Have you taken out the garbage yet?
 Henry: Oh I forgot. I'll do that once I'm finished with my assignment for my math class.

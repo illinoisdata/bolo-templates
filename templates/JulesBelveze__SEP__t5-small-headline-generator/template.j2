@@ -1,11 +1,10 @@
-{% set repo_id = "JulesBelveze/t5-small-headline-generator" %}
-{% set device = "cuda:0" %}
-{% set article_text = "US FCC commissioner Brendan Carr has asked Apple and Google to remove TikTok from their app stores. The video app is owned by Chinese company ByteDance. Carr claims that TikTok functions as a surveillance tool that harvests extensive amounts of personal and sensitive data from US citizens. TikTok says its data access approval process is overseen by a US-based security team and that data is only accessed on an as-needed basis under strict controls." %}
-{% set max_input_length = 384 %}
-{% set max_output_length = 84 %}
-{% set num_beams = 4 %}
-{% set no_repeat_ngram_size = 2 %}
-
+{% set repo_id = repo_id | default("JulesBelveze/t5-small-headline-generator") %}
+{% set device = device | default("cuda:0") %}
+{% set article_text = article_text | default("US FCC commissioner Brendan Carr has asked Apple and Google to remove TikTok from their app stores. The video app is owned by Chinese company ByteDance. Carr claims that TikTok functions as a surveillance tool that harvests extensive amounts of personal and sensitive data from US citizens. TikTok says its data access approval process is overseen by a US-based security team and that data is only accessed on an as-needed basis under strict controls.") %}
+{% set max_input_length = max_input_length | default(384) %}
+{% set max_output_length = max_output_length | default(84) %}
+{% set num_beams = num_beams | default(4) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(2) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 article_text = "{{ article_text }}"

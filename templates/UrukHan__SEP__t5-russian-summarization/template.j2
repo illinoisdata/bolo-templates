@@ -1,14 +1,13 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "UrukHan/t5-russian-summarization" %}
-{% set input_texts = ["Запад после начала российской специальной операции по демилитаризации Украины ввел несколько раундов новых экономических санкций. В Кремле новые ограничения назвали серьезными, но отметили, что Россия готовилась к ним заранее."] %}
-{% set prefix = "summarize: " %}
-{% set max_length = 200 %}
-{% set min_length = 30 %}
-{% set num_beams = 4 %}
-{% set length_penalty = 2.0 %}
-{% set no_repeat_ngram_size = 3 %}
-{% set early_stopping = true %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("UrukHan/t5-russian-summarization") %}
+{% set input_texts = input_texts | default(["Запад после начала российской специальной операции по демилитаризации Украины ввел несколько раундов новых экономических санкций. В Кремле новые ограничения назвали серьезными, но отметили, что Россия готовилась к ним заранее."]) %}
+{% set prefix = prefix | default("summarize: ") %}
+{% set max_length = max_length | default(200) %}
+{% set min_length = min_length | default(30) %}
+{% set num_beams = num_beams | default(4) %}
+{% set length_penalty = length_penalty | default(2.0) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
+{% set early_stopping = early_stopping | default(true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_texts = {{ input_texts }}

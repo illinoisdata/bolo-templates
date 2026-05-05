@@ -1,15 +1,14 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "jordiclive/flan-t5-3b-summarizer" %}
-{% set prompt = "Produce an article summary of the following news article:" %}
-{% set raw_document = "The economic landscape has shifted dramatically over the past few quarters, with inflation peaking and then gradually easing. The latest data shows that consumer prices are stabilizing, yet uncertainty lingers across labor markets and international trade tensions continue to influence central bank policies." %}
-{% set max_length = 200 %}
-{% set min_length = 30 %}
-{% set num_beams = 4 %}
-{% set length_penalty = 2.0 %}
-{% set no_repeat_ngram_size = 3 %}
-{% set early_stopping = true %}
-{% set max_input_length = 512 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("jordiclive/flan-t5-3b-summarizer") %}
+{% set prompt = prompt | default("Produce an article summary of the following news article:") %}
+{% set raw_document = raw_document | default("The economic landscape has shifted dramatically over the past few quarters, with inflation peaking and then gradually easing. The latest data shows that consumer prices are stabilizing, yet uncertainty lingers across labor markets and international trade tensions continue to influence central bank policies.") %}
+{% set max_length = max_length | default(200) %}
+{% set min_length = min_length | default(30) %}
+{% set num_beams = num_beams | default(4) %}
+{% set length_penalty = length_penalty | default(2.0) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
+{% set early_stopping = early_stopping | default(true) %}
+{% set max_input_length = max_input_length | default(512) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

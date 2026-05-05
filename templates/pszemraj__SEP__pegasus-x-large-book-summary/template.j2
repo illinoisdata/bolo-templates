@@ -1,13 +1,12 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "pszemraj/pegasus-x-large-book-summary" %}
-{% set input_text = "Modern long-form summarization models condense extensive documents into concise overviews while respecting the core arguments and narrative flow." %}
-{% set max_length = 512 %}
-{% set min_length = 8 %}
-{% set num_beams = 2 %}
-{% set length_penalty = 0.8 %}
-{% set no_repeat_ngram_size = 3 %}
-{% set early_stopping = true %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("pszemraj/pegasus-x-large-book-summary") %}
+{% set input_text = input_text | default("Modern long-form summarization models condense extensive documents into concise overviews while respecting the core arguments and narrative flow.") %}
+{% set max_length = max_length | default(512) %}
+{% set min_length = min_length | default(8) %}
+{% set num_beams = num_beams | default(2) %}
+{% set length_penalty = length_penalty | default(0.8) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
+{% set early_stopping = early_stopping | default(true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "circulus/koelectra-act-v1" %}
-{% set input_text = "오늘은 어떤 감정을 느끼고 계신가요? 저희가 함께 살펴보겠습니다." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("circulus/koelectra-act-v1") %}
+{% set input_text = input_text | default("오늘은 어떤 감정을 느끼고 계신가요? 저희가 함께 살펴보겠습니다.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

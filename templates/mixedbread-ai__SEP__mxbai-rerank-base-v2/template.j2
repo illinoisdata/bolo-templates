@@ -1,9 +1,8 @@
-{% set repo_id = "mixedbread-ai/mxbai-rerank-base-v2" %}
-{% set device = "cuda:0" %}
-{% set prompt = "Who wrote 'To Kill a Mockingbird'?" %}
-{% set max_new_tokens = 64 %}
-{% set temperature = 0.8 %}
-
+{% set repo_id = repo_id | default("mixedbread-ai/mxbai-rerank-base-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default("Who wrote 'To Kill a Mockingbird'?") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set temperature = temperature | default(0.8) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

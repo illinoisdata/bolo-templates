@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "schen/longformer-chinese-base-4096" %}
-{% set text_input = "今天天气很好，适合处理长文本。" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("schen/longformer-chinese-base-4096") %}
+{% set text_input = text_input | default("今天天气很好，适合处理长文本。") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

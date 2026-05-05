@@ -1,8 +1,7 @@
-{% set repo_id = "ai-forever/FRED-T5-large" %}
-{% set device = "cuda:0" %}
-{% set prompt = "Привет! Расскажи короткий позитивный рассказ." %}
-{% set max_length = 128 %}
-
+{% set repo_id = repo_id | default("ai-forever/FRED-T5-large") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default("Привет! Расскажи короткий позитивный рассказ.") %}
+{% set max_length = max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = """{{ prompt }}"""

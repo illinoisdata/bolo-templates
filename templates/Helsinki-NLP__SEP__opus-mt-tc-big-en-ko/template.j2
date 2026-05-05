@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-tc-big-en-ko" %}
-{% set source_texts = ["2, 4, 6 etc. are even numbers.", "Yes."] %}
-{% set target_lang = "ko" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-en-ko") %}
+{% set source_texts = source_texts | default(["2, 4, 6 etc. are even numbers.", "Yes."]) %}
+{% set target_lang = target_lang | default("ko") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_texts = {{ source_texts }}

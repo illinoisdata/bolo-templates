@@ -1,7 +1,6 @@
-{% set repo_id = "namdp-ptit/ViDense" %}
-{% set device = "cuda:0" %}
-{% set sentences = ["Tỉnh nào có diện tích lớn nhất Việt Nam", "Tỉnh nào có diện tích nhỏ nhất Việt Nam", "Tỉnh nào có diện tích rộng nhất Việt Nam"] %}
-
+{% set repo_id = repo_id | default("namdp-ptit/ViDense") %}
+{% set device = device | default("cuda:0") %}
+{% set sentences = sentences | default(["Tỉnh nào có diện tích lớn nhất Việt Nam", "Tỉnh nào có diện tích nhỏ nhất Việt Nam", "Tỉnh nào có diện tích rộng nhất Việt Nam"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences }}

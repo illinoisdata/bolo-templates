@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "castorini/ance-msmarco-passage" %}
-{% set input_queries = ["what is the capital of France?", "Explain how transformers work."] %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("castorini/ance-msmarco-passage") %}
+{% set input_queries = input_queries | default(["what is the capital of France?", "Explain how transformers work."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_queries = {{ input_queries | tojson }}

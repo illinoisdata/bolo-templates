@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-en-ROMANCE" %}
-{% set text = "The quick brown fox jumps over the lazy dog." %}
-{% set target_lang = "fr" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-en-ROMANCE") %}
+{% set text = text | default("The quick brown fox jumps over the lazy dog.") %}
+{% set target_lang = target_lang | default("fr") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = {{ text | tojson }}

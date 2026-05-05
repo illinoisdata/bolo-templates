@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "sshleifer/student_marian_en_ro_6_1" %}
-{% set input_text = "This is a test." %}
-{% set num_beams = 6 %}
-{% set max_length = 512 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("sshleifer/student_marian_en_ro_6_1") %}
+{% set input_text = input_text | default("This is a test.") %}
+{% set num_beams = num_beams | default(6) %}
+{% set max_length = max_length | default(512) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

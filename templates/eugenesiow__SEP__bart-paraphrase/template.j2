@@ -1,9 +1,8 @@
-{% set repo_id = "eugenesiow/bart-paraphrase" %}
-{% set device = "cuda:0" %}
-{% set input_text = "They were there to enjoy us and they were there to pray for us." %}
-{% set max_length = 60 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("eugenesiow/bart-paraphrase") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("They were there to enjoy us and they were there to pray for us.") %}
+{% set max_length = max_length | default(60) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

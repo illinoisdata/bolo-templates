@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "circulus/kobart-correct-v1" %}
-{% set text = "This is a test sentence." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("circulus/kobart-correct-v1") %}
+{% set text = text | default("This is a test sentence.") %}
 device = "{{ device }}"
 repo_id = "{{ repo_id }}"
 text = "{{ text }}"

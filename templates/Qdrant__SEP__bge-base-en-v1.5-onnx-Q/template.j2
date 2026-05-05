@@ -1,8 +1,8 @@
-{% set repo_id = "Qdrant/bge-base-en-v1.5-onnx-Q" %}
-{% set base_model = "BAAI/bge-base-en-v1.5" %}
-{% set device = "cuda:0" %}
-{% set texts = ["The quick brown fox jumps over the lazy dog.", "A fast auburn fox leaps above a sleepy canine."] %}
-{% set max_length = 128 %}
+{% set repo_id = repo_id | default("Qdrant/bge-base-en-v1.5-onnx-Q") %}
+{% set base_model = base_model | default("BAAI/bge-base-en-v1.5") %}
+{% set device = device | default("cuda:0") %}
+{% set texts = texts | default(["The quick brown fox jumps over the lazy dog.", "A fast auburn fox leaps above a sleepy canine."]) %}
+{% set max_length = max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 base_model = "{{ base_model }}"
 device = "{{ device }}"

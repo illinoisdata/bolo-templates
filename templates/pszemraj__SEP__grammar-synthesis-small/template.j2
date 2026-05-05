@@ -1,13 +1,12 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "pszemraj/grammar-synthesis-small" %}
-{% set input_text = "i can has cheezburger" %}
-{% set max_length = 128 %}
-{% set min_length = 4 %}
-{% set num_beams = 8 %}
-{% set repetition_penalty = 1.21 %}
-{% set length_penalty = 1.0 %}
-{% set early_stopping = true %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("pszemraj/grammar-synthesis-small") %}
+{% set input_text = input_text | default("i can has cheezburger") %}
+{% set max_length = max_length | default(128) %}
+{% set min_length = min_length | default(4) %}
+{% set num_beams = num_beams | default(8) %}
+{% set repetition_penalty = repetition_penalty | default(1.21) %}
+{% set length_penalty = length_penalty | default(1.0) %}
+{% set early_stopping = early_stopping | default(true) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 input_text = {{ input_text | tojson }}

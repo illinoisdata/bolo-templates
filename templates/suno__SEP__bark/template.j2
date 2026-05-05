@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "suno/bark" %}
-{% set text_prompt = "Hello, my name is Suno. Bark is speaking to demonstrate text-to-audio inference." %}
-{% set do_sample = true %}
-{% set temperature = 1.0 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("suno/bark") %}
+{% set text_prompt = text_prompt | default("Hello, my name is Suno. Bark is speaking to demonstrate text-to-audio inference.") %}
+{% set do_sample = do_sample | default(true) %}
+{% set temperature = temperature | default(1.0) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_prompt = "{{ text_prompt }}"

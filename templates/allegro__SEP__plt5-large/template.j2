@@ -1,8 +1,7 @@
-{% set repo_id = "allegro/plt5-large" %}
-{% set device = "cuda:0" %}
-{% set text = "To jest test." %}
-{% set max_new_tokens = 128 %}
-
+{% set repo_id = repo_id | default("allegro/plt5-large") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("To jest test.") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

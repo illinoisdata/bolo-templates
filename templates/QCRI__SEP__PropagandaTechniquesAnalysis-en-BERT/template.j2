@@ -1,7 +1,6 @@
-{% set repo_id = "QCRI/PropagandaTechniquesAnalysis-en-BERT" %}
-{% set device = "cuda:0" %}
-{% set text = "Hello, my dog is cute" %}
-
+{% set repo_id = repo_id | default("QCRI/PropagandaTechniquesAnalysis-en-BERT") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Hello, my dog is cute") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

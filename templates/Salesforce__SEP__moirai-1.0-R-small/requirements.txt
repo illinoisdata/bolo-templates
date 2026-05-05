@@ -87,3 +87,4 @@ typing-inspection==0.4.2
 uni2ts @ git+https://github.com/SalesforceAIResearch/uni2ts.git@7a4e77cff8d6cf480c559c6b6879ee621a492a42
 wadler-lindig==0.1.7
 yarl==1.23.0
+pybolo

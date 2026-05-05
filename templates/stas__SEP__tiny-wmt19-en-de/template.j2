@@ -1,7 +1,6 @@
-{% set repo_id = "stas/tiny-wmt19-en-de" %}
-{% set device = "cuda:0" %}
-{% set translation_source = "Hello, how are you?" %}
-
+{% set repo_id = repo_id | default("stas/tiny-wmt19-en-de") %}
+{% set device = device | default("cuda:0") %}
+{% set translation_source = translation_source | default("Hello, how are you?") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 translation_source = "{{ translation_source }}"

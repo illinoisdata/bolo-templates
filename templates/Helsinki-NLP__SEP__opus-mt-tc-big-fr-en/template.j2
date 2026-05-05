@@ -1,7 +1,6 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-tc-big-fr-en" %}
-{% set device = "cuda:0" %}
-{% set text_inputs = ["J'ai adoré l'Angleterre.", "C'était la seule chose à faire."] %}
-
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-fr-en") %}
+{% set device = device | default("cuda:0") %}
+{% set text_inputs = text_inputs | default(["J'ai adoré l'Angleterre.", "C'était la seule chose à faire."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_inputs = {{ text_inputs | tojson }}

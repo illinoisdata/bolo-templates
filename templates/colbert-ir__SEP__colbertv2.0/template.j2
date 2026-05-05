@@ -1,8 +1,7 @@
-{% set repo_id = "colbert-ir/colbertv2.0" %}
-{% set device = "cuda:0" %}
-{% set query_text = "What is ColBERT retrieval?" %}
-{% set passage_text = "ColBERT uses contextual late interaction to compute dense passage representations." %}
-
+{% set repo_id = repo_id | default("colbert-ir/colbertv2.0") %}
+{% set device = device | default("cuda:0") %}
+{% set query_text = query_text | default("What is ColBERT retrieval?") %}
+{% set passage_text = passage_text | default("ColBERT uses contextual late interaction to compute dense passage representations.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query_text = "{{ query_text }}"

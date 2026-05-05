@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Shahm/t5-small-german" %}
-{% set input_text = "Dies ist ein deutscher Beispielsatz mit mehreren Informationen, die ein kompaktes, aussagekräftiges Summary verdienen." %}
-{% set max_length = 200 %}
-{% set min_length = 30 %}
-{% set num_beams = 4 %}
-{% set prefix = "summarize: " %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Shahm/t5-small-german") %}
+{% set input_text = input_text | default("Dies ist ein deutscher Beispielsatz mit mehreren Informationen, die ein kompaktes, aussagekräftiges Summary verdienen.") %}
+{% set max_length = max_length | default(200) %}
+{% set min_length = min_length | default(30) %}
+{% set num_beams = num_beams | default(4) %}
+{% set prefix = prefix | default("summarize: ") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

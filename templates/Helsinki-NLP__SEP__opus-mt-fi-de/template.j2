@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-fi-de" %}
-{% set text_input = "Tämä on esimerkkilauselma käännettäväksi saksaksi." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-fi-de") %}
+{% set text_input = text_input | default("Tämä on esimerkkilauselma käännettäväksi saksaksi.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

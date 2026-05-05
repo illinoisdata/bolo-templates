@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "AntonV/mamba2-780m-hf" %}
-{% set input_text = "Hey how are you doing?" %}
-{% set max_new_tokens = 10 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("AntonV/mamba2-780m-hf") %}
+{% set input_text = input_text | default("Hey how are you doing?") %}
+{% set max_new_tokens = max_new_tokens | default(10) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

@@ -1,9 +1,8 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-en-ar" %}
-{% set device = "cuda:0" %}
-{% set source_text = "Hello, how are you today?" %}
-{% set target_lang = "ara" %}
-{% set max_length = 128 %}
-
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-en-ar") %}
+{% set device = device | default("cuda:0") %}
+{% set source_text = source_text | default("Hello, how are you today?") %}
+{% set target_lang = target_lang | default("ara") %}
+{% set max_length = max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = """{{ source_text }}"""

@@ -1,8 +1,7 @@
-{% set repo_id = "peterchou/ernie-gram" %}
-{% set device = "cuda:0" %}
-{% set input_text = "在这个城市里，我想要[MASK]生活。" %}
-{% set top_k = 5 %}
-
+{% set repo_id = repo_id | default("peterchou/ernie-gram") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("在这个城市里，我想要[MASK]生活。") %}
+{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

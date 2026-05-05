@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ViktorAlm/electra-base-norwegian-uncased-discriminator" %}
-{% set text_input = "Dette er en testsetning for norsk Electra-modellen." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ViktorAlm/electra-base-norwegian-uncased-discriminator") %}
+{% set text_input = text_input | default("Dette er en testsetning for norsk Electra-modellen.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

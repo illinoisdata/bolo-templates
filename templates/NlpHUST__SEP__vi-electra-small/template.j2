@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "NlpHUST/vi-electra-small" %}
-{% set text_input = "Thế giới ML phát triển nhanh chóng." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("NlpHUST/vi-electra-small") %}
+{% set text_input = text_input | default("Thế giới ML phát triển nhanh chóng.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

@@ -1,7 +1,6 @@
-{% set repo_id = "aglazkova/bart_finetuned_keyphrase_extraction" %}
-{% set device = "cuda:0" %}
-{% set text = "In this paper, we investigate cross-domain limitations of keyphrase generation using the models for abstractive text summarization." %}
-
+{% set repo_id = repo_id | default("aglazkova/bart_finetuned_keyphrase_extraction") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("In this paper, we investigate cross-domain limitations of keyphrase generation using the models for abstractive text summarization.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

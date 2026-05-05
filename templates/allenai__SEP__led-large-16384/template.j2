@@ -1,5 +1,5 @@
-{% set repo_id = "allenai/led-large-16384" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("allenai/led-large-16384") %}
+{% set device = device | default("cuda:0") %}
 {% set input_text = input_text | default("AllenAI's LED is designed to summarize and answer questions over long documents with 16K tokens of context. Provide a concise summary of the input content.") %}
 {% set input_max_length = input_max_length | default(4096) %}
 {% set max_new_tokens = max_new_tokens | default(256) %}

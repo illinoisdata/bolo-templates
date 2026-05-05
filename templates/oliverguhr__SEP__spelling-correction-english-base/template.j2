@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "oliverguhr/spelling-correction-english-base" %}
-{% set text = "lets do a comparsion" %}
-{% set max_length = 128 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("oliverguhr/spelling-correction-english-base") %}
+{% set text = text | default("lets do a comparsion") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

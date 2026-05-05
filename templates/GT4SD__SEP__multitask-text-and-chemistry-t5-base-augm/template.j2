@@ -1,11 +1,10 @@
-{% set repo_id = "GT4SD/multitask-text-and-chemistry-t5-base-augm" %}
-{% set device = "cuda:0" %}
-{% set input_text = "summarize: The quick brown fox jumps over the lazy dog." %}
-{% set max_length = 200 %}
-{% set num_beams = 4 %}
-{% set do_sample = false %}
-{% set temperature = 1.0 %}
-
+{% set repo_id = repo_id | default("GT4SD/multitask-text-and-chemistry-t5-base-augm") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("summarize: The quick brown fox jumps over the lazy dog.") %}
+{% set max_length = max_length | default(200) %}
+{% set num_beams = num_beams | default(4) %}
+{% set do_sample = do_sample | default(false) %}
+{% set temperature = temperature | default(1.0) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

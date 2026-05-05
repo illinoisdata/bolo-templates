@@ -1,8 +1,8 @@
-{% set repo_id = "akreal/tiny-random-mbart" %}
-{% set device = "cuda:0" %}
-{% set text_input = "Hello, world!" %}
-{% set src_lang = "en_XX" %}
-{% set tgt_lang = "fr_XX" %}
+{% set repo_id = repo_id | default("akreal/tiny-random-mbart") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("Hello, world!") %}
+{% set src_lang = src_lang | default("en_XX") %}
+{% set tgt_lang = tgt_lang | default("fr_XX") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

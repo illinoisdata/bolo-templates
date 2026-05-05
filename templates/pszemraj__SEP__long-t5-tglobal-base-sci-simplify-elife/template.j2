@@ -1,15 +1,14 @@
-{% set repo_id = "pszemraj/long-t5-tglobal-base-sci-simplify-elife" %}
-{% set device = "cuda:0" %}
-{% set input_text = "large earthquakes along a given fault segment do not occur at random intervals because it takes time to accumulate the strain energy for the rupture. The rates at which tectonic plates move and accumulate strain at their boundaries are approximately uniform. Therefore, in first approximation, one may expect that large ruptures of the same fault segment will occur at approximately constant time intervals." %}
-{% set max_length = 64 %}
-{% set min_length = 8 %}
-{% set no_repeat_ngram_size = 3 %}
-{% set early_stopping = true %}
-{% set repetition_penalty = 3.5 %}
-{% set encoder_no_repeat_ngram_size = 4 %}
-{% set length_penalty = 0.4 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("pszemraj/long-t5-tglobal-base-sci-simplify-elife") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("large earthquakes along a given fault segment do not occur at random intervals because it takes time to accumulate the strain energy for the rupture. The rates at which tectonic plates move and accumulate strain at their boundaries are approximately uniform. Therefore, in first approximation, one may expect that large ruptures of the same fault segment will occur at approximately constant time intervals.") %}
+{% set max_length = max_length | default(64) %}
+{% set min_length = min_length | default(8) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
+{% set early_stopping = early_stopping | default(true) %}
+{% set repetition_penalty = repetition_penalty | default(3.5) %}
+{% set encoder_no_repeat_ngram_size = encoder_no_repeat_ngram_size | default(4) %}
+{% set length_penalty = length_penalty | default(0.4) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ibm-granite/granite-timeseries-patchtst" %}
-{% set historical_values = [[0.0] * 7] * 512 %}
-{% set forecast_horizon = 96 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ibm-granite/granite-timeseries-patchtst") %}
+{% set historical_values = historical_values | default([[0.0] * 7] * 512) %}
+{% set forecast_horizon = forecast_horizon | default(96) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 historical_values = {{ historical_values }}

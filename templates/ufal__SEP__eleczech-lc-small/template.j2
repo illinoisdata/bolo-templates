@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ufal/eleczech-lc-small" %}
-{% set text_input = "Toto je [MASK] věta." %}
-{% set top_k = 5 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ufal/eleczech-lc-small") %}
+{% set text_input = text_input | default("Toto je [MASK] věta.") %}
+{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

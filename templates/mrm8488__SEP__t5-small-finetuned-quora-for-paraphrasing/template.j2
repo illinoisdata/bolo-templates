@@ -1,14 +1,13 @@
-{% set repo_id = "mrm8488/t5-small-finetuned-quora-for-paraphrasing" %}
-{% set device = "cuda:0" %}
-{% set input_text = "paraphrase: What is the best framework for dealing with a huge text dataset?" %}
-{% set num_return_sequences = 5 %}
-{% set num_beams = 5 %}
-{% set max_length = 128 %}
-{% set no_repeat_ngram_size = 2 %}
-{% set repetition_penalty = 3.5 %}
-{% set length_penalty = 1.0 %}
-{% set early_stopping = True %}
-
+{% set repo_id = repo_id | default("mrm8488/t5-small-finetuned-quora-for-paraphrasing") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("paraphrase: What is the best framework for dealing with a huge text dataset?") %}
+{% set num_return_sequences = num_return_sequences | default(5) %}
+{% set num_beams = num_beams | default(5) %}
+{% set max_length = max_length | default(128) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(2) %}
+{% set repetition_penalty = repetition_penalty | default(3.5) %}
+{% set length_penalty = length_penalty | default(1.0) %}
+{% set early_stopping = early_stopping | default(True) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

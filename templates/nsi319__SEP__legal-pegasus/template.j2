@@ -1,12 +1,11 @@
-{% set repo_id = "nsi319/legal-pegasus" %}
-{% set device = "cuda:0" %}
-{% set input_text = "The defendant was found guilty of fraud and sentenced to ten years in prison." %}
-{% set max_length = 128 %}
-{% set min_length = 32 %}
-{% set num_beams = 8 %}
-{% set length_penalty = 0.8 %}
-{% set early_stopping = true %}
-
+{% set repo_id = repo_id | default("nsi319/legal-pegasus") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("The defendant was found guilty of fraud and sentenced to ten years in prison.") %}
+{% set max_length = max_length | default(128) %}
+{% set min_length = min_length | default(32) %}
+{% set num_beams = num_beams | default(8) %}
+{% set length_penalty = length_penalty | default(0.8) %}
+{% set early_stopping = early_stopping | default(true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

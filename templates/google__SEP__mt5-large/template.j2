@@ -1,7 +1,6 @@
-{% set repo_id = "google/mt5-large" %}
-{% set device = "cuda:0" %}
-{% set text_prompt = "translate English to French: The house is wonderful." %}
-
+{% set repo_id = repo_id | default("google/mt5-large") %}
+{% set device = device | default("cuda:0") %}
+{% set text_prompt = text_prompt | default("translate English to French: The house is wonderful.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_prompt = "{{ text_prompt }}"

@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "flexudy/t5-base-multi-sentence-doctor" %}
-{% set input_text = "repair_sentence: m a medical doct context: {That is my job I a}{or I save lives} </s>" %}
-{% set max_length = 32 %}
-{% set num_beams = 1 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("flexudy/t5-base-multi-sentence-doctor") %}
+{% set input_text = input_text | default("repair_sentence: m a medical doct context: {That is my job I a}{or I save lives} </s>") %}
+{% set max_length = max_length | default(32) %}
+{% set num_beams = num_beams | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

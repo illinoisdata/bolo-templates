@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "GanymedeNil/text2vec-base-chinese" %}
-{% set texts = ["这是第一句中文。", "这是第二句中文。"] %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("GanymedeNil/text2vec-base-chinese") %}
+{% set texts = texts | default(["这是第一句中文。", "这是第二句中文。"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 texts = {{ texts }}

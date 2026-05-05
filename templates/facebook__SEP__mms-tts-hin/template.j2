@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/mms-tts-hin" %}
-{% set text_input = "यह एक उदाहरण हिंदी पाठ है।" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/mms-tts-hin") %}
+{% set text_input = text_input | default("यह एक उदाहरण हिंदी पाठ है।") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

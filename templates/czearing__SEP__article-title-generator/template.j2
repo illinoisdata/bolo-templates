@@ -1,9 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "czearing/article-title-generator" %}
-{% set article_text = "Summarize the latest sustainable energy article for urban planners." %}
-{% set prefix = "write an article title for: " %}
-{% set max_length = 40 %}
-{% set num_beams = 4 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("czearing/article-title-generator") %}
+{% set article_text = article_text | default("Summarize the latest sustainable energy article for urban planners.") %}
+{% set prefix = prefix | default("write an article title for: ") %}
+{% set max_length = max_length | default(40) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 article_text = """{{ article_text }}"""

@@ -1,7 +1,7 @@
-{% set repo_id = "stas/mt5-tiny-random" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Translate English to French: The weather is nice today." %}
-{% set max_length = 64 %}
+{% set repo_id = repo_id | default("stas/mt5-tiny-random") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Translate English to French: The weather is nice today.") %}
+{% set max_length = max_length | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

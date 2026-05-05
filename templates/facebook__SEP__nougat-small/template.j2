@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/nougat-small" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/nougat-small") %}
 repo_id = "{{ repo_id }}"
 from huggingface_hub import hf_hub_download
 import json

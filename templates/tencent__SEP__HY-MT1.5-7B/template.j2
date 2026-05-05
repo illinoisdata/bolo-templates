@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "tencent/HY-MT1.5-7B" %}
-{% set translation_input = "It's on the house." %}
-{% set target_language = "Chinese" %}
-{% set max_new_tokens = 256 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("tencent/HY-MT1.5-7B") %}
+{% set translation_input = translation_input | default("It's on the house.") %}
+{% set target_language = target_language | default("Chinese") %}
+{% set max_new_tokens = max_new_tokens | default(256) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 translation_input = {{ translation_input | tojson }}

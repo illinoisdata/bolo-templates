@@ -1,9 +1,8 @@
-{% set repo_id = "noamrot/FuseCap_Image_Captioning" %}
-{% set device = "cuda:0" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set prompt = "a picture of " %}
-{% set num_beams = 3 %}
-
+{% set repo_id = repo_id | default("noamrot/FuseCap_Image_Captioning") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set prompt = prompt | default("a picture of ") %}
+{% set num_beams = num_beams | default(3) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

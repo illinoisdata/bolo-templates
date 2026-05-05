@@ -1,9 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/pegasus-newsroom" %}
-{% set text_input = "The city council debated a new budget proposal that allocates additional funding to public health, infrastructure, and education. The plan also creates a small business grant program to support struggling entrepreneurs in under-resourced neighborhoods." %}
-{% set max_summary_length = 128 %}
-{% set min_summary_length = 32 %}
-{% set num_beams = 4 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/pegasus-newsroom") %}
+{% set text_input = text_input | default("The city council debated a new budget proposal that allocates additional funding to public health, infrastructure, and education. The plan also creates a small business grant program to support struggling entrepreneurs in under-resourced neighborhoods.") %}
+{% set max_summary_length = max_summary_length | default(128) %}
+{% set min_summary_length = min_summary_length | default(32) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_input = {{ text_input | tojson }}

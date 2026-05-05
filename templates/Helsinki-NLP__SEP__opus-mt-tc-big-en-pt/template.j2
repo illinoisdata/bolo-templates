@@ -1,5 +1,5 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-tc-big-en-pt" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-en-pt") %}
+{% set device = device | default("cuda:0") %}
 {% set src_text = [
     ">>por<< Tom tried to stab me.",
     ">>por<< He has been to Hawaii several times."

@@ -1,10 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "alicekyting/Qwen2-Audio-7B-Instruct-4bit" %}
-{% set audio_path = '/u/yli77/projects/ML-code-generation/data/audio.wav' %}
-{% set output_path = '/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/alicekyting__SEP__Qwen2-Audio-7B-Instruct-4bit/response.txt' %}
-{% set max_new_tokens = 256 %}
-{% set user_instruction = 'Please describe the sound you hear and any context you can infer.' %}
-{% set system_prompt = 'You are a helpful assistant specializing in understanding and describing short audio clips.' %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("alicekyting/Qwen2-Audio-7B-Instruct-4bit") %}
+{% set audio_path = audio_path | default('/u/yli77/projects/ML-code-generation/data/audio.wav') %}
+{% set output_path = output_path | default('/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/alicekyting__SEP__Qwen2-Audio-7B-Instruct-4bit/response.txt') %}
+{% set max_new_tokens = max_new_tokens | default(256) %}
+{% set user_instruction = user_instruction | default('Please describe the sound you hear and any context you can infer.') %}
+{% set system_prompt = system_prompt | default('You are a helpful assistant specializing in understanding and describing short audio clips.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"

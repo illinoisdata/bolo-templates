@@ -1,10 +1,9 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-ru-bg" %}
-{% set device = "cuda:0" %}
-{% set text_input = "Привет, как дела?" %}
-{% set target_lang_token = ">>bg<<" %}
-{% set max_length = 200 %}
-{% set output_filename = "translation.txt" %}
-
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-ru-bg") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("Привет, как дела?") %}
+{% set target_lang_token = target_lang_token | default(">>bg<<") %}
+{% set max_length = max_length | default(200) %}
+{% set output_filename = output_filename | default("translation.txt") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

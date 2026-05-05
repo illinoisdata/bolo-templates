@@ -1,14 +1,13 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Kyle1668/imdb-t5-large" %}
-{% set input_text = 'The movie was fantastic and had a thrilling plot.' %}
-{% set prefix = 'summarize: ' %}
-{% set max_length = 200 %}
-{% set min_length = 30 %}
-{% set length_penalty = 2.0 %}
-{% set num_beams = 4 %}
-{% set no_repeat_ngram_size = 3 %}
-{% set early_stopping = True %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Kyle1668/imdb-t5-large") %}
+{% set input_text = input_text | default('The movie was fantastic and had a thrilling plot.') %}
+{% set prefix = prefix | default('summarize: ') %}
+{% set max_length = max_length | default(200) %}
+{% set min_length = min_length | default(30) %}
+{% set length_penalty = length_penalty | default(2.0) %}
+{% set num_beams = num_beams | default(4) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
+{% set early_stopping = early_stopping | default(True) %}
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
 input_text = '{{ input_text }}'

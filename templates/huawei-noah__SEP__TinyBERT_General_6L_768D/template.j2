@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "huawei-noah/TinyBERT_General_6L_768D" %}
-{% set text = "Example sentence for TinyBERT inference." %}
-{% set max_length = 128 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("huawei-noah/TinyBERT_General_6L_768D") %}
+{% set text = text | default("Example sentence for TinyBERT inference.") %}
+{% set max_length = max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

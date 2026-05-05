@@ -1,8 +1,8 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-en-trk" %}
-{% set device = "cuda:0" %}
-{% set source_sentence = "This is a short example sentence to translate." %}
-{% set target_language_token = ">>trk<<" %}
-{% set max_target_length = 128 %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-en-trk") %}
+{% set device = device | default("cuda:0") %}
+{% set source_sentence = source_sentence | default("This is a short example sentence to translate.") %}
+{% set target_language_token = target_language_token | default(">>trk<<") %}
+{% set max_target_length = max_target_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_sentence = "{{ source_sentence }}"

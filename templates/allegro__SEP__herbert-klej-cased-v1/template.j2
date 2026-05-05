@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "allegro/herbert-klej-cased-v1" %}
-{% set text_input = "To przykładowe zdanie w języku polskim do analizy." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("allegro/herbert-klej-cased-v1") %}
+{% set text_input = text_input | default("To przykładowe zdanie w języku polskim do analizy.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

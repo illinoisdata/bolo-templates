@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "rhasspy/faster-whisper-small-int8" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("rhasspy/faster-whisper-small-int8") %}
 repo_id = "{{ repo_id }}"
 
 import huggingface_hub as hf

@@ -1,8 +1,7 @@
-{% set repo_id = "hubertsiuzdak/snac_24khz" %}
-{% set device = "cuda:0" %}
-{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set sampling_rate = 24000 %}
-
+{% set repo_id = repo_id | default("hubertsiuzdak/snac_24khz") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
+{% set sampling_rate = sampling_rate | default(24000) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"

@@ -1,7 +1,6 @@
-{% set repo_id = "FPTAI/vibert-base-cased" %}
-{% set device = "cuda:0" %}
-{% set input_texts = ["I am very satisfied with the service.", "The final result did not meet my expectations."] %}
-
+{% set repo_id = repo_id | default("FPTAI/vibert-base-cased") %}
+{% set device = device | default("cuda:0") %}
+{% set input_texts = input_texts | default(["I am very satisfied with the service.", "The final result did not meet my expectations."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_texts = {{ input_texts }}

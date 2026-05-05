@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "hfl/chinese-electra-180g-small-discriminator" %}
-{% set text = "这是一个用于测试的中文输入。" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("hfl/chinese-electra-180g-small-discriminator") %}
+{% set text = text | default("这是一个用于测试的中文输入。") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

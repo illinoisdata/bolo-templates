@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "dbmdz/bert-base-french-europeana-cased" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("dbmdz/bert-base-french-europeana-cased") %}
 {% set input_text = input_text | default("Bonjour, voici un exemple de texte en français pour tester le modèle de langage.") %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}

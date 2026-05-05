@@ -1,9 +1,9 @@
-{% set repo_id = "imvladikon/het5_summarization" %}
-{% set device = "cuda:0" %}
-{% set max_length = 50 %}
-{% set num_beams = 4 %}
-{% set no_repeat_ngram_size = 2 %}
-{% set early_stopping = true %}
+{% set repo_id = repo_id | default("imvladikon/het5_summarization") %}
+{% set device = device | default("cuda:0") %}
+{% set max_length = max_length | default(50) %}
+{% set num_beams = num_beams | default(4) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(2) %}
+{% set early_stopping = early_stopping | default(true) %}
 {% set text %}
 צרפת ממשיכה לבעור: לאחר ארבעה ימים של עימותים אלימים בין מתפרעים לכוחות הביטחון בכל רחבי צרפת, היום (שבת) התקיימה הלוויתו של הנער האלג'יראי, נאהל בן ה-17, שנורה למוות על ידי שוטר לאחר שנחשד בגניבת רכב. לבקשת משפחתו, ההלוויה התקיימה כאירוע מצומצם שבו השתתפו בני משפחה וחברים בלבד. לאחר שארונו של נאהל הוצא מהמסגד בעיר נאנטר, אלפים קראו "לעשיית צדק עבורו".במקביל, המשטרה הצרפתית נערכת להמשך המהומות בעשרות מוקדים ברחבי המדינה, כשבמהלך הלילה נעצרו 1,300 בני אדם. משרד הפנים הצרפתי הודיע כי במהלך האירועים הוצתו 1,350 כלי רכב, ו-234 הצתות של מבנים. כמו כן, על פי הנתונים נגרם נזק ל-200 מרכזי קניות, 200 סופרמרקטים ו-250 סניפי בנק.
 {% endset %}

@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "BridgeTower/bridgetower-base" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("BridgeTower/bridgetower-base") %}
 from transformers import BridgeTowerProcessor
 import inspect
 

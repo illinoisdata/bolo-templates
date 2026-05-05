@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese") %}
 repo_id = "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese"
 from huggingface_hub import list_repo_files
 

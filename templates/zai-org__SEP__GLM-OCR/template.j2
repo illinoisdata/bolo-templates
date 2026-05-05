@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "zai-org/GLM-OCR" %}
-{% set input_image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set prompt_text = "Text Recognition:" %}
-{% set max_new_tokens = 8192 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("zai-org/GLM-OCR") %}
+{% set input_image_path = input_image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set prompt_text = prompt_text | default("Text Recognition:") %}
+{% set max_new_tokens = max_new_tokens | default(8192) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_image_path = "{{ input_image_path }}"

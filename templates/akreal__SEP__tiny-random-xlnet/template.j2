@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "akreal/tiny-random-xlnet" %}
-{% set prompt = "Hello, huggingface" %}
-{% set max_new_tokens = 20 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("akreal/tiny-random-xlnet") %}
+{% set prompt = prompt | default("Hello, huggingface") %}
+{% set max_new_tokens = max_new_tokens | default(20) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

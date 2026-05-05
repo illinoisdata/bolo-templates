@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "circulus/canvers-ko2en-v1" %}
-{% set input_text = "안녕하세요, 세계!" %}
-{% set max_length = 256 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("circulus/canvers-ko2en-v1") %}
+{% set input_text = input_text | default("안녕하세요, 세계!") %}
+{% set max_length = max_length | default(256) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "UBC-NLP/turjuman" %}
-{% set src_text = "Translate into Arabic: The weather is nice today." %}
-{% set max_new_tokens = 128 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("UBC-NLP/turjuman") %}
+{% set src_text = src_text | default("Translate into Arabic: The weather is nice today.") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 src_text = """{{ src_text }}"""

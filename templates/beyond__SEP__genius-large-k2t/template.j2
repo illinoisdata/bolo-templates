@@ -1,10 +1,9 @@
-{% set repo_id = "beyond/genius-large-k2t" %}
-{% set device = "cuda:0" %}
-{% set sketch = "machine learning data science my future work" %}
-{% set max_length = 100 %}
-{% set num_beams = 2 %}
-{% set do_sample = true %}
-
+{% set repo_id = repo_id | default("beyond/genius-large-k2t") %}
+{% set device = device | default("cuda:0") %}
+{% set sketch = sketch | default("machine learning data science my future work") %}
+{% set max_length = max_length | default(100) %}
+{% set num_beams = num_beams | default(2) %}
+{% set do_sample = do_sample | default(true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sketch = "{{ sketch }}"

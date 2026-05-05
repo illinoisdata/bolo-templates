@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "allenai/PRIMERA" %}
-{% set text_input = "Multi-document summarization requires the model to condense diverse viewpoints into one coherent narrative. Document one introduces the research setting and the objective of combining multiple sources. Document two details experimental results that extend those findings. The summary should capture both the high-level motivation and the key outcomes." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("allenai/PRIMERA") %}
+{% set text_input = text_input | default("Multi-document summarization requires the model to condense diverse viewpoints into one coherent narrative. Document one introduces the research setting and the objective of combining multiple sources. Document two details experimental results that extend those findings. The summary should capture both the high-level motivation and the key outcomes.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""

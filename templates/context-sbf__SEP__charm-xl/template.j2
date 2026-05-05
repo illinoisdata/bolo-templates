@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "context-sbf/charm-xl" %}
-{% set prompt = "summarize: In a few sentences, summarize the following article about sustainable energy transitions." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("context-sbf/charm-xl") %}
+{% set prompt = prompt | default("summarize: In a few sentences, summarize the following article about sustainable energy transitions.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

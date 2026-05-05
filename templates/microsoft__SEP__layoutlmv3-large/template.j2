@@ -1,7 +1,7 @@
-{% set repo_id = "microsoft/layoutlmv3-large" %}
-{% set device = "cuda:0" %}
-{% set doc_image_path = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
-{% set question = "What is the invoice number?" %}
+{% set repo_id = repo_id | default("microsoft/layoutlmv3-large") %}
+{% set device = device | default("cuda:0") %}
+{% set doc_image_path = doc_image_path | default("/u/yli77/projects/ML-code-generation/data/doc.jpeg") %}
+{% set question = question | default("What is the invoice number?") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 doc_image_path = "{{ doc_image_path }}"

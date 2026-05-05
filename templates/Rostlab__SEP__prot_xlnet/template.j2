@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Rostlab/prot_xlnet" %}
-{% set text_sequence = "MGDVEKGKKIFIMKCSQCHTVEKGGKHKTGPNLHGLFGRKTGQAPGYSYTAANKNKGIIWGEDTLMEYLENPKKYIPGTKMIFAGIKG" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Rostlab/prot_xlnet") %}
+{% set text_sequence = text_sequence | default("MGDVEKGKKIFIMKCSQCHTVEKGGKHKTGPNLHGLFGRKTGQAPGYSYTAANKNKGIIWGEDTLMEYLENPKKYIPGTKMIFAGIKG") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_sequence = "{{ text_sequence }}"

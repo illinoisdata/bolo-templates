@@ -1,7 +1,6 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-tc-big-ar-en" %}
-{% set device = "cuda:0" %}
-{% set src_text = ["اتبع قلبك فحسب.", "وين راهي دّوش؟"] %}
-
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-ar-en") %}
+{% set device = device | default("cuda:0") %}
+{% set src_text = src_text | default(["اتبع قلبك فحسب.", "وين راهي دّوش؟"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 src_text = {{ src_text }}

@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "microsoft/speecht5_tts" %}
-{% set text = "Hello, my dog is cooler than you!" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("microsoft/speecht5_tts") %}
+{% set text = text | default("Hello, my dog is cooler than you!") %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text = {{ text | tojson }}

@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "trituenhantaoio/bert-base-vietnamese-uncased" %}
-{% set input_text = "Xin chào! Đây là một đoạn văn bản mẫu để phân loại." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("trituenhantaoio/bert-base-vietnamese-uncased") %}
+{% set input_text = input_text | default("Xin chào! Đây là một đoạn văn bản mẫu để phân loại.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

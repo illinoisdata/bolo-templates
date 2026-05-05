@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "cnicu/t5-small-booksum" %}
-{% set input_text = "The latest chapter details the protagonist's journey across distant lands, weaving in themes of resilience and wonder." %}
-{% set prefix = "summarize: " %}
-{% set max_length = 200 %}
-{% set min_length = 30 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("cnicu/t5-small-booksum") %}
+{% set input_text = input_text | default("The latest chapter details the protagonist's journey across distant lands, weaving in themes of resilience and wonder.") %}
+{% set prefix = prefix | default("summarize: ") %}
+{% set max_length = max_length | default(200) %}
+{% set min_length = min_length | default(30) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

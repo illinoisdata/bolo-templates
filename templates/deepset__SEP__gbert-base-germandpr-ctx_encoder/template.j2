@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "deepset/gbert-base-germandpr-ctx_encoder" %}
-{% set passage_text = "Die deutsche Hauptstadt Berlin hat eine reiche Geschichte, insbesondere im Kontext der deutschen Wiedervereinigung." %}
-{% set max_length = 256 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("deepset/gbert-base-germandpr-ctx_encoder") %}
+{% set passage_text = passage_text | default("Die deutsche Hauptstadt Berlin hat eine reiche Geschichte, insbesondere im Kontext der deutschen Wiedervereinigung.") %}
+{% set max_length = max_length | default(256) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 passage_text = """{{ passage_text }}"""

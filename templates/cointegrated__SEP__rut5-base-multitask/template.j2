@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "cointegrated/rut5-base-multitask" %}
-{% set text = "translate ru-en | Каждый охотник желает знать, где сидит фазан." %}
-{% set num_beams = 5 %}
-{% set max_length = None %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("cointegrated/rut5-base-multitask") %}
+{% set text = text | default("translate ru-en | Каждый охотник желает знать, где сидит фазан.") %}
+{% set num_beams = num_beams | default(5) %}
+{% set max_length = max_length | default(None) %}
 repo_id = {{ repo_id|tojson }}
 device = {{ device|tojson }}
 text = {{ text|tojson }}

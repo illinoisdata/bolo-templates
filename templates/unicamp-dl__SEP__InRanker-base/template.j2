@@ -1,12 +1,12 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "unicamp-dl/InRanker-base" %}
-{% set query = "What is the best way to learn deep learning?" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("unicamp-dl/InRanker-base") %}
+{% set query = query | default("What is the best way to learn deep learning?") %}
 {% set docs = [
     "The capital of France is Paris",
     "Learn deep learning with InRanker and transformers"
 ] %}
-{% set generation_max_new_tokens = 16 %}
-{% set generation_num_beams = 4 %}
+{% set generation_max_new_tokens = generation_max_new_tokens | default(16) %}
+{% set generation_num_beams = generation_num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query = "{{ query }}"

@@ -1,12 +1,11 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "IlyaGusev/rubert_telegram_headlines" %}
-{% set article_text = "Это пример текста новости, на основе которого модель должна сгенерировать краткий заголовок." %}
-{% set max_input_length = 256 %}
-{% set max_output_length = 64 %}
-{% set num_beams = 10 %}
-{% set top_p = 0.95 %}
-{% set no_repeat_ngram_size = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("IlyaGusev/rubert_telegram_headlines") %}
+{% set article_text = article_text | default("Это пример текста новости, на основе которого модель должна сгенерировать краткий заголовок.") %}
+{% set max_input_length = max_input_length | default(256) %}
+{% set max_output_length = max_output_length | default(64) %}
+{% set num_beams = num_beams | default(10) %}
+{% set top_p = top_p | default(0.95) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 article_text = "{{ article_text }}"

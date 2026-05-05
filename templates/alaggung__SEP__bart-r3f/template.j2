@@ -1,9 +1,8 @@
-{% set repo_id = "alaggung/bart-r3f" %}
-{% set device = "cuda:0" %}
-{% set text = "[BOS]밥 ㄱ?[SEP]고고고고 뭐 먹을까?[SEP]어제 김치찌개 먹어서 한식말고 딴 거[SEP]그럼 돈까스 어때?[SEP]오 좋다 1시 학관 앞으로 오셈[SEP]ㅇㅋ[EOS]" %}
-{% set max_length = 64 %}
-{% set top_k = 5 %}
-
+{% set repo_id = repo_id | default("alaggung/bart-r3f") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("[BOS]밥 ㄱ?[SEP]고고고고 뭐 먹을까?[SEP]어제 김치찌개 먹어서 한식말고 딴 거[SEP]그럼 돈까스 어때?[SEP]오 좋다 1시 학관 앞으로 오셈[SEP]ㅇㅋ[EOS]") %}
+{% set max_length = max_length | default(64) %}
+{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

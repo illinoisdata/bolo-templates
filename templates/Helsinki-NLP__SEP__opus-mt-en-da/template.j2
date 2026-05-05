@@ -1,7 +1,6 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-en-da" %}
-{% set device = "cuda:0" %}
-{% set english_text = "The quick brown fox jumps over the lazy dog." %}
-
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-en-da") %}
+{% set device = device | default("cuda:0") %}
+{% set english_text = english_text | default("The quick brown fox jumps over the lazy dog.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 english_text = "{{ english_text }}"

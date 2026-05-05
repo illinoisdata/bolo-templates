@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "german-nlp-group/electra-base-german-uncased" %}
-{% set text_input = "Das ist ein Beispielsatz für die Inferenz mit dem Electra-Modell." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("german-nlp-group/electra-base-german-uncased") %}
+{% set text_input = text_input | default("Das ist ein Beispielsatz für die Inferenz mit dem Electra-Modell.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

@@ -1,5 +1,5 @@
-{% set repo_id = "airkingbd/dplm_3b" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("airkingbd/dplm_3b") %}
+{% set device = device | default("cuda:0") %}
 {% set input_sequence = input_sequence | default("MKTAYIAKQRQISFVKSHFSRQ") %}
 {% set max_new_tokens = max_new_tokens | default(64) %}
 {% set num_return_sequences = num_return_sequences | default(1) %}

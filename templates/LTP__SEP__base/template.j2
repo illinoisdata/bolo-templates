@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "LTP/base" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("LTP/base") %}
 import pkg_resources
 
 dist = pkg_resources.get_distribution("ltp")

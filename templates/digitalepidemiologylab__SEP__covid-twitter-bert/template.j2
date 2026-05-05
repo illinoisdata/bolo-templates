@@ -1,7 +1,6 @@
-{% set repo_id = "digitalepidemiologylab/covid-twitter-bert" %}
-{% set device = "cuda:0" %}
-{% set text_input = "Assess how Twitter discussions around COVID-19 vaccines evolve over time." %}
-
+{% set repo_id = repo_id | default("digitalepidemiologylab/covid-twitter-bert") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("Assess how Twitter discussions around COVID-19 vaccines evolve over time.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

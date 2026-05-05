@@ -1,10 +1,9 @@
-{% set repo_id = "google/pegasus-multi_news" %}
-{% set device = "cuda:0" %}
-{% set document = "Google's Pegasus model is designed for abstractive summarization. This example document explains how to use the model for multi-document summarization. It can condense long inputs into concise summaries while preserving the main ideas." %}
-{% set summary_min_length = 60 %}
-{% set summary_max_length = 200 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("google/pegasus-multi_news") %}
+{% set device = device | default("cuda:0") %}
+{% set document = document | default("Google's Pegasus model is designed for abstractive summarization. This example document explains how to use the model for multi-document summarization. It can condense long inputs into concise summaries while preserving the main ideas.") %}
+{% set summary_min_length = summary_min_length | default(60) %}
+{% set summary_max_length = summary_max_length | default(200) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 document = """{{ document }}"""

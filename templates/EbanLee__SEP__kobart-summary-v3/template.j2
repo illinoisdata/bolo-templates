@@ -1,5 +1,5 @@
-{% set repo_id = "EbanLee/kobart-summary-v3" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("EbanLee/kobart-summary-v3") %}
+{% set device = device | default("cuda:0") %}
 {% set input_text %}
 10년 논란 끝에 밑글씨까지 새기고 제작 완료를 눈앞에 둔 ‘광화문 현판’을 원점에서 재검토해 한글 현판으로 교체하자는 주장이 문화계 명사들이 포함된 자칭 ‘시민모임’에서 나왔다.
 이들은 문화재청이 지난해 8월 최종 확정한 복원안이 시민 의견과 시대정신을 반영한 것이 아니라면서 오는 한글날까지 대대적인 현판 교체 시민운동을 벌이겠다고 예고했다.

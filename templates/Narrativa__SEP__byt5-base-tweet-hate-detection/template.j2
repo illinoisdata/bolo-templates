@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Narrativa/byt5-base-tweet-hate-detection" %}
-{% set tweet = "@user black lives really matter?" %}
-{% set max_length = 512 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Narrativa/byt5-base-tweet-hate-detection") %}
+{% set tweet = tweet | default("@user black lives really matter?") %}
+{% set max_length = max_length | default(512) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 tweet = "{{ tweet }}"

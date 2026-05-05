@@ -1,5 +1,5 @@
-{% set repo_id = "monologg/koelectra-base-v3-discriminator" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("monologg/koelectra-base-v3-discriminator") %}
+{% set device = device | default("cuda:0") %}
 {% set text = text | default("나는 내일 밥을 먹었다.") %}
 
 repo_id = "{{ repo_id }}"

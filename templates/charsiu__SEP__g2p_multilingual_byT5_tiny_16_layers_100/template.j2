@@ -1,7 +1,6 @@
-{% set repo_id = "charsiu/g2p_multilingual_byT5_tiny_16_layers_100" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Convert this text to grapheme-to-phoneme output" %}
-
+{% set repo_id = repo_id | default("charsiu/g2p_multilingual_byT5_tiny_16_layers_100") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Convert this text to grapheme-to-phoneme output") %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 input_text = {{ input_text | tojson }}

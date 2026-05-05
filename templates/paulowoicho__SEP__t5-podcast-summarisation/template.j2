@@ -1,9 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "paulowoicho/t5-podcast-summarisation" %}
-{% set input_text = "The podcast transcript explores lessons learned from a recent engineering expedition, highlighting teamwork, unexpected challenges, and how every member contributed to solving complex problems. This summary should capture the most actionable insights." %}
-{% set min_length = 30 %}
-{% set max_length = 200 %}
-{% set task_prefix = "summarize: " %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("paulowoicho/t5-podcast-summarisation") %}
+{% set input_text = input_text | default("The podcast transcript explores lessons learned from a recent engineering expedition, highlighting teamwork, unexpected challenges, and how every member contributed to solving complex problems. This summary should capture the most actionable insights.") %}
+{% set min_length = min_length | default(30) %}
+{% set max_length = max_length | default(200) %}
+{% set task_prefix = task_prefix | default("summarize: ") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

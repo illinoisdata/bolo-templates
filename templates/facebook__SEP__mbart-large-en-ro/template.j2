@@ -1,8 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/mbart-large-en-ro" %}
-{% set source_lang = "en_XX" %}
-{% set target_lang = "ro_RO" %}
-{% set src_text = "This is a sample English sentence to translate into Romanian." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/mbart-large-en-ro") %}
+{% set source_lang = source_lang | default("en_XX") %}
+{% set target_lang = target_lang | default("ro_RO") %}
+{% set src_text = src_text | default("This is a sample English sentence to translate into Romanian.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_lang = "{{ source_lang }}"

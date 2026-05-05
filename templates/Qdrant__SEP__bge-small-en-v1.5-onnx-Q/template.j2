@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Qdrant/bge-small-en-v1.5-onnx-Q" %}
-{% set texts = ["The quick brown fox jumps over the lazy dog.", "A short sentence for embedding."] %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Qdrant/bge-small-en-v1.5-onnx-Q") %}
+{% set texts = texts | default(["The quick brown fox jumps over the lazy dog.", "A short sentence for embedding."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 texts = {{ texts }}

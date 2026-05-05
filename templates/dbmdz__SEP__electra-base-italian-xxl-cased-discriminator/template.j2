@@ -1,6 +1,6 @@
-{% set repo_id = "dbmdz/electra-base-italian-xxl-cased-discriminator" %}
-{% set device = "cuda:0" %}
-{% set input_text = "L'Italia è famosa per la sua arte e cultura." %}
+{% set repo_id = repo_id | default("dbmdz/electra-base-italian-xxl-cased-discriminator") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("L'Italia è famosa per la sua arte e cultura.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

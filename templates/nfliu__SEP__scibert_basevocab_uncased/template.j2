@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "nfliu/scibert_basevocab_uncased" %}
-{% set text = 'Hello, world!' %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("nfliu/scibert_basevocab_uncased") %}
+{% set text = text | default('Hello, world!') %}
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
 text = '{{ text }}'

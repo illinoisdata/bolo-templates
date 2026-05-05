@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "vblagoje/dpr-ctx_encoder-single-lfqa-wiki" %}
-{% set query = "Where an aircraft passes through a cloud, it can disperse the cloud in its path..." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("vblagoje/dpr-ctx_encoder-single-lfqa-wiki") %}
+{% set query = query | default("Where an aircraft passes through a cloud, it can disperse the cloud in its path...") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query = """{{ query }}"""

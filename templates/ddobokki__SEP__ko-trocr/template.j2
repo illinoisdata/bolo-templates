@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ddobokki/ko-trocr" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ddobokki/ko-trocr") %}
 {% set image_path = image_path | default('/u/yli77/projects/ML-code-generation/data/image1.jpeg') %}
 
 repo_id = "{{ repo_id }}"

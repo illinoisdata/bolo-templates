@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "circulus/canvers-en2ko-v1" %}
-{% set src_text = "This is a test sentence for English to Korean translation." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("circulus/canvers-en2ko-v1") %}
+{% set src_text = src_text | default("This is a test sentence for English to Korean translation.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 src_text = "{{ src_text }}"

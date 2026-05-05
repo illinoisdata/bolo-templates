@@ -1,9 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "microsoft/git-base-textcaps" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set prompt = "A photo of a cat." %}
-{% set max_new_tokens = 50 %}
-{% set num_beams = 3 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("microsoft/git-base-textcaps") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set prompt = prompt | default("A photo of a cat.") %}
+{% set max_new_tokens = max_new_tokens | default(50) %}
+{% set num_beams = num_beams | default(3) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

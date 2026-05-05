@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-de-it" %}
-{% set src_text = "Ein einfacher deutscher Beispielsatz." %}
-{% set num_beams = 4 %}
-{% set max_length = 512 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-de-it") %}
+{% set src_text = src_text | default("Ein einfacher deutscher Beispielsatz.") %}
+{% set num_beams = num_beams | default(4) %}
+{% set max_length = max_length | default(512) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 src_text = "{{ src_text }}"

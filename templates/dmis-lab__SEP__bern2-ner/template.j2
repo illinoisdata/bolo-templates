@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "dmis-lab/bern2-ner" %}
-{% set input_text = "The patient was diagnosed with acute myeloid leukemia and started targeted therapy." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("dmis-lab/bern2-ner") %}
+{% set input_text = input_text | default("The patient was diagnosed with acute myeloid leukemia and started targeted therapy.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

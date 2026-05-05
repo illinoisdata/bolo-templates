@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/mms-tts-nld" %}
-{% set text_input = "Deze tekst dient als voorbeeld voor Nederlandse tekst naar spraak." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/mms-tts-nld") %}
+{% set text_input = text_input | default("Deze tekst dient als voorbeeld voor Nederlandse tekst naar spraak.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

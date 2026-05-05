@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/mbart-large-50-many-to-one-mmt" %}
-{% set source_sentence = "संयुक्त राष्ट्र के प्रमुख का कहना है कि सीरिया में कोई सैन्य समाधान नहीं है" %}
-{% set source_lang = "hi_IN" %}
-{% set target_lang = "en_XX" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/mbart-large-50-many-to-one-mmt") %}
+{% set source_sentence = source_sentence | default("संयुक्त राष्ट्र के प्रमुख का कहना है कि सीरिया में कोई सैन्य समाधान नहीं है") %}
+{% set source_lang = source_lang | default("hi_IN") %}
+{% set target_lang = target_lang | default("en_XX") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_sentence = """{{ source_sentence }}"""

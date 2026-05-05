@@ -1,9 +1,8 @@
-{% set repo_id = "charsiu/g2p_multilingual_byT5_small_100" %}
-{% set device = "cuda:0" %}
-{% set text_input = "Sample text for grapheme to phoneme conversion." %}
-{% set max_length = 64 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("charsiu/g2p_multilingual_byT5_small_100") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("Sample text for grapheme to phoneme conversion.") %}
+{% set max_length = max_length | default(64) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""

@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Cohere/Cohere-embed-multilingual-v3.0" %}
-{% set texts = ["The capital of France is Paris", "PyTorch is a flexible deep learning framework", "Multilingual embeddings unlock powerful search"] %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Cohere/Cohere-embed-multilingual-v3.0") %}
+{% set texts = texts | default(["The capital of France is Paris", "PyTorch is a flexible deep learning framework", "Multilingual embeddings unlock powerful search"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 texts = {{ texts | tojson }}

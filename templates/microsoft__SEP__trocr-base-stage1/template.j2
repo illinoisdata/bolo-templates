@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "microsoft/trocr-base-stage1" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("microsoft/trocr-base-stage1") %}
 repo_id = "{{ repo_id }}"
 
 import torch

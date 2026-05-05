@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "microsoft/kosmos-2-patch14-224" %}
-{% set prompt = '<grounding> An image of' %}
-{% set image = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
-{% set use_cache = True %}
-{% set max_new_tokens = 128 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("microsoft/kosmos-2-patch14-224") %}
+{% set prompt = prompt | default('<grounding> An image of') %}
+{% set image = image | default('/u/yli77/projects/ML-code-generation/data/image1.jpeg') %}
+{% set use_cache = use_cache | default(True) %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
 prompt = '{{ prompt }}'

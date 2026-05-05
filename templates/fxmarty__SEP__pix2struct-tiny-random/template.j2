@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "fxmarty/pix2struct-tiny-random" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set max_new_tokens = 64 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("fxmarty/pix2struct-tiny-random") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

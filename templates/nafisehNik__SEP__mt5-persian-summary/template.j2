@@ -1,13 +1,12 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "nafisehNik/mt5-persian-summary" %}
-{% set input_text = "این یک متن نمونه برای خلاصه سازی اخبار فارسی است." %}
-{% set num_beams = 2 %}
-{% set max_output_length = 120 %}
-{% set max_input_length = 1024 %}
-{% set length_penalty = 2.0 %}
-{% set repetition_penalty = 1.0 %}
-{% set early_stopping = True %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("nafisehNik/mt5-persian-summary") %}
+{% set input_text = input_text | default("این یک متن نمونه برای خلاصه سازی اخبار فارسی است.") %}
+{% set num_beams = num_beams | default(2) %}
+{% set max_output_length = max_output_length | default(120) %}
+{% set max_input_length = max_input_length | default(1024) %}
+{% set length_penalty = length_penalty | default(2.0) %}
+{% set repetition_penalty = repetition_penalty | default(1.0) %}
+{% set early_stopping = early_stopping | default(True) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

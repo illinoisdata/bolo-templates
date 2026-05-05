@@ -1,7 +1,6 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-en-gl" %}
-{% set device = "cuda:0" %}
-{% set text_inputs = text_inputs if text_inputs is defined else ["The weather is nice today."] %}
-
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-en-gl") %}
+{% set device = device | default("cuda:0") %}
+{% set text_inputs = text_inputs | default(text_inputs if text_inputs is defined else ["The weather is nice today."]) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_inputs = {{ text_inputs | tojson }}

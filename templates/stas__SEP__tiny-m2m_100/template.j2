@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "stas/tiny-m2m_100" %}
-{% set input_text = "Hello, world!" %}
-{% set source_lang = "en" %}
-{% set target_lang = "fr" %}
-{% set max_new_tokens = 50 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("stas/tiny-m2m_100") %}
+{% set input_text = input_text | default("Hello, world!") %}
+{% set source_lang = source_lang | default("en") %}
+{% set target_lang = target_lang | default("fr") %}
+{% set max_new_tokens = max_new_tokens | default(50) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 input_text = {{ input_text | tojson }}

@@ -1,8 +1,7 @@
-{% set repo_id = "Qdrant/multilingual-e5-large-onnx" %}
-{% set device = "cuda:0" %}
-{% set sentence1 = "This is a test sentence." %}
-{% set sentence2 = "This is another test sentence." %}
-
+{% set repo_id = repo_id | default("Qdrant/multilingual-e5-large-onnx") %}
+{% set device = device | default("cuda:0") %}
+{% set sentence1 = sentence1 | default("This is a test sentence.") %}
+{% set sentence2 = sentence2 | default("This is another test sentence.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentence1 = "{{ sentence1 }}"

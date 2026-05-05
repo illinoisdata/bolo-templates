@@ -1,7 +1,6 @@
-{% set repo_id = "MarcoMancini/low-law-emb" %}
-{% set device = "cuda:0" %}
-{% set sentences = ["This is an example sentence for embedding.", "Each sentence is converted into a dense vector representation."] %}
-
+{% set repo_id = repo_id | default("MarcoMancini/low-law-emb") %}
+{% set device = device | default("cuda:0") %}
+{% set sentences = sentences | default(["This is an example sentence for embedding.", "Each sentence is converted into a dense vector representation."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences | tojson }}

@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-tc-big-tr-en" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-tr-en") %}
 {% set turkish_sentences = [
     "Allahsızlığı Yayma Kürsüsü başkanıydı.",
     "Tom'a ne olduğunu öğrenin."

@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "KETI-AIR/ke-t5-small" %}
-{% set input_text = "아버지가 방에 들어가신다.</s>" %}
-{% set max_length = 50 %}
-{% set num_beams = 5 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("KETI-AIR/ke-t5-small") %}
+{% set input_text = input_text | default("아버지가 방에 들어가신다.</s>") %}
+{% set max_length = max_length | default(50) %}
+{% set num_beams = num_beams | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

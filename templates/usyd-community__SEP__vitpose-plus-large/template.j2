@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "usyd-community/vitpose-plus-large" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("usyd-community/vitpose-plus-large") %}
 repo_id = "{{ repo_id }}"
 import inspect
 from transformers import image_utils

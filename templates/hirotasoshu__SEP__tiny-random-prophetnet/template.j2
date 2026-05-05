@@ -1,8 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "hirotasoshu/tiny-random-prophetnet" %}
-{% set input_text = "The quick brown fox jumps over the lazy dog." %}
-{% set max_new_tokens = 32 %}
-{% set num_return_sequences = 1 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("hirotasoshu/tiny-random-prophetnet") %}
+{% set input_text = input_text | default("The quick brown fox jumps over the lazy dog.") %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

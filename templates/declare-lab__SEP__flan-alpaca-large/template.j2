@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "declare-lab/flan-alpaca-large" %}
-{% set prompt = "Write an email about an alpaca that likes flan" %}
-{% set max_new_tokens = 128 %}
-{% set do_sample = true %}
-{% set temperature = 0.7 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("declare-lab/flan-alpaca-large") %}
+{% set prompt = prompt | default("Write an email about an alpaca that likes flan") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set do_sample = do_sample | default(true) %}
+{% set temperature = temperature | default(0.7) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

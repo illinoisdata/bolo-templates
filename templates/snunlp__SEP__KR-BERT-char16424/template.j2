@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "snunlp/KR-BERT-char16424" %}
-{% set input_text = "한국어 BERT 모델을 테스트합니다." %}
-{% set max_length = 128 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("snunlp/KR-BERT-char16424") %}
+{% set input_text = input_text | default("한국어 BERT 모델을 테스트합니다.") %}
+{% set max_length = max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

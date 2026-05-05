@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/mms-tts-vie" %}
-{% set text_input = "Xin chào! Đây là một ví dụ tạo giọng nói tiếng Việt." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/mms-tts-vie") %}
+{% set text_input = text_input | default("Xin chào! Đây là một ví dụ tạo giọng nói tiếng Việt.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

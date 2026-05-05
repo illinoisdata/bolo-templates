@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-tc-big-fi-en" %}
-{% set input_text = ["Kolme kolmanteen on kaksikymmentäseitsemän.", "Heille syntyi poikavauva."] %}
-{% set num_beams = 6 %}
-{% set max_length = 256 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-fi-en") %}
+{% set input_text = input_text | default(["Kolme kolmanteen on kaksikymmentäseitsemän.", "Heille syntyi poikavauva."]) %}
+{% set num_beams = num_beams | default(6) %}
+{% set max_length = max_length | default(256) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = {{ input_text | tojson }}

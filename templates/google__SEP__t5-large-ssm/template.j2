@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/t5-large-ssm" %}
-{% set prompt = "question: What is the capital of France?" %}
-{% set max_new_tokens = 64 %}
-{% set output_filename = "answer.txt" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/t5-large-ssm") %}
+{% set prompt = prompt | default("question: What is the capital of France?") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set output_filename = output_filename | default("answer.txt") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

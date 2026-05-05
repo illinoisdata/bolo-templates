@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "mesolitica/translation-t5-small-standard-bahasa-cased-v2" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("mesolitica/translation-t5-small-standard-bahasa-cased-v2") %}
 {% set text_input = text_input | default('Hai, ada yang bisa saya bantu?') %}
 {% set prompt_prefix = prompt_prefix | default('terjemah ke Melayu: ') %}
 {% set max_length = max_length | default(100) %}

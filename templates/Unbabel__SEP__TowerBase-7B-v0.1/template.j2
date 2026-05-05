@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Unbabel/TowerBase-7B-v0.1" %}
-{% set text_prompt = "English: My name is TowerBase.\nPortuguese:" %}
-{% set max_new_tokens = 64 %}
-{% set temperature = 0.2 %}
-{% set top_p = 0.95 %}
-{% set result_file_name = "generated_text.txt" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Unbabel/TowerBase-7B-v0.1") %}
+{% set text_prompt = text_prompt | default("English: My name is TowerBase.\nPortuguese:") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set temperature = temperature | default(0.2) %}
+{% set top_p = top_p | default(0.95) %}
+{% set result_file_name = result_file_name | default("generated_text.txt") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_prompt = """{{ text_prompt }}"""

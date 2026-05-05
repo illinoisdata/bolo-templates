@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "bionlp/bluebert_pubmed_mimic_uncased_L-24_H-1024_A-16" %}
-{% set text_inputs = ["The patient has a history of asthma and is currently stable."] %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("bionlp/bluebert_pubmed_mimic_uncased_L-24_H-1024_A-16") %}
+{% set text_inputs = text_inputs | default(["The patient has a history of asthma and is currently stable."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_inputs = {{ text_inputs | tojson }}

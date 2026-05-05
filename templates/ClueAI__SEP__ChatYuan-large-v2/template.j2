@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ClueAI/ChatYuan-large-v2" %}
-{% set text = "你好" %}
-{% set max_length = 250 %}
-{% set temperature = 0.7 %}
-{% set top_p = 1 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ClueAI/ChatYuan-large-v2") %}
+{% set text = text | default("你好") %}
+{% set max_length = max_length | default(250) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

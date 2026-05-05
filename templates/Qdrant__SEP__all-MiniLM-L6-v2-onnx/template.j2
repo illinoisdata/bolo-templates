@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Qdrant/all-MiniLM-L6-v2-onnx" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Qdrant/all-MiniLM-L6-v2-onnx") %}
 repo_id = "unused"
 import importlib
 modules = [

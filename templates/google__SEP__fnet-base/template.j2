@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/fnet-base" %}
-{% set fill_mask_text = "Hello I'm a [MASK] model." %}
-{% set top_k = 5 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/fnet-base") %}
+{% set fill_mask_text = fill_mask_text | default("Hello I'm a [MASK] model.") %}
+{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 fill_mask_text = "{{ fill_mask_text }}"

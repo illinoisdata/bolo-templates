@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ZhangCheng/T5-Base-finetuned-for-Question-Generation" %}
-{% set answer = "ZhangCheng" %}
-{% set context = "ZhangCheng fine-tuned T5 on SQuAD dataset for question generation." %}
-{% set max_length = 64 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ZhangCheng/T5-Base-finetuned-for-Question-Generation") %}
+{% set answer = answer | default("ZhangCheng") %}
+{% set context = context | default("ZhangCheng fine-tuned T5 on SQuAD dataset for question generation.") %}
+{% set max_length = max_length | default(64) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 answer = """{{ answer }}"""

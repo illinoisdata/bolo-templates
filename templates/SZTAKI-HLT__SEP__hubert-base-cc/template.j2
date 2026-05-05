@@ -1,7 +1,6 @@
-{% set repo_id = "SZTAKI-HLT/hubert-base-cc" %}
-{% set device = "cuda:0" %}
-{% set text_input = "Ez egy példamondat a modellhez." %}
-
+{% set repo_id = repo_id | default("SZTAKI-HLT/hubert-base-cc") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("Ez egy példamondat a modellhez.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

@@ -1,7 +1,6 @@
-{% set repo_id = "hfl/chinese-electra-180g-small-ex-discriminator" %}
-{% set device = "cuda:0" %}
-{% set text = "这是一个示例句子，用于测试模型的推理。" %}
-
+{% set repo_id = repo_id | default("hfl/chinese-electra-180g-small-ex-discriminator") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("这是一个示例句子，用于测试模型的推理。") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

@@ -1,8 +1,7 @@
-{% set question = "What is 42?" %}
-{% set context = "42 is the answer to life, the universe and everything" %}
-{% set repo_id = "MaRiOrOsSi/t5-base-finetuned-question-answering" %}
-{% set device = "cuda:0" %}
-
+{% set question = question | default("What is 42?") %}
+{% set context = context | default("42 is the answer to life, the universe and everything") %}
+{% set repo_id = repo_id | default("MaRiOrOsSi/t5-base-finetuned-question-answering") %}
+{% set device = device | default("cuda:0") %}
 question = "{{ question }}"
 context = "{{ context }}"
 repo_id = "{{ repo_id }}"

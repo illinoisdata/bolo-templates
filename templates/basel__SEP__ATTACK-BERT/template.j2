@@ -1,7 +1,6 @@
-{% set repo_id = "basel/ATTACK-BERT" %}
-{% set device = "cuda:0" %}
-{% set sentences = ["Attacker takes a screenshot", "Attacker captures the screen"] %}
-
+{% set repo_id = repo_id | default("basel/ATTACK-BERT") %}
+{% set device = device | default("cuda:0") %}
+{% set sentences = sentences | default(["Attacker takes a screenshot", "Attacker captures the screen"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences | tojson }}

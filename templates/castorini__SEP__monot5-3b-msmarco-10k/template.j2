@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "castorini/monot5-3b-msmarco-10k" %}
-{% set query = "What does MonoT5 use for passage reranking?" %}
-{% set passage = "MonoT5 is a reranker built on T5 trained on MS MARCO for high-quality passage ranking." %}
-{% set max_new_tokens = 16 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("castorini/monot5-3b-msmarco-10k") %}
+{% set query = query | default("What does MonoT5 use for passage reranking?") %}
+{% set passage = passage | default("MonoT5 is a reranker built on T5 trained on MS MARCO for high-quality passage ranking.") %}
+{% set max_new_tokens = max_new_tokens | default(16) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query = """{{ query }}"""

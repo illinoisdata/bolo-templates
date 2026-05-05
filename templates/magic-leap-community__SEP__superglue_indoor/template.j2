@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "magic-leap-community/superglue_indoor" %}
-{% set image1_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set image2_path = "/u/yli77/projects/ML-code-generation/data/image2.jpeg" %}
-{% set matching_threshold = 0.2 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("magic-leap-community/superglue_indoor") %}
+{% set image1_path = image1_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set image2_path = image2_path | default("/u/yli77/projects/ML-code-generation/data/image2.jpeg") %}
+{% set matching_threshold = matching_threshold | default(0.2) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image1_path = "{{ image1_path }}"

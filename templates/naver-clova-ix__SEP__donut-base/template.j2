@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "naver-clova-ix/donut-base" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("naver-clova-ix/donut-base") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/doc.jpeg") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

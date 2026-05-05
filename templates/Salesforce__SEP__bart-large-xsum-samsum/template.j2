@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Salesforce/bart-large-xsum-samsum" %}
-{% set input_text = "Salesforce research summary: The Salesforce paper release includes a new abstractive summarization training corpus and method described for research purposes." %}
-{% set max_length = 128 %}
-{% set num_beams = 6 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Salesforce/bart-large-xsum-samsum") %}
+{% set input_text = input_text | default("Salesforce research summary: The Salesforce paper release includes a new abstractive summarization training corpus and method described for research purposes.") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(6) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

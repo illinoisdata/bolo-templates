@@ -1,6 +1,6 @@
-{% set repo_id = "cointegrated/SONAR_200_text_encoder" %}
-{% set device = "cuda:0" %}
-{% set input_texts = ["This is a test sentence.", "Multilingual sentence embedding example."] %}
+{% set repo_id = repo_id | default("cointegrated/SONAR_200_text_encoder") %}
+{% set device = device | default("cuda:0") %}
+{% set input_texts = input_texts | default(["This is a test sentence.", "Multilingual sentence embedding example."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_texts = {{ input_texts }}

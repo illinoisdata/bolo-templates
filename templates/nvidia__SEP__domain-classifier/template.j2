@@ -1,7 +1,6 @@
-{% set repo_id = "nvidia/domain-classifier" %}
-{% set device = "cuda:0" %}
-{% set text_samples = ["Sports is a popular domain", "Politics is a popular domain"] %}
-
+{% set repo_id = repo_id | default("nvidia/domain-classifier") %}
+{% set device = device | default("cuda:0") %}
+{% set text_samples = text_samples | default(["Sports is a popular domain", "Politics is a popular domain"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_samples = {{ text_samples | tojson }}

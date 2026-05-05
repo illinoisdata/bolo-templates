@@ -1,9 +1,8 @@
-{% set repo_id = "persiannlp/mt5-large-parsinlu-translation_en_fa" %}
-{% set device = "cuda:0" %}
-{% set input_string = "Praise be to Allah, the Cherisher and Sustainer of the worlds;" %}
-{% set max_length = 100 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("persiannlp/mt5-large-parsinlu-translation_en_fa") %}
+{% set device = device | default("cuda:0") %}
+{% set input_string = input_string | default("Praise be to Allah, the Cherisher and Sustainer of the worlds;") %}
+{% set max_length = max_length | default(100) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_string = "{{ input_string }}"

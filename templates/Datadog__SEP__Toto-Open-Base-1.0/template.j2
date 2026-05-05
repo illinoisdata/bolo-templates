@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Datadog/Toto-Open-Base-1.0" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Datadog/Toto-Open-Base-1.0") %}
 repo_id = "{{ repo_id }}"
 
 from huggingface_hub import hf_hub_download

@@ -1,2 +1,2 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "microsoft/layoutlmv3-base-chinese" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("microsoft/layoutlmv3-base-chinese") %}

@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "rhasspy/faster-whisper-medium-int8" %}
-{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set language = "en" %}
-{% set beam_size = 5 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("rhasspy/faster-whisper-medium-int8") %}
+{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
+{% set language = language | default("en") %}
+{% set beam_size = beam_size | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"

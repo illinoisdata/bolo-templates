@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Kirili4ik/mbart_ruDialogSum" %}
-{% set input_text = "Джефф: Могу ли я обучить модель 🤗 Transformers на Amazon SageMaker?\n\nФилипп: Конечно, вы можете использовать новый контейнер для глубокого обучения HuggingFace.\n\nДжефф: Хорошо.\n\nДжефф: и как я могу начать?\n\nДжефф: где я могу найти документацию?\n\nФилипп: ок, ок, здесь можно найти все: https://huggingface.co/blog/the-partnership-amazon-sagemaker-and-hugging-face" %}
-{% set summary_max_length = 600 %}
-{% set num_beams = 5 %}
-{% set no_repeat_ngram_size = 3 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Kirili4ik/mbart_ruDialogSum") %}
+{% set input_text = input_text | default("Джефф: Могу ли я обучить модель 🤗 Transformers на Amazon SageMaker?\n\nФилипп: Конечно, вы можете использовать новый контейнер для глубокого обучения HuggingFace.\n\nДжефф: Хорошо.\n\nДжефф: и как я могу начать?\n\nДжефф: где я могу найти документацию?\n\nФилипп: ок, ок, здесь можно найти все: https://huggingface.co/blog/the-partnership-amazon-sagemaker-and-hugging-face") %}
+{% set summary_max_length = summary_max_length | default(600) %}
+{% set num_beams = num_beams | default(5) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

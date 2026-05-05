@@ -1,7 +1,6 @@
-{% set repo_id = "google/t5-v1_1-base" %}
-{% set device = "cuda:0" %}
-{% set text_prompt = "summarize: The quick brown fox jumps over the lazy dog." %}
-
+{% set repo_id = repo_id | default("google/t5-v1_1-base") %}
+{% set device = device | default("cuda:0") %}
+{% set text_prompt = text_prompt | default("summarize: The quick brown fox jumps over the lazy dog.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_prompt = "{{ text_prompt }}"

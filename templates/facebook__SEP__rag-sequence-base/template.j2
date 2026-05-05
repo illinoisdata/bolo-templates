@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/rag-sequence-base" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/rag-sequence-base") %}
 repo_id = "{{ repo_id }}"
 
 import json

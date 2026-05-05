@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "VoVanPhuc/sup-SimCSE-VietNamese-phobert-base" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("VoVanPhuc/sup-SimCSE-VietNamese-phobert-base") %}
 {% set sentences = [
   "Kẻ đánh bom đinh tồi tệ nhất nước Anh.",
   "Nghệ sĩ làm thiện nguyện phải minh bạch.",

@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "setu4993/smaller-LaBSE" %}
-{% set sentences_anchor = ["dog", "Puppies are nice.", "I enjoy taking long walks along the beach with my dog."] %}
-{% set sentences_target = ["cane", "I cuccioli sono carini.", "Mi piace fare lunghe passeggiate lungo la spiaggia con il mio cane."] %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("setu4993/smaller-LaBSE") %}
+{% set sentences_anchor = sentences_anchor | default(["dog", "Puppies are nice.", "I enjoy taking long walks along the beach with my dog."]) %}
+{% set sentences_target = sentences_target | default(["cane", "I cuccioli sono carini.", "Mi piace fare lunghe passeggiate lungo la spiaggia con il mio cane."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences_anchor = {{ sentences_anchor }}

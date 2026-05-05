@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Qdrant/all_miniLM_L6_v2_with_attentions" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Qdrant/all_miniLM_L6_v2_with_attentions") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 

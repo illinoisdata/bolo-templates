@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "huawei-noah/TinyBERT_4L_zh" %}
-{% set text_input = "今天天气[MASK]" %}
-{% set top_k = 5 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("huawei-noah/TinyBERT_4L_zh") %}
+{% set text_input = text_input | default("今天天气[MASK]") %}
+{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

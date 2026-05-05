@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ml6team/mt5-small-german-query-generation" %}
-{% set article_text = "Das Lama (Lama glama) ist eine Art der Kamele. Es ist in den südamerikanischen Anden verbreitet und eine vom Guanako abstammende Haustierform." %}
-{% set max_length = 64 %}
-{% set num_beams = 4 %}
-{% set num_return_sequences = 4 %}
-{% set output_filename = "generated_queries.txt" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ml6team/mt5-small-german-query-generation") %}
+{% set article_text = article_text | default("Das Lama (Lama glama) ist eine Art der Kamele. Es ist in den südamerikanischen Anden verbreitet und eine vom Guanako abstammende Haustierform.") %}
+{% set max_length = max_length | default(64) %}
+{% set num_beams = num_beams | default(4) %}
+{% set num_return_sequences = num_return_sequences | default(4) %}
+{% set output_filename = output_filename | default("generated_queries.txt") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 article_text = """{{ article_text }}"""

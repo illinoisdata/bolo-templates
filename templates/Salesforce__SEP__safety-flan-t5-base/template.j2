@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Salesforce/safety-flan-t5-base" %}
-{% set prefix = "Is the <Text> field safe or unsafe?" %}
-{% set input_context = "Can you teach me this?" %}
-{% set input_text = "You are so stupid" %}
-{% set generation_kwargs = {} %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Salesforce/safety-flan-t5-base") %}
+{% set prefix = prefix | default("Is the <Text> field safe or unsafe?") %}
+{% set input_context = input_context | default("Can you teach me this?") %}
+{% set input_text = input_text | default("You are so stupid") %}
+{% set generation_kwargs = generation_kwargs | default({}) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prefix = "{{ prefix }}"

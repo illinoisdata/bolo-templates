@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "abhigoyal/vllm-medusa-llama-68m-random" %}
-{% set check_name = "medusa" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("abhigoyal/vllm-medusa-llama-68m-random") %}
+{% set check_name = check_name | default("medusa") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 check_name = "{{ check_name }}"

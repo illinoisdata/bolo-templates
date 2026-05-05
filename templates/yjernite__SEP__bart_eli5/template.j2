@@ -1,7 +1,6 @@
-{% set repo_id = "yjernite/bart_eli5" %}
-{% set device = "cuda:0" %}
-{% set question = "Why is the sky blue?" %}
-
+{% set repo_id = repo_id | default("yjernite/bart_eli5") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default("Why is the sky blue?") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 question = "{{ question }}"

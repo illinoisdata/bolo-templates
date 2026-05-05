@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "akreal/tiny-random-t5" %}
-{% set input_text = "Hello, my dog is cute" %}
-{% set max_length = 20 %}
-{% set num_beams = 1 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("akreal/tiny-random-t5") %}
+{% set input_text = input_text | default("Hello, my dog is cute") %}
+{% set max_length = max_length | default(20) %}
+{% set num_beams = num_beams | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

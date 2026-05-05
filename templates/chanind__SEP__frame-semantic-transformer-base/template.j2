@@ -1,8 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "chanind/frame-semantic-transformer-base" %}
-{% set text_to_parse = "The agent quickly filled out the application." %}
-{% set max_new_tokens = 128 %}
-{% set num_beams = 4 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("chanind/frame-semantic-transformer-base") %}
+{% set text_to_parse = text_to_parse | default("The agent quickly filled out the application.") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_to_parse = "{{ text_to_parse }}"

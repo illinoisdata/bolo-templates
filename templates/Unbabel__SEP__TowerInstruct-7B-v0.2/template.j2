@@ -1,9 +1,8 @@
-{% set repo_id = "Unbabel/TowerInstruct-7B-v0.2" %}
-{% set device = "cuda:0" %}
-{% set messages = [{"role": "user", "content": "Translate the following text from Portuguese into English.\nPortuguese: Um grupo de investigadores lançou um novo modelo para tarefas relacionadas com tradução.\nEnglish:"}] %}
-{% set max_new_tokens = 256 %}
-{% set do_sample = False %}
-
+{% set repo_id = repo_id | default("Unbabel/TowerInstruct-7B-v0.2") %}
+{% set device = device | default("cuda:0") %}
+{% set messages = messages | default([{"role": "user", "content": "Translate the following text from Portuguese into English.\nPortuguese: Um grupo de investigadores lançou um novo modelo para tarefas relacionadas com tradução.\nEnglish:"}]) %}
+{% set max_new_tokens = max_new_tokens | default(256) %}
+{% set do_sample = do_sample | default(False) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 messages = {{ messages }}

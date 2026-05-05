@@ -1,6 +1,6 @@
-{% set repo_id = "monologg/koelectra-small-v2-discriminator" %}
-{% set device = "cuda:0" %}
-{% set input_text = "안녕하세요! 이것은 테스트 입력입니다." %}
+{% set repo_id = repo_id | default("monologg/koelectra-small-v2-discriminator") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("안녕하세요! 이것은 테스트 입력입니다.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

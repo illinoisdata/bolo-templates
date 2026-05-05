@@ -1,6 +1,6 @@
-{% set repo_id = "facebook/mms-tts-cat" %}
-{% set device = "cuda:0" %}
-{% set text_input = "Catalan text-to-speech synthesis with expressive intonation." %}
+{% set repo_id = repo_id | default("facebook/mms-tts-cat") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("Catalan text-to-speech synthesis with expressive intonation.") %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_input = {{ text_input | tojson }}

@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "monologg/bert-base-cased-goemotions-group" %}
-{% set text = "I feel great today!" %}
-{% set probability_threshold = 0.5 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("monologg/bert-base-cased-goemotions-group") %}
+{% set text = text | default("I feel great today!") %}
+{% set probability_threshold = probability_threshold | default(0.5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

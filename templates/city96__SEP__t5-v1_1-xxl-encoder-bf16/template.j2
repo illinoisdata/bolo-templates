@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "city96/t5-v1_1-xxl-encoder-bf16" %}
-{% set text_input = "An image of a cat sitting on a mat with a playful expression." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("city96/t5-v1_1-xxl-encoder-bf16") %}
+{% set text_input = text_input | default("An image of a cat sitting on a mat with a playful expression.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

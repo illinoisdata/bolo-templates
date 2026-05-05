@@ -1,5 +1,5 @@
-{% set repo_id = "tennessejoyce/titlewave-t5-base" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("tennessejoyce/titlewave-t5-base") %}
+{% set device = device | default("cuda:0") %}
 {% set question_body = question_body | default("Example question body.") %}
 {% set summarization_prefix = summarization_prefix | default("summarize: ") %}
 {% set max_length = max_length | default(40) %}

@@ -1,5 +1,5 @@
-{% set repo_id = "SpanBERT/spanbert-large-cased" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("SpanBERT/spanbert-large-cased") %}
+{% set device = device | default("cuda:0") %}
 {% set inference_text = inference_text | default("SpanBERT is a [MASK] of BERT.") %}
 {% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"

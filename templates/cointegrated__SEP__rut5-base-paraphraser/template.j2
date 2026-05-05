@@ -1,13 +1,12 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "cointegrated/rut5-base-paraphraser" %}
-{% set prompt = "Каждый охотник желает знать, где сидит фазан." %}
-{% set num_beams = 5 %}
-{% set encoder_no_repeat_ngram_size = 4 %}
-{% set do_sample = False %}
-{% set length_factor = 1.5 %}
-{% set length_offset = 10 %}
-{% set max_length_cap = 256 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("cointegrated/rut5-base-paraphraser") %}
+{% set prompt = prompt | default("Каждый охотник желает знать, где сидит фазан.") %}
+{% set num_beams = num_beams | default(5) %}
+{% set encoder_no_repeat_ngram_size = encoder_no_repeat_ngram_size | default(4) %}
+{% set do_sample = do_sample | default(False) %}
+{% set length_factor = length_factor | default(1.5) %}
+{% set length_offset = length_offset | default(10) %}
+{% set max_length_cap = max_length_cap | default(256) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = {{ prompt | tojson }}

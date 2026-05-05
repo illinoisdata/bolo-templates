@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "prithivida/passive_to_active_styletransfer" %}
-{% set text = "The ball was kicked by the boy." %}
-{% set max_length = 128 %}
-{% set num_beams = 4 %}
-{% set output_filename = "generated_passive2active.txt" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("prithivida/passive_to_active_styletransfer") %}
+{% set text = text | default("The ball was kicked by the boy.") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(4) %}
+{% set output_filename = output_filename | default("generated_passive2active.txt") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = """{{ text }}"""

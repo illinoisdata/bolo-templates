@@ -1,8 +1,8 @@
-{% set repo_id = "Qwen/Qwen2-Audio-7B" %}
-{% set device = "cuda:0" %}
-{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set prompt = "<|audio_bos|><|AUDIO|><|audio_eos|>Generate the caption in English:" %}
-{% set max_length = 256 %}
+{% set repo_id = repo_id | default("Qwen/Qwen2-Audio-7B") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
+{% set prompt = prompt | default("<|audio_bos|><|AUDIO|><|audio_eos|>Generate the caption in English:") %}
+{% set max_length = max_length | default(256) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"

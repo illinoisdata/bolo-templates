@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "bloomberg/KeyBART" %}
-{% set text_input = "In this work, we explore how to learn task specific language models aimed towards learning rich representation of keyphrases from text documents. We experiment with different masking strategies for pre-training transformer language models in discriminative as well as generative settings." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("bloomberg/KeyBART") %}
+{% set text_input = text_input | default("In this work, we explore how to learn task specific language models aimed towards learning rich representation of keyphrases from text documents. We experiment with different masking strategies for pre-training transformer language models in discriminative as well as generative settings.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = {{ text_input | tojson }}

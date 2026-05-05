@@ -1,8 +1,8 @@
-{% set repo_id = "autogluon/chronos-t5-small" %}
-{% set device = "cuda:0" %}
-{% set context_series = [112.0, 118.0, 132.0, 129.0, 121.0, 135.0, 148.0, 148.0, 136.0, 119.0, 104.0, 118.0, 115.0, 126.0, 141.0, 135.0, 125.0, 149.0, 170.0, 170.0, 158.0, 133.0, 114.0, 140.0] %}
-{% set prediction_length = 12 %}
-{% set num_samples = 20 %}
+{% set repo_id = repo_id | default("autogluon/chronos-t5-small") %}
+{% set device = device | default("cuda:0") %}
+{% set context_series = context_series | default([112.0, 118.0, 132.0, 129.0, 121.0, 135.0, 148.0, 148.0, 136.0, 119.0, 104.0, 118.0, 115.0, 126.0, 141.0, 135.0, 125.0, 149.0, 170.0, 170.0, 158.0, 133.0, 114.0, 140.0]) %}
+{% set prediction_length = prediction_length | default(12) %}
+{% set num_samples = num_samples | default(20) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 context_series = {{ context_series }}

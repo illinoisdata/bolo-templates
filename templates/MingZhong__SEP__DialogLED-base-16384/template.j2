@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "MingZhong/DialogLED-base-16384" %}
-{% set input_text = "DialogLED is a long-dialogue understanding and summarization model inspired by LED; it needs a concise overview of its capabilities." %}
-{% set max_new_tokens = 128 %}
-{% set min_length = 64 %}
-{% set max_length = 128 %}
-{% set num_beams = 6 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("MingZhong/DialogLED-base-16384") %}
+{% set input_text = input_text | default("DialogLED is a long-dialogue understanding and summarization model inspired by LED; it needs a concise overview of its capabilities.") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set min_length = min_length | default(64) %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(6) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

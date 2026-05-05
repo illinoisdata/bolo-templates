@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "bandainamco-mirai/distilbert-base-japanese" %}
-{% set input_text = "吾輩は猫である。" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("bandainamco-mirai/distilbert-base-japanese") %}
+{% set input_text = input_text | default("吾輩は猫である。") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

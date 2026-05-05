@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/mms-tts-deu" %}
-{% set text = "Guten Tag! Dies ist ein kurzes Beispiel für die deutsche TTS-Ausgabe." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/mms-tts-deu") %}
+{% set text = text | default("Guten Tag! Dies ist ein kurzes Beispiel für die deutsche TTS-Ausgabe.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

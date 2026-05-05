@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Maltehb/aelaectra-danish-electra-small-cased" %}
-{% set text = "Dette er en prøve sætning." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Maltehb/aelaectra-danish-electra-small-cased") %}
+{% set text = text | default("Dette er en prøve sætning.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

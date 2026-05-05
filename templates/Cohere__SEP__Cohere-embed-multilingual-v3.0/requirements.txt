@@ -65,3 +65,4 @@ types-urllib3==1.26.25.14
 typing-extensions==4.15.0
 typing-inspection==0.4.2
 urllib3==1.26.13
+pybolo

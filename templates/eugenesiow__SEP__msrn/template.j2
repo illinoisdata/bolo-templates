@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "eugenesiow/msrn" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set scale = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("eugenesiow/msrn") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set scale = scale | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

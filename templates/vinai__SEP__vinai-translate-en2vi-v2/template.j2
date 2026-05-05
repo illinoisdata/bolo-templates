@@ -1,7 +1,6 @@
-{% set repo_id = "vinai/vinai-translate-en2vi-v2" %}
-{% set device = "cuda:0" %}
-{% set input_text = "VinAI Translate provides advanced translation from English to Vietnamese." %}
-
+{% set repo_id = repo_id | default("vinai/vinai-translate-en2vi-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("VinAI Translate provides advanced translation from English to Vietnamese.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

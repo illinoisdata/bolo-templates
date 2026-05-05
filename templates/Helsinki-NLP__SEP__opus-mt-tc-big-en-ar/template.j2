@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-tc-big-en-ar" %}
-{% set source_text = ["Hello world!", ">>ara<< I can't help you because I'm busy."] %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-en-ar") %}
+{% set source_text = source_text | default(["Hello world!", ">>ara<< I can't help you because I'm busy."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = {{ source_text | tojson }}

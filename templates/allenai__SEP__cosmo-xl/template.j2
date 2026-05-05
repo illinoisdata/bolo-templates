@@ -1,13 +1,12 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "allenai/cosmo-xl" %}
-{% set situation_narrative = "Cosmo had a really fun time participating in the EMNLP conference at Abu Dhabi." %}
-{% set role_instruction = "You are Cosmo and you are talking to a friend." %}
-{% set conversation_history = ["Hey, how was your trip to Abu Dhabi?"] %}
-{% set max_new_tokens = 128 %}
-{% set temperature = 1.0 %}
-{% set top_p = 0.95 %}
-{% set do_sample = true %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("allenai/cosmo-xl") %}
+{% set situation_narrative = situation_narrative | default("Cosmo had a really fun time participating in the EMNLP conference at Abu Dhabi.") %}
+{% set role_instruction = role_instruction | default("You are Cosmo and you are talking to a friend.") %}
+{% set conversation_history = conversation_history | default(["Hey, how was your trip to Abu Dhabi?"]) %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set temperature = temperature | default(1.0) %}
+{% set top_p = top_p | default(0.95) %}
+{% set do_sample = do_sample | default(true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 situation_narrative = "{{ situation_narrative }}"

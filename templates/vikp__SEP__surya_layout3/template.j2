@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "vikp/surya_layout3" %}
-{% set dummy = '' %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("vikp/surya_layout3") %}
+{% set dummy = dummy | default('') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 

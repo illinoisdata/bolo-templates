@@ -1,7 +1,6 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-tc-big-en-ro" %}
-{% set device = "cuda:0" %}
-{% set source_sentences = [">>ron<< A bad writer's prose is full of hackneyed phrases.", ">>ron<< Zero is a special number."] %}
-
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-en-ro") %}
+{% set device = device | default("cuda:0") %}
+{% set source_sentences = source_sentences | default([">>ron<< A bad writer's prose is full of hackneyed phrases.", ">>ron<< Zero is a special number."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_sentences = {{ source_sentences | tojson }}

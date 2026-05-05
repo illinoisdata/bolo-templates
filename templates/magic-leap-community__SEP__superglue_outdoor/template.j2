@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "magic-leap-community/superglue_outdoor" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("magic-leap-community/superglue_outdoor") %}
 repo_id = "magic-leap-community/superglue_outdoor"
 
 import importlib

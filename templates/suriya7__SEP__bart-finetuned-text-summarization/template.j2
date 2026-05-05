@@ -1,8 +1,8 @@
-{% set repo_id = "suriya7/bart-finetuned-text-summarization" %}
-{% set device = "cuda:0" %}
-{% set text_input = "Now, there is no doubt that one of the most important aspects of any Pixel phone is its camera. And there might be good news for all camera lovers. Rumours have suggested that the Pixel 9 could come with a telephoto lens, improving its photography capabilities even further. Google will likely continue to focus on using AI to enhance its camera performance, in order to make sure that Pixel phones remain top contenders in the world of mobile photography." %}
-{% set max_input_length = 1024 %}
-{% set max_new_tokens = 142 %}
+{% set repo_id = repo_id | default("suriya7/bart-finetuned-text-summarization") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("Now, there is no doubt that one of the most important aspects of any Pixel phone is its camera. And there might be good news for all camera lovers. Rumours have suggested that the Pixel 9 could come with a telephoto lens, improving its photography capabilities even further. Google will likely continue to focus on using AI to enhance its camera performance, in order to make sure that Pixel phones remain top contenders in the world of mobile photography.") %}
+{% set max_input_length = max_input_length | default(1024) %}
+{% set max_new_tokens = max_new_tokens | default(142) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""

@@ -1,7 +1,6 @@
-{% set repo_id = "csebuetnlp/banglat5_nmt_en_bn" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Please translate the following sentence into Bengali." %}
-
+{% set repo_id = repo_id | default("csebuetnlp/banglat5_nmt_en_bn") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Please translate the following sentence into Bengali.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

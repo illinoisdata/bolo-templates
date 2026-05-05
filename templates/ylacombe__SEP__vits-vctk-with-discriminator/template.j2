@@ -1,10 +1,9 @@
-{% set repo_id = "ylacombe/vits-vctk-with-discriminator" %}
-{% set device = "cuda:0" %}
-{% set text = "Hello, world!" %}
-{% set speaker_id = 0 %}
-{% set speaking_rate = 1.0 %}
-{% set sampling_rate = 22050 %}
-
+{% set repo_id = repo_id | default("ylacombe/vits-vctk-with-discriminator") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Hello, world!") %}
+{% set speaker_id = speaker_id | default(0) %}
+{% set speaking_rate = speaking_rate | default(1.0) %}
+{% set sampling_rate = sampling_rate | default(22050) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

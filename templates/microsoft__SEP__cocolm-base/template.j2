@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "microsoft/cocolm-base" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("microsoft/cocolm-base") %}
 repo_id = "{{ repo_id }}"
 
 import os

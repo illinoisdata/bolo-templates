@@ -1,9 +1,8 @@
-{% set repo_id = "facebook/hf-seamless-m4t-large" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Hello, my dog is cute" %}
-{% set src_lang = "eng" %}
-{% set tgt_lang = "rus" %}
-
+{% set repo_id = repo_id | default("facebook/hf-seamless-m4t-large") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Hello, my dog is cute") %}
+{% set src_lang = src_lang | default("eng") %}
+{% set tgt_lang = tgt_lang | default("rus") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/byt5-large" %}
-{% set prompt = "Translate English to French: The quick brown fox jumps over the lazy dog." %}
-{% set max_length = 128 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/byt5-large") %}
+{% set prompt = prompt | default("Translate English to French: The quick brown fox jumps over the lazy dog.") %}
+{% set max_length = max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

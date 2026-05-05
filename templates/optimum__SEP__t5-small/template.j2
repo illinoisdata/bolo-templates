@@ -1,5 +1,5 @@
-{% set repo_id = "optimum/t5-small" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("optimum/t5-small") %}
+{% set device = device | default("cuda:0") %}
 {% set input_text = input_text | default("My name is Eustache and I have a pet raccoon") %}
 {% set translation_prefix = translation_prefix | default("translate English to French: ") %}
 repo_id = "{{ repo_id }}"

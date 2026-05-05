@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "sonoisa/t5-base-japanese-title-generation" %}
-{% set article_text = "記事本文のサンプルです。日本語で書かれた記事の一部をここに置き換えて、モデルにタイトル生成を依頼します。" %}
-{% set tokenizer_max_length = 512 %}
-{% set generation_max_length = 64 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("sonoisa/t5-base-japanese-title-generation") %}
+{% set article_text = article_text | default("記事本文のサンプルです。日本語で書かれた記事の一部をここに置き換えて、モデルにタイトル生成を依頼します。") %}
+{% set tokenizer_max_length = tokenizer_max_length | default(512) %}
+{% set generation_max_length = generation_max_length | default(64) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 article_text = """{{ article_text }}"""

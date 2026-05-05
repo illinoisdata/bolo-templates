@@ -1,5 +1,5 @@
-{% set repo_id = "slauw87/bart_summarisation" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("slauw87/bart_summarisation") %}
+{% set device = device | default("cuda:0") %}
 {% set text_input -%}
 Sugi: I am tired of everything in my life.
 Tommy: What? How happy you life is! I do envy you.

@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "fxmarty/tiny-marian" %}
-{% set text_input = "This is a sample English sentence to translate into Spanish." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("fxmarty/tiny-marian") %}
+{% set text_input = text_input | default("This is a sample English sentence to translate into Spanish.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

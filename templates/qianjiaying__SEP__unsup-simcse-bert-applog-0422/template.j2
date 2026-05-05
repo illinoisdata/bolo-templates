@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "qianjiaying/unsup-simcse-bert-applog-0422" %}
-{% set sentences = ["An example sentence for unsupervised SimCSE inference."] %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("qianjiaying/unsup-simcse-bert-applog-0422") %}
+{% set sentences = sentences | default(["An example sentence for unsupervised SimCSE inference."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences }}

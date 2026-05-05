@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "DeepPavlov/distilrubert-tiny-cased-conversational" %}
-{% set text = ["Привет, как дела?"] %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("DeepPavlov/distilrubert-tiny-cased-conversational") %}
+{% set text = text | default(["Привет, как дела?"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = {{ text }}

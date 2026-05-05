@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "csebuetnlp/banglabert" %}
-{% set text_input = "আমি কৃতজ্ঞ কারণ আপনি আমার জন্য অনেক কিছু করেছেন।" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("csebuetnlp/banglabert") %}
+{% set text_input = text_input | default("আমি কৃতজ্ঞ কারণ আপনি আমার জন্য অনেক কিছু করেছেন।") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

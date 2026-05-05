@@ -1,13 +1,12 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "kykim/bertshared-kor-base" %}
-{% set input_text = '안녕하세요. 반갑습니다.' %}
-{% set max_length = 20 %}
-{% set min_length = 8 %}
-{% set num_beams = 4 %}
-{% set length_penalty = 1.5 %}
-{% set no_repeat_ngram_size = 2 %}
-{% set early_stopping = true %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("kykim/bertshared-kor-base") %}
+{% set input_text = input_text | default('안녕하세요. 반갑습니다.') %}
+{% set max_length = max_length | default(20) %}
+{% set min_length = min_length | default(8) %}
+{% set num_beams = num_beams | default(4) %}
+{% set length_penalty = length_penalty | default(1.5) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(2) %}
+{% set early_stopping = early_stopping | default(true) %}
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
 input_text = '{{ input_text }}'

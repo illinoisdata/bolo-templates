@@ -1,7 +1,6 @@
-{% set repo_id = "google/bert_uncased_L-8_H-768_A-12" %}
-{% set device = "cuda:0" %}
-{% set text = "Hello, I'm a [MASK] model." %}
-
+{% set repo_id = repo_id | default("google/bert_uncased_L-8_H-768_A-12") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Hello, I'm a [MASK] model.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

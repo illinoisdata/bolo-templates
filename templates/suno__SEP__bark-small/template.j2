@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "suno/bark-small" %}
-{% set text_prompt = "Hello, I am sampling from Bark. Please describe the sun." %}
-{% set do_sample = true %}
-{% set temperature = 1.0 %}
-{% set top_k = 50 %}
-{% set top_p = 0.95 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("suno/bark-small") %}
+{% set text_prompt = text_prompt | default("Hello, I am sampling from Bark. Please describe the sun.") %}
+{% set do_sample = do_sample | default(true) %}
+{% set temperature = temperature | default(1.0) %}
+{% set top_k = top_k | default(50) %}
+{% set top_p = top_p | default(0.95) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_prompt = """{{ text_prompt }}"""

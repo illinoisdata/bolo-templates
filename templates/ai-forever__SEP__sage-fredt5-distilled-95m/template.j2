@@ -1,8 +1,7 @@
-{% set repo_id = "ai-forever/sage-fredt5-distilled-95m" %}
-{% set device = "cuda:0" %}
-{% set input_text = 'И не чсно прохожим в этот день непогожйи почему я веселый такйо' %}
-{% set length_multiplier = 1.5 %}
-
+{% set repo_id = repo_id | default("ai-forever/sage-fredt5-distilled-95m") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('И не чсно прохожим в этот день непогожйи почему я веселый такйо') %}
+{% set length_multiplier = length_multiplier | default(1.5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

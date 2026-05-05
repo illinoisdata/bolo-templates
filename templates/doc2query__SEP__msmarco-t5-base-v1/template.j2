@@ -1,13 +1,12 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "doc2query/msmarco-t5-base-v1" %}
-{% set input_text = "Python is an interpreted, high-level and general-purpose programming language. Python's design philosophy emphasizes code readability with its notable use of significant whitespace. Its language constructs and object-oriented approach aim to help programmers write clear, logical code for small and large-scale projects." %}
-{% set max_input_length = 320 %}
-{% set generation_max_length = 64 %}
-{% set num_return_sequences = 5 %}
-{% set do_sample = True %}
-{% set top_p = 0.95 %}
-{% set temperature = 1.0 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("doc2query/msmarco-t5-base-v1") %}
+{% set input_text = input_text | default("Python is an interpreted, high-level and general-purpose programming language. Python's design philosophy emphasizes code readability with its notable use of significant whitespace. Its language constructs and object-oriented approach aim to help programmers write clear, logical code for small and large-scale projects.") %}
+{% set max_input_length = max_input_length | default(320) %}
+{% set generation_max_length = generation_max_length | default(64) %}
+{% set num_return_sequences = num_return_sequences | default(5) %}
+{% set do_sample = do_sample | default(True) %}
+{% set top_p = top_p | default(0.95) %}
+{% set temperature = temperature | default(1.0) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

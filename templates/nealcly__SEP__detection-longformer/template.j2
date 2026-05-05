@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "nealcly/detection-longformer" %}
-{% set text_input = "The quick brown fox jumps over the lazy dog." %}
-{% set max_length = 4096 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("nealcly/detection-longformer") %}
+{% set text_input = text_input | default("The quick brown fox jumps over the lazy dog.") %}
+{% set max_length = max_length | default(4096) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""

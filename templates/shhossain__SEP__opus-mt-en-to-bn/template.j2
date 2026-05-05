@@ -1,7 +1,6 @@
-{% set repo_id = "shhossain/opus-mt-en-to-bn" %}
-{% set device = "cuda:0" %}
-{% set text = "Will you come home tonight?" %}
-
+{% set repo_id = repo_id | default("shhossain/opus-mt-en-to-bn") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Will you come home tonight?") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

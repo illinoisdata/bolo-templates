@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "zxhezexin/openlrm-mix-base-1.1" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("zxhezexin/openlrm-mix-base-1.1") %}
 repo_id = "{{ repo_id }}"
 
 import json

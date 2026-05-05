@@ -1,9 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-zh-vi" %}
-{% set input_text = "中国的首都是哪里？" %}
-{% set num_beams = 6 %}
-{% set max_length = 128 %}
-{% set output_path = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-zh-vi/output" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-zh-vi") %}
+{% set input_text = input_text | default("中国的首都是哪里？") %}
+{% set num_beams = num_beams | default(6) %}
+{% set max_length = max_length | default(128) %}
+{% set output_path = output_path | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-zh-vi/output") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

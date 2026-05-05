@@ -1,5 +1,5 @@
-{% set repo_id = "google-t5/t5-base" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("google-t5/t5-base") %}
+{% set device = device | default("cuda:0") %}
 {% set input_text = input_text | default("translate English to German: The quick brown fox jumps over the lazy dog.") %}
 {% set max_length = max_length | default(100) %}
 {% set num_beams = num_beams | default(4) %}

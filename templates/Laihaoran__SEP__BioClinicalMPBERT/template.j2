@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Laihaoran/BioClinicalMPBERT" %}
-{% set input_text = "Patient presents with shortness of breath and abnormal vital signs; recommend further evaluation for potential cardiac issues." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Laihaoran/BioClinicalMPBERT") %}
+{% set input_text = input_text | default("Patient presents with shortness of breath and abnormal vital signs; recommend further evaluation for potential cardiac issues.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

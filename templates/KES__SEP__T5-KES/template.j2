@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "KES/T5-KES" %}
-{% set text_input = "I am lived with my parenmts " %}
-{% set prefix = "grammar: " %}
-{% set num_beams = 4 %}
-{% set max_length = 512 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("KES/T5-KES") %}
+{% set text_input = text_input | default("I am lived with my parenmts ") %}
+{% set prefix = prefix | default("grammar: ") %}
+{% set num_beams = num_beams | default(4) %}
+{% set max_length = max_length | default(512) %}
 repo_id = "{{ repo_id }}"
 device = {{ device | tojson }}
 text_input = {{ text_input | tojson }}

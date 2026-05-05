@@ -1,10 +1,9 @@
-{% set repo_id = "microsoft/git-large" %}
-{% set device = "cuda:0" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set max_length = 20 %}
-{% set num_beams = 1 %}
-{% set num_return_sequences = 1 %}
-
+{% set repo_id = repo_id | default("microsoft/git-large") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set max_length = max_length | default(20) %}
+{% set num_beams = num_beams | default(1) %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

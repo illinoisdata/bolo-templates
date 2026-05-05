@@ -1,5 +1,5 @@
-{% set repo_id = "laituan245/molt5-base" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("laituan245/molt5-base") %}
+{% set device = device | default("cuda:0") %}
 {% set input_text = input_text | default("translate English to German: The molecule is stable.") %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}

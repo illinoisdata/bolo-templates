@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/nllb-200-3.3B" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/nllb-200-3.3B") %}
 from transformers.models import nllb
 
 print([name for name in dir(nllb.tokenization_nllb) if name.isupper()])

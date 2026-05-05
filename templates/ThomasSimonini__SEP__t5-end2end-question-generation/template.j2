@@ -1,13 +1,12 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ThomasSimonini/t5-end2end-question-generation" %}
-{% set input_context = "Context: The Apollo missions landed astronauts on the Moon and illustrated humanity's reach into space." %}
-{% set prefix = "generate questions: " %}
-{% set max_length = 256 %}
-{% set num_beams = 4 %}
-{% set length_penalty = 1.5 %}
-{% set no_repeat_ngram_size = 3 %}
-{% set early_stopping = true %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ThomasSimonini/t5-end2end-question-generation") %}
+{% set input_context = input_context | default("Context: The Apollo missions landed astronauts on the Moon and illustrated humanity's reach into space.") %}
+{% set prefix = prefix | default("generate questions: ") %}
+{% set max_length = max_length | default(256) %}
+{% set num_beams = num_beams | default(4) %}
+{% set length_penalty = length_penalty | default(1.5) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
+{% set early_stopping = early_stopping | default(true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_context = """{{ input_context }}"""

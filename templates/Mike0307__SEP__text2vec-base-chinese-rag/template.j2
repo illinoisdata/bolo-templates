@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Mike0307/text2vec-base-chinese-rag" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Mike0307/text2vec-base-chinese-rag") %}
 {% set input_texts = [
   "福井舞所屬哪家唱片公司？",
   "23歲時出道、血型A型的福井舞是出身於京都的日本女創作歌手，所屬唱片公司為J-more。2004年，與WADAGAKI、SHINO組合地下音樂隊Poplar，發表了兩張專輯，天照和夢死物語。在2006年時退出，2007年10月加入了Avex獨立發展。"
 ] %}
-{% set max_length = 512 %}
-
+{% set max_length = max_length | default(512) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_texts = {{ input_texts }}

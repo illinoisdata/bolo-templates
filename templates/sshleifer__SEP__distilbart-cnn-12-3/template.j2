@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "sshleifer/distilbart-cnn-12-3" %}
-{% set input_text = "NASA released new climate data showing unprecedented heat waves across Europe, raising concerns among scientists about future weather patterns." %}
-{% set num_beams = 4 %}
-{% set max_length = 142 %}
-{% set min_length = 56 %}
-{% set length_penalty = 2.0 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("sshleifer/distilbart-cnn-12-3") %}
+{% set input_text = input_text | default("NASA released new climate data showing unprecedented heat waves across Europe, raising concerns among scientists about future weather patterns.") %}
+{% set num_beams = num_beams | default(4) %}
+{% set max_length = max_length | default(142) %}
+{% set min_length = min_length | default(56) %}
+{% set length_penalty = length_penalty | default(2.0) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

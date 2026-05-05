@@ -1,7 +1,6 @@
-{% set repo_id = "bvanaken/CORe-clinical-outcome-biobert-v1" %}
-{% set device = "cuda:0" %}
-{% set text = "Patient is a 67-year-old male with chest pain and shortness of breath." %}
-
+{% set repo_id = repo_id | default("bvanaken/CORe-clinical-outcome-biobert-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Patient is a 67-year-old male with chest pain and shortness of breath.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

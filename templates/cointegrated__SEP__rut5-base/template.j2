@@ -1,9 +1,8 @@
-{% set repo_id = "cointegrated/rut5-base" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Hello, world!" %}
-{% set max_length = 50 %}
-{% set num_beams = 1 %}
-
+{% set repo_id = repo_id | default("cointegrated/rut5-base") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Hello, world!") %}
+{% set max_length = max_length | default(50) %}
+{% set num_beams = num_beams | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

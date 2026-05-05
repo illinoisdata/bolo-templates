@@ -1,9 +1,8 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-cy-en" %}
-{% set device = "cuda:0" %}
-{% set source_text = "Mae hen wlad fy nhadau" %}
-{% set max_new_tokens = 128 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-cy-en") %}
+{% set device = device | default("cuda:0") %}
+{% set source_text = source_text | default("Mae hen wlad fy nhadau") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = {{ source_text | tojson }}

@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "mrm8488/t5-base-finetuned-wikiSQL" %}
-{% set question = "How many models were finetuned using BERT as base model?" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("mrm8488/t5-base-finetuned-wikiSQL") %}
+{% set question = question | default("How many models were finetuned using BERT as base model?") %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 question = {{ question | tojson }}

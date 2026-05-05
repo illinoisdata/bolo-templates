@@ -1,8 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Exscientia/IgT5_unpaired" %}
-{% set input_sequences = ["EVVMTQSPASLSVSPGERATLSCRARASLGISTDLAWYQQRPGQAPRLLIYGASTRATGIPARFSGSGSGTEFTLTISSLQSEDSAVYYCQQYSNWPLTFGGGTKVEIK", "ALTQPASVSGSPGQSITISCTGTSSDVGGYNYVSWYQQHPGKAPKLMIYDVSKRPSGVSNRFSGSKSGNTASLTISGLQSEDEADYYCNSLTSISTWVFGGGTKLTVL"] %}
-{% set max_new_tokens = 64 %}
-{% set num_return_sequences = 1 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Exscientia/IgT5_unpaired") %}
+{% set input_sequences = input_sequences | default(["EVVMTQSPASLSVSPGERATLSCRARASLGISTDLAWYQQRPGQAPRLLIYGASTRATGIPARFSGSGSGTEFTLTISSLQSEDSAVYYCQQYSNWPLTFGGGTKVEIK", "ALTQPASVSGSPGQSITISCTGTSSDVGGYNYVSWYQQHPGKAPKLMIYDVSKRPSGVSNRFSGSKSGNTASLTISGLQSEDEADYYCNSLTSISTWVFGGGTKLTVL"]) %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_sequences = {{ input_sequences | tojson }}

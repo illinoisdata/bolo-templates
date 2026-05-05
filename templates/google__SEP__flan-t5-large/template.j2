@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/flan-t5-large" %}
-{% set text_input = "translate English to German: How old are you?" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/flan-t5-large") %}
+{% set text_input = text_input | default("translate English to German: How old are you?") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

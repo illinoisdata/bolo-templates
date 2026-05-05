@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-en-it" %}
-{% set input_text = "The cat sat on the mat." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-en-it") %}
+{% set input_text = input_text | default("The cat sat on the mat.") %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 input_text = {{ input_text | tojson }}

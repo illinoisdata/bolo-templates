@@ -1,9 +1,8 @@
-{% set repo_id = "0x7o/keyt5-large" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Reuters сообщил об отмене 3,6 тыс. авиарейсов из-за «омикрона» и погоды\nНаибольшее число отмен авиарейсов 2 января пришлось на американские авиакомпании SkyWest и Southwest, у каждой — более 400 отмененных рейсов. При этом среди отмененных 2 января авиарейсов — более 2,1 тыс. рейсов в США. Также свыше 6400 рейсов были задержаны." %}
-{% set max_length = 64 %}
-{% set top_p = 1.0 %}
-
+{% set repo_id = repo_id | default("0x7o/keyt5-large") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Reuters сообщил об отмене 3,6 тыс. авиарейсов из-за «омикрона» и погоды\nНаибольшее число отмен авиарейсов 2 января пришлось на американские авиакомпании SkyWest и Southwest, у каждой — более 400 отмененных рейсов. При этом среди отмененных 2 января авиарейсов — более 2,1 тыс. рейсов в США. Также свыше 6400 рейсов были задержаны.") %}
+{% set max_length = max_length | default(64) %}
+{% set top_p = top_p | default(1.0) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 input_text = {{ input_text | tojson }}

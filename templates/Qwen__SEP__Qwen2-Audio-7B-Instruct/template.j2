@@ -1,10 +1,9 @@
-{% set repo_id = "Qwen/Qwen2-Audio-7B-Instruct" %}
-{% set device = "cuda:0" %}
-{% set audio = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set instruction = "What's that sound?" %}
-{% set system_prompt = "You are a helpful assistant." %}
-{% set max_length = 256 %}
-
+{% set repo_id = repo_id | default("Qwen/Qwen2-Audio-7B-Instruct") %}
+{% set device = device | default("cuda:0") %}
+{% set audio = audio | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
+{% set instruction = instruction | default("What's that sound?") %}
+{% set system_prompt = system_prompt | default("You are a helpful assistant.") %}
+{% set max_length = max_length | default(256) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio = "{{ audio }}"

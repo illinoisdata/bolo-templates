@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/wav2vec2-conformer-rel-pos-large" %}
-{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set expected_sample_rate = 16000 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/wav2vec2-conformer-rel-pos-large") %}
+{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
+{% set expected_sample_rate = expected_sample_rate | default(16000) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"

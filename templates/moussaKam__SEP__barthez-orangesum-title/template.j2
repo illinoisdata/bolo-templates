@@ -1,7 +1,6 @@
-{% set repo_id = "moussaKam/barthez-orangesum-title" %}
-{% set device = "cuda:0" %}
-{% set text_input = "Citant les préoccupations de ses clients dénonçant des cas de censure, un fournisseur d'accès Internet de l'État de l'Idaho a décidé de bloquer Facebook et Twitter pour les clients mécontents de la politique de ces réseaux sociaux." %}
-
+{% set repo_id = repo_id | default("moussaKam/barthez-orangesum-title") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("Citant les préoccupations de ses clients dénonçant des cas de censure, un fournisseur d'accès Internet de l'État de l'Idaho a décidé de bloquer Facebook et Twitter pour les clients mécontents de la politique de ces réseaux sociaux.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""

@@ -1,6 +1,6 @@
-{% set repo_id = "csebuetnlp/mT5_multilingual_XLSum" %}
-{% set device = "cuda:0" %}
-{% set article_text = 'sample text' %}
+{% set repo_id = repo_id | default("csebuetnlp/mT5_multilingual_XLSum") %}
+{% set device = device | default("cuda:0") %}
+{% set article_text = article_text | default('sample text') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 article_text = """{{ article_text }}"""

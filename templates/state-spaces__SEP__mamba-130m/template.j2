@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "state-spaces/mamba-130m" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("state-spaces/mamba-130m") %}
 repo_id = "{{ repo_id }}"
 
 from huggingface_hub import HfApi

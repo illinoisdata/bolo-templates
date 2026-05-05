@@ -1,7 +1,6 @@
-{% set repo_id = "deepset/bert-small-mm_retrieval-table_encoder" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Deep learning enables efficient retrieval embeddings." %}
-
+{% set repo_id = repo_id | default("deepset/bert-small-mm_retrieval-table_encoder") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Deep learning enables efficient retrieval embeddings.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

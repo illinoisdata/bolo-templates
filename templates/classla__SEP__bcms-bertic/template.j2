@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "classla/bcms-bertic" %}
-{% set text = "Primjer rečenice na bosanskom jeziku." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("classla/bcms-bertic") %}
+{% set text = text | default("Primjer rečenice na bosanskom jeziku.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

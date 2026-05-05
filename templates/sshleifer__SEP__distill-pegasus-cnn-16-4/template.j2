@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "sshleifer/distill-pegasus-cnn-16-4" %}
-{% set input_text = "The government announced a new climate initiative that aims to reduce emissions substantially while boosting renewable energy infrastructure." %}
-{% set generation_max_length = 128 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("sshleifer/distill-pegasus-cnn-16-4") %}
+{% set input_text = input_text | default("The government announced a new climate initiative that aims to reduce emissions substantially while boosting renewable energy infrastructure.") %}
+{% set generation_max_length = generation_max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

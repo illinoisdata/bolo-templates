@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "deep-learning-analytics/GrammarCorrector" %}
-{% set text_input = "He are moving here." %}
-{% set num_return_sequences = 1 %}
-{% set max_length = 64 %}
-{% set num_beams = 4 %}
-{% set temperature = 1.5 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("deep-learning-analytics/GrammarCorrector") %}
+{% set text_input = text_input | default("He are moving here.") %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
+{% set max_length = max_length | default(64) %}
+{% set num_beams = num_beams | default(4) %}
+{% set temperature = temperature | default(1.5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "tsystems/colqwen2.5-3b-base" %}
-{% set text_prompt = "Describe the content of the image in one sentence." %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("tsystems/colqwen2.5-3b-base") %}
+{% set text_prompt = text_prompt | default("Describe the content of the image in one sentence.") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_prompt = {{ text_prompt | tojson }}

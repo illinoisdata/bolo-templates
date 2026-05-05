@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "allenai/unifiedqa-v2-t5-3b-1363200" %}
-{% set prompt = "Summarize the societal impacts of climate change mentioned in the article." %}
-{% set generation_max_length = 256 %}
-{% set num_beams = 4 %}
-{% set do_sample = False %}
-{% set temperature = 1.0 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("allenai/unifiedqa-v2-t5-3b-1363200") %}
+{% set prompt = prompt | default("Summarize the societal impacts of climate change mentioned in the article.") %}
+{% set generation_max_length = generation_max_length | default(256) %}
+{% set num_beams = num_beams | default(4) %}
+{% set do_sample = do_sample | default(False) %}
+{% set temperature = temperature | default(1.0) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

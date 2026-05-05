@@ -1,7 +1,7 @@
-{% set repo_id = "google/long-t5-tglobal-xl" %}
-{% set device = "cuda:0" %}
-{% set prompt = "Summarize the benefits of efficient attention mechanisms for long-context modeling." %}
-{% set max_new_tokens = 256 %}
+{% set repo_id = repo_id | default("google/long-t5-tglobal-xl") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default("Summarize the benefits of efficient attention mechanisms for long-context modeling.") %}
+{% set max_new_tokens = max_new_tokens | default(256) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

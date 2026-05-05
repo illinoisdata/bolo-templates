@@ -1,9 +1,8 @@
-{% set repo_id = "mrm8488/t5-base-finetuned-e2m-intent" %}
-{% set device = "cuda:0" %}
-{% set event = "PersonX takes PersonY home" %}
-{% set max_length = 16 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("mrm8488/t5-base-finetuned-e2m-intent") %}
+{% set device = device | default("cuda:0") %}
+{% set event = event | default("PersonX takes PersonY home") %}
+{% set max_length = max_length | default(16) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 event = "{{ event }}"

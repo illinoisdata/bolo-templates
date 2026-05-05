@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "SEBIS/code_trans_t5_base_code_documentation_generation_python" %}
-{% set input_code = "def e ( message , exit_code = None ) : print_log ( message , YELLOW , BOLD ) if exit_code is not None : sys . exit ( exit_code )" %}
-{% set max_length = 512 %}
-{% set num_beams = 4 %}
-{% set prefix = "function documentation generation python: " %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("SEBIS/code_trans_t5_base_code_documentation_generation_python") %}
+{% set input_code = input_code | default("def e ( message , exit_code = None ) : print_log ( message , YELLOW , BOLD ) if exit_code is not None : sys . exit ( exit_code )") %}
+{% set max_length = max_length | default(512) %}
+{% set num_beams = num_beams | default(4) %}
+{% set prefix = prefix | default("function documentation generation python: ") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_code = "{{ input_code }}"

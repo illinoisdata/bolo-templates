@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "persiannlp/mt5-base-parsinlu-opus-translation_fa_en" %}
-{% set input_text = "ستایش خدای را که پروردگار جهانیان است." %}
-{% set generator_kwargs = {"num_beams": 4, "max_length": 128} %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("persiannlp/mt5-base-parsinlu-opus-translation_fa_en") %}
+{% set input_text = input_text | default("ستایش خدای را که پروردگار جهانیان است.") %}
+{% set generator_kwargs = generator_kwargs | default({"num_beams": 4, "max_length": 128}) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

@@ -1,6 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "huggingface/time-series-transformer-tourism-monthly" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("huggingface/time-series-transformer-tourism-monthly") %}
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
 

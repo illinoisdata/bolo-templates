@@ -1,11 +1,10 @@
-{% set repo_id = "davidkim205/iris-7b" %}
-{% set device = "cuda:0" %}
-{% set direction = "ko2en" %}
-{% set text = "아이리스는 딥러닝을 기반으로 한 한-영어 문장 번역을 위한 모델이다." %}
-{% set max_new_tokens = 2048 %}
-{% set temperature = 1.0 %}
-{% set num_beams = 5 %}
-
+{% set repo_id = repo_id | default("davidkim205/iris-7b") %}
+{% set device = device | default("cuda:0") %}
+{% set direction = direction | default("ko2en") %}
+{% set text = text | default("아이리스는 딥러닝을 기반으로 한 한-영어 문장 번역을 위한 모델이다.") %}
+{% set max_new_tokens = max_new_tokens | default(2048) %}
+{% set temperature = temperature | default(1.0) %}
+{% set num_beams = num_beams | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 direction = "{{ direction }}"

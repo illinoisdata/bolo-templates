@@ -1,9 +1,8 @@
-{% set repo_id = "google/pix2struct-large" %}
-{% set device = "cuda:0" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set prompt = "Describe the image in a single sentence." %}
-{% set max_new_tokens = 128 %}
-
+{% set repo_id = repo_id | default("google/pix2struct-large") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set prompt = prompt | default("Describe the image in a single sentence.") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

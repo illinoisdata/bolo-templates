@@ -1,7 +1,6 @@
-{% set repo_id = "soheeyang/rdr-ctx_encoder-single-nq-base" %}
-{% set device = "cuda:0" %}
-{% set context_text = "A passage describing the Retriever context for Natural Questions" %}
-
+{% set repo_id = repo_id | default("soheeyang/rdr-ctx_encoder-single-nq-base") %}
+{% set device = device | default("cuda:0") %}
+{% set context_text = context_text | default("A passage describing the Retriever context for Natural Questions") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 context_text = "{{ context_text }}"

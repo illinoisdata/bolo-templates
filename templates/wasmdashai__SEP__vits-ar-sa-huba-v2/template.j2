@@ -1,7 +1,6 @@
-{% set repo_id = "wasmdashai/vits-ar-sa-huba-v2" %}
-{% set device = "cuda:0" %}
-{% set text = "السلام عليكم كيفك عساك بخير" %}
-
+{% set repo_id = repo_id | default("wasmdashai/vits-ar-sa-huba-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("السلام عليكم كيفك عساك بخير") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

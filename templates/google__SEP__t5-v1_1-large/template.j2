@@ -1,8 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/t5-v1_1-large" %}
-{% set input_text = "translate English to German: The quick brown fox jumps over the lazy dog." %}
-{% set max_new_tokens = 64 %}
-{% set output_filename = "generated_text.txt" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/t5-v1_1-large") %}
+{% set input_text = input_text | default("translate English to German: The quick brown fox jumps over the lazy dog.") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set output_filename = output_filename | default("generated_text.txt") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

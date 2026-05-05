@@ -1,12 +1,11 @@
-{% set repo_id = "tuner007/pegasus_summarizer" %}
-{% set device = "cuda:0" %}
-{% set input_text = "My dog is cute, but he sometimes chews my shoes, which is frustrating." %}
-{% set max_input_length = 1024 %}
-{% set max_summary_length = 128 %}
-{% set num_beams = 5 %}
-{% set num_return_sequences = 1 %}
-{% set temperature = 1.5 %}
-
+{% set repo_id = repo_id | default("tuner007/pegasus_summarizer") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("My dog is cute, but he sometimes chews my shoes, which is frustrating.") %}
+{% set max_input_length = max_input_length | default(1024) %}
+{% set max_summary_length = max_summary_length | default(128) %}
+{% set num_beams = num_beams | default(5) %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
+{% set temperature = temperature | default(1.5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

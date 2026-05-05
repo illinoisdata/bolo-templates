@@ -1,9 +1,9 @@
-{% set repo_id = "xiuyul/mamba-2.8b-zephyr" %}
-{% set device = "cuda:0" %}
-{% set prompt = "Explain how to cook a simple pasta dish for a beginner." %}
-{% set max_new_tokens = 256 %}
-{% set temperature = 0.7 %}
-{% set top_p = 0.9 %}
+{% set repo_id = repo_id | default("xiuyul/mamba-2.8b-zephyr") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default("Explain how to cook a simple pasta dish for a beginner.") %}
+{% set max_new_tokens = max_new_tokens | default(256) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.9) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

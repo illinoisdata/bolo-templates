@@ -1,10 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/rag-token-nq" %}
-{% set question_text = "who holds the record in 100m freestyle" %}
-{% set use_dummy_retriever = true %}
-{% set retriever_index_name = "exact" %}
-{% set num_return_sequences = 1 %}
-{% set max_length = 50 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/rag-token-nq") %}
+{% set question_text = question_text | default("who holds the record in 100m freestyle") %}
+{% set use_dummy_retriever = use_dummy_retriever | default(true) %}
+{% set retriever_index_name = retriever_index_name | default("exact") %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
+{% set max_length = max_length | default(50) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 question_text = "{{ question_text | replace('"', '\\"') }}"

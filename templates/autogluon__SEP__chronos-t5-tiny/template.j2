@@ -1,12 +1,11 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "autogluon/chronos-t5-tiny" %}
-{% set context_sequence = [112.0, 118.5, 121.5, 123.2, 128.6, 130.1, 133.4, 136.0, 138.7, 140.2, 141.8, 143.1] %}
-{% set prediction_length = 12 %}
-{% set temperature = 1.0 %}
-{% set top_k = 50 %}
-{% set top_p = 0.95 %}
-{% set num_return_sequences = 1 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("autogluon/chronos-t5-tiny") %}
+{% set context_sequence = context_sequence | default([112.0, 118.5, 121.5, 123.2, 128.6, 130.1, 133.4, 136.0, 138.7, 140.2, 141.8, 143.1]) %}
+{% set prediction_length = prediction_length | default(12) %}
+{% set temperature = temperature | default(1.0) %}
+{% set top_k = top_k | default(50) %}
+{% set top_p = top_p | default(0.95) %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 context_sequence = {{ context_sequence }}

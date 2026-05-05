@@ -1,8 +1,8 @@
-{% set repo_id = "microsoft/layoutlm-large-uncased" %}
-{% set device = "cuda:0" %}
-{% set words = ["Invoice", "Date", "Amount", "Total", "."] %}
-{% set bounding_boxes = [[0, 0, 50, 50], [60, 0, 110, 50], [0, 60, 80, 110], [90, 60, 140, 110], [150, 60, 170, 80]] %}
-{% set max_length = 128 %}
+{% set repo_id = repo_id | default("microsoft/layoutlm-large-uncased") %}
+{% set device = device | default("cuda:0") %}
+{% set words = words | default(["Invoice", "Date", "Amount", "Total", "."]) %}
+{% set bounding_boxes = bounding_boxes | default([[0, 0, 50, 50], [60, 0, 110, 50], [0, 60, 80, 110], [90, 60, 140, 110], [150, 60, 170, 80]]) %}
+{% set max_length = max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 words = {{ words | tojson }}

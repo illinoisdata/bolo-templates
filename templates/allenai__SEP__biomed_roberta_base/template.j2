@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "allenai/biomed_roberta_base" %}
-{% set text = "Clinical note: A patient exhibits persistent cough and fever." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("allenai/biomed_roberta_base") %}
+{% set text = text | default("Clinical note: A patient exhibits persistent cough and fever.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

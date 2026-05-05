@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-af-en" %}
-{% set source_text = "Dit is 'n voorbeeldsin in Afrikaans." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-af-en") %}
+{% set source_text = source_text | default("Dit is 'n voorbeeldsin in Afrikaans.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = "{{ source_text }}"

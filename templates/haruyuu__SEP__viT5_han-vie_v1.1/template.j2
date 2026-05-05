@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "haruyuu/viT5_han-vie_v1.1" %}
-{% set mapping_file = "map.json" %}
-{% set input_text = '谁知道 “ 你三更半夜回家发现自己忘记带钥匙，家里又没有其他人在，这时你最大的愿望是什么？ ” 的正确答案是什么呀？' %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("haruyuu/viT5_han-vie_v1.1") %}
+{% set mapping_file = mapping_file | default("map.json") %}
+{% set input_text = input_text | default('谁知道 “ 你三更半夜回家发现自己忘记带钥匙，家里又没有其他人在，这时你最大的愿望是什么？ ” 的正确答案是什么呀？') %}
 device = "{{ device }}"
 repo_id = "{{ repo_id }}"
 mapping_file = "{{ mapping_file }}"

@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "LTP/base1" %}
-{% set input_text = "他叫汤姆去拿外衣。" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("LTP/base1") %}
+{% set input_text = input_text | default("他叫汤姆去拿外衣。") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

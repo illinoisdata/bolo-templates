@@ -1,8 +1,8 @@
-{% set repo_id = "vidore/colqwen2-v1.0-hf" %}
-{% set device = "cuda:0" %}
-{% set image1_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set image2_path = "/u/yli77/projects/ML-code-generation/data/image2.jpeg" %}
-{% set queries = ["When was the United States Declaration of Independence proclaimed?", "Who printed the edition of Romeo and Juliet?"] %}
+{% set repo_id = repo_id | default("vidore/colqwen2-v1.0-hf") %}
+{% set device = device | default("cuda:0") %}
+{% set image1_path = image1_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set image2_path = image2_path | default("/u/yli77/projects/ML-code-generation/data/image2.jpeg") %}
+{% set queries = queries | default(["When was the United States Declaration of Independence proclaimed?", "Who printed the edition of Romeo and Juliet?"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image1_path = "{{ image1_path }}"

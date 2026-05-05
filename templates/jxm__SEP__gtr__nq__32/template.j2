@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "jxm/gtr__nq__32" %}
-{% set text_query = "What is the capital of France?" %}
-{% set max_new_tokens = 64 %}
-{% set num_return_sequences = 1 %}
-{% set tokenizer_id = "t5-base" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("jxm/gtr__nq__32") %}
+{% set text_query = text_query | default("What is the capital of France?") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
+{% set tokenizer_id = tokenizer_id | default("t5-base") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_query = "{{ text_query }}"

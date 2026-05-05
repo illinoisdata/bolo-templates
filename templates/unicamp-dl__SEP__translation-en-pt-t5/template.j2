@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "unicamp-dl/translation-en-pt-t5" %}
-{% set text_prompt = "translate English to Portuguese: I like to eat rice." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("unicamp-dl/translation-en-pt-t5") %}
+{% set text_prompt = text_prompt | default("translate English to Portuguese: I like to eat rice.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_prompt = "{{ text_prompt }}"

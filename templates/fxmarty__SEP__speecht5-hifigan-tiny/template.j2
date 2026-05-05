@@ -1,12 +1,11 @@
-{% set repo_id = "fxmarty/speecht5-hifigan-tiny" %}
-{% set device = "cuda:0" %}
-{% set audio_path = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-{% set sampling_rate = 16000 %}
-{% set mel_n_fft = 1024 %}
-{% set mel_win_length = 1024 %}
-{% set mel_hop_length = 256 %}
-{% set mel_n_mels = 80 %}
-
+{% set repo_id = repo_id | default("fxmarty/speecht5-hifigan-tiny") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
+{% set sampling_rate = sampling_rate | default(16000) %}
+{% set mel_n_fft = mel_n_fft | default(1024) %}
+{% set mel_win_length = mel_win_length | default(1024) %}
+{% set mel_hop_length = mel_hop_length | default(256) %}
+{% set mel_n_mels = mel_n_mels | default(80) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"

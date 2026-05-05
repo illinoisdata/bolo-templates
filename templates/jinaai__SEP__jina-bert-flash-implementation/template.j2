@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "jinaai/jina-bert-flash-implementation" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("jinaai/jina-bert-flash-implementation") %}
 repo_id = "{{ repo_id }}"
 
 from huggingface_hub import list_repo_files

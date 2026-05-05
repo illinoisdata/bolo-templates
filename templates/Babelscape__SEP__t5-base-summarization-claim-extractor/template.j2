@@ -1,6 +1,6 @@
-{% set repo_id = "Babelscape/t5-base-summarization-claim-extractor" %}
-{% set device = "cuda:0" %}
-{% set summary_text = """Simone Biles made a triumphant return to the Olympic stage at the Paris 2024 Games, competing in the women's gymnastics qualifications. Overcoming a previous struggle with the 'twisties' that led to her withdrawal from events at the Tokyo 2020 Olympics, Biles dazzled with strong performances on all apparatus, helping the U.S. team secure a commanding lead in the qualifications. Her routines showcased her resilience and skill, drawing enthusiastic support from a star-studded audience.""" %}
+{% set repo_id = repo_id | default("Babelscape/t5-base-summarization-claim-extractor") %}
+{% set device = device | default("cuda:0") %}
+{% set summary_text = summary_text | default("""Simone Biles made a triumphant return to the Olympic stage at the Paris 2024 Games, competing in the women's gymnastics qualifications. Overcoming a previous struggle with the 'twisties' that led to her withdrawal from events at the Tokyo 2020 Olympics, Biles dazzled with strong performances on all apparatus, helping the U.S. team secure a commanding lead in the qualifications. Her routines showcased her resilience and skill, drawing enthusiastic support from a star-studded audience.""") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 summary_text = """Simone Biles made a triumphant return to the Olympic stage at the Paris 2024 Games, competing in the women's gymnastics qualifications. Overcoming a previous struggle with the 'twisties' that led to her withdrawal from events at the Tokyo 2020 Olympics, Biles dazzled with strong performances on all apparatus, helping the U.S. team secure a commanding lead in the qualifications. Her routines showcased her resilience and skill, drawing enthusiastic support from a star-studded audience."""

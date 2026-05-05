@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "RUNorm/RUNorm-kirillizator" %}
-{% set input_text = "Пример текста для нормализации: номер 123" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("RUNorm/RUNorm-kirillizator") %}
+{% set input_text = input_text | default("Пример текста для нормализации: номер 123") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

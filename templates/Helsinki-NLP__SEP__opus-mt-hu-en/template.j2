@@ -1,6 +1,6 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-hu-en" %}
-{% set device = "cuda:0" %}
-{% set source_text = "Ez egy egyszerű teszt." %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-hu-en") %}
+{% set device = device | default("cuda:0") %}
+{% set source_text = source_text | default("Ez egy egyszerű teszt.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = "{{ source_text }}"

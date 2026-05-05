@@ -1,7 +1,6 @@
-{% set repo_id = "almanach/camembert-base-wikipedia-4gb" %}
-{% set device = "cuda:0" %}
-{% set text = "Le camembert est un fromage de <mask>!" %}
-
+{% set repo_id = repo_id | default("almanach/camembert-base-wikipedia-4gb") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Le camembert est un fromage de <mask>!") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

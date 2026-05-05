@@ -1,9 +1,8 @@
-{% set repo_id = "google/pix2struct-textcaps-base" %}
-{% set device = "cuda:0" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set prompt_text = "" %}
-{% set max_patches = None %}
-
+{% set repo_id = repo_id | default("google/pix2struct-textcaps-base") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set prompt_text = prompt_text | default("") %}
+{% set max_patches = max_patches | default(None) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 image_path = {{ image_path | tojson }}

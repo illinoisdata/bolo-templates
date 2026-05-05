@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "circulus/koelectra-emotion-v1" %}
-{% set text_input = "오늘 기분이 좋습니다. 날씨도 화창해요." %}
-{% set probability_threshold = 0.5 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("circulus/koelectra-emotion-v1") %}
+{% set text_input = text_input | default("오늘 기분이 좋습니다. 날씨도 화창해요.") %}
+{% set probability_threshold = probability_threshold | default(0.5) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_input = {{ text_input | tojson }}

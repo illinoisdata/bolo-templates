@@ -1,7 +1,6 @@
-{% set repo_id = "echarlaix/t5-small-openvino" %}
-{% set device = "cuda:0" %}
-{% set text = "He never went out without a book under his arm, and he often came back with two." %}
-
+{% set repo_id = repo_id | default("echarlaix/t5-small-openvino") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("He never went out without a book under his arm, and he often came back with two.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

@@ -1,9 +1,8 @@
-{% set repo_id = "vinai/vinai-translate-vi2en" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Việt Nam là một đất nước xinh đẹp." %}
-{% set max_length = 1024 %}
-{% set num_beams = 5 %}
-
+{% set repo_id = repo_id | default("vinai/vinai-translate-vi2en") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Việt Nam là một đất nước xinh đẹp.") %}
+{% set max_length = max_length | default(1024) %}
+{% set num_beams = num_beams | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

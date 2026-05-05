@@ -1,8 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Seznam/simcse-dist-mpnet-czeng-cs-en" %}
-{% set text_a = "Dnes je výborné počasí na procházku po parku." %}
-{% set text_b = "Večer si oblíbím dobrý film a uvařím si čaj." %}
-{% set max_length = 512 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Seznam/simcse-dist-mpnet-czeng-cs-en") %}
+{% set text_a = text_a | default("Dnes je výborné počasí na procházku po parku.") %}
+{% set text_b = text_b | default("Večer si oblíbím dobrý film a uvařím si čaj.") %}
+{% set max_length = max_length | default(512) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_a = "{{ text_a }}"

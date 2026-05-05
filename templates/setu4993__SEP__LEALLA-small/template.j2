@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "setu4993/LEALLA-small" %}
-{% set sentences_1 = ["This is a sentence.", "This is another sentence."] %}
-{% set sentences_2 = ["C'est une phrase.", "C'est une autre phrase."] %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("setu4993/LEALLA-small") %}
+{% set sentences_1 = sentences_1 | default(["This is a sentence.", "This is another sentence."]) %}
+{% set sentences_2 = sentences_2 | default(["C'est une phrase.", "C'est une autre phrase."]) %}
 device = "{{ device }}"
 repo_id = "{{ repo_id }}"
 sentences_1 = {{ sentences_1 }}

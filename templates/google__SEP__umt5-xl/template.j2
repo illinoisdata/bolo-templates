@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/umt5-xl" %}
-{% set prompt = "Translate English to Spanish: The quick brown fox jumps over the lazy dog." %}
-{% set output_filename = "generation.txt" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/umt5-xl") %}
+{% set prompt = prompt | default("Translate English to Spanish: The quick brown fox jumps over the lazy dog.") %}
+{% set output_filename = output_filename | default("generation.txt") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

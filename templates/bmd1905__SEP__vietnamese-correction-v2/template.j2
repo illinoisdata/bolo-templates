@@ -1,5 +1,5 @@
-{% set repo_id = "bmd1905/vietnamese-correction-v2" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("bmd1905/vietnamese-correction-v2") %}
+{% set device = device | default("cuda:0") %}
 {% set text_samples = [
     "côn viec kin doanh thì rất kho khan nên toi quyết dinh chuyển sang nghề khac",
     "toi dang là sinh diên nam hai ở truong đạ hoc khoa jọc tự nhiên , trogn năm ke tiep toi sẽ chọn chuyen nganh về trí tue nhana tạo",
@@ -14,8 +14,7 @@
     "nèn kinh te thé giới đang đứng trươc nguy co của mọt cuoc suy thoai",
     "kinh tế viet nam dang dứng truoc 1 thoi ky đổi mơi chưa tung có tienf lệ trong lịch sử"
 ] %}
-{% set max_length = 512 %}
-
+{% set max_length = max_length | default(512) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_samples = {{ text_samples | tojson }}

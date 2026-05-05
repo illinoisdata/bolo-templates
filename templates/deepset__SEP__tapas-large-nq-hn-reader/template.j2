@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "deepset/tapas-large-nq-hn-reader" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("deepset/tapas-large-nq-hn-reader") %}
 import inspect
 from transformers import AutoTokenizer
 

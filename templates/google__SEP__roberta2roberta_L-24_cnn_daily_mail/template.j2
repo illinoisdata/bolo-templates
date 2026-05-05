@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/roberta2roberta_L-24_cnn_daily_mail" %}
-{% set article_text = "(The Hollywood Reporter)\"The Rocky Horror Picture Show\" is the latest musical getting the small-screen treatment. Fox is developing a two-hour remake of the 1975 cult classic to be directed, executive-produced and choreographed by Kenneth Ortega (\"High School Musical\"). The project, tentatively titled \"The Rocky Horror Picture Show Event,\" is casting-contingent. The special will be filmed in advance and not air live, but few details beyond that are known. In addition to Ortega, Gail Berman and Lou Adler, who produced the original film, are also attached as executive producers. The special will be produced by Fox 21 Television Studios, and Berman's The Jackal Group. The special is timed to celebrate the 40th anniversary of the film, which has grossed more than $112 million and still plays in theaters across the country." %}
-{% set max_new_tokens = 200 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/roberta2roberta_L-24_cnn_daily_mail") %}
+{% set article_text = article_text | default("(The Hollywood Reporter)\"The Rocky Horror Picture Show\" is the latest musical getting the small-screen treatment. Fox is developing a two-hour remake of the 1975 cult classic to be directed, executive-produced and choreographed by Kenneth Ortega (\"High School Musical\"). The project, tentatively titled \"The Rocky Horror Picture Show Event,\" is casting-contingent. The special will be filmed in advance and not air live, but few details beyond that are known. In addition to Ortega, Gail Berman and Lou Adler, who produced the original film, are also attached as executive producers. The special will be produced by Fox 21 Television Studios, and Berman's The Jackal Group. The special is timed to celebrate the 40th anniversary of the film, which has grossed more than $112 million and still plays in theaters across the country.") %}
+{% set max_new_tokens = max_new_tokens | default(200) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 article = {{ article_text | tojson }}

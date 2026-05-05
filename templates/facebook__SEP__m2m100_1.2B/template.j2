@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/m2m100_1.2B" %}
-{% set src_text = "जीवन एक चॉकलेट बॉक्स की तरह है।" %}
-{% set src_lang = "hi" %}
-{% set tgt_lang = "fr" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/m2m100_1.2B") %}
+{% set src_text = src_text | default("जीवन एक चॉकलेट बॉक्स की तरह है।") %}
+{% set src_lang = src_lang | default("hi") %}
+{% set tgt_lang = tgt_lang | default("fr") %}
 device = "{{ device }}"
 repo_id = "{{ repo_id }}"
 src_text = "{{ src_text }}"

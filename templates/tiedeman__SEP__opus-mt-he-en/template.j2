@@ -1,5 +1,5 @@
-{% set repo_id = "tiedeman/opus-mt-he-en" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("tiedeman/opus-mt-he-en") %}
+{% set device = device | default("cuda:0") %}
 {% set src_text = src_text | default("זה מבחן תרגום") %}
 {% set num_beams = num_beams | default(6) %}
 {% set max_length = max_length | default(512) %}

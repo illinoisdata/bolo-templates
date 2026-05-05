@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "AutonLab/MOMENT-1-small" %}
-{% set input_series = "series: [11.0, 10.5, 10.8, 11.2]; horizon: 4" %}
-{% set tokenizer_source = "google/flan-t5-small" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("AutonLab/MOMENT-1-small") %}
+{% set input_series = input_series | default("series: [11.0, 10.5, 10.8, 11.2]; horizon: 4") %}
+{% set tokenizer_source = tokenizer_source | default("google/flan-t5-small") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_series = "{{ input_series }}"

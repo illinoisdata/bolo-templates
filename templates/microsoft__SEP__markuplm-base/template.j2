@@ -1,7 +1,6 @@
-{% set repo_id = "microsoft/markuplm-base" %}
-{% set device = "cuda:0" %}
-{% set text_input = "<html><body><p>Hello world!</p></body></html>" %}
-
+{% set repo_id = repo_id | default("microsoft/markuplm-base") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("<html><body><p>Hello world!</p></body></html>") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

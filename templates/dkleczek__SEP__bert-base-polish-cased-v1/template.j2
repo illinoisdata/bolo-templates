@@ -1,7 +1,6 @@
-{% set repo_id = "dkleczek/bert-base-polish-cased-v1" %}
-{% set device = "cuda:0" %}
-{% set text = "Adam Mickiewicz wielkim polskim <mask> był." %}
-
+{% set repo_id = repo_id | default("dkleczek/bert-base-polish-cased-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Adam Mickiewicz wielkim polskim <mask> był.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

@@ -1,10 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "OpenMOSS-Team/bart-large-chinese" %}
-{% set text_input = "北京是[MASK]的首都" %}
-{% set max_length = 50 %}
-{% set num_beams = 4 %}
-{% set do_sample = false %}
-{% set output_filename = "generated_text.txt" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("OpenMOSS-Team/bart-large-chinese") %}
+{% set text_input = text_input | default("北京是[MASK]的首都") %}
+{% set max_length = max_length | default(50) %}
+{% set num_beams = num_beams | default(4) %}
+{% set do_sample = do_sample | default(false) %}
+{% set output_filename = output_filename | default("generated_text.txt") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

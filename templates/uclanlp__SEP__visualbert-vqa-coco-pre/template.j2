@@ -1,8 +1,7 @@
-{% set repo_id = "uclanlp/visualbert-vqa-coco-pre" %}
-{% set device = "cuda:0" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set question = "What object is the focus of the image?" %}
-
+{% set repo_id = repo_id | default("uclanlp/visualbert-vqa-coco-pre") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set question = question | default("What object is the focus of the image?") %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 image_path = {{ image_path | tojson }}

@@ -57,3 +57,4 @@ transformers @ git+https://github.com/huggingface/transformers.git@947eff6e756ff
 triton==3.6.0
 typer==0.24.1
 typing-extensions==4.15.0
+pybolo

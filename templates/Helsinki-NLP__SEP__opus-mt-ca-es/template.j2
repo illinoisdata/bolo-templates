@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-ca-es" %}
-{% set source_text = "Aquest és un exemple de text en català per a la traducció." %}
-{% set max_length = 512 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-ca-es") %}
+{% set source_text = source_text | default("Aquest és un exemple de text en català per a la traducció.") %}
+{% set max_length = max_length | default(512) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = "{{ source_text }}"

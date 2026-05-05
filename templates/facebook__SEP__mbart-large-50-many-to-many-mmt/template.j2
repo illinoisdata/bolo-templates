@@ -1,8 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/mbart-large-50-many-to-many-mmt" %}
-{% set text_input = "The UN secretary-general says there is no military solution in Syria." %}
-{% set src_lang = "en_XX" %}
-{% set target_lang = "fr_XX" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/mbart-large-50-many-to-many-mmt") %}
+{% set text_input = text_input | default("The UN secretary-general says there is no military solution in Syria.") %}
+{% set src_lang = src_lang | default("en_XX") %}
+{% set target_lang = target_lang | default("fr_XX") %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_input = {{ text_input | tojson }}

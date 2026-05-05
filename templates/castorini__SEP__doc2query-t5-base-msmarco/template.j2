@@ -1,11 +1,10 @@
-{% set repo_id = "castorini/doc2query-t5-base-msmarco" %}
-{% set device = "cuda:0" %}
-{% set doc_text = "Document expansion generates helpful queries to improve retrieval quality." %}
-{% set num_return_sequences = 3 %}
-{% set num_beams = 4 %}
-{% set max_length = 64 %}
-{% set temperature = 1.0 %}
-
+{% set repo_id = repo_id | default("castorini/doc2query-t5-base-msmarco") %}
+{% set device = device | default("cuda:0") %}
+{% set doc_text = doc_text | default("Document expansion generates helpful queries to improve retrieval quality.") %}
+{% set num_return_sequences = num_return_sequences | default(3) %}
+{% set num_beams = num_beams | default(4) %}
+{% set max_length = max_length | default(64) %}
+{% set temperature = temperature | default(1.0) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 doc_text = "{{ doc_text }}"

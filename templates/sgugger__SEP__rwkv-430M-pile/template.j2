@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "sgugger/rwkv-430M-pile" %}
-{% set prompt = "Hello, my name is" %}
-{% set max_new_tokens = 50 %}
-{% set temperature = 1.0 %}
-{% set do_sample = false %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("sgugger/rwkv-430M-pile") %}
+{% set prompt = prompt | default("Hello, my name is") %}
+{% set max_new_tokens = max_new_tokens | default(50) %}
+{% set temperature = temperature | default(1.0) %}
+{% set do_sample = do_sample | default(false) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

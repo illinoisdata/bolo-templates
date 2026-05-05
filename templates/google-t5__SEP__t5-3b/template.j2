@@ -1,14 +1,13 @@
-{% set repo_id = "google-t5/t5-3b" %}
-{% set device = "cuda:0" %}
-{% set prefix = "summarize: " %}
-{% set text = "My friends are cool but they eat too many carbs." %}
-{% set max_length = 200 %}
-{% set min_length = 30 %}
-{% set length_penalty = 2.0 %}
-{% set no_repeat_ngram_size = 3 %}
-{% set num_beams = 4 %}
-{% set early_stopping = True %}
-
+{% set repo_id = repo_id | default("google-t5/t5-3b") %}
+{% set device = device | default("cuda:0") %}
+{% set prefix = prefix | default("summarize: ") %}
+{% set text = text | default("My friends are cool but they eat too many carbs.") %}
+{% set max_length = max_length | default(200) %}
+{% set min_length = min_length | default(30) %}
+{% set length_penalty = length_penalty | default(2.0) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
+{% set num_beams = num_beams | default(4) %}
+{% set early_stopping = early_stopping | default(True) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prefix = "{{ prefix }}"

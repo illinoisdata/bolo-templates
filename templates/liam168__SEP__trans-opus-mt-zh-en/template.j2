@@ -1,8 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "liam168/trans-opus-mt-zh-en" %}
-{% set input_text = "我喜欢学习数据科学和机器学习。" %}
-{% set max_length = 400 %}
-{% set num_beams = 4 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("liam168/trans-opus-mt-zh-en") %}
+{% set input_text = input_text | default("我喜欢学习数据科学和机器学习。") %}
+{% set max_length = max_length | default(400) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "biu-nlp/lingmess-coref" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("biu-nlp/lingmess-coref") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 

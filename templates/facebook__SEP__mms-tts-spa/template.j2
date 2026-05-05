@@ -1,6 +1,6 @@
-{% set repo_id = "facebook/mms-tts-spa" %}
-{% set device = "cuda:0" %}
-{% set text = "Hola, este es un ejemplo breve de texto en español para convertir a habla." %}
+{% set repo_id = repo_id | default("facebook/mms-tts-spa") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Hola, este es un ejemplo breve de texto en español para convertir a habla.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

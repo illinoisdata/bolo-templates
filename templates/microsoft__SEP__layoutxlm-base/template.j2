@@ -1,5 +1,5 @@
-{% set repo_id = "microsoft/layoutxlm-base" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("microsoft/layoutxlm-base") %}
+{% set device = device | default("cuda:0") %}
 {% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
 {% set words = words | default(["Invoice", "Date", "Total"]) %}
 {% set boxes = boxes | default([[0, 0, 360, 90], [0, 110, 360, 200], [0, 220, 360, 310]]) %}

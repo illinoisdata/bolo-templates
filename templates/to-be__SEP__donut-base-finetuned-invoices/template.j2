@@ -1,9 +1,8 @@
-{% set repo_id = "to-be/donut-base-finetuned-invoices" %}
-{% set device = "cuda:0" %}
-{% set document_image_path = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
-{% set max_length = 768 %}
-{% set num_beams = 1 %}
-
+{% set repo_id = repo_id | default("to-be/donut-base-finetuned-invoices") %}
+{% set device = device | default("cuda:0") %}
+{% set document_image_path = document_image_path | default("/u/yli77/projects/ML-code-generation/data/doc.jpeg") %}
+{% set max_length = max_length | default(768) %}
+{% set num_beams = num_beams | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 document_image_path = "{{ document_image_path }}"

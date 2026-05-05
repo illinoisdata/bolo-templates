@@ -1,7 +1,6 @@
-{% set repo_id = "lmsys/fastchat-t5-3b-v1.0" %}
-{% set device = "cuda:0" %}
-{% set prompt = "Hello, how are you?" %}
-
+{% set repo_id = repo_id | default("lmsys/fastchat-t5-3b-v1.0") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default("Hello, how are you?") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

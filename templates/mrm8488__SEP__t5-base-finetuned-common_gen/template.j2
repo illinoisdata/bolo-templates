@@ -1,9 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "mrm8488/t5-base-finetuned-common_gen" %}
-{% set prompt = "tree plant ground hole dig" %}
-{% set max_length = 64 %}
-{% set num_beams = 4 %}
-{% set num_return_sequences = 1 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("mrm8488/t5-base-finetuned-common_gen") %}
+{% set prompt = prompt | default("tree plant ground hole dig") %}
+{% set max_length = max_length | default(64) %}
+{% set num_beams = num_beams | default(4) %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

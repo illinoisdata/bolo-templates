@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "UBC-NLP/AraT5-base" %}
-{% set prompt = "هذا اختبار لتوليد نص عربي باستخدام AraT5-base." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("UBC-NLP/AraT5-base") %}
+{% set prompt = prompt | default("هذا اختبار لتوليد نص عربي باستخدام AraT5-base.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

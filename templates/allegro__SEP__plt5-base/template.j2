@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "allegro/plt5-base" %}
-{% set prompt = "translate Polish to English: To jest testowy akapit opisujący pogodę." %}
-{% set max_new_tokens = 64 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("allegro/plt5-base") %}
+{% set prompt = prompt | default("translate Polish to English: To jest testowy akapit opisujący pogodę.") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

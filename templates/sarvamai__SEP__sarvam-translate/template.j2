@@ -1,12 +1,11 @@
-{% set repo_id = "sarvamai/sarvam-translate" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Be the change you wish to see in the world." %}
-{% set target_language = "Hindi" %}
-{% set max_new_tokens = 1024 %}
-{% set do_sample = true %}
-{% set temperature = 0.01 %}
-{% set num_return_sequences = 1 %}
-
+{% set repo_id = repo_id | default("sarvamai/sarvam-translate") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Be the change you wish to see in the world.") %}
+{% set target_language = target_language | default("Hindi") %}
+{% set max_new_tokens = max_new_tokens | default(1024) %}
+{% set do_sample = do_sample | default(true) %}
+{% set temperature = temperature | default(0.01) %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

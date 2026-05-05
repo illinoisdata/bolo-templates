@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ibm-granite/granite-embedding-107m-multilingual" %}
-{% set query_texts = ["Who made the song My achy breaky heart?", "summit define"] %}
-{% set passage_texts = ["Achy Breaky Heart is a country song written by Don Von Tress. Originally titled Don't Tell My Heart and performed by The Marcy Brothers in 1991.", "Definition of summit: the highest point of a mountain, the highest level, or a meeting of governments."] %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ibm-granite/granite-embedding-107m-multilingual") %}
+{% set query_texts = query_texts | default(["Who made the song My achy breaky heart?", "summit define"]) %}
+{% set passage_texts = passage_texts | default(["Achy Breaky Heart is a country song written by Don Von Tress. Originally titled Don't Tell My Heart and performed by The Marcy Brothers in 1991.", "Definition of summit: the highest point of a mountain, the highest level, or a meeting of governments."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query_texts = {{ query_texts }}

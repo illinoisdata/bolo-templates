@@ -1,15 +1,14 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "pszemraj/led-base-book-summary" %}
-{% set text_input = """The majority of available text summarization datasets include short-form source documents that lack long-range causal and temporal dependencies, and often contain strong layout and stylistic biases. BookSum introduces long-form narratives such as novels, plays, and stories with highly abstractive human-written summaries that pose challenges including very long documents, nontrivial causal and temporal dependencies, and rich discourse structures.""" %}
-{% set max_length = 96 %}
-{% set min_length = 8 %}
-{% set no_repeat_ngram_size = 3 %}
-{% set encoder_no_repeat_ngram_size = 3 %}
-{% set num_beams = 4 %}
-{% set repetition_penalty = 3.5 %}
-{% set length_penalty = 0.3 %}
-{% set early_stopping = true %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("pszemraj/led-base-book-summary") %}
+{% set text_input = text_input | default("""The majority of available text summarization datasets include short-form source documents that lack long-range causal and temporal dependencies, and often contain strong layout and stylistic biases. BookSum introduces long-form narratives such as novels, plays, and stories with highly abstractive human-written summaries that pose challenges including very long documents, nontrivial causal and temporal dependencies, and rich discourse structures.""") %}
+{% set max_length = max_length | default(96) %}
+{% set min_length = min_length | default(8) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
+{% set encoder_no_repeat_ngram_size = encoder_no_repeat_ngram_size | default(3) %}
+{% set num_beams = num_beams | default(4) %}
+{% set repetition_penalty = repetition_penalty | default(3.5) %}
+{% set length_penalty = length_penalty | default(0.3) %}
+{% set early_stopping = early_stopping | default(true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = {{ text_input | tojson }}

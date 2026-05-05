@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "mrm8488/t5-small-finetuned-common_gen" %}
-{% set input_text = "apples, oranges, and bananas" %}
-{% set max_length = 50 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("mrm8488/t5-small-finetuned-common_gen") %}
+{% set input_text = input_text | default("apples, oranges, and bananas") %}
+{% set max_length = max_length | default(50) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

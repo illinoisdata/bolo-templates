@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/t5-efficient-small" %}
-{% set prompt = "Translate English to German: The house is wonderful." %}
-{% set max_new_tokens = 64 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/t5-efficient-small") %}
+{% set prompt = prompt | default("Translate English to German: The house is wonderful.") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = {{ prompt | tojson }}

@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "syssec-utd/py312-pylingual-v1-statement" %}
-{% set prompt = "summarize: The Transformers library allows developers to build powerful text generation models for natural language tasks." %}
-{% set max_length = 256 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("syssec-utd/py312-pylingual-v1-statement") %}
+{% set prompt = prompt | default("summarize: The Transformers library allows developers to build powerful text generation models for natural language tasks.") %}
+{% set max_length = max_length | default(256) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

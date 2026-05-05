@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "IAMJB/chexpert-mimic-cxr-impression-baseline" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set max_length = 128 %}
-{% set num_beams = 2 %}
-{% set num_return_sequences = 1 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("IAMJB/chexpert-mimic-cxr-impression-baseline") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(2) %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
 device = "{{ device }}"
 repo_id = "{{ repo_id }}"
 image_path = "{{ image_path }}"

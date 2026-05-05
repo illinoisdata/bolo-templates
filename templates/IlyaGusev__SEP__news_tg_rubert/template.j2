@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "IlyaGusev/news_tg_rubert" %}
-{% set text = "Сегодня [MASK] хорошая погода." %}
-{% set top_k = 5 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("IlyaGusev/news_tg_rubert") %}
+{% set text = text | default("Сегодня [MASK] хорошая погода.") %}
+{% set top_k = top_k | default(5) %}
 text = "{{ text }}"
 top_k = {{ top_k }}
 repo_id = "{{ repo_id }}"

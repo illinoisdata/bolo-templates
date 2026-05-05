@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "dangvantuan/CrossEncoder-camembert-large" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("dangvantuan/CrossEncoder-camembert-large") %}
 {% set sentence_pairs = [
     ("Un avion est en train de décoller.", "Un homme joue d'une grande flûte."),
     ("Un homme étale du fromage râpé sur une pizza.", "Une personne jette un chat au plafond")

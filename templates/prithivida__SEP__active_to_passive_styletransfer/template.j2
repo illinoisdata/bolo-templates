@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "prithivida/active_to_passive_styletransfer" %}
-{% set text_inputs = "The committee approved the new policy yesterday." %}
-{% set max_length = 128 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("prithivida/active_to_passive_styletransfer") %}
+{% set text_inputs = text_inputs | default("The committee approved the new policy yesterday.") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_inputs = "{{ text_inputs }}"

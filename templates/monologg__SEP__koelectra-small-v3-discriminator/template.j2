@@ -1,7 +1,6 @@
-{% set repo_id = "monologg/koelectra-small-v3-discriminator" %}
-{% set device = "cuda:0" %}
-{% set text_input = "이 문장은 KoELECTRA 사전학습 모델 테스트용 예시입니다." %}
-
+{% set repo_id = repo_id | default("monologg/koelectra-small-v3-discriminator") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("이 문장은 KoELECTRA 사전학습 모델 테스트용 예시입니다.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

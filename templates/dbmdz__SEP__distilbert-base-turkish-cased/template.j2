@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "dbmdz/distilbert-base-turkish-cased" %}
-{% set text_input = "Merhaba dunya, bu bir test cumlesidir." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("dbmdz/distilbert-base-turkish-cased") %}
+{% set text_input = text_input | default("Merhaba dunya, bu bir test cumlesidir.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

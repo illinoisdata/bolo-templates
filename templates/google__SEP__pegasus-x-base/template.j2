@@ -1,10 +1,9 @@
-{% set repo_id = "google/pegasus-x-base" %}
-{% set device = "cuda:0" %}
-{% set text_input = "The quick brown fox jumps over the lazy dog." %}
-{% set input_max_length = 1024 %}
-{% set generation_max_length = 256 %}
-{% set max_new_tokens = 128 %}
-
+{% set repo_id = repo_id | default("google/pegasus-x-base") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("The quick brown fox jumps over the lazy dog.") %}
+{% set input_max_length = input_max_length | default(1024) %}
+{% set generation_max_length = generation_max_length | default(256) %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

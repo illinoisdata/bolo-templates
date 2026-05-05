@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "microsoft/speecht5_vc" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("microsoft/speecht5_vc") %}
 {% set audio_input_path = audio_input_path | default('/u/yli77/projects/ML-code-generation/data/audio.wav') %}
 {% set vocoder_repo_id = vocoder_repo_id | default('microsoft/speecht5_hifigan') %}
 

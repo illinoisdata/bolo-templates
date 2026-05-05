@@ -1,8 +1,7 @@
-{% set repo_id = "facebook/flava-full" %}
-{% set device = "cuda:0" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set text = "a photo of a cat" %}
-
+{% set repo_id = repo_id | default("facebook/flava-full") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set text = text | default("a photo of a cat") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

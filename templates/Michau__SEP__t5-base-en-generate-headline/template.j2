@@ -1,8 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Michau/t5-base-en-generate-headline" %}
-{% set article_text = "President campaigns modernizes messaging with concise daily briefs." %}
-{% set max_length = 64 %}
-{% set num_beams = 3 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Michau/t5-base-en-generate-headline") %}
+{% set article_text = article_text | default("President campaigns modernizes messaging with concise daily briefs.") %}
+{% set max_length = max_length | default(64) %}
+{% set num_beams = num_beams | default(3) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 article_text = """President campaigns modernizes messaging with concise daily briefs."""

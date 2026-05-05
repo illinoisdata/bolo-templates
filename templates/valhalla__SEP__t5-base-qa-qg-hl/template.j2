@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "valhalla/t5-base-qa-qg-hl" %}
-{% set prompt = "generate question:  42  is the answer to life, the universe and everything. " %}
-{% set max_new_tokens = 64 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("valhalla/t5-base-qa-qg-hl") %}
+{% set prompt = prompt | default("generate question:  42  is the answer to life, the universe and everything. ") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 prompt = "{{ prompt }}"
 device = "{{ device }}"

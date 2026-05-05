@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "bloomberg/KBIR" %}
-{% set input_text = "The capital of France is <mask>." %}
-{% set top_k = 5 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("bloomberg/KBIR") %}
+{% set input_text = input_text | default("The capital of France is <mask>.") %}
+{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

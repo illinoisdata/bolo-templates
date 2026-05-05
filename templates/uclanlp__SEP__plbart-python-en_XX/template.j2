@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "uclanlp/plbart-python-en_XX" %}
-{% set source_text = "def greet():\n    print('Hello from PLBART translation!')" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("uclanlp/plbart-python-en_XX") %}
+{% set source_text = source_text | default("def greet():\n    print('Hello from PLBART translation!')") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = """{{ source_text }}"""

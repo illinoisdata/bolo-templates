@@ -1,7 +1,6 @@
-{% set repo_id = "facebook/vit-mae-large" %}
-{% set device = "cuda:0" %}
-{% set image_path = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
-
+{% set repo_id = repo_id | default("facebook/vit-mae-large") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yli77/projects/ML-code-generation/data/image1.jpeg') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

@@ -1,8 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/genre-linking-blink" %}
-{% set text_input = "Einstein was a [START_ENT] German [END_ENT] physicist." %}
-{% set num_beams = 5 %}
-{% set num_return_sequences = 5 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/genre-linking-blink") %}
+{% set text_input = text_input | default("Einstein was a [START_ENT] German [END_ENT] physicist.") %}
+{% set num_beams = num_beams | default(5) %}
+{% set num_return_sequences = num_return_sequences | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

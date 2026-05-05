@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/hf-seamless-m4t-medium" %}
-{% set text_prompt = "Hello, this is a SeamlessM4T text-to-speech demo." %}
-{% set src_lang = "eng" %}
-{% set tgt_lang = "fra" %}
-{% set output_audio_filename = "text_to_speech.wav" %}
-{% set sampling_rate = 16000 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/hf-seamless-m4t-medium") %}
+{% set text_prompt = text_prompt | default("Hello, this is a SeamlessM4T text-to-speech demo.") %}
+{% set src_lang = src_lang | default("eng") %}
+{% set tgt_lang = tgt_lang | default("fra") %}
+{% set output_audio_filename = output_audio_filename | default("text_to_speech.wav") %}
+{% set sampling_rate = sampling_rate | default(16000) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_prompt = "{{ text_prompt }}"

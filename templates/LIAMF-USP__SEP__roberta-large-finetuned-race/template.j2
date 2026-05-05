@@ -1,9 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "LIAMF-USP/roberta-large-finetuned-race" %}
-{% set question = "What is the capital of France?" %}
-{% set context = "France is a Western European country whose capital city is famous for the Eiffel Tower, art museums, and a rich cultural history." %}
-{% set options = ["Berlin", "Madrid", "Paris", "Rome"] %}
-{% set max_length = 128 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("LIAMF-USP/roberta-large-finetuned-race") %}
+{% set question = question | default("What is the capital of France?") %}
+{% set context = context | default("France is a Western European country whose capital city is famous for the Eiffel Tower, art museums, and a rich cultural history.") %}
+{% set options = options | default(["Berlin", "Madrid", "Paris", "Rome"]) %}
+{% set max_length = max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 question = "{{ question }}"

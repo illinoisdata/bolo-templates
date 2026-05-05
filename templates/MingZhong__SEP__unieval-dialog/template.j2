@@ -1,7 +1,6 @@
-{% set repo_id = "MingZhong/unieval-dialog" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Conversation: Hello, how are you? Response: I'm doing well." %}
-
+{% set repo_id = repo_id | default("MingZhong/unieval-dialog") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Conversation: Hello, how are you? Response: I'm doing well.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "almanach/camembert-large" %}
-{% set fill_text = "Le camembert est <mask> :)" %}
-{% set top_k = 5 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("almanach/camembert-large") %}
+{% set fill_text = fill_text | default("Le camembert est <mask> :)") %}
+{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 fill_text = "{{ fill_text }}"

@@ -1,8 +1,7 @@
-{% set repo_id = "microsoft/trocr-base-printed" %}
-{% set device = "cuda:0" %}
-{% set document_image_path = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
-{% set generate_max_length = 256 %}
-
+{% set repo_id = repo_id | default("microsoft/trocr-base-printed") %}
+{% set device = device | default("cuda:0") %}
+{% set document_image_path = document_image_path | default("/u/yli77/projects/ML-code-generation/data/doc.jpeg") %}
+{% set generate_max_length = generate_max_length | default(256) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 document_image_path = "{{ document_image_path }}"

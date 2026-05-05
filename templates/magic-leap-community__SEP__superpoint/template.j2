@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "magic-leap-community/superpoint" %}
-{% set image_path = '/u/yli77/projects/ML-code-generation/data/image1.jpeg' %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("magic-leap-community/superpoint") %}
+{% set image_path = image_path | default('/u/yli77/projects/ML-code-generation/data/image1.jpeg') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

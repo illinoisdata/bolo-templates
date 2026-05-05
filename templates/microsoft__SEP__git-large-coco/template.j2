@@ -1,8 +1,7 @@
-{% set repo_id = "microsoft/git-large-coco" %}
-{% set device = "cuda:0" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set prompt = "a photography of" %}
-
+{% set repo_id = repo_id | default("microsoft/git-large-coco") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set prompt = prompt | default("a photography of") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

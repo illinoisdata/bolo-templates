@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "sshleifer/tiny-mbart" %}
-{% set src_text = "Hello, world!" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("sshleifer/tiny-mbart") %}
+{% set src_text = src_text | default("Hello, world!") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 src_text = "{{ src_text }}"

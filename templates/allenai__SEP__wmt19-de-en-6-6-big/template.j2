@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "allenai/wmt19-de-en-6-6-big" %}
-{% set source_text = "Maschinelles Lernen ist großartig, nicht wahr?" %}
-{% set max_length = 128 %}
-{% set num_beams = 5 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("allenai/wmt19-de-en-6-6-big") %}
+{% set source_text = source_text | default("Maschinelles Lernen ist großartig, nicht wahr?") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(5) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 source_text = {{ source_text | tojson }}

@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "michaelfeil/colbert-tiny-random" %}
-{% set query_text = "ColBERT is a dense retrieval architecture built on BERT." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("michaelfeil/colbert-tiny-random") %}
+{% set query_text = query_text | default("ColBERT is a dense retrieval architecture built on BERT.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query_text = "{{ query_text }}"

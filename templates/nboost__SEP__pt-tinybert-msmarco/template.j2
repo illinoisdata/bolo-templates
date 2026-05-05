@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "nboost/pt-tinybert-msmarco" %}
-{% set text_input = "Encode a sample Portuguese query with pt-tinybert-msmarco." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("nboost/pt-tinybert-msmarco") %}
+{% set text_input = text_input | default("Encode a sample Portuguese query with pt-tinybert-msmarco.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = "{{ text_input }}"

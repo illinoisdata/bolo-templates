@@ -1,9 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ielabgroup/vec2text_gtr-base-st_inversion" %}
-{% set prompt = "Summarize the potential research applications of text inversion models." %}
-{% set max_length = 64 %}
-{% set num_beams = 4 %}
-{% set output_path = "/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ielabgroup__SEP__vec2text_gtr-base-st_inversion" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ielabgroup/vec2text_gtr-base-st_inversion") %}
+{% set prompt = prompt | default("Summarize the potential research applications of text inversion models.") %}
+{% set max_length = max_length | default(64) %}
+{% set num_beams = num_beams | default(4) %}
+{% set output_path = output_path | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/ielabgroup__SEP__vec2text_gtr-base-st_inversion") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = """{{ prompt }}"""

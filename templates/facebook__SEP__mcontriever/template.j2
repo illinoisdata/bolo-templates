@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "facebook/mcontriever" %}
-{% set texts = ["How does Contriever encode a sentence?", "Retrieve dense embeddings for similarity search."] %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("facebook/mcontriever") %}
+{% set texts = texts | default(["How does Contriever encode a sentence?", "Retrieve dense embeddings for similarity search."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 texts = {{ texts }}

@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "circulus/kobart-copywrite-v1" %}
-{% set text = "이 제품의 장점을 광고 문구로 작성하세요." %}
-{% set max_length = 50 %}
-{% set num_beams = 4 %}
-{% set num_return_sequences = 1 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("circulus/kobart-copywrite-v1") %}
+{% set text = text | default("이 제품의 장점을 광고 문구로 작성하세요.") %}
+{% set max_length = max_length | default(50) %}
+{% set num_beams = num_beams | default(4) %}
+{% set num_return_sequences = num_return_sequences | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

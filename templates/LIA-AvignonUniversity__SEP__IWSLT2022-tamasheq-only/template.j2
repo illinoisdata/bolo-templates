@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "LIA-AvignonUniversity/IWSLT2022-tamasheq-only" %}
-{% set audio_file = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("LIA-AvignonUniversity/IWSLT2022-tamasheq-only") %}
+{% set audio_file = audio_file | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_file = "{{ audio_file }}"

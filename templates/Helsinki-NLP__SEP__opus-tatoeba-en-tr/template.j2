@@ -1,8 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-tatoeba-en-tr" %}
-{% set source_text = "Hello, this is a test translation from English to Turkish." %}
-{% set max_length = 200 %}
-{% set num_beams = 6 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-tatoeba-en-tr") %}
+{% set source_text = source_text | default("Hello, this is a test translation from English to Turkish.") %}
+{% set max_length = max_length | default(200) %}
+{% set num_beams = num_beams | default(6) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = "{{ source_text }}"

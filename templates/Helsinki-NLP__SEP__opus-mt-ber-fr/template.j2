@@ -1,8 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-ber-fr" %}
-{% set source_text = "Hello, world!" %}
-{% set num_beams = 4 %}
-{% set max_new_tokens = 128 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-ber-fr") %}
+{% set source_text = source_text | default("Hello, world!") %}
+{% set num_beams = num_beams | default(4) %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_text = "{{ source_text }}"

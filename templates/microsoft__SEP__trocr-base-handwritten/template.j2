@@ -1,6 +1,6 @@
-{% set repo_id = "microsoft/trocr-base-handwritten" %}
-{% set device = "cuda:0" %}
-{% set document_image = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
+{% set repo_id = repo_id | default("microsoft/trocr-base-handwritten") %}
+{% set device = device | default("cuda:0") %}
+{% set document_image = document_image | default("/u/yli77/projects/ML-code-generation/data/doc.jpeg") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 document_image = "{{ document_image }}"

@@ -1,11 +1,10 @@
-{% set repo_id = "diffusers/ddpm_dummy" %}
-{% set device = "cuda:0" %}
-{% set batch_size = 1 %}
-{% set num_channels = 3 %}
-{% set height = 32 %}
-{% set width = 32 %}
-{% set time_step_value = 10 %}
-
+{% set repo_id = repo_id | default("diffusers/ddpm_dummy") %}
+{% set device = device | default("cuda:0") %}
+{% set batch_size = batch_size | default(1) %}
+{% set num_channels = num_channels | default(3) %}
+{% set height = height | default(32) %}
+{% set width = width | default(32) %}
+{% set time_step_value = time_step_value | default(10) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 batch_size = {{ batch_size }}

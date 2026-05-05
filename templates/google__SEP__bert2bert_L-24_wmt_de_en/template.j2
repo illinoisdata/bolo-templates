@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/bert2bert_L-24_wmt_de_en" %}
-{% set input_text = "Willst du einen Kaffee trinken gehen mit mir?" %}
-{% set max_new_tokens = 64 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/bert2bert_L-24_wmt_de_en") %}
+{% set input_text = input_text | default("Willst du einen Kaffee trinken gehen mit mir?") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

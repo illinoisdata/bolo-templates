@@ -1,8 +1,7 @@
-{% set repo_id = "google/umt5-small" %}
-{% set device = "cuda:0" %}
-{% set input_text = "translate English to Spanish: Machine learning is transforming the world." %}
-{% set max_new_tokens = 64 %}
-
+{% set repo_id = repo_id | default("google/umt5-small") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("translate English to Spanish: Machine learning is transforming the world.") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

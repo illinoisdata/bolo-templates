@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "retrieva-jp/t5-base-long" %}
-{% set prompt_text = "Translate English to Japanese: The quick brown fox jumps over the lazy dog." %}
-{% set max_new_tokens = 128 %}
-{% set num_beams = 4 %}
-{% set temperature = 1.0 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("retrieva-jp/t5-base-long") %}
+{% set prompt_text = prompt_text | default("Translate English to Japanese: The quick brown fox jumps over the lazy dog.") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set num_beams = num_beams | default(4) %}
+{% set temperature = temperature | default(1.0) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt_text = """{{ prompt_text }}"""

@@ -1,7 +1,6 @@
-{% set repo_id = "prajjwal1/bert-tiny" %}
-{% set device = "cuda:0" %}
-{% set texts = ["Hello, world!"] %}
-
+{% set repo_id = repo_id | default("prajjwal1/bert-tiny") %}
+{% set device = device | default("cuda:0") %}
+{% set texts = texts | default(["Hello, world!"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 texts = {{ texts }}

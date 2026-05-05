@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "allenai/scibert_scivocab_uncased" %}
-{% set text_input = "Scientific studies require models trained on domain-specific text." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("allenai/scibert_scivocab_uncased") %}
+{% set text_input = text_input | default("Scientific studies require models trained on domain-specific text.") %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 text_input = {{ text_input | tojson }}

@@ -1,8 +1,8 @@
-{% set repo_id = "alan-turing-institute/mt5-large-finetuned-mnli-xtreme-xnli" %}
-{% set device = "cuda:0" %}
-{% set sequence_to_classify = "¿A quién vas a votar en 2020?" %}
-{% set candidate_labels = ["Europa", "salud pública", "política"] %}
-{% set hypothesis_template = "Este ejemplo es {}." %}
+{% set repo_id = repo_id | default("alan-turing-institute/mt5-large-finetuned-mnli-xtreme-xnli") %}
+{% set device = device | default("cuda:0") %}
+{% set sequence_to_classify = sequence_to_classify | default("¿A quién vas a votar en 2020?") %}
+{% set candidate_labels = candidate_labels | default(["Europa", "salud pública", "política"]) %}
+{% set hypothesis_template = hypothesis_template | default("Este ejemplo es {}.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sequence_to_classify = "{{ sequence_to_classify }}"

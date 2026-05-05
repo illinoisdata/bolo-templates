@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "declare-lab/flan-alpaca-base" %}
-{% set prompt = "Describe the main features of instruction-tuned language models." %}
-{% set max_length = 256 %}
-{% set temperature = 0.7 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("declare-lab/flan-alpaca-base") %}
+{% set prompt = prompt | default("Describe the main features of instruction-tuned language models.") %}
+{% set max_length = max_length | default(256) %}
+{% set temperature = temperature | default(0.7) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

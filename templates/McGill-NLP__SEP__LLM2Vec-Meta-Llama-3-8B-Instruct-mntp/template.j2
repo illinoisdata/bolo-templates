@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp") %}
 repo_id = "{{ repo_id }}"
 
 from huggingface_hub import list_repo_files

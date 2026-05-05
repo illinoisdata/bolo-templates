@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Rostlab/prot_albert" %}
-{% set sequence = 'M T E Y K L V V V G A G G V G K S A L T I Q L I Q' %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Rostlab/prot_albert") %}
+{% set sequence = sequence | default('M T E Y K L V V V G A G G V G K S A L T I Q L I Q') %}
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'
 sequence = '{{ sequence }}'

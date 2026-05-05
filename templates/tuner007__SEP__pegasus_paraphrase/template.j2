@@ -1,11 +1,10 @@
-{% set repo_id = "tuner007/pegasus_paraphrase" %}
-{% set device = "cuda:0" %}
-{% set input_text = "The ultimate test of your knowledge is your capacity to convey it to another." %}
-{% set num_beams = 10 %}
-{% set num_return_sequences = 10 %}
-{% set max_length = 60 %}
-{% set temperature = 1.5 %}
-
+{% set repo_id = repo_id | default("tuner007/pegasus_paraphrase") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("The ultimate test of your knowledge is your capacity to convey it to another.") %}
+{% set num_beams = num_beams | default(10) %}
+{% set num_return_sequences = num_return_sequences | default(10) %}
+{% set max_length = max_length | default(60) %}
+{% set temperature = temperature | default(1.5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ElnaggarLab/ankh-base" %}
-{% set input_text = "Summarize how proteins fold using structural features." %}
-{% set max_new_tokens = 256 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ElnaggarLab/ankh-base") %}
+{% set input_text = input_text | default("Summarize how proteins fold using structural features.") %}
+{% set max_new_tokens = max_new_tokens | default(256) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

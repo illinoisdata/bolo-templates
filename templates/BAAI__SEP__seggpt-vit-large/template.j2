@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "BAAI/seggpt-vit-large" %}
-{% set image = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set prompt_image = "/u/yli77/projects/ML-code-generation/data/image2.jpeg" %}
-{% set prompt_mask = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
-{% set num_labels = 1 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("BAAI/seggpt-vit-large") %}
+{% set image = image | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set prompt_image = prompt_image | default("/u/yli77/projects/ML-code-generation/data/image2.jpeg") %}
+{% set prompt_mask = prompt_mask | default("/u/yli77/projects/ML-code-generation/data/doc.jpeg") %}
+{% set num_labels = num_labels | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image = "{{ image }}"

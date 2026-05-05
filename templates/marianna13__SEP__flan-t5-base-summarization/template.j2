@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "marianna13/flan-t5-base-summarization" %}
-{% set text = "The Arctic ice is melting faster than predicted, endangering species and coastal communities." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("marianna13/flan-t5-base-summarization") %}
+{% set text = text | default("The Arctic ice is melting faster than predicted, endangering species and coastal communities.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = """{{ text }}"""

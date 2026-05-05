@@ -1,12 +1,11 @@
-{% set repo_id = "Neleac/SpaceTimeGPT" %}
-{% set device = "cuda:0" %}
-{% set video_path = "/u/yli77/projects/ML-code-generation/data/video.avi" %}
-{% set min_length = 10 %}
-{% set max_length = 20 %}
-{% set num_beams = 4 %}
-{% set image_processor_repo = "facebook/timesformer-base-finetuned-k600" %}
-{% set tokenizer_repo = "gpt2" %}
-
+{% set repo_id = repo_id | default("Neleac/SpaceTimeGPT") %}
+{% set device = device | default("cuda:0") %}
+{% set video_path = video_path | default("/u/yli77/projects/ML-code-generation/data/video.avi") %}
+{% set min_length = min_length | default(10) %}
+{% set max_length = max_length | default(20) %}
+{% set num_beams = num_beams | default(4) %}
+{% set image_processor_repo = image_processor_repo | default("facebook/timesformer-base-finetuned-k600") %}
+{% set tokenizer_repo = tokenizer_repo | default("gpt2") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 video_path = "{{ video_path }}"

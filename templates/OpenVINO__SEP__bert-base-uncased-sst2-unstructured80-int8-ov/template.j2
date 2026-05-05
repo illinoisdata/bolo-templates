@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "OpenVINO/bert-base-uncased-sst2-unstructured80-int8-ov" %}
-{% set input_text = "The movie was absolutely wonderful and the performances were brilliant." %}
-{% set top_k = 2 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("OpenVINO/bert-base-uncased-sst2-unstructured80-int8-ov") %}
+{% set input_text = input_text | default("The movie was absolutely wonderful and the performances were brilliant.") %}
+{% set top_k = top_k | default(2) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

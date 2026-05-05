@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/long-t5-local-base" %}
-{% set prompt = "Summarize the following text about the LongT5 model, focusing on its purpose and capabilities." %}
-{% set max_new_tokens = 256 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/long-t5-local-base") %}
+{% set prompt = prompt | default("Summarize the following text about the LongT5 model, focusing on its purpose and capabilities.") %}
+{% set max_new_tokens = max_new_tokens | default(256) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"

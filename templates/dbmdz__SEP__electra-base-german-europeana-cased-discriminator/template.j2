@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "dbmdz/electra-base-german-europeana-cased-discriminator" %}
-{% set text = "Dies ist ein Beispieltext auf Deutsch für die Inferenz mit ELECTRA." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("dbmdz/electra-base-german-europeana-cased-discriminator") %}
+{% set text = text | default("Dies ist ein Beispieltext auf Deutsch für die Inferenz mit ELECTRA.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

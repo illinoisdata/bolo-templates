@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Rostlab/prot_t5_xl_half_uniref50-enc" %}
-{% set sequences = ["PRTEINO", "SEQWENCE"] %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Rostlab/prot_t5_xl_half_uniref50-enc") %}
+{% set sequences = sequences | default(["PRTEINO", "SEQWENCE"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sequences = {{ sequences }}

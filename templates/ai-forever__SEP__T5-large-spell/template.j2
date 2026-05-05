@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "ai-forever/T5-large-spell" %}
-{% set prefix = "grammar: " %}
-{% set text = "If you bought something goregous, you well be very happy." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ai-forever/T5-large-spell") %}
+{% set prefix = prefix | default("grammar: ") %}
+{% set text = text | default("If you bought something goregous, you well be very happy.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prefix = "{{ prefix }}"

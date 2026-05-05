@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "studio-ousia/luke-large-finetuned-tacred" %}
-{% set text = "Barack Obama was born in Honolulu." %}
-{% set entity_spans = [(0, 12), (25, 33)] %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("studio-ousia/luke-large-finetuned-tacred") %}
+{% set text = text | default("Barack Obama was born in Honolulu.") %}
+{% set entity_spans = entity_spans | default([(0, 12), (25, 33)]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

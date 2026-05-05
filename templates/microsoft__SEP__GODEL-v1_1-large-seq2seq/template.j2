@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "microsoft/GODEL-v1_1-large-seq2seq" %}
-{% set instruction = "Instruction: given a dialog context, you need to response empathically." %}
-{% set knowledge = "" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("microsoft/GODEL-v1_1-large-seq2seq") %}
+{% set instruction = instruction | default("Instruction: given a dialog context, you need to response empathically.") %}
+{% set knowledge = knowledge | default("") %}
 {% set dialog = [
     "Does money buy happiness?",
     "It is a question. Money buys you a lot of things, but not enough to buy happiness.",

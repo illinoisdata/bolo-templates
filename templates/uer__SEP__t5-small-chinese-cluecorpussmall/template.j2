@@ -1,9 +1,8 @@
-{% set repo_id = "uer/t5-small-chinese-cluecorpussmall" %}
-{% set device = "cuda:0" %}
-{% set input_text = "作为电子extra0的平台，京东绝对是领先者。如今的刘强extra1已经是身价过extra2的老板。" %}
-{% set max_length = 50 %}
-{% set do_sample = false %}
-
+{% set repo_id = repo_id | default("uer/t5-small-chinese-cluecorpussmall") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("作为电子extra0的平台，京东绝对是领先者。如今的刘强extra1已经是身价过extra2的老板。") %}
+{% set max_length = max_length | default(50) %}
+{% set do_sample = do_sample | default(false) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

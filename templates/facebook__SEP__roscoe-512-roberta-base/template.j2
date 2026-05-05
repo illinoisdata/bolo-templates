@@ -1,7 +1,6 @@
-{% set repo_id = "facebook/roscoe-512-roberta-base" %}
-{% set device = "cuda:0" %}
-{% set sentences = ["This is a test sentence.", "This is another one."] %}
-
+{% set repo_id = repo_id | default("facebook/roscoe-512-roberta-base") %}
+{% set device = device | default("cuda:0") %}
+{% set sentences = sentences | default(["This is a test sentence.", "This is another one."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences }}

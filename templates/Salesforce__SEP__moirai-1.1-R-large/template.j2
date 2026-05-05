@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Salesforce/moirai-1.1-R-large" %}
-{% set dummy = 0 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Salesforce/moirai-1.1-R-large") %}
+{% set dummy = dummy | default(0) %}
 dummy = {{ dummy }}
 
 import pkgutil

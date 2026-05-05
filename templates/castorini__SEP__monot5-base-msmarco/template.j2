@@ -1,9 +1,8 @@
-{% set repo_id = "castorini/monot5-base-msmarco" %}
-{% set device = "cuda:0" %}
-{% set query = "What is document reranking?" %}
-{% set document = "Monot5 is a T5-base reranker fine-tuned on MS MARCO passages." %}
-{% set max_new_tokens = 5 %}
-
+{% set repo_id = repo_id | default("castorini/monot5-base-msmarco") %}
+{% set device = device | default("cuda:0") %}
+{% set query = query | default("What is document reranking?") %}
+{% set document = document | default("Monot5 is a T5-base reranker fine-tuned on MS MARCO passages.") %}
+{% set max_new_tokens = max_new_tokens | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query = "{{ query }}"

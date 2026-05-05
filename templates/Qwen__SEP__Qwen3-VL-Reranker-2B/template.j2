@@ -1,8 +1,8 @@
-{% set repo_id = "Qwen/Qwen3-VL-Reranker-2B" %}
-{% set device = "cuda:0" %}
-{% set instruction = "Retrieve images or text relevant to the user's query." %}
-{% set query_text = "A woman playing with her dog on a beach at sunset." %}
-{% set image1 = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
+{% set repo_id = repo_id | default("Qwen/Qwen3-VL-Reranker-2B") %}
+{% set device = device | default("cuda:0") %}
+{% set instruction = instruction | default("Retrieve images or text relevant to the user's query.") %}
+{% set query_text = query_text | default("A woman playing with her dog on a beach at sunset.") %}
+{% set image1 = image1 | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
 {% set documents = [
     {"text": "A woman shares a joyful moment with her golden retriever on a sun-drenched beach at sunset, as the dog offers its paw in a heartwarming display of companionship and trust."},
     {"image": image1},

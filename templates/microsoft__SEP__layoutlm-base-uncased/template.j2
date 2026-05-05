@@ -1,9 +1,8 @@
-{% set repo_id = "microsoft/layoutlm-base-uncased" %}
-{% set device = "cuda:0" %}
-{% set image = "/u/yli77/projects/ML-code-generation/data/doc.jpeg" %}
-{% set words = ["Hello", "world", "!"] %}
-{% set boxes = [[0, 0, 100, 100], [100, 0, 200, 100], [200, 0, 300, 150]] %}
-
+{% set repo_id = repo_id | default("microsoft/layoutlm-base-uncased") %}
+{% set device = device | default("cuda:0") %}
+{% set image = image | default("/u/yli77/projects/ML-code-generation/data/doc.jpeg") %}
+{% set words = words | default(["Hello", "world", "!"]) %}
+{% set boxes = boxes | default([[0, 0, 100, 100], [100, 0, 200, 100], [200, 0, 300, 150]]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image = "{{ image }}"

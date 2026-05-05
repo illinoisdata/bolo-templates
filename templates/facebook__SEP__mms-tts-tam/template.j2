@@ -1,7 +1,6 @@
-{% set repo_id = "facebook/mms-tts-tam" %}
-{% set device = "cuda:0" %}
-{% set text = "some example text in the Tamil language" %}
-
+{% set repo_id = repo_id | default("facebook/mms-tts-tam") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("some example text in the Tamil language") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

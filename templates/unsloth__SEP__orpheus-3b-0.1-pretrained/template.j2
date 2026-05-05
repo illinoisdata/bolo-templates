@@ -1,9 +1,8 @@
-{% set repo_id = "unsloth/orpheus-3b-0.1-pretrained" %}
-{% set device = "cuda:0" %}
-{% set text_prompt = "Hello! Please describe the experience of a friendly, high-quality text-to-speech voice." %}
-{% set max_new_tokens = 256 %}
-{% set temperature = 0.7 %}
-
+{% set repo_id = repo_id | default("unsloth/orpheus-3b-0.1-pretrained") %}
+{% set device = device | default("cuda:0") %}
+{% set text_prompt = text_prompt | default("Hello! Please describe the experience of a friendly, high-quality text-to-speech voice.") %}
+{% set max_new_tokens = max_new_tokens | default(256) %}
+{% set temperature = temperature | default(0.7) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_prompt = """{{ text_prompt }}"""

@@ -1,8 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Qdrant/gte-large-onnx" %}
-{% set text_a = "A sentence describing how generative embeddings capture semantic similarity." %}
-{% set text_b = "Another sentence that shares the same semantic topic as the first one." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Qdrant/gte-large-onnx") %}
+{% set text_a = text_a | default("A sentence describing how generative embeddings capture semantic similarity.") %}
+{% set text_b = text_b | default("Another sentence that shares the same semantic topic as the first one.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_a = """{{ text_a }}"""

@@ -1,8 +1,7 @@
-{% set repo_id = "s-nlp/Mutual_Implication_Score" %}
-{% set device = "cuda:0" %}
-{% set source_texts = ["I want to leave this room", "Hello world, my name is Nick"] %}
-{% set paraphrases = ["I want to go out of this room", "Hello world, my surname is Petrov"] %}
-
+{% set repo_id = repo_id | default("s-nlp/Mutual_Implication_Score") %}
+{% set device = device | default("cuda:0") %}
+{% set source_texts = source_texts | default(["I want to leave this room", "Hello world, my name is Nick"]) %}
+{% set paraphrases = paraphrases | default(["I want to go out of this room", "Hello world, my surname is Petrov"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 source_texts = {{ source_texts }}

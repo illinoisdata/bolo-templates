@@ -1,7 +1,6 @@
-{% set repo_id = "persiannlp/mt5-large-parsinlu-opus-translation_fa_en" %}
-{% set device = "cuda:0" %}
-{% set input_text = "ستایش خدای را که پروردگار جهانیان است." %}
-
+{% set repo_id = repo_id | default("persiannlp/mt5-large-parsinlu-opus-translation_fa_en") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("ستایش خدای را که پروردگار جهانیان است.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

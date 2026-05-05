@@ -1,11 +1,10 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "transformersbook/pegasus-samsum" %}
-{% set input_text = "Today's meeting concluded with a plan to address the feature gaps next sprint, the support team is handling the critical bug fixes, and the design review will follow once the prototype is stabilized." %}
-{% set max_length = 128 %}
-{% set min_length = 30 %}
-{% set num_beams = 4 %}
-{% set length_penalty = 0.8 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("transformersbook/pegasus-samsum") %}
+{% set input_text = input_text | default("Today's meeting concluded with a plan to address the feature gaps next sprint, the support team is handling the critical bug fixes, and the design review will follow once the prototype is stabilized.") %}
+{% set max_length = max_length | default(128) %}
+{% set min_length = min_length | default(30) %}
+{% set num_beams = num_beams | default(4) %}
+{% set length_penalty = length_penalty | default(0.8) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

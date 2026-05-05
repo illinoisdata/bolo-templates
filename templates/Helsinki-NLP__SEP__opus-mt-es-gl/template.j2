@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "Helsinki-NLP/opus-mt-es-gl" %}
-{% set text = "Este es un texto en español que queremos traducir al gallego." %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-es-gl") %}
+{% set text = text | default("Este es un texto en español que queremos traducir al gallego.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

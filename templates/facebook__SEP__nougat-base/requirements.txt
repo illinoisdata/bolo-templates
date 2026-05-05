@@ -55,3 +55,4 @@ transformers==4.34.0
 triton==3.6.0
 typing-extensions==4.15.0
 urllib3==1.26.13
+pybolo

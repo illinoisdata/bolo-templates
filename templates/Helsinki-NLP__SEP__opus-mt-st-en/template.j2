@@ -1,9 +1,8 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-st-en" %}
-{% set device = "cuda:0" %}
-{% set input_texts = ["This is a test."] %}
-{% set max_length = 512 %}
-{% set num_beams = 6 %}
-
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-st-en") %}
+{% set device = device | default("cuda:0") %}
+{% set input_texts = input_texts | default(["This is a test."]) %}
+{% set max_length = max_length | default(512) %}
+{% set num_beams = num_beams | default(6) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_texts = {{ input_texts }}

@@ -1,7 +1,6 @@
-{% set repo_id = "sshleifer/distilbart-xsum-12-1" %}
-{% set device = "cuda:0" %}
-{% set input_text = "The Eiffel Tower is located in Paris and is one of the most famous landmarks in the world." %}
-
+{% set repo_id = repo_id | default("sshleifer/distilbart-xsum-12-1") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("The Eiffel Tower is located in Paris and is one of the most famous landmarks in the world.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = """{{ input_text }}"""

@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "mustafaaljadery/gemma-2B-10M" %}
-{% set prompt_text = "Write a concise summary of how advances in AI can benefit society." %}
-{% set max_new_tokens = 256 %}
-{% set temperature = 0.8 %}
-{% set top_p = 0.95 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("mustafaaljadery/gemma-2B-10M") %}
+{% set prompt_text = prompt_text | default("Write a concise summary of how advances in AI can benefit society.") %}
+{% set max_new_tokens = max_new_tokens | default(256) %}
+{% set temperature = temperature | default(0.8) %}
+{% set top_p = top_p | default(0.95) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 prompt_text = {{ prompt_text | tojson }}

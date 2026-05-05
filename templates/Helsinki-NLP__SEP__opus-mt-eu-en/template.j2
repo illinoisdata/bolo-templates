@@ -1,5 +1,5 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-eu-en" %}
-{% set device = "cuda:0" %}
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-eu-en") %}
+{% set device = device | default("cuda:0") %}
 {% set input_text = input_text | default("Kaixo, nola zaude?") %}
 
 repo_id = "{{ repo_id }}"

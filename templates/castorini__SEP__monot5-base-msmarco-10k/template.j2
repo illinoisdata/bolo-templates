@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "castorini/monot5-base-msmarco-10k" %}
-{% set query = "What is the role of monot5 reranker?" %}
-{% set passage = "Monot5 reranker is fine-tuned on MS MARCO to produce accurate rankings for passages." %}
-{% set max_length = 128 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("castorini/monot5-base-msmarco-10k") %}
+{% set query = query | default("What is the role of monot5 reranker?") %}
+{% set passage = passage | default("Monot5 reranker is fine-tuned on MS MARCO to produce accurate rankings for passages.") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query = {{ query | tojson }}

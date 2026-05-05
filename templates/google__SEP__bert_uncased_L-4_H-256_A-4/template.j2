@@ -1,7 +1,6 @@
-{% set repo_id = "google/bert_uncased_L-4_H-256_A-4" %}
-{% set device = "cuda:0" %}
-{% set text = "The capital of France is <mask>." %}
-
+{% set repo_id = repo_id | default("google/bert_uncased_L-4_H-256_A-4") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("The capital of France is <mask>.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

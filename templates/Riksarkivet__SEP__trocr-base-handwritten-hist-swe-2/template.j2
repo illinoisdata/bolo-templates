@@ -1,6 +1,5 @@
-{% set repo_id = "Riksarkivet/trocr-base-handwritten-hist-swe-2" %}
-{% set device = "cuda:0" %}
-
+{% set repo_id = repo_id | default("Riksarkivet/trocr-base-handwritten-hist-swe-2") %}
+{% set device = device | default("cuda:0") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 

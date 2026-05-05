@@ -1,7 +1,6 @@
-{% set repo_id = "jinaai/jina-embeddings-v4-vllm-retrieval" %}
-{% set device = "cuda:0" %}
-{% set text_prompt = "Provide a concise, factual summary of the following input sentence." %}
-
+{% set repo_id = repo_id | default("jinaai/jina-embeddings-v4-vllm-retrieval") %}
+{% set device = device | default("cuda:0") %}
+{% set text_prompt = text_prompt | default("Provide a concise, factual summary of the following input sentence.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_prompt = "{{ text_prompt }}"

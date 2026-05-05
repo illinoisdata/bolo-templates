@@ -1,9 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "iarfmoose/t5-base-question-generator" %}
-{% set answer_text = "The Eiffel Tower" %}
-{% set context_text = "The Eiffel Tower is a wrought-iron lattice tower on the Champ de Mars in Paris." %}
-{% set generation_max_new_tokens = 64 %}
-{% set generation_num_beams = 5 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("iarfmoose/t5-base-question-generator") %}
+{% set answer_text = answer_text | default("The Eiffel Tower") %}
+{% set context_text = context_text | default("The Eiffel Tower is a wrought-iron lattice tower on the Champ de Mars in Paris.") %}
+{% set generation_max_new_tokens = generation_max_new_tokens | default(64) %}
+{% set generation_num_beams = generation_num_beams | default(5) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 answer_text = {{ answer_text | tojson }}

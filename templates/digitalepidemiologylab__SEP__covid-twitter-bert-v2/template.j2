@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "digitalepidemiologylab/covid-twitter-bert-v2" %}
-{% set input_sentence = "In places with a lot of people, it's a good idea to wear a [MASK]." %}
-{% set top_k = 5 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("digitalepidemiologylab/covid-twitter-bert-v2") %}
+{% set input_sentence = input_sentence | default("In places with a lot of people, it's a good idea to wear a [MASK].") %}
+{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_sentence = "{{ input_sentence }}"

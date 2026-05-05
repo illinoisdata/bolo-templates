@@ -1,9 +1,8 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "knkarthick/MEETING-SUMMARY-BART-LARGE-XSUM-SAMSUM-DIALOGSUM-AMI" %}
-{% set text_input = "The team held a kickoff meeting to design a remote control, discussing functionality, production cost, marketing, and next steps. They debated how to keep the device trendy yet affordable while covering a wide range of user needs." %}
-{% set max_new_tokens = 128 %}
-{% set num_beams = 4 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("knkarthick/MEETING-SUMMARY-BART-LARGE-XSUM-SAMSUM-DIALOGSUM-AMI") %}
+{% set text_input = text_input | default("The team held a kickoff meeting to design a remote control, discussing functionality, production cost, marketing, and next steps. They debated how to keep the device trendy yet affordable while covering a wide range of user needs.") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text_input = """{{ text_input }}"""

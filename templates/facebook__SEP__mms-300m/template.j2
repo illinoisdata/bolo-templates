@@ -1,7 +1,6 @@
-{% set audio_file = '/u/yli77/projects/ML-code-generation/data/audio.wav' %}
-{% set repo_id = "facebook/mms-300m" %}
-{% set device = "cuda:0" %}
-
+{% set audio_file = audio_file | default('/u/yli77/projects/ML-code-generation/data/audio.wav') %}
+{% set repo_id = repo_id | default("facebook/mms-300m") %}
+{% set device = device | default("cuda:0") %}
 audio_file = '{{ audio_file }}'
 repo_id = '{{ repo_id }}'
 device = '{{ device }}'

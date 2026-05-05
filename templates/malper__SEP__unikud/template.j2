@@ -1,8 +1,7 @@
-{% set repo_id = "malper/unikud" %}
-{% set device = "cuda:0" %}
-{% set input_text = "שלום עולם" %}
-{% set max_length = 512 %}
-
+{% set repo_id = repo_id | default("malper/unikud") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("שלום עולם") %}
+{% set max_length = max_length | default(512) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

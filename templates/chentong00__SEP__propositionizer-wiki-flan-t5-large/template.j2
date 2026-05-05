@@ -1,10 +1,9 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "chentong00/propositionizer-wiki-flan-t5-large" %}
-{% set title = "Leaning Tower of Pisa" %}
-{% set section = "" %}
-{% set content = "Prior to restoration work performed between 1990 and 2001, Leaning Tower of Pisa leaned at an angle of 5.5 degrees, but the tower now leans at about 3.99 degrees. This means the top of the tower is displaced horizontally 3.9 meters (12 ft 10 in) from the center." %}
-{% set max_new_tokens = 512 %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("chentong00/propositionizer-wiki-flan-t5-large") %}
+{% set title = title | default("Leaning Tower of Pisa") %}
+{% set section = section | default("") %}
+{% set content = content | default("Prior to restoration work performed between 1990 and 2001, Leaning Tower of Pisa leaned at an angle of 5.5 degrees, but the tower now leans at about 3.99 degrees. This means the top of the tower is displaced horizontally 3.9 meters (12 ft 10 in) from the center.") %}
+{% set max_new_tokens = max_new_tokens | default(512) %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 title = {{ title | tojson }}

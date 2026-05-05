@@ -1,6 +1,6 @@
-{% set repo_id = "Salesforce/codet5-small" %}
-{% set device = "cuda:0" %}
-{% set prompt = "def greet(user): print(f\"hello <extra_id_0>!\")" %}
+{% set repo_id = repo_id | default("Salesforce/codet5-small") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default("def greet(user): print(f\"hello <extra_id_0>!\")") %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 prompt = {{ prompt | tojson }}

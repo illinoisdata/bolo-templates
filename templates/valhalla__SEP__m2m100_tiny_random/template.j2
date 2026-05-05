@@ -1,7 +1,6 @@
-{% set repo_id = "valhalla/m2m100_tiny_random" %}
-{% set device = "cuda:0" %}
-{% set text = "Hello, world!" %}
-
+{% set repo_id = repo_id | default("valhalla/m2m100_tiny_random") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Hello, world!") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

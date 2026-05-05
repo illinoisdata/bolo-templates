@@ -38,3 +38,4 @@ torchvision==0.26.0+cu128
 triton==3.6.0
 typing-extensions==4.15.0
 urllib3==1.26.13
+pybolo

@@ -1,7 +1,6 @@
-{% set repo_id = "facebook/wav2vec2-large" %}
-{% set device = "cuda:0" %}
-{% set audio_filepath = "/u/yli77/projects/ML-code-generation/data/audio.wav" %}
-
+{% set repo_id = repo_id | default("facebook/wav2vec2-large") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_filepath = audio_filepath | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_filepath = "{{ audio_filepath }}"

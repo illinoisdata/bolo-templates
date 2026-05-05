@@ -1,7 +1,6 @@
-{% set repo_id = "OpenRLHF/Llama-3-8b-rm-mixture" %}
-{% set device = "cuda:0" %}
-{% set text = 'Transformers are amazing!' %}
-
+{% set repo_id = repo_id | default("OpenRLHF/Llama-3-8b-rm-mixture") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Transformers are amazing!') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"

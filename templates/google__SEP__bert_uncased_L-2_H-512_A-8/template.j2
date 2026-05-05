@@ -1,7 +1,7 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "google/bert_uncased_L-2_H-512_A-8" %}
-{% set input_text = "The capital of France is [MASK]." %}
-{% set num_predictions = 5 %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("google/bert_uncased_L-2_H-512_A-8") %}
+{% set input_text = input_text | default("The capital of France is [MASK].") %}
+{% set num_predictions = num_predictions | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

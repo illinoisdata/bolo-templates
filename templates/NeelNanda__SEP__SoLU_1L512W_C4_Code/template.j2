@@ -1,5 +1,5 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "NeelNanda/SoLU_1L512W_C4_Code" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("NeelNanda/SoLU_1L512W_C4_Code") %}
 repo_id = "{{ repo_id }}"
 import json
 from huggingface_hub import HfApi

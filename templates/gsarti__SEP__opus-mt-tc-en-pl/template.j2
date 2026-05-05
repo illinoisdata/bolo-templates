@@ -1,8 +1,8 @@
-{% set repo_id = "gsarti/opus-mt-tc-en-pl" %}
-{% set device = "cuda:0" %}
-{% set input_text = "Translate this sentence from English to Polish." %}
-{% set num_beams = 6 %}
-{% set max_length = 128 %}
+{% set repo_id = repo_id | default("gsarti/opus-mt-tc-en-pl") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("Translate this sentence from English to Polish.") %}
+{% set num_beams = num_beams | default(6) %}
+{% set max_length = max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"

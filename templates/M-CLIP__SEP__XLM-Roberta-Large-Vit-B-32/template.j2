@@ -1,6 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "M-CLIP/XLM-Roberta-Large-Vit-B-32" %}
-{% set placeholder = "" %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("M-CLIP/XLM-Roberta-Large-Vit-B-32") %}
+{% set placeholder = placeholder | default("") %}
 placeholder = "{{ placeholder }}"
 
 import torch

@@ -1,7 +1,6 @@
-{% set device = "cuda:0" %}
-{% set repo_id = "deepset/gelectra-large" %}
-{% set text = "Das ist ein Beispielsatz für die Inferenz." %}
-
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("deepset/gelectra-large") %}
+{% set text = text | default("Das ist ein Beispielsatz für die Inferenz.") %}
 repo_id = {{ repo_id | tojson }}
 device = {{ device | tojson }}
 input_text = {{ text | tojson }}

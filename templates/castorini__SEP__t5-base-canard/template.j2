@@ -1,9 +1,8 @@
-{% set repo_id = "castorini/t5-base-canard" %}
-{% set device = "cuda:0" %}
-{% set question_input = "Frank Zappa ||| Disbandment ||| What group disbanded ||| Zappa and the Mothers of Invention ||| When did they disband?" %}
-{% set max_new_tokens = 64 %}
-{% set num_beams = 4 %}
-
+{% set repo_id = repo_id | default("castorini/t5-base-canard") %}
+{% set device = device | default("cuda:0") %}
+{% set question_input = question_input | default("Frank Zappa ||| Disbandment ||| What group disbanded ||| Zappa and the Mothers of Invention ||| When did they disband?") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 question_input = "{{ question_input }}"

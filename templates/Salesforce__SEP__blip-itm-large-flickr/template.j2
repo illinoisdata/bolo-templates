@@ -1,8 +1,7 @@
-{% set repo_id = "Salesforce/blip-itm-large-flickr" %}
-{% set device = "cuda:0" %}
-{% set image_path = "/u/yli77/projects/ML-code-generation/data/image1.jpeg" %}
-{% set question = "A woman and a dog sitting together in a beach." %}
-
+{% set repo_id = repo_id | default("Salesforce/blip-itm-large-flickr") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set question = question | default("A woman and a dog sitting together in a beach.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"

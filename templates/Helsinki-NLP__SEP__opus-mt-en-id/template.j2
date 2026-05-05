@@ -1,8 +1,7 @@
-{% set repo_id = "Helsinki-NLP/opus-mt-en-id" %}
-{% set device = "cuda:0" %}
-{% set src_text = "The quick brown fox jumps over the lazy dog." %}
-{% set max_new_tokens = 128 %}
-
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-en-id") %}
+{% set device = device | default("cuda:0") %}
+{% set src_text = src_text | default("The quick brown fox jumps over the lazy dog.") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 src_text = "{{ src_text }}"

@@ -1,7 +1,6 @@
-{% set repo_id = "google/pegasus-xsum" %}
-{% set device = "cuda:0" %}
-{% set input_text = "In the city of New York, the mayor addressed climate change initiatives that aim to reduce emissions and invest in public transit." %}
-
+{% set repo_id = repo_id | default("google/pegasus-xsum") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("In the city of New York, the mayor addressed climate change initiatives that aim to reduce emissions and invest in public transit.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
