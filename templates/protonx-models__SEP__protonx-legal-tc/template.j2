@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("protonx-models/protonx-legal-tc") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("Điều 10. Điều kiện bảo đảm an ninh mạng đối với thiết bị, phân cứng, phân mẫn thành phần hệ thống 1. Các thiết bị phàn cứng là thành phần hệ thống phải được kiểm tra an ninh mạng để phát hiện điểm yếu, lỗ hỏng bảo mật, mã độc, thiết bị thu phát, phần cứng độc hại bảo đảm sự tương thích với các thành phần khác trong hệ thống thông tin quan trọng về an ninh quốc gia. Các thiết bị quản trị phải được cải đặt hệ điều hành, phần mềm sạch, có các lớp tường lữa bảo vệ. Hệ thống thông tin xử lý bí mật nhà nước không được kết nối với mạng Internet.") %}
+{% set max_input_tokens = max_input_tokens | default(160) %}
+{% set max_new_tokens = max_new_tokens | default(160) %}
+{% set num_beams = num_beams | default(10) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+max_input_tokens = {{ max_input_tokens }}
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+model_weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+state_dict = load_file(model_weights_path)
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(
+    text_input,
+    return_tensors="pt",
+    truncation=True,
+    max_length=max_input_tokens,
+).to(device)
+
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        num_beams=num_beams,
+        max_new_tokens=max_new_tokens,
+        early_stopping=True,
+    )
+
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"output": output_text}

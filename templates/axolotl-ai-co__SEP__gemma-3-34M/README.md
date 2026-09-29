@@ -1,0 +1,1 @@
+Randomly initialized `gemma-3` model for CI purposes.

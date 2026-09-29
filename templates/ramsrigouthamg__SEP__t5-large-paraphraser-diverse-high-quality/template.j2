@@ -1,50 +1,47 @@
 {% set repo_id = repo_id | default("ramsrigouthamg/t5-large-paraphraser-diverse-high-quality") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("Once, a group of frogs were roaming around the forest in search of water.") %}
+{% set context = context | default('Once, a group of frogs were roaming around the forest in search of water.') %}
 {% set max_length = max_length | default(128) %}
 {% set num_beams = num_beams | default(15) %}
 {% set num_return_sequences = num_return_sequences | default(3) %}
-{% set early_stopping = early_stopping | default(true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = "{{ text }}"
+context = "{{ context }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 num_return_sequences = {{ num_return_sequences }}
-early_stopping = {{ early_stopping }}
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import torch
 import os
-import json
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+
 model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+
 model = model.to(device)
-
-inputs = tokenizer(
-    "paraphrase: " + text + " </s>",
-    max_length=max_length,
-    padding=True,
-    truncation=True,
-    return_tensors="pt",
-)
-input_ids = inputs["input_ids"].to(device)
-attention_mask = inputs["attention_mask"].to(device)
-
 model.eval()
-outputs = model.generate(
+
+text = "paraphrase: " + context + " </s>"
+encoding = tokenizer(text, max_length=128, padding="max_length", return_tensors="pt", truncation=True)
+input_ids = encoding["input_ids"].to(device)
+attention_mask = encoding["attention_mask"].to(device)
+
+beam_outputs = model.generate(
     input_ids=input_ids,
     attention_mask=attention_mask,
     max_length=max_length,
-    early_stopping=early_stopping,
+    early_stopping=True,
     num_beams=num_beams,
     num_return_sequences=num_return_sequences,
 )
 
-paraphrases = [
-    tokenizer.decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-    for output in outputs
-]
+outputs = [tokenizer.decode(beam_output, skip_special_tokens=True, clean_up_tokenization_spaces=True) for beam_output in beam_outputs]
 
-RESULT = {"paraphrases": paraphrases}
+RESULT = {"context": context, "outputs": outputs}

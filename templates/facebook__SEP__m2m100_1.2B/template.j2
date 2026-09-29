@@ -1,28 +1,51 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("facebook/m2m100_1.2B") %}
-{% set src_text = src_text | default("जीवन एक चॉकलेट बॉक्स की तरह है।") %}
-{% set src_lang = src_lang | default("hi") %}
-{% set tgt_lang = tgt_lang | default("fr") %}
-device = "{{ device }}"
+{% set device = device | default("cuda:0") %}
+{% set src_text = src_text | default('जीवन एक चॉकलेट बॉक्स की तरह है।') %}
+{% set src_lang = src_lang | default('hi') %}
+{% set tgt_lang = tgt_lang | default('fr') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
+device = "{{ device }}"
 src_text = "{{ src_text }}"
 src_lang = "{{ src_lang }}"
 tgt_lang = "{{ tgt_lang }}"
+max_new_tokens = {{ max_new_tokens }}
 
 import os
+import torch
 from transformers import M2M100ForConditionalGeneration, M2M100Tokenizer
+from huggingface_hub import hf_hub_download
 
-tokenizer = M2M100Tokenizer.from_pretrained(repo_id)
-model = M2M100ForConditionalGeneration.from_pretrained(repo_id)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+sentencepiece_path = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+model = M2M100ForConditionalGeneration.from_pretrained(
+    os.path.dirname(weights_path),
+    local_files_only=True,
+)
 model.to(device)
+model.eval()
 
+tokenizer = M2M100Tokenizer.from_pretrained(
+    os.path.dirname(sentencepiece_path),
+    local_files_only=True,
+)
 tokenizer.src_lang = src_lang
-encoded = tokenizer(src_text, return_tensors="pt")
-encoded = encoded.to(device)
+inputs = tokenizer(src_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 forced_bos_token_id = tokenizer.get_lang_id(tgt_lang)
-generated_tokens = model.generate(**encoded, forced_bos_token_id=forced_bos_token_id)
+with torch.no_grad():
+    generated_tokens = model.generate(
+        **inputs,
+        forced_bos_token_id=forced_bos_token_id,
+        max_new_tokens=max_new_tokens,
+    )
+translated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
-translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
-
-RESULT = {"translation": translation}
+RESULT = {"translation_text": translated_text}

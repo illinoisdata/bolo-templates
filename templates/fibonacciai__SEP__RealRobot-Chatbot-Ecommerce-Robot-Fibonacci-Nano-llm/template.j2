@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("fibonacciai/RealRobot-Chatbot-Ecommerce-Robot-Fibonacci-Nano-llm") %}
+{% set device = device | default("cuda:0") %}
+{% set gguf_filename = gguf_filename | default('realrobot_chatbot_llm-q8_0.gguf') %}
+{% set prompt = prompt | default('What are the main features of the RealRobot X1 model?') %}
+{% set max_tokens = max_tokens | default(128) %}
+{% set temperature = temperature | default(0.2) %}
+{% set top_p = top_p | default(0.95) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+gguf_filename = "{{ gguf_filename }}"
+prompt = "{{ prompt }}"
+max_tokens = {{ max_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=gguf_filename)
+
+llm = Llama.from_pretrained(
+    repo_id=repo_id,
+    filename=gguf_filename,
+    n_ctx=2048,
+    n_gpu_layers=-1 if device.startswith('cuda') else 0,
+    verbose=False,
+)
+
+messages = [
+    {"role": "user", "content": prompt},
+]
+
+response = llm.create_chat_completion(
+    messages=messages,
+    temperature=temperature,
+    top_p=top_p,
+    max_tokens=max_tokens,
+)
+
+output_text = response["choices"][0]["message"]["content"]
+
+RESULT = {"output_text": output_text}

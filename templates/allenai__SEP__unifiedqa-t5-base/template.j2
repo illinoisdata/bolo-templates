@@ -1,29 +1,50 @@
-{% set device = device | default("cuda:0") %}
-{% set repo_id = repo_id | default("allenai/unifiedqa-t5-base") %}
-{% set prompt = prompt | default("Answer the following question: What is the capital of France?") %}
-{% set max_length = max_length | default(128) %}
+{% set question = question | default('what is the capital of France?') %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
 {% set num_beams = num_beams | default(4) %}
+{% set do_sample = do_sample | default(false) %}
+{% set temperature = temperature | default(1.0) %}
+{% set top_p = top_p | default(1.0) %}
+{% set repo_id = repo_id | default("allenai/unifiedqa-t5-base") %}
+{% set device = device | default("cuda:0") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
-max_length = {{ max_length }}
+question = "{{ question }}"
+max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+do_sample = {{ do_sample }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+
+_ = hf_hub_download(repo_id=repo_id, filename='config.json')
+_ = hf_hub_download(repo_id=repo_id, filename='pytorch_model.bin')
+_ = hf_hub_download(repo_id=repo_id, filename='tokenizer_config.json')
+_ = hf_hub_download(repo_id=repo_id, filename='special_tokens_map.json')
+_ = hf_hub_download(repo_id=repo_id, filename='spiece.model')
+
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    use_fast=False,
+    legacy=True,
+)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(prompt, return_tensors="pt", truncation=True)
-inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+inputs = tokenizer(question, return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+        do_sample=do_sample,
+        temperature=temperature,
+        top_p=top_p,
+    )
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-generated_ids = model.generate(
-    **inputs,
-    max_length=max_length,
-    num_beams=num_beams,
-)
-
-generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-
-RESULT = {"generated_text": generated_text}
+RESULT = {"output": output_text}

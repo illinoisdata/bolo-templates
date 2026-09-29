@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("facebook/w2v-bert-2.0") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+audio_path = {{ audio_path | tojson }}
+
+from transformers import AutoFeatureExtractor, pipeline
+from transformers.pipelines.feature_extraction import FeatureExtractionPipeline
+import wave
+import numpy as np
+
+FeatureExtractionPipeline._load_tokenizer = False
+
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+pipe = pipeline(
+    task=task,
+    model=repo_id,
+    tokenizer=feature_extractor,
+    feature_extractor=feature_extractor,
+    device=device,
+)
+
+wf = wave.open(audio_path, "rb")
+sr = wf.getframerate()
+audio_bytes = wf.readframes(wf.getnframes())
+audio = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32)
+
+RESULT = pipe(audio, sampling_rate=sr)

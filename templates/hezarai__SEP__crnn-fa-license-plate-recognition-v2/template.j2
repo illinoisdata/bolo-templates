@@ -1,0 +1,31 @@
+{% set repo_id = repo_id | default("hezarai/crnn-fa-license-plate-recognition-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import os
+import json
+import yaml
+import torch
+import requests
+from PIL import Image
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.pt")
+config_path = hf_hub_download(repo_id=repo_id, filename="model_config.yaml")
+image_processor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor/image_processor_config.yaml")
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+from torch import nn
+class Dummy(nn.Module):
+    def forward(self, x):
+        return x
+
+RESULT = {"weights_path": weights_path, "config_path": config_path, "image_processor_config_path": image_processor_config_path, "image_size": image.size}

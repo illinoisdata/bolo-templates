@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("google/long-t5-tglobal-large") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Summarize the following passage in one concise sentence: LongT5 is a text-to-text transformer designed for long sequences using efficient sparse attention patterns, and it is effective for tasks such as summarization and question answering.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+
+tokenizer_dir = os.path.dirname(tokenizer_path)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    os.path.dirname(weights_path),
+    local_files_only=True,
+    torch_dtype=torch.float32,
+)
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir, local_files_only=True)
+
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=32, num_beams=1)
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

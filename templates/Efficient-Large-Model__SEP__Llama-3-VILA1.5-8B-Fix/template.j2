@@ -1,9 +1,0 @@
-{% set device = device | default("cuda:0") %}
-{% set repo_id = repo_id | default("Efficient-Large-Model/Llama-3-VILA1.5-8B-Fix") %}
-import pkgutil
-import transformers
-
-modules = [finder.name for finder in pkgutil.iter_modules(transformers.models.__path__)]
-print(modules)
-
-RESULT = {"module_count": len(modules)}

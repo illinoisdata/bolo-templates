@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("Xenova/bert-base-uncased") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("The capital of France is [MASK].") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import json
+from pathlib import Path
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+from transformers.models.bert import BertConfig, BertForMaskedLM
+import torch
+
+onnx_weights_path = hf_hub_download(repo_id=repo_id, filename="onnx/model.onnx")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+repo_dir = Path(config_path).parent
+
+with open(config_path, "r") as f:
+    config_dict = json.load(f)
+config = BertConfig.from_dict(config_dict)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, use_fast=True)
+model = BertForMaskedLM(config)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+mask_token_index = (inputs["input_ids"] == tokenizer.mask_token_id).nonzero(as_tuple=True)[1]
+mask_logits = logits[0, mask_token_index, :]
+topk = torch.topk(mask_logits, k=5, dim=-1)
+top_tokens = tokenizer.convert_ids_to_tokens(topk.indices[0].tolist())
+top_scores = topk.values[0].tolist()
+
+RESULT = {"top_tokens": top_tokens, "top_scores": top_scores}

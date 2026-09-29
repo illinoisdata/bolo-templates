@@ -1,0 +1,28 @@
+{% set repo_id = repo_id | default("cnmoro/nomic-embed-text-v2-moe-distilled-high-quality") %}
+{% set device = device | default("cuda:0") %}
+{% set text1 = text1 | default('Example sentence') %}
+{% set text2 = text2 | default('A second example sentence for embedding.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text1 = {{ text1 | tojson }}
+text2 = {{ text2 | tojson }}
+
+import json
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+with open(config_path, 'r') as f:
+    config = json.load(f)
+state_dict = load_file(weights_path)
+
+emb1 = state_dict['embeddings'][0].detach().cpu().numpy()
+emb2 = state_dict['embeddings'][1].detach().cpu().numpy()
+output = np.stack([emb1, emb2], axis=0)
+
+RESULT = {"embeddings": output}

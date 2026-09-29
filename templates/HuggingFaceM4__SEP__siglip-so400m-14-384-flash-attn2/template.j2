@@ -1,0 +1,31 @@
+{% set repo_id = repo_id | default("HuggingFaceM4/siglip-so400m-14-384-flash-attn2") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("zero-shot-image-classification") -%}
+{% set input_path = input_path | default("/u/yunqili4/projects/ML-code-generation/data/image2.jpeg") -%}
+{% set candidate_labels = candidate_labels | default(["fox", "bear", "seagull", "cat"]) -%}
+{% set tokenizer_checkpoint = tokenizer_checkpoint | default("google/siglip-base-patch16-224") -%}
+{% set image_size = image_size | default({"height": 384, "width": 384}) -%}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_path = {{ input_path | tojson }}
+candidate_labels = {{ candidate_labels | tojson }}
+tokenizer_checkpoint = {{ tokenizer_checkpoint | tojson }}
+image_size = {{ image_size | tojson }}
+
+from transformers import SiglipImageProcessor, SiglipTokenizer, pipeline
+
+image_processor = SiglipImageProcessor(size=image_size)
+tokenizer = SiglipTokenizer.from_pretrained(tokenizer_checkpoint)
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=tokenizer,
+    image_processor=image_processor,
+    device=device,
+)
+
+prepared_input = input_path
+RESULT = pipe(prepared_input, candidate_labels=candidate_labels)

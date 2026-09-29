@@ -1,0 +1,94 @@
+{% set repo_id = repo_id | default("replit/replit-code-v1-3b") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") -%}
+{% set input_prompt = input_prompt | default("def greet(name):\n    return f'Hello, {name}!\n") -%}
+{% set max_new_tokens = max_new_tokens | default(128) -%}
+{% set do_sample = do_sample | default(false) -%}
+
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens | tojson }}
+do_sample = {{ do_sample }}
+
+import os
+from shutil import copyfile
+from typing import Any, Dict, List, Optional, Tuple
+
+import sentencepiece as spm
+from transformers import PreTrainedTokenizer, pipeline
+
+VOCAB_FILES_NAMES = {"vocab_file": "spiece.model"}
+
+class ReplitLMTokenizer(PreTrainedTokenizer):
+    vocab_files_names = VOCAB_FILES_NAMES
+    prefix_tokens: List[int] = []
+    model_input_names = ["input_ids", "attention_mask"]
+
+    def __init__(self, vocab_file, bos_token=None, eos_token="<|endoftext|>", unk_token="<|unk|>", pad_token="<|pad|>", sep_token=None, sp_model_kwargs: Optional[Dict[str, Any]] = None, **kwargs) -> None:
+        self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
+        self.vocab_file = vocab_file
+        self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
+        self.sp_model.Load(vocab_file)
+        super().__init__(bos_token=bos_token, eos_token=eos_token, unk_token=unk_token, pad_token=pad_token, sep_token=sep_token, sp_model_kwargs=self.sp_model_kwargs, **kwargs)
+
+    @property
+    def vocab_size(self) -> int:
+        return self.sp_model.get_piece_size()
+
+    def get_vocab(self) -> Dict[str, int]:
+        vocab = {self.convert_ids_to_tokens(i): i for i in range(self.sp_model.get_piece_size())}
+        vocab.update(self.added_tokens_encoder)
+        return vocab
+
+    def __getstate__(self) -> Dict[str, Any]:
+        state = self.__dict__.copy()
+        state["sp_model"] = None
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        self.__dict__ = state
+        if not hasattr(self, "sp_model_kwargs"):
+            self.sp_model_kwargs = {}
+        self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
+        self.sp_model.Load(self.vocab_file)
+
+    def _tokenize(self, text: str) -> List[str]:
+        return self.sp_model.encode(text, out_type=str)
+
+    def _convert_token_to_id(self, token: str) -> int:
+        return self.sp_model.piece_to_id(token)
+
+    def _convert_id_to_token(self, index: int) -> str:
+        return self.sp_model.id_to_piece(index)
+
+    def convert_tokens_to_string(self, tokens: List[str]) -> str:
+        return self.sp_model.decode(tokens)
+
+    def save_vocabulary(self, save_directory: str, filename_prefix: Optional[str] = None) -> Tuple[str]:
+        if not os.path.isdir(save_directory):
+            raise ValueError(f"Vocabulary path ({save_directory}) should be a directory")
+        output_file = os.path.join(save_directory, (filename_prefix + "-" if filename_prefix else "") + VOCAB_FILES_NAMES["vocab_file"])
+        if os.path.abspath(self.vocab_file) != os.path.abspath(output_file) and os.path.isfile(self.vocab_file):
+            copyfile(self.vocab_file, output_file)
+        elif not os.path.isfile(self.vocab_file):
+            with open(output_file, "wb") as file:
+                serialized = self.sp_model.serialized_model_proto()
+                file.write(serialized)
+        return (output_file,)
+
+tokenizer = ReplitLMTokenizer.from_pretrained(repo_id)
+pipe = pipeline(task=task, model=repo_id, tokenizer=tokenizer, device=device)
+
+prompt = input_prompt
+
+raw_output = pipe(
+    prompt,
+    max_new_tokens=max_new_tokens,
+    do_sample=do_sample,
+    clean_up_tokenization_spaces=False,
+)
+
+RESULT = {"generated_text": raw_output}

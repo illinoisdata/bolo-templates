@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("Xenova/nomic-embed-text-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Nomic embeddings are useful for semantic search and retrieval.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import numpy as np
+import onnxruntime as ort
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+try:
+    hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+except Exception:
+    pass
+try:
+    hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+except Exception:
+    pass
+model_path = hf_hub_download(repo_id=repo_id, filename="onnx/model.onnx")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+encoded = tokenizer(text, return_tensors="np", truncation=True, padding=True, max_length=512)
+
+session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+input_names = [inp.name for inp in session.get_inputs()]
+ort_inputs = {}
+for name in input_names:
+    if name in encoded:
+        ort_inputs[name] = encoded[name].astype(np.int64)
+    elif name == "token_type_ids":
+        ort_inputs[name] = np.zeros_like(encoded["input_ids"], dtype=np.int64)
+
+outputs = session.run(None, ort_inputs)
+embeddings = outputs[0]
+
+RESULT = {"embeddings": embeddings}

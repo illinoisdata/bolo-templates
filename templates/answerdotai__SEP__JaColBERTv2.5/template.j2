@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("answerdotai/JaColBERTv2.5") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('日本で一番高い山は何ですか？') %}
+{% set document = document | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+document = "{{ document }}"
+
+import os
+import requests
+import torch
+from PIL import Image
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+if document.startswith(("http://", "https://")):
+    document_image = Image.open(requests.get(document, stream=True).raw).convert("RGB")
+else:
+    document_image = Image.open(document).convert("RGB")
+
+model = AutoModel.from_pretrained(repo_id, torch_dtype=torch.float32, device_map=None)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+query_inputs = tokenizer(question, return_tensors="pt", truncation=True, max_length=512)
+query_inputs = {k: v.to(device) for k, v in query_inputs.items()}
+
+with torch.no_grad():
+    query_outputs = model(**query_inputs)
+    query_embedding = query_outputs.last_hidden_state[:, 0, :].detach().cpu()
+
+image_size = document_image.size
+RESULT = {
+    "query_embedding": query_embedding,
+    "document_size": image_size,
+}

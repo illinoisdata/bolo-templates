@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("Xenova/bge-small-en-v1.5") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Represent this sentence for searching relevant passages: A quick brown fox jumps over the lazy dog.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import numpy as np
+import torch
+import onnxruntime as ort
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+
+onnx_path = hf_hub_download(repo_id=repo_id, filename="onnx/model.onnx")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+inputs = tokenizer(text, return_tensors="np", truncation=True, padding=True, max_length=512)
+
+providers = ["CPUExecutionProvider"]
+session = ort.InferenceSession(onnx_path, providers=providers)
+ort_inputs = {k: v for k, v in inputs.items()}
+outputs = session.run(None, ort_inputs)
+last_hidden_state = torch.from_numpy(outputs[0])
+attention_mask = torch.from_numpy(inputs["attention_mask"]).unsqueeze(-1).expand_as(last_hidden_state).float()
+pooled = (last_hidden_state * attention_mask).sum(dim=1) / attention_mask.sum(dim=1).clamp(min=1e-9)
+pooled = torch.nn.functional.normalize(pooled, p=2, dim=1)
+embedding = pooled[0].cpu().numpy()
+RESULT = {"embedding": embedding.tolist(), "shape": list(embedding.shape)}

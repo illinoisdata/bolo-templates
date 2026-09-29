@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("nvidia/C-RADIO") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default('image-feature-extraction') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+
+task = {{ task | tojson }}
+image_path = {{ image_path | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+
+from transformers import pipeline
+from PIL import Image
+import torch
+import types
+
+if not hasattr(torch.nn.Module, 'all_tied_weights_keys'):
+    def _get_all_tied_weights_keys(self):
+        val = getattr(self, '_tied_weights_keys', None)
+        return {} if val is None else val
+    torch.nn.Module.all_tied_weights_keys = property(_get_all_tied_weights_keys)
+
+pipe = pipeline(task=task, model=repo_id, device=device, trust_remote_code=True)
+
+# Monkey-patch RADIOModel.forward to accept pixel_values keyword
+_old_forward = pipe.model.forward
+
+def _forward_with_pixel(self, pixel_values=None, **kwargs):
+    return _old_forward(pixel_values, **kwargs)
+
+pipe.model.forward = types.MethodType(_forward_with_pixel, pipe.model)
+
+image = Image.open(image_path).convert('RGB')
+RESULT = pipe(image)

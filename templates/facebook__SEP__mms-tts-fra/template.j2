@@ -1,26 +1,19 @@
 {% set repo_id = repo_id | default("facebook/mms-tts-fra") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default('Ceci est un exemple de texte en français.') %}
+{% set text = text | default('Bonjour, ceci est un test de synthèse vocale en français.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
-from transformers import VitsModel, AutoTokenizer
 import torch
-import numpy as np
-import scipy.io.wavfile as wavfile
-import os
+from transformers import VitsModel, AutoTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = VitsModel.from_pretrained(repo_id).to(device)
-model.eval()
-
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
 inputs = tokenizer(text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    output = model(**inputs).waveform
+    waveform = model(**inputs).waveform
 
-waveform = output.squeeze(0).cpu().numpy()
-
-RESULT = {"waveform": waveform}
+RESULT = {"waveform": waveform.detach().cpu().numpy(), "sampling_rate": model.config.sampling_rate}

@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("omlab/omdet-turbo-swin-tiny-hf") %}
+{% set device = device | default("cuda:0") %}
+{% set image = image | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set classes = classes | default(['cat', 'remote']) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image = "{{ image }}"
+classes = {{ classes | tojson }}
+
+import os
+import torch
+from PIL import Image
+from transformers import AutoProcessor, OmDetTurboForObjectDetection
+from huggingface_hub import hf_hub_download
+from io import BytesIO
+import requests
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+repo_dir = os.path.dirname(preprocessor_path)
+
+processor = AutoProcessor.from_pretrained(repo_dir, trust_remote_code=True)
+model = OmDetTurboForObjectDetection.from_pretrained(repo_dir, torch_dtype=torch.float32, trust_remote_code=True)
+model.to(device)
+model.eval()
+
+if image.startswith(("http://", "https://")):
+    image_obj = Image.open(BytesIO(requests.get(image, stream=True).content)).convert("RGB")
+else:
+    image_obj = Image.open(image).convert("RGB")
+
+task = "Detect {}.".format(", ".join(classes))
+inputs = processor(images=image_obj, text=classes, task=task, return_tensors="pt")
+inputs = {k: v.to(device) if hasattr(v, "to") else v for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+results = processor.post_process_grounded_object_detection(
+    outputs,
+    target_sizes=[image_obj.size[::-1]],
+    threshold=0.3,
+)[0]
+
+RESULT = {"scores": results["scores"].detach().cpu().tolist(), "classes": results["labels"].detach().cpu().tolist(), "boxes": results["boxes"].detach().cpu().tolist()}

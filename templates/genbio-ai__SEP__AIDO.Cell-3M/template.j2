@@ -1,0 +1,135 @@
+{% set repo_id = repo_id | default("genbio-ai/AIDO.Cell-3M") %}
+{% set device = device | default("cuda:0") %}
+{% set input_seq = input_seq | default('ACGTACGTACGT') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_seq = "{{ input_seq }}"
+
+import json
+import torch
+import torch.nn.functional as F
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+config = json.load(open(config_path))
+state_dict = load_file(weights_path)
+
+vocab_size = config["vocab_size"]
+hidden_size = config["hidden_size"]
+num_heads = config["num_attention_heads"]
+num_layers = config["num_hidden_layers"]
+intermediate_size = config["intermediate_size"]
+eps = config["layer_norm_eps"]
+
+class Linear(torch.nn.Module):
+    def __init__(self, in_f, out_f, bias=True):
+        super().__init__()
+        self.weight = torch.nn.Parameter(torch.empty(out_f, in_f))
+        self.bias = torch.nn.Parameter(torch.empty(out_f)) if bias else None
+    def forward(self, x):
+        return F.linear(x, self.weight, self.bias)
+
+class Embedding(torch.nn.Module):
+    def __init__(self, n, d):
+        super().__init__()
+        self.weight = torch.nn.Parameter(torch.empty(n, d))
+    def forward(self, x):
+        return F.embedding(x, self.weight)
+
+class MHA(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.self_query = Linear(hidden_size, hidden_size, bias=False)
+        self.self_key = Linear(hidden_size, hidden_size, bias=False)
+        self.self_value = Linear(hidden_size, hidden_size, bias=False)
+        self.output_dense = Linear(hidden_size, hidden_size, bias=False)
+        self.ln = torch.nn.LayerNorm(hidden_size, eps=eps)
+    def forward(self, x):
+        b, s, h = x.shape
+        q = self.self_query(x).view(b, s, num_heads, h // num_heads).transpose(1, 2)
+        k = self.self_key(x).view(b, s, num_heads, h // num_heads).transpose(1, 2)
+        v = self.self_value(x).view(b, s, num_heads, h // num_heads).transpose(1, 2)
+        att = (q @ k.transpose(-2, -1)) * (1.0 / (h // num_heads) ** 0.5)
+        mask = torch.tril(torch.ones(s, s, device=x.device, dtype=torch.bool))
+        att = att.masked_fill(~mask, torch.finfo(att.dtype).min)
+        att = torch.softmax(att, dim=-1)
+        y = (att @ v).transpose(1, 2).contiguous().view(b, s, h)
+        return self.output_dense(self.ln(y))
+
+class MLP(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.gate_proj = Linear(hidden_size, intermediate_size, bias=False)
+        self.up_proj = Linear(hidden_size, intermediate_size, bias=False)
+        self.down_proj = Linear(intermediate_size, hidden_size, bias=False)
+    def forward(self, x):
+        return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+
+class Block(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.ln = torch.nn.LayerNorm(hidden_size, eps=eps)
+        self.attention = MHA()
+        self.mlp = MLP()
+    def forward(self, x):
+        x = x + self.attention(self.ln(x))
+        x = x + self.mlp(self.ln(x))
+        return x
+
+class Model(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.bert = torch.nn.Module()
+        self.bert.gene_embedding = torch.nn.Module()
+        self.bert.gene_embedding.lookup_table = Embedding(vocab_size, hidden_size)
+        self.bert.gene_embedding.mask_embedding = Embedding(1, hidden_size)
+        self.bert.gene_embedding.pad_embedding = Embedding(1, hidden_size)
+        self.bert.gene_embedding.linear1 = Linear(hidden_size, hidden_size, bias=True)
+        self.bert.gene_embedding.linear2 = Linear(hidden_size, hidden_size, bias=True)
+        self.bert.position_embedding = Embedding(config["max_position_embeddings"], hidden_size)
+        self.bert.encoder = torch.nn.Module()
+        self.bert.encoder.layer = torch.nn.ModuleList([Block() for _ in range(num_layers)])
+        self.bert.encoder.ln = torch.nn.LayerNorm(hidden_size, eps=eps)
+        self.cls = torch.nn.Module()
+        self.cls.predictions = torch.nn.Module()
+        self.cls.predictions.decoder = Linear(hidden_size, vocab_size, bias=False)
+        self.cls.predictions.bias = torch.nn.Parameter(torch.zeros(vocab_size))
+        self.cls.predictions.transform = torch.nn.Module()
+        self.cls.predictions.transform.dense = Linear(hidden_size, hidden_size, bias=True)
+        self.cls.predictions.transform.LayerNorm = torch.nn.LayerNorm(hidden_size, eps=eps)
+    def forward(self, input_ids):
+        b, s = input_ids.shape
+        pos = torch.arange(s, device=input_ids.device).unsqueeze(0).expand(b, s)
+        x = self.bert.gene_embedding.lookup_table(input_ids) + self.bert.position_embedding(pos)
+        for layer in self.bert.encoder.layer:
+            x = layer(x)
+        x = self.bert.encoder.ln(x)
+        x = self.cls.predictions.transform.dense(x)
+        x = F.gelu(x)
+        x = self.cls.predictions.transform.LayerNorm(x)
+        logits = self.cls.predictions.decoder(x) + self.cls.predictions.bias
+        return type('obj', (), {'logits': logits})
+
+model = Model().to(device)
+# load only matching keys by exact names; the repo uses a BERT-style layout
+filtered = {k:v for k,v in state_dict.items() if k in model.state_dict() and model.state_dict()[k].shape == v.shape}
+model.load_state_dict(filtered, strict=False)
+model.eval()
+
+char2id = {"A": 0, "C": 1, "G": 2, "T": 3, "N": 4, "<": 5, ">": 6, "[": 7, "]": 8, "_": 9, "-": 10, ".": 11, ",": 12, ":": 13, ";": 14, "?": 15}
+ids = [char2id.get(ch.upper(), 4) for ch in input_seq]
+input_ids = torch.tensor([ids], dtype=torch.long, device=device)
+
+with torch.no_grad():
+    logits = model(input_ids).logits
+    probs = torch.softmax(logits, dim=-1)
+    top_probs, top_ids = torch.topk(probs, k=min(3, probs.shape[-1]), dim=-1)
+
+RESULT = {
+    "logits": logits.detach().cpu().tolist(),
+    "top_probs": top_probs.detach().cpu().tolist(),
+    "top_ids": top_ids.detach().cpu().tolist(),
+}

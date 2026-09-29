@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("PaddlePaddle/PP-DocBlockLayout") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+from urllib.parse import urlparse
+from huggingface_hub import hf_hub_download
+from paddleocr import LayoutDetection
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="inference.pdiparams")
+_ = (config_path, weights_path)
+
+if urlparse(image_path).scheme in ("http", "https"):
+    input_image = image_path
+else:
+    input_image = image_path
+
+model = LayoutDetection(model_name="PP-DocBlockLayout")
+output = model.predict(input_image, batch_size=1, layout_nms=True)
+
+result_list = []
+for res in output:
+    if hasattr(res, "json"):
+        result_list.append(res.json)
+    elif hasattr(res, "to_json"):
+        result_list.append(res.to_json())
+    else:
+        result_list.append(repr(res))
+
+RESULT = {"output": result_list}

@@ -1,21 +1,35 @@
 {% set repo_id = repo_id | default("facebook/roscoe-512-roberta-base") %}
 {% set device = device | default("cuda:0") %}
-{% set sentences = sentences | default(["This is a test sentence.", "This is another one."]) %}
+{% set text_a = text_a | default('Step 1: The problem is read carefully. Step 2: Relevant facts are identified. Step 3: A concise answer is formed.') %}
+{% set text_b = text_b | default('Step 1: The question is analyzed. Step 2: Important information is extracted. Step 3: The final reasoning is summarized.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-sentences = {{ sentences }}
+text_a = {{ text_a | tojson }}
+text_b = {{ text_b | tojson }}
 
 import os
-import json
 import torch
 from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 
-inputs = tokenizer(sentences, return_tensors="pt", padding=True, truncation=True).to(device)
-outputs = model(**inputs)
-embeddings = outputs.pooler_output
-embeddings = embeddings.cpu().tolist()
+model_dir = os.path.dirname(model_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
+model = AutoModel.from_pretrained(model_dir, local_files_only=True)
+model.to(device)
+model.eval()
 
-RESULT = {"embeddings": embeddings}
+inputs = tokenizer([text_a, text_b], padding=True, truncation=True, max_length=512, return_tensors="pt").to(device)
+with torch.no_grad():
+    outputs = model(**inputs)
+    last_hidden = outputs.last_hidden_state
+    attention_mask = inputs["attention_mask"].unsqueeze(-1)
+    masked = last_hidden * attention_mask
+    summed = masked.sum(dim=1)
+    counts = attention_mask.sum(dim=1).clamp(min=1)
+    embeddings = summed / counts
+    similarity = torch.nn.functional.cosine_similarity(embeddings[0], embeddings[1], dim=0).item()
+
+RESULT = {"sentence_embeddings": embeddings.detach().cpu().tolist(), "cosine_similarity": similarity}

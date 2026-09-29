@@ -1,0 +1,21 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Organism-Base-220M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Caenorhabditis elegans is a model organism for genetic studies.') %}
+{% set labels = labels | default(['SPECIES']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+labels = {{ labels | tojson }}
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+
+import pickle
+state_dict = torch.load(weights_path, map_location="cpu")
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+RESULT = {"entities": [{"text": text, "labels": labels, "config_keys": sorted(list(cfg.keys()))[:5], "state_dict_keys": list(state_dict.keys())[:5]}]}

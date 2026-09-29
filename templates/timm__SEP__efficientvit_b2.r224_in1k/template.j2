@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("timm/efficientvit_b2.r224_in1k") %}
+{% set device = device | default("cuda:0") %}
+{%- set task = task | default("image-classification") -%}
+{%- set model = model | default(repo_id) -%}
+{%- set input_data = input_data | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") -%}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_data = {{ input_data | tojson }}
+
+from PIL import Image
+from transformers import pipeline
+
+
+def _resolve_device(device_value):
+    if isinstance(device_value, str):
+        normalized = device_value.lower()
+        if normalized == "cpu":
+            return -1
+        if normalized.startswith("cuda"):
+            parts = normalized.split(":")
+            if len(parts) == 1 or parts[1] == "":
+                return 0
+            return int(parts[1])
+    return device_value
+
+pipeline_device = _resolve_device(device)
+pipe = pipeline(task=task, model=model, device=pipeline_device)
+
+image_input = Image.open(input_data).convert("RGB")
+
+inference_output = pipe(image_input)
+
+RESULT = {"predictions": inference_output}

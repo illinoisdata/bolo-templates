@@ -1,26 +1,35 @@
 {% set repo_id = repo_id | default("circulus/canvers-ko2en-v2") %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("안녕하세요. 영어로 번역을 위한 예시 문장입니다.") %}
-{% set max_new_tokens = max_new_tokens | default(256) %}
+{% set text = text | default('안녕하세요. 오늘 날씨가 정말 좋네요.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = """{{ text_input }}"""
-max_new_tokens = {{ max_new_tokens }}
+text = "{{ text }}"
 
-from pathlib import Path
+import os
+import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
 
-encoded_inputs = tokenizer(text_input, return_tensors="pt")
-encoded_inputs = {
-    name: tensor.to(device)
-    for name, tensor in encoded_inputs.items()
-    if name != "token_type_ids"
-}
+local_files_dir = os.path.dirname(config_path)
 
-generated_tokens = model.generate(**encoded_inputs, max_new_tokens=max_new_tokens)
-translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+tokenizer = AutoTokenizer.from_pretrained(local_files_dir, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(local_files_dir)
+model.to(device)
+model.eval()
 
-RESULT = {"translation": translation}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items() if k != "token_type_ids"}
+
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=64)
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"translation": output_text}

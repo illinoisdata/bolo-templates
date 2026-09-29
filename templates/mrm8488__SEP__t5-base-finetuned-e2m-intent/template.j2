@@ -1,26 +1,31 @@
 {% set repo_id = repo_id | default("mrm8488/t5-base-finetuned-e2m-intent") %}
 {% set device = device | default("cuda:0") %}
-{% set event = event | default("PersonX takes PersonY home") %}
+{% set event_text = event_text | default('PersonX takes PersonY home') %}
 {% set max_length = max_length | default(16) %}
-{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-event = "{{ event }}"
+event_text = "{{ event_text }}"
 max_length = {{ max_length }}
-num_beams = {{ num_beams }}
 
-from pathlib import Path
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-torch_device = torch.device(device)
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-features = tokenizer(event, return_tensors="pt")
-features = {key: value.to(torch_device) for key, value in features.items()}
+input_text = f"{event_text} </s>"
+features = tokenizer([input_text], return_tensors="pt")
+features = {k: v.to(device) for k, v in features.items()}
 
-generated_ids = model.generate(**features, max_length=max_length, num_beams=num_beams)
-intent = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+with torch.no_grad():
+    output_ids = model.generate(
+        input_ids=features["input_ids"],
+        attention_mask=features["attention_mask"],
+        max_length=max_length,
+    )
 
-RESULT = {"intent": intent}
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"output": output_text}

@@ -1,0 +1,28 @@
+{% set repo_id = repo_id | default("Xenova/distilgpt2") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Once upon a time') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import os
+import numpy as np
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+from optimum.onnxruntime import ORTModelForCausalLM
+
+model_dir = os.path.dirname(hf_hub_download(repo_id=repo_id, filename='config.json'))
+hf_hub_download(repo_id=repo_id, filename='onnx/model.onnx')
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True, tokenizer_file=hf_hub_download(repo_id=repo_id, filename='tokenizer.json'))
+provider = 'CPUExecutionProvider'
+model = ORTModelForCausalLM.from_pretrained(model_dir, subfolder='onnx', file_name='model.onnx', provider=provider)
+
+inputs = tokenizer(prompt, return_tensors='pt')
+input_ids = inputs['input_ids']
+attention_mask = inputs.get('attention_mask', None)
+
+output_ids = model.generate(input_ids=input_ids, attention_mask=attention_mask, max_new_tokens=20, do_sample=False)
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"text": output_text}

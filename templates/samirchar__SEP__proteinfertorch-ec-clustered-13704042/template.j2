@@ -1,0 +1,93 @@
+{% set repo_id = repo_id | default("samirchar/proteinfertorch-ec-clustered-13704042") %}
+{% set device = device | default("cuda:0") %}
+{% set seq = seq | default('MKTFFVAGVILLLAVTAGALAAPVNAKATATGRVVVDAEAGKALDQLKKDPNNAKILQKNDLNTLADQLKQKLEK') %}
+{% set max_length = max_length | default(1024) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+seq = "{{ seq }}"
+max_length = {{ max_length }}
+
+import json
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from safetensors.torch import load_file
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+class ProteInferBlock(nn.Module):
+    def __init__(self, channels, kernel_size, dilation, bottleneck_channels):
+        super().__init__()
+        padding = ((kernel_size - 1) // 2) * dilation
+        self.masked_conv1 = nn.Conv1d(channels, bottleneck_channels, kernel_size, padding=padding, dilation=dilation)
+        self.bn_activation_1 = nn.Sequential(nn.BatchNorm1d(bottleneck_channels), nn.ReLU())
+        self.masked_conv2 = nn.Conv1d(bottleneck_channels, channels, 1)
+        self.bn_activation_2 = nn.Sequential(nn.BatchNorm1d(channels), nn.ReLU())
+
+    def forward(self, x):
+        residual = x
+        x = self.bn_activation_1(self.masked_conv1(x))
+        x = self.bn_activation_2(self.masked_conv2(x))
+        return x + residual
+
+class ProteInferTorch(nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        input_channels = cfg["input_channels"]
+        output_channels = cfg["output_channels"]
+        num_labels = cfg["num_labels"]
+        kernel_size = cfg["kernel_size"]
+        num_blocks = cfg["num_resnet_blocks"]
+        dilation_base = cfg["dilation_base"]
+        bottleneck_channels = int(output_channels * cfg["bottleneck_factor"])
+        self.conv1 = nn.Conv1d(input_channels, output_channels, kernel_size, padding=kernel_size // 2)
+        self.resnet_blocks = nn.ModuleList([
+            ProteInferBlock(output_channels, kernel_size, dilation_base ** i, bottleneck_channels)
+            for i in range(num_blocks)
+        ])
+        self.output_layer = nn.Conv1d(output_channels, num_labels, 1)
+        self.pool = nn.AdaptiveMaxPool1d(1)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        for block in self.resnet_blocks:
+            x = block(x)
+        x = self.output_layer(x)
+        x = self.pool(x)
+        return x.squeeze(-1)
+
+alphabet = "ACDEFGHIKLMNPQRSTVWY"
+char_to_idx = {c: i for i, c in enumerate(alphabet)}
+seq = seq.strip().upper()[:max_length]
+encoded = torch.zeros(1, len(alphabet), len(seq), dtype=torch.float32)
+for pos, aa in enumerate(seq):
+    if aa in char_to_idx:
+        encoded[0, char_to_idx[aa], pos] = 1.0
+
+model = ProteInferTorch(config).to(device)
+state_dict = load_file(weights_path)
+model_state = model.state_dict()
+filtered_state = {}
+for k, v in state_dict.items():
+    if k in model_state and model_state[k].shape == v.shape:
+        filtered_state[k] = v
+model_state.update(filtered_state)
+model.load_state_dict(model_state)
+model.eval()
+
+with torch.no_grad():
+    logits = model(encoded.to(device))
+    probs = torch.sigmoid(logits).cpu().squeeze(0)
+    topk = torch.topk(probs, k=min(10, probs.numel()))
+
+RESULT = {
+    "logits": logits.cpu().squeeze(0).tolist(),
+    "probabilities": probs.tolist(),
+    "top_indices": topk.indices.tolist(),
+    "top_scores": topk.values.tolist(),
+}

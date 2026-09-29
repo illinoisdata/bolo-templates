@@ -1,0 +1,62 @@
+{% set repo_id = repo_id | default("SuperAnnotate/roberta-large-llm-content-detector") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set text_example = text_example | default("This sentence helps evaluate the generated text detector model") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = {{ task | tojson }}
+text_example = {{ text_example | tojson }}
+
+from generated_text_detector.utils.model.roberta_classifier import RobertaClassifier
+from transformers import AutoConfig, AutoTokenizer, pipeline
+from transformers.pipelines.text_classification import TextClassificationPipeline
+import torch
+
+class GeneratedContentDetectorPipeline(TextClassificationPipeline):
+    def check_model_type(self, supported_models):
+        return
+
+    def _sanitize_parameters(self, function_to_apply=None, top_k="", cls_output=True, **tokenizer_kwargs):
+        preprocess_params, _, postprocess_params = super()._sanitize_parameters(
+            function_to_apply=function_to_apply,
+            top_k=top_k,
+            **tokenizer_kwargs,
+        )
+        forward_params = {}
+        if cls_output is not None:
+            forward_params["cls_output"] = cls_output
+        return preprocess_params, forward_params, postprocess_params
+
+    def _forward(self, model_inputs, cls_output=True):
+        model_inputs = dict(model_inputs)
+        if cls_output is not None:
+            model_inputs["cls_output"] = cls_output
+        return super()._forward(model_inputs)
+
+model = RobertaClassifier.from_pretrained(repo_id)
+base_config = AutoConfig.from_pretrained("facebookai/roberta-large")
+base_config.num_labels = 1
+base_config.id2label = {0: "GENERATED"}
+base_config.label2id = {"GENERATED": 0}
+model.config = base_config
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+torch_device = torch.device(device)
+model = model.to(torch_device)
+model.device = torch_device
+
+if torch_device.type == "cuda":
+    pipeline_device = torch_device.index if torch_device.index is not None else 0
+else:
+    pipeline_device = -1
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=tokenizer,
+    device=pipeline_device,
+    pipeline_class=GeneratedContentDetectorPipeline,
+)
+RESULT = pipe(text_example)

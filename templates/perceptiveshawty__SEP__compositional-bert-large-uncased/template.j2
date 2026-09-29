@@ -1,40 +1,43 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("perceptiveshawty/compositional-bert-large-uncased") %}
-{% set text_input = text_input | default("The quick brown fox jumps over the lazy dog.") %}
-{% set max_length = max_length | default(128) %}
+{% set device = device | default("cuda:0") %}
+{% set text1 = text1 | default('A cat sits on a mat.') %}
+{% set text2 = text2 | default('A feline is resting on a rug.') %}
+{% set max_length = max_length | default(32) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+text1 = "{{ text1 }}"
+text2 = "{{ text2 }}"
 max_length = {{ max_length }}
 
 import os
-
-import numpy as np
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer, AutoConfig, BertModel
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+# Tokenizer assets
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+# Load tokenizer from local vocab file
+vocab_dir = os.path.dirname(vocab_path)
+tokenizer = AutoTokenizer.from_pretrained(vocab_dir, use_fast=False)
+config = AutoConfig.from_pretrained(config_path)
+model = BertModel.from_pretrained(weights_path, config=config)
 model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(
-    text_input,
-    return_tensors="pt",
-    truncation=True,
-    padding="max_length",
-    max_length=max_length,
-)
-encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
+inputs = tokenizer(text1, text2, truncation=True, padding=True, max_length=max_length, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
+    outputs = model(**inputs)
+    pooled = outputs.pooler_output
+    last_hidden = outputs.last_hidden_state
+    sentence_embedding = pooled.detach().cpu().tolist() if pooled is not None else None
+    cls_token_embedding = last_hidden[:, 0, :].detach().cpu().tolist()
 
-sequence_output = outputs.last_hidden_state[0].cpu()
-pooled_output = outputs.pooler_output
-if pooled_output is not None:
-    pooled_output = pooled_output[0].cpu()
-
-RESULT = {"last_hidden_state": sequence_output}
-if pooled_output is not None:
-    RESULT["pooled_output"] = pooled_output
+RESULT = {"sentence_embedding": sentence_embedding, "cls_token_embedding": cls_token_embedding}

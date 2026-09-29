@@ -1,0 +1,55 @@
+{% set repo_id = repo_id | default("potsawee/longformer-large-4096-answering-race") %}
+{% set device = device | default("cuda:0") %}
+{% set context = context | default('Chelsea\'s mini-revival continued with a third victory in a row as they consigned struggling Leicester City to a fifth consecutive defeat. Buoyed by their Champions League win over Borussia Dortmund, Chelsea started brightly and Ben Chilwell volleyed in from a tight angle against his old club. Chelsea\'s Joao Felix and Leicester\'s Kiernan Dewsbury-Hall hit the woodwork in the space of two minutes, then Felix had a goal ruled out by the video assistant referee for offside. Patson Daka rifled home an excellent equaliser after Ricardo Pereira won the ball off the dawdling Felix outside the box. But Kai Havertz pounced six minutes into first-half injury time with an excellent dinked finish from Enzo Fernandez\'s clever aerial ball. Mykhailo Mudryk thought he had his first goal for the Blues after the break but his effort was disallowed for offside. Mateo Kovacic sealed the win as he volleyed in from Mudryk\'s header. The sliding Foxes, who ended with 10 men following Wout Faes\' late dismissal for a second booking, now just sit one point outside the relegation zone.') %}
+{% set question = question | default('Who had a goal ruled out for offside?') %}
+{% set options = options | default(['Ricardo Pereira', 'Ben Chilwell', 'Joao Felix', 'The Foxes']) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+context = "{{ context }}"
+question = "{{ question }}"
+options = {{ options }}
+
+import torch
+from transformers import LongformerTokenizer, LongformerForMultipleChoice
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+_ = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+
+model = LongformerForMultipleChoice.from_pretrained(
+    repo_id,
+    local_files_only=True,
+)
+state_dict = torch.load(weights_path, map_location='cpu')
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
+
+tokenizer = LongformerTokenizer.from_pretrained(
+    repo_id,
+    local_files_only=True,
+)
+
+c_plus_q = context + ' ' + tokenizer.bos_token + ' ' + question
+c_plus_q_4 = [c_plus_q] * len(options)
+tokenized_examples = tokenizer(
+    c_plus_q_4,
+    options,
+    max_length=4096,
+    padding='longest',
+    truncation=True,
+    return_tensors='pt',
+)
+input_ids = tokenized_examples['input_ids'].unsqueeze(0).to(device)
+attention_mask = tokenized_examples['attention_mask'].unsqueeze(0).to(device)
+
+outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+prob = torch.softmax(outputs.logits, dim=-1)[0].detach().cpu().tolist()
+selected_answer = options[int(torch.argmax(outputs.logits, dim=-1).item())]
+
+RESULT = {"probabilities": prob, "selected_answer": selected_answer}

@@ -1,0 +1,55 @@
+{% set repo_id = repo_id | default("laion/CLIP-convnext_large_d.laion2B-s26B-b102K-augreg") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set texts = texts | default(['a photo of a cat', 'a photo of a dog', 'a photo of a bird']) %}
+{% set top_k = top_k | default(3) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+texts = {{ texts }}
+top_k = {{ top_k }}
+
+from io import BytesIO
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+import open_clip
+
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+if image_path.startswith(("http://", "https://")):
+    import requests
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model, preprocess = open_clip.create_model_from_pretrained(
+    model_name="convnext_large_d",
+    pretrained=weights_path,
+    device=device,
+)
+model.eval()
+
+image_tensor = preprocess(image).unsqueeze(0).to(device)
+tokenizer = open_clip.get_tokenizer("convnext_large_d")
+
+with torch.no_grad():
+    text_tokens = tokenizer(texts).to(device)
+    image_features = model.encode_image(image_tensor)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logit_scale = model.logit_scale.exp()
+    logits = logit_scale * image_features @ text_features.T
+    probs = logits.softmax(dim=-1)[0]
+
+probs_np = probs.detach().cpu().numpy()
+indices = np.argsort(-probs_np)[:top_k]
+RESULT = {
+    "labels": [texts[i] for i in indices],
+    "scores": [float(probs_np[i]) for i in indices],
+}

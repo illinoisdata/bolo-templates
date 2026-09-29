@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("timm/vit_base_patch16_plus_clip_240.laion400m_e31") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text = text | default('a photo of a cat') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text = "{{ text }}"
+
+import json
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+import open_clip
+
+# Download model files
+config_path = hf_hub_download(repo_id=repo_id, filename='open_clip_config.json')
+weights_path = hf_hub_download(repo_id=repo_id, filename='open_clip_pytorch_model.bin')
+
+# Pre-process input & load model
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    from urllib.request import urlopen
+    image = Image.open(urlopen(image_path)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+with open(config_path, 'r') as f:
+    cfg = json.load(f)
+
+model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-16-plus-240', pretrained=None)
+state_dict = torch.load(weights_path, map_location='cpu', weights_only=False)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+# Run inference
+image_tensor = preprocess(image).unsqueeze(0).to(device)
+text_tokens = open_clip.tokenize([text]).to(device)
+with torch.no_grad():
+    image_features = model.encode_image(image_tensor)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logits = 100.0 * image_features @ text_features.T
+    probs = torch.softmax(logits, dim=-1)
+
+# Post-process & build RESULT dict
+RESULT = {
+    'logits': logits.detach().cpu().tolist(),
+    'probabilities': probs.detach().cpu().tolist(),
+}

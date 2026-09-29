@@ -1,0 +1,48 @@
+{% set repo_id = repo_id | default("timm/vit_base_patch32_clip_224.laion400m_e31") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text_prompt = text_prompt | default('a photo of a cat') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text_prompt = "{{ text_prompt }}"
+
+from io import BytesIO
+from urllib.parse import urlparse
+
+import requests
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from open_clip import create_model_from_pretrained, get_tokenizer, image_transform
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+if urlparse(image_path).scheme in ("http", "https"):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model = create_model_from_pretrained("ViT-B-32-quickgelu", pretrained=weights_path, device=device)[0]
+model.eval()
+
+preprocess = image_transform(image_size=224, is_train=False)
+tokenizer = get_tokenizer("ViT-B-32-quickgelu")
+image_tensor = preprocess(image).unsqueeze(0).to(device)
+text_tokens = tokenizer([text_prompt]).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_tensor)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logit_scale = model.logit_scale.exp()
+    logits_per_image = logit_scale * image_features @ text_features.T
+    probs = logits_per_image.softmax(dim=-1).squeeze(0)
+
+RESULT = {
+    "logits_per_image": logits_per_image.detach().cpu(),
+    "probabilities": probs.detach().cpu(),
+    "text_prompt": text_prompt,
+}

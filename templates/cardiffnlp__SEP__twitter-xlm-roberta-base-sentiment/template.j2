@@ -1,0 +1,14 @@
+{% set repo_id = repo_id | default("cardiffnlp/twitter-xlm-roberta-base-sentiment") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set input_prompt = input_prompt | default("I love you!") %}
+
+task = "{{ task }}"
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_prompt = "{{ input_prompt }}"
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, tokenizer=repo_id, device=device)
+RESULT = pipe(input_prompt)

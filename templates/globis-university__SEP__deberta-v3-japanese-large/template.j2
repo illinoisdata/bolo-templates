@@ -1,0 +1,29 @@
+{% set repo_id = repo_id | default("globis-university/deberta-v3-japanese-large") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("token-classification") %}
+{% set model = model | default(repo_id) %}
+{% set input_prompt = input_prompt | default("東京大学での研究成果をさらに広めたいと思います。") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+import json
+from huggingface_hub import hf_hub_download
+from transformers import DebertaV2Tokenizer, pipeline
+
+tokenizer_file = hf_hub_download(model, filename="tokenizer.json")
+with open(tokenizer_file, "r", encoding="utf-8") as f:
+    tokenizer_metadata = json.load(f)
+
+vocab_mapping = tokenizer_metadata["model"]["vocab"]
+ordered_vocab = sorted(vocab_mapping.items(), key=lambda token_item: int(token_item[1]))
+vocab_list = [(token, 0.0) for token, _ in ordered_vocab]
+unk_token_id = int(vocab_mapping.get("[UNK]", 1))
+
+tokenizer = DebertaV2Tokenizer(vocab=vocab_list, unk_id=unk_token_id)
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+
+inputs = input_prompt
+RESULT = pipe(inputs)

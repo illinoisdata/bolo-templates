@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("depth-anything/DA3-GIANT-1.1") %}
+{% set device = device | default("cuda:0") %}
+{% set image1 = image1 | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set image2 = image2 | default('/u/yunqili4/projects/ML-code-generation/data/image2.jpeg') %}
+{% set export_dir = export_dir | default('/workspace/da3_output') %}
+{% set export_format = export_format | default('npz') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image1 = "{{ image1 }}"
+image2 = "{{ image2 }}"
+export_dir = "{{ export_dir }}"
+export_format = "{{ export_format }}"
+
+import os
+from pathlib import Path
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_dir = str(Path(model_file).parent)
+weights_path = model_file
+
+if image1.startswith(("http://", "https://")):
+    import requests
+    img1 = Image.open(requests.get(image1, stream=True).raw).convert("RGB")
+else:
+    img1 = Image.open(image1).convert("RGB")
+if image2.startswith(("http://", "https://")):
+    import requests
+    img2 = Image.open(requests.get(image2, stream=True).raw).convert("RGB")
+else:
+    img2 = Image.open(image2).convert("RGB")
+
+os.makedirs(export_dir, exist_ok=True)
+import json
+with open(os.path.join(model_dir, "config.json"), "r") as f:
+    cfg = json.load(f)
+
+model = torch.jit.load(weights_path, map_location=device) if weights_path.endswith(".pt") else None
+
+RESULT = {
+    "config": cfg,
+    "weights_path": weights_path,
+    "images": [img1.size, img2.size],
+}

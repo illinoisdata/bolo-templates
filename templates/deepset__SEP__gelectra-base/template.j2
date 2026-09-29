@@ -1,25 +1,40 @@
 {% set repo_id = repo_id | default("deepset/gelectra-base") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("Dies ist ein Beispielsatz.") %}
-
+{% set text = text | default('Das ist ein deutscher Beispielsatz zur Vorhersage.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
 import os
-import numpy as np
 import torch
 from transformers import AutoTokenizer, AutoModelForPreTraining
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+# Load tokenizer and model
+_tokenizer_dir = os.path.dirname(tokenizer_path)
+tokenizer = AutoTokenizer.from_pretrained(_tokenizer_dir, use_fast=False)
+model = AutoModelForPreTraining.from_pretrained(repo_id, torch_dtype=None)
+model.to(device)
+model.eval()
 
 inputs = tokenizer(text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-outputs = model(**inputs)
-discriminator_logits = outputs.logits
+with torch.no_grad():
+    outputs = model(**inputs)
+
+# ELECTRA pretraining output: discriminator logits per token
+logits = outputs.logits
+probs = torch.sigmoid(logits)
+prediction = probs.argmax(dim=-1)
 
 RESULT = {
-    "discriminator_logits": discriminator_logits,
+    "logits": logits.detach().cpu(),
+    "probabilities": probs.detach().cpu(),
+    "prediction": prediction.detach().cpu(),
 }

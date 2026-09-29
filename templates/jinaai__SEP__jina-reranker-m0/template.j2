@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("jinaai/jina-reranker-m0") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set model = model | default(repo_id) %}
+{% set input_prompt = input_prompt | default("An example document to embed for reranking evaluation.") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(input_prompt)

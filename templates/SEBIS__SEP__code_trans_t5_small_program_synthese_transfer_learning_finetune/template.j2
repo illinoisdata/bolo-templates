@@ -1,44 +1,40 @@
 {% set repo_id = repo_id | default("SEBIS/code_trans_t5_small_program_synthese_transfer_learning_finetune") %}
 {% set device = device | default("cuda:0") %}
-{% set prompt = prompt | default("you are given an array of numbers a and a number b , compute the difference of elements in a and b") %}
-{% set prefix = prefix | default("program synthesis: ") %}
-{% set max_length = max_length | default(512) %}
-{% set num_beams = num_beams | default(4) %}
+{% set input_text = input_text | default("you are given an array of numbers a and a number b , compute the difference of elements in a and b") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
-prefix = "{{ prefix }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+input_text = "{{ input_text }}"
 
 import torch
-from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-device_obj = torch.device(device)
+prefix = "program synthesis: "
+full_input = prefix + input_text
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device_obj)
+# Load tokenizer/model from repo snapshot directory
+repo_dir = tokenizer_file.rsplit("/", 1)[0]
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_dir, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-input_text = prefix + prompt
-encoded_inputs = tokenizer(
-    input_text,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-    max_length=max_length,
-)
-encoded_inputs = {key: value.to(device_obj) for key, value in encoded_inputs.items()}
+inputs = tokenizer(full_input, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    generated_tokens = model.generate(
-        **encoded_inputs,
-        max_length=max_length,
-        num_beams=num_beams,
+    generated_ids = model.generate(
+        **inputs,
+        max_length=128,
+        num_beams=4,
+        do_sample=False,
     )
 
-generated_programs = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-RESULT = {"generated_programs": generated_programs}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+RESULT = {"generated_text": output_text}

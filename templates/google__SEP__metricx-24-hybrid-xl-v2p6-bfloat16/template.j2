@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("google/metricx-24-hybrid-xl-v2p6-bfloat16") %}
+{% set device = device | default("cuda:0") %}
+{% set text_source = text_source | default('This is a test source sentence.') %}
+{% set text_reference = text_reference | default('This is a test reference sentence.') %}
+{% set use_reference = use_reference | default(true) %}
+{% set max_length = max_length | default(256) %}
+{% set truncation = truncation | default(true) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_source = "{{ text_source }}"
+text_reference = "{{ text_reference }}"
+use_reference = {{ use_reference }}
+max_length = {{ max_length }}
+truncation = {{ truncation }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+model.eval()
+
+if use_reference:
+    model_input = f"source: {text_source} reference: {text_reference}"
+else:
+    model_input = f"source: {text_source}"
+
+inputs = tokenizer(
+    model_input,
+    return_tensors="pt",
+    truncation=truncation,
+    max_length=max_length,
+)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated = model.generate(**inputs, max_new_tokens=8)
+    decoded = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+score = float(decoded) if decoded.strip() else 0.0
+RESULT = {"score": score}

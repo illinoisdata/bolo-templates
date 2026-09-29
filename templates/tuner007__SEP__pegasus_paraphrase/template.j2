@@ -1,30 +1,25 @@
 {% set repo_id = repo_id | default("tuner007/pegasus_paraphrase") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("The ultimate test of your knowledge is your capacity to convey it to another.") %}
+{% set input_text = input_text | default('The ultimate test of your knowledge is your capacity to convey it to another.') %}
 {% set num_beams = num_beams | default(10) %}
 {% set num_return_sequences = num_return_sequences | default(10) %}
-{% set max_length = max_length | default(60) %}
-{% set temperature = temperature | default(1.5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 num_beams = {{ num_beams }}
 num_return_sequences = {{ num_return_sequences }}
-max_length = {{ max_length }}
-temperature = {{ temperature }}
 
-import os
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import PegasusForConditionalGeneration, PegasusTokenizer
 
-if device.startswith("cuda") and not torch.cuda.is_available():
-    device = "cpu"
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+tokenizer = PegasusTokenizer.from_pretrained(repo_id, use_fast=False)
+model = PegasusForConditionalGeneration.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
 
-inputs = tokenizer([input_text], truncation=True, padding="longest", max_length=max_length, return_tensors="pt").to(device)
-generated = model.generate(**inputs, max_length=max_length, num_beams=num_beams, num_return_sequences=num_return_sequences, temperature=temperature)
-paraphrases = tokenizer.batch_decode(generated, skip_special_tokens=True)
+batch = tokenizer([input_text], truncation=True, padding='longest', max_length=60, return_tensors="pt").to(device)
+translated = model.generate(**batch, max_length=60, num_beams=num_beams, num_return_sequences=num_return_sequences, temperature=1.5)
+output_text = tokenizer.batch_decode(translated, skip_special_tokens=True)
 
-RESULT = {"paraphrases": paraphrases}
+RESULT = {"output_text": output_text}

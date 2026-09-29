@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("philschmid/distilbert-onnx") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What is the name of the repository?') %}
+{% set context = context | default('The repository philschmid/distilbert-onnx provides an ONNX conversion of DistilBERT fine-tuned on SQuAD.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import os
+import torch
+import onnxruntime as ort
+from transformers import AutoTokenizer
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.onnx")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(vocab_path), use_fast=False)
+inputs = tokenizer(question, context, return_tensors="np")
+
+providers = ["CPUExecutionProvider"]
+if str(device).startswith("cuda") and torch.cuda.is_available():
+    providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+session = ort.InferenceSession(model_path, providers=providers)
+ort_inputs = {k: v for k, v in inputs.items() if k in {i.name for i in session.get_inputs()}}
+start_logits, end_logits = session.run(None, ort_inputs)
+
+start_idx = int(start_logits[0].argmax())
+end_idx = int(end_logits[0].argmax())
+if end_idx < start_idx:
+    end_idx = start_idx
+answer_ids = inputs["input_ids"][0][start_idx:end_idx + 1]
+answer = tokenizer.decode(answer_ids, skip_special_tokens=True)
+
+RESULT = {"output": {"answer": answer, "start": start_idx, "end": end_idx}}

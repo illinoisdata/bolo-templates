@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("facebook/FairBERTa") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The quick brown fox jumps over the lazy dog.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+hf_hub_download(repo_id=repo_id, filename="vocab.json")
+hf_hub_download(repo_id=repo_id, filename="merges.txt")
+repo_dir = os.path.dirname(model_file)
+
+# Pre-process input & load model
+
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, local_files_only=True)
+model = AutoModelForMaskedLM.from_pretrained(repo_dir, local_files_only=True)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    pred_ids = torch.argmax(logits, dim=-1)
+    predicted_text = tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
+
+RESULT = {"predicted_text": predicted_text, "logits_shape": list(logits.shape)}

@@ -1,33 +1,38 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("ElnaggarLab/ankh-large") %}
-{% set text_input = text_input | default("Summarize: The quick brown fox jumps over the lazy dog.") %}
-{% set max_length = max_length | default(256) %}
-{% set num_return_sequences = num_return_sequences | default(1) %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('ACDEFGHIKLMNPQRSTVWY') %}
+{% set max_new_tokens = max_new_tokens | default(16) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-max_length = {{ max_length }}
-num_return_sequences = {{ num_return_sequences }}
+input_text = "{{ input_text }}"
+max_new_tokens = {{ max_new_tokens }}
 
-from pathlib import Path
-
+import os
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    os.path.dirname(weights_path),
+    config=config_path,
+    local_files_only=True,
+)
+model.load_state_dict(torch.load(weights_path, map_location="cpu"))
+model.to(device)
 model.eval()
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
 
-inputs = tokenizer(text_input, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_path), local_files_only=True)
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    generated_ids = model.generate(
-        **inputs,
-        max_length=max_length,
-        num_return_sequences=num_return_sequences,
-        return_dict_in_generate=False,
-    )
+    output_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-RESULT = {"generated_texts": generated_texts}
+RESULT = {"output_text": output_text}

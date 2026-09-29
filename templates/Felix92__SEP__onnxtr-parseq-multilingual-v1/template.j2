@@ -1,0 +1,73 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Felix92/onnxtr-parseq-multilingual-v1") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import json
+import os
+import subprocess
+import sys
+import numpy as np
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "onnxruntime", "requests"])
+import onnxruntime as ort
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.onnx")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+mean = np.array(config["mean"], dtype=np.float32)
+std = np.array(config["std"], dtype=np.float32)
+input_shape = config["input_shape"]
+vocab = config["vocab"]
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    img = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    img = Image.open(image_path).convert("RGB")
+
+c, h, w = input_shape
+img = img.resize((w, h))
+arr = np.asarray(img).astype(np.float32) / 255.0
+arr = (arr - mean) / std
+arr = np.transpose(arr, (2, 0, 1))[None, ...].astype(np.float32)
+
+providers = ["CPUExecutionProvider"]
+if device.startswith("cuda"):
+    providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+
+session = ort.InferenceSession(weights_path, providers=providers)
+input_name = session.get_inputs()[0].name
+output = session.run(None, {input_name: arr})[0]
+
+# greedy CTC-style decode
+if output.ndim == 3:
+    logits = output[0]
+elif output.ndim == 2:
+    logits = output
+else:
+    logits = np.squeeze(output)
+
+if logits.ndim == 1:
+    logits = logits[None, :]
+
+pred_ids = np.argmax(logits, axis=-1).tolist()
+blank_id = 0
+chars = []
+prev = None
+for idx in pred_ids:
+    if idx != blank_id and idx != prev and idx < len(vocab):
+        chars.append(vocab[idx])
+    prev = idx
+text = "".join(chars)
+
+RESULT = {"text": text}

@@ -1,39 +1,43 @@
 {% set repo_id = repo_id | default("Salesforce/blip-image-captioning-base") %}
 {% set device = device | default("cuda:0") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set prompt_text = prompt_text | default("a photography of") %}
+{% set text_prompt = text_prompt | default("a photography of") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-image_path = "{{ image_path }}"
-prompt_text = "{{ prompt_text }}"
+text_prompt = "{{ text_prompt }}"
 
-from transformers import BlipProcessor, BlipForConditionalGeneration
+import os
+import torch
 from PIL import Image
 import requests
-import os
+from transformers import BlipProcessor, BlipForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-# Load processor and model
+repo_files = [
+    hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin"),
+    hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json"),
+    hf_hub_download(repo_id=repo_id, filename="tokenizer.json"),
+    hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json"),
+    hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json"),
+    hf_hub_download(repo_id=repo_id, filename="vocab.txt"),
+]
+model_dir = os.path.dirname(repo_files[0])
 processor = BlipProcessor.from_pretrained(repo_id)
-model = BlipForConditionalGeneration.from_pretrained(repo_id)
-model.to(device)
+model = BlipForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
+model = model.to(device)
+model.eval()
 
-# Pre-process input image
-if image_path.startswith("http://") or image_path.startswith("https://"):
-    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+image_path = "/u/yunqili4/projects/ML-code-generation/data/image1.jpeg"
+if str(image_path).startswith("http://") or str(image_path).startswith("https://"):
+    raw_image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
 else:
-    image = Image.open(image_path).convert("RGB")
+    raw_image = Image.open(image_path).convert("RGB")
 
-# Conditional image captioning
-inputs_cond = processor(image, prompt_text, return_tensors="pt").to(device)
-cond_ids = model.generate(**inputs_cond)
-cond_caption = processor.decode(cond_ids[0], skip_special_tokens=True)
+inputs = processor(raw_image, text_prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Unconditional image captioning
-inputs_uncond = processor(image, return_tensors="pt").to(device)
-uncond_ids = model.generate(**inputs_uncond)
-uncond_caption = processor.decode(uncond_ids[0], skip_special_tokens=True)
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=20)
 
-RESULT = {
-    "conditional_caption": cond_caption,
-    "unconditional_caption": uncond_caption,
-}
+caption = processor.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"caption": caption}

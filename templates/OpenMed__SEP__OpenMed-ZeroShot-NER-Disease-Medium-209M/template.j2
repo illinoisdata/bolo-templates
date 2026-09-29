@@ -1,0 +1,23 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Disease-Medium-209M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The patient was diagnosed with diabetes mellitus type 2.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+_ = hf_hub_download(repo_id=repo_id, filename="spm.model")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+RESULT = {"config": cfg, "weights_path": weights_path}

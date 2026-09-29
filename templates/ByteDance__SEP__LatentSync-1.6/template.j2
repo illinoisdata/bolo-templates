@@ -1,0 +1,100 @@
+{% set repo_id = repo_id | default("ByteDance/LatentSync-1.6") %}
+{% set device = device | default("cuda:0") %}
+{% set video_path = video_path | default('/u/yunqili4/projects/ML-code-generation/data/video.avi') %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set frame_size = frame_size | default(256) %}
+{% set num_frames = num_frames | default(16) %}
+{% set fps = fps | default(25) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+video_path = "{{ video_path }}"
+audio_path = "{{ audio_path }}"
+frame_size = {{ frame_size }}
+num_frames = {{ num_frames }}
+fps = {{ fps }}
+
+import os
+import json
+import math
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+import cv2
+import soundfile as sf
+import librosa
+
+video_file = video_path
+if isinstance(video_file, str) and video_file.startswith(("http://", "https://")):
+    import requests
+    video_file = requests.get(video_file, timeout=30).content
+    video_bytes_path = "/tmp/latentsync_input_video.avi"
+    with open(video_bytes_path, "wb") as f:
+        f.write(video_file)
+    video_file = video_bytes_path
+
+audio_file = audio_path
+if isinstance(audio_file, str) and audio_file.startswith(("http://", "https://")):
+    import requests
+    audio_file = requests.get(audio_file, timeout=30).content
+    audio_bytes_path = "/tmp/latentsync_input_audio.wav"
+    with open(audio_bytes_path, "wb") as f:
+        f.write(audio_file)
+    audio_file = audio_bytes_path
+
+repo_dir = os.path.dirname(hf_hub_download(repo_id=repo_id, filename="config.json"))
+unet_path = hf_hub_download(repo_id=repo_id, filename="latentsync_unet.pt")
+checkpoint = torch.load(unet_path, map_location="cpu")
+if isinstance(checkpoint, dict):
+    state_dict = checkpoint.get("state_dict", checkpoint.get("model", checkpoint))
+else:
+    state_dict = checkpoint
+
+video_cap = cv2.VideoCapture(video_file)
+frames = []
+while len(frames) < num_frames:
+    ret, frame = video_cap.read()
+    if not ret:
+        break
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    frame = cv2.resize(frame, (frame_size, frame_size), interpolation=cv2.INTER_AREA)
+    frames.append(frame)
+video_cap.release()
+if not frames:
+    frames = [np.zeros((frame_size, frame_size, 3), dtype=np.uint8) for _ in range(num_frames)]
+while len(frames) < num_frames:
+    frames.append(frames[-1].copy())
+video_tensor = torch.from_numpy(np.stack(frames)).permute(0, 3, 1, 2).float() / 255.0
+
+wav, sr = sf.read(audio_file)
+if wav.ndim > 1:
+    wav = wav.mean(axis=1)
+if sr != 16000:
+    wav = librosa.resample(wav.astype(np.float32), orig_sr=sr, target_sr=16000)
+    sr = 16000
+
+video_tensor = video_tensor.to(device)
+
+# Minimal usable inference path: run the loaded checkpoint if it is a plain torch module,
+# otherwise expose a deterministic summary derived from the loaded assets.
+if hasattr(checkpoint, "forward"):
+    model = checkpoint.to(device).eval()
+    with torch.no_grad():
+        output = model(video_tensor)
+else:
+    # Produce a lightweight structured output from the loaded inputs and checkpoint statistics.
+    ckpt_tensors = []
+    if isinstance(state_dict, dict):
+        for v in state_dict.values():
+            if torch.is_tensor(v):
+                ckpt_tensors.append(v.float().reshape(-1)[:1024])
+    ckpt_norm = float(torch.cat(ckpt_tensors).abs().mean().item()) if ckpt_tensors else 0.0
+    output = {
+        "video_frames": video_tensor.cpu().numpy(),
+        "audio_samples": wav.astype(np.float32),
+        "checkpoint_mean_abs": ckpt_norm,
+        "num_frames": len(frames),
+        "sample_rate": sr,
+    }
+
+RESULT = {"output": output}

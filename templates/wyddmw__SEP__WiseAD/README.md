@@ -1,0 +1,1 @@
+This is the model ckpts for our WiseAD. For more details, please refer to our github repo https://github.com/wyddmw/WiseAD

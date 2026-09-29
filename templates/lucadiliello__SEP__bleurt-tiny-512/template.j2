@@ -1,0 +1,84 @@
+{% set repo_id = repo_id | default("lucadiliello/bleurt-tiny-512") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set references = references | default(["a bird chirps by the window", "this is a random sentence"]) %}
+{% set candidates = candidates | default(["a bird chirps by the window", "this looks like a random sentence"]) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+references = {{ references | tojson }}
+candidates = {{ candidates | tojson }}
+
+import sys
+import torch
+import transformers.pytorch_utils as pyt_utils
+from transformers.models.bert import tokenization_bert as bert_tokenization
+from transformers.models.auto.modeling_auto import MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES
+from transformers.pipelines import SUPPORTED_TASKS
+
+sys.modules["transformers.models.bert.tokenization_bert_fast"] = bert_tokenization
+
+
+def find_pruneable_heads_and_indices(heads, num_attention_heads, head_size, already_pruned_heads):
+    """Monkey-patch for transformers compatibility: define find_pruneable_heads_and_indices"""
+    heads_set = set(heads) - set(already_pruned_heads)
+    index = []
+    for head in sorted(heads_set):
+        start = head * head_size
+        end = start + head_size
+        index.extend(list(range(start, end)))
+    return heads_set, index
+
+pyt_utils.find_pruneable_heads_and_indices = find_pruneable_heads_and_indices
+
+torch_device = torch.device(device if isinstance(device, str) else device)
+
+from bleurt_pytorch import BleurtConfig, BleurtForSequenceClassification, BleurtTokenizer
+from bleurt_pytorch.bleurt.modeling_bleurt import BleurtModel
+from transformers import pipeline
+
+
+def _bleurt_convert_head_mask_to_5d(self, head_mask, num_hidden_layers):
+    if head_mask.dim() == 1:
+        head_mask = head_mask.unsqueeze(0).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
+        head_mask = head_mask.expand(num_hidden_layers, -1, -1, -1, -1)
+    elif head_mask.dim() == 2:
+        head_mask = head_mask.unsqueeze(1).unsqueeze(-1).unsqueeze(-1)
+    assert head_mask.dim() == 5, f"head_mask.dim != 5, instead {head_mask.dim()}"
+    return head_mask.to(dtype=self.dtype)
+
+
+def _bleurt_get_head_mask(self, head_mask, num_hidden_layers, is_attention_chunked: bool = False):
+    if head_mask is not None:
+        head_mask = self._convert_head_mask_to_5d(head_mask, num_hidden_layers)
+        if is_attention_chunked:
+            head_mask = head_mask.unsqueeze(-1)
+    else:
+        head_mask = [None] * num_hidden_layers
+    return head_mask
+
+BleurtModel._convert_head_mask_to_5d = _bleurt_convert_head_mask_to_5d
+BleurtModel.get_head_mask = _bleurt_get_head_mask
+
+config = BleurtConfig.from_pretrained(repo_id)
+tokenizer = BleurtTokenizer.from_pretrained(repo_id)
+model = BleurtForSequenceClassification.from_pretrained(repo_id)
+model.to(torch_device)
+MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES["bleurt"] = "BleurtForSequenceClassification"
+SUPPORTED_TASKS["text-classification"]["pt"] = (
+    *SUPPORTED_TASKS["text-classification"]["pt"],
+    BleurtForSequenceClassification,
+)
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=tokenizer,
+    config=config,
+    device=device,
+)
+input_pairs = [
+    {"text": ref, "text_pair": cand}
+    for ref, cand in zip(references, candidates)
+]
+RESULT = pipe(input_pairs)

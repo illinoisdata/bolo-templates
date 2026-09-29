@@ -1,0 +1,89 @@
+{% set repo_id = repo_id | default("onnx-community/whisper-base") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set language = language | default('en') %}
+{% set task = task | default('transcribe') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+language = "{{ language }}"
+task = "{{ task }}"
+
+import os
+import json
+import numpy as np
+import torch
+import librosa
+import onnxruntime as ort
+from huggingface_hub import hf_hub_download
+from transformers import AutoProcessor, WhisperConfig
+
+encoder_path = hf_hub_download(repo_id=repo_id, filename="onnx/encoder_model.onnx")
+decoder_path = hf_hub_download(repo_id=repo_id, filename="onnx/decoder_model.onnx")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+processor = AutoProcessor.from_pretrained(repo_id)
+config = WhisperConfig.from_json_file(config_path)
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    import requests
+    import tempfile
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    with tempfile.NamedTemporaryFile(suffix=os.path.splitext(audio_path)[1] or ".wav", delete=False) as f:
+        f.write(audio_bytes)
+        local_audio_path = f.name
+else:
+    local_audio_path = audio_path
+
+speech_array, sampling_rate = librosa.load(local_audio_path, sr=16000)
+inputs = processor(audio=speech_array, sampling_rate=16000, return_tensors="np")
+input_features = inputs.input_features.astype(np.float32)
+
+encoder_session = ort.InferenceSession(encoder_path, providers=["CPUExecutionProvider"])
+encoder_inputs = {encoder_session.get_inputs()[0].name: input_features}
+encoder_hidden_states = encoder_session.run(None, encoder_inputs)[0]
+
+decoder_session = ort.InferenceSession(decoder_path, providers=["CPUExecutionProvider"])
+
+forced_decoder_ids = processor.get_decoder_prompt_ids(language=language, task=task)
+forced_tokens = [token_id for _, token_id in forced_decoder_ids]
+
+decoder_input_ids = np.array([[config.decoder_start_token_id]], dtype=np.int64)
+past_key_values = None
+for step in range(64):
+    ort_inputs = {}
+    for inp in decoder_session.get_inputs():
+        name = inp.name
+        if name == "input_ids":
+            ort_inputs[name] = decoder_input_ids
+        elif name == "encoder_hidden_states":
+            ort_inputs[name] = encoder_hidden_states
+        elif name.startswith("past_key_values") and past_key_values is not None:
+            parts = name.split(".")
+            layer_idx = int(parts[1])
+            kv_type = parts[2]
+            ort_inputs[name] = past_key_values[layer_idx][0 if kv_type == "key" else 1]
+
+    outputs = decoder_session.run(None, ort_inputs)
+    logits = outputs[0]
+    if len(outputs) > 1:
+        past_key_values = []
+        kv_count = (len(outputs) - 1) // 2
+        for i in range(kv_count):
+            past_key_values.append((outputs[1 + 2 * i], outputs[1 + 2 * i + 1]))
+
+    if step < len(forced_tokens):
+        next_token = forced_tokens[step]
+    else:
+        next_token = int(np.argmax(logits[:, -1, :], axis=-1)[0])
+
+    decoder_input_ids = np.concatenate([decoder_input_ids, np.array([[next_token]], dtype=np.int64)], axis=1)
+    if next_token == config.eos_token_id:
+        break
+
+transcription = processor.batch_decode(decoder_input_ids, skip_special_tokens=True)[0]
+RESULT = {"transcription": transcription}

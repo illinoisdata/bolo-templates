@@ -1,25 +1,30 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-sla-en") %}
-{% set source_text = source_text | default("Pozdravljen svet!") %}
-{% set max_new_tokens = max_new_tokens | default(100) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Zdravo, kako si?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_text = "{{ source_text }}"
-max_new_tokens = {{ max_new_tokens }}
+text = "{{ text }}"
 
-import os
 import torch
 from transformers import MarianMTModel, MarianTokenizer
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-tokenizer = MarianTokenizer.from_pretrained(repo_id)
-model = MarianMTModel.from_pretrained(repo_id).to(torch_device)
+tokenizer = MarianTokenizer(vocab=vocab_path, source_spm=source_spm_path, target_spm=target_spm_path)
+model = MarianMTModel.from_pretrained(repo_id)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
 
-encoded_input = tokenizer(source_text, return_tensors="pt", padding=True).to(torch_device)
+inputs = tokenizer([text], return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated = model.generate(**inputs, num_beams=6)
+translation = tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
 
-generated_tokens = model.generate(**encoded_input, max_new_tokens=max_new_tokens)
-
-translated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
-
-RESULT = {"translation": translated_text}
+RESULT = {"translation": translation}

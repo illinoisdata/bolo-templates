@@ -1,25 +1,44 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("valhalla/t5-base-qa-qg-hl") %}
-{% set prompt = prompt | default("generate question:  42  is the answer to life, the universe and everything. ") %}
-{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set device = device | default("cuda:0") %}
+{% set prompt_qg = prompt_qg | default('generate question: <hl> 42 <hl> is the answer to life, the universe and everything. </s>') %}
+{% set prompt_qa = prompt_qa | default('question: What is 42 context: 42 is the answer to life, the universe and everything. </s>') %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
-prompt = "{{ prompt }}"
 device = "{{ device }}"
+prompt_qg = "{{ prompt_qg }}"
+prompt_qa = "{{ prompt_qa }}"
 max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
 
-import os
-
+from huggingface_hub import hf_hub_download
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_tokenizer_files = [
+    hf_hub_download(repo_id=repo_id, filename="spiece.model"),
+    hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json"),
+    hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json"),
+    hf_hub_download(repo_id=repo_id, filename="added_tokens.json"),
+]
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-tokenized_inputs = tokenizer(prompt, return_tensors="pt")
-inputs = {k: v.to(device) for k, v in tokenized_inputs.items()}
+tokenizer = AutoTokenizer.from_pretrained(config_path.rsplit("/", 1)[0], use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(config_path.rsplit("/", 1)[0])
+model.to(device)
+model.eval()
 
-generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
-generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+inputs_qg = tokenizer(prompt_qg, return_tensors="pt")
+inputs_qg = {k: v.to(device) for k, v in inputs_qg.items()}
+inputs_qa = tokenizer(prompt_qa, return_tensors="pt")
+inputs_qa = {k: v.to(device) for k, v in inputs_qa.items()}
 
-RESULT = {"generated_text": generated_text}
+with torch.no_grad():
+    out_qg = model.generate(**inputs_qg, max_new_tokens=max_new_tokens, num_beams=num_beams)
+    out_qa = model.generate(**inputs_qa, max_new_tokens=max_new_tokens, num_beams=num_beams)
+
+text_qg = tokenizer.decode(out_qg[0], skip_special_tokens=True)
+text_qa = tokenizer.decode(out_qa[0], skip_special_tokens=True)
+
+RESULT = {"question_generation": text_qg, "question_answering": text_qa}

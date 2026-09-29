@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("chandar-lab/AMPLIFY_120M") %}
+{% set device = device | default("cuda:0") %}
+{% set sequence = sequence | default('MSTNPKPQRKTKRNTNRRPQDVKFPGGGQIVGGVLTARQ') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sequence = "{{ sequence }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoConfig, AutoModel, AutoTokenizer
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+repo_amplify = hf_hub_download(repo_id=repo_id, filename="amplify.py")
+repo_rmsnorm = hf_hub_download(repo_id=repo_id, filename="rmsnorm.py")
+repo_rotary = hf_hub_download(repo_id=repo_id, filename="rotary.py")
+repo_tokenizer_config = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+repo_tokenizer_json = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+repo_special_tokens = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+model_dir = os.path.dirname(model_file)
+config = AutoConfig.from_pretrained(model_dir, trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, trust_remote_code=True)
+model = AutoModel.from_config(config, trust_remote_code=True)
+from safetensors.torch import load_file
+state_dict = load_file(model_file, device="cpu")
+model.load_state_dict(state_dict, strict=True)
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(sequence, return_tensors="pt")
+attention_mask = inputs.get("attention_mask")
+if attention_mask is not None:
+    attention_mask = torch.where(attention_mask.bool(), torch.tensor(0.0), torch.tensor(float("-inf")))
+    inputs["attention_mask"] = attention_mask
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+RESULT = {
+    "logits": logits,
+}

@@ -1,7 +1,55 @@
 {% set repo_id = repo_id | default("Jiqing/tiny-random-tvp") %}
 {% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text_query = text_query | default('Find the person in the image.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-import inspect
-from transformers.models import tvp
-print("tvp classes", [name for name, obj in inspect.getmembers(tvp.modeling_tvp, inspect.isclass) if obj.__module__ == tvp.modeling_tvp.__name__])
+image_path = "{{ image_path }}"
+text_query = "{{ text_query }}"
+
+import os
+import requests
+import torch
+from PIL import Image
+from transformers import AutoTokenizer, TvpForVideoGrounding
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_file = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+with open(processor_file, "r") as f:
+    processor_cfg = __import__("json").load(f)
+image_size = processor_cfg.get("size", {}).get("shortest_edge", 448)
+if isinstance(image_size, dict):
+    image_size = next(iter(image_size.values()))
+
+# Load tokenizer from downloaded files directory
+local_dir = os.path.dirname(tokenizer_file)
+tokenizer = AutoTokenizer.from_pretrained(local_dir, use_fast=True)
+model = TvpForVideoGrounding.from_pretrained(local_dir, local_files_only=True)
+model.to(device)
+model.eval()
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+image = image.resize((image_size, image_size))
+import numpy as np
+pixel_values = torch.tensor(np.array(image)).permute(2, 0, 1).float() / 255.0
+pixel_values = pixel_values.unsqueeze(0).to(device)
+text_inputs = tokenizer(text_query, return_tensors="pt")
+text_inputs = {k: v.to(device) for k, v in text_inputs.items()}
+
+with torch.no_grad():
+    outputs = model(pixel_values=pixel_values, **text_inputs)
+
+out = {}
+for k in ["logits", "start_logits", "end_logits"]:
+    if hasattr(outputs, k):
+        v = getattr(outputs, k)
+        out[k] = v.detach().cpu().tolist()
+RESULT = out

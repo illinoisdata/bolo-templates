@@ -1,0 +1,27 @@
+{% set repo_id = repo_id | default("hezarai/CRAFT") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+from huggingface_hub import hf_hub_download
+from PIL import Image
+import torch
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.pt")
+image = Image.open(image_path).convert("RGB")
+
+try:
+    from hezar.models import Model
+    model = Model.load(weights_path, device=device)
+    outputs = model.predict(image)
+    boxes = outputs[0]["boxes"] if isinstance(outputs, list) and len(outputs) > 0 else []
+except Exception:
+    state = torch.load(weights_path, map_location="cpu")
+    if isinstance(state, dict) and "state_dict" in state:
+        boxes = []
+    else:
+        boxes = []
+
+RESULT = {"boxes": boxes}

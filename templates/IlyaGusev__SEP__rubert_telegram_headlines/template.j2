@@ -1,25 +1,27 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("IlyaGusev/rubert_telegram_headlines") %}
-{% set article_text = article_text | default("Это пример текста новости, на основе которого модель должна сгенерировать краткий заголовок.") %}
-{% set max_input_length = max_input_length | default(256) %}
-{% set max_output_length = max_output_length | default(64) %}
+{% set device = device | default("cuda:0") %}
+{% set article_text = article_text | default('В Москве прошла конференция по машинному обучению, где участники обсудили новые методы обучения языковых моделей и применение искусственного интеллекта в промышленности.') %}
+{% set max_length = max_length | default(64) %}
 {% set num_beams = num_beams | default(10) %}
-{% set top_p = top_p | default(0.95) %}
 {% set no_repeat_ngram_size = no_repeat_ngram_size | default(4) %}
+{% set top_p = top_p | default(0.95) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 article_text = "{{ article_text }}"
-max_input_length = {{ max_input_length }}
-max_output_length = {{ max_output_length }}
+max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-top_p = {{ top_p }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
-
-import os
-from pathlib import Path
+top_p = {{ top_p }}
 
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, EncoderDecoderModel
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
 tokenizer = AutoTokenizer.from_pretrained(
     repo_id,
@@ -27,33 +29,31 @@ tokenizer = AutoTokenizer.from_pretrained(
     do_basic_tokenize=False,
     strip_accents=False,
 )
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = EncoderDecoderModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-torch_device = torch.device(device)
-model = model.to(torch_device)
-
-input_tensors = tokenizer(
-    article_text,
+inputs = tokenizer(
+    [article_text],
     add_special_tokens=True,
-    max_length=max_input_length,
+    max_length=256,
     padding="max_length",
     truncation=True,
     return_tensors="pt",
 )
-input_tensors = {name: tensor.to(torch_device) for name, tensor in input_tensors.items()}
+input_ids = inputs["input_ids"].to(device)
+attention_mask = inputs["attention_mask"].to(device)
 
-generated_ids = model.generate(
-    **input_tensors,
-    max_length=max_output_length,
-    num_beams=num_beams,
-    top_p=top_p,
-    no_repeat_ngram_size=no_repeat_ngram_size,
-)
+with torch.no_grad():
+    output_ids = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        max_length=max_length,
+        no_repeat_ngram_size=no_repeat_ngram_size,
+        num_beams=num_beams,
+        top_p=top_p,
+    )[0]
 
-headline = tokenizer.decode(
-    generated_ids[0],
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-)
+headline = tokenizer.decode(output_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
 
 RESULT = {"headline": headline}

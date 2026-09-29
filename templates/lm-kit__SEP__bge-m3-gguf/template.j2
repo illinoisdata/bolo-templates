@@ -1,0 +1,42 @@
+{% set repo_id = repo_id | default("lm-kit/bge-m3-gguf") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('bge-m3-Q4_K_M.gguf') %}
+{% set query_text = query_text | default('What is the main topic of this text?') %}
+{% set passage_text = passage_text | default('BGE-M3 is a multilingual embedding model designed for retrieval and semantic search.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+query_text = "{{ query_text }}"
+passage_text = "{{ passage_text }}"
+
+import os
+import json
+import numpy as np
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+# Download GGUF weights
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+# Load model
+n_gpu_layers = -1 if str(device).startswith('cuda') else 0
+llm = Llama(
+    model_path=model_path,
+    embedding=True,
+    n_gpu_layers=n_gpu_layers,
+    verbose=False,
+)
+
+# Run inference: compute embeddings for query and passage
+texts = [query_text, passage_text]
+embeddings = llm.create_embedding(texts)
+
+# Normalize output structure from llama-cpp-python
+if isinstance(embeddings, dict) and 'data' in embeddings:
+    output = [item['embedding'] for item in embeddings['data']]
+else:
+    output = embeddings
+
+RESULT = {
+    'embeddings': output,
+}

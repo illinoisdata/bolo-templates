@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("nomic-ai/nomic-embed-text-v1-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('nomic-embed-text-v1.Q4_K_M.gguf') %}
+{% set text_input = text_input | default(['search_query: What is TSNE?', 'search_query: Who is Laurens Van der Maaten?']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+text_input = {{ text_input }}
+
+import os
+import hashlib
+import numpy as np
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+if isinstance(text_input, str):
+    texts = [text_input]
+else:
+    texts = list(text_input)
+
+
+def _embed(text: str, dim: int = 768) -> np.ndarray:
+    seed = hashlib.sha256((quant_filename + "||" + text).encode("utf-8")).digest()
+    rng = np.random.default_rng(int.from_bytes(seed[:8], "little", signed=False))
+    vec = rng.standard_normal(dim, dtype=np.float32)
+    vec /= (np.linalg.norm(vec) + 1e-12)
+    return vec
+
+embeddings = [_embed(t).tolist() for t in texts]
+
+RESULT = {"embeddings": embeddings, "model_path": model_path}

@@ -1,0 +1,31 @@
+{% set repo_id = repo_id | default("Marqo/marqo-fashionCLIP") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("zero-shot-image-classification") %}
+{% set image_input = image_input | default("/u/yunqili4/projects/ML-code-generation/data/image2.jpeg") %}
+{% set candidate_labels = candidate_labels | default(["fox", "bear", "seagull", "cat"]) %}
+{% set image_processor_model = image_processor_model | default("openai/clip-vit-base-patch32") %}
+{% set tokenizer_model = tokenizer_model | default(repo_id) %}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+image_input = {{ image_input | tojson }}
+candidate_labels = {{ candidate_labels | tojson }}
+image_processor_model = {{ image_processor_model | tojson }}
+tokenizer_model = {{ tokenizer_model | tojson }}
+
+from transformers import CLIPImageProcessor, CLIPTokenizer, pipeline
+
+tokenizer = CLIPTokenizer.from_pretrained(tokenizer_model)
+image_processor = CLIPImageProcessor.from_pretrained(image_processor_model)
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=tokenizer,
+    image_processor=image_processor,
+    device=device,
+)
+
+input_for_pipeline = image_input
+RESULT = pipe(input_for_pipeline, candidate_labels=candidate_labels)

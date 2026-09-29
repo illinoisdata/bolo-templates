@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("circulus/koelectra-ethics-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('This is a sample sentence to evaluate ethics.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, ElectraForSequenceClassification
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+repo_dir = os.path.dirname(weights_path)
+
+_ = config_path
+_ = tokenizer_config_path
+_ = special_tokens_map_path
+_ = vocab_path
+
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, use_fast=False)
+model = ElectraForSequenceClassification.from_pretrained(repo_dir)
+state_dict = torch.load(weights_path, map_location="cpu")
+if "classifier.weight" in state_dict and hasattr(model.classifier, "dense"):
+    model.classifier.out_proj = torch.nn.Linear(model.classifier.out_proj.in_features, model.classifier.out_proj.out_features)
+    model.classifier.dense = torch.nn.Linear(model.classifier.dense.in_features, model.classifier.dense.out_features)
+    model.classifier.weight = torch.nn.Parameter(state_dict["classifier.weight"])
+    model.classifier.bias = torch.nn.Parameter(state_dict["classifier.bias"])
+else:
+    model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+probabilities = torch.sigmoid(logits).squeeze(0).detach().cpu().tolist()
+labels = [model.config.id2label[i] if i in model.config.id2label else model.config.id2label[str(i)] for i in range(len(probabilities))]
+RESULT = {"labels": labels, "probabilities": probabilities}

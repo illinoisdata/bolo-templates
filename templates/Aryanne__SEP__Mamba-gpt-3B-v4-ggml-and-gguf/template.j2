@@ -1,0 +1,56 @@
+{% set repo_id = repo_id | default("Aryanne/Mamba-gpt-3B-v4-ggml-and-gguf") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('q4_0-gguf-mamba-gpt-3B_v4.gguf') %}
+{% set prompt = prompt | default('Write a short, helpful paragraph about what a Mamba language model is.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoConfig
+from transformers.utils import is_torch_available
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+repo_dir = os.path.dirname(model_path)
+
+# Use the original Hugging Face model for text generation; the repo provides quantized GGUF/BIN artifacts.
+base_model_id = "CobraMamba/mamba-gpt-3b-v4"
+tokenizer = AutoTokenizer.from_pretrained(base_model_id)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+config = AutoConfig.from_pretrained(base_model_id, trust_remote_code=True)
+
+# Prefer GPU if available and requested, otherwise fall back to CPU.
+if device.startswith("cuda") and torch.cuda.is_available():
+    model_device = torch.device(device)
+else:
+    model_device = torch.device("cpu")
+
+# Load with AutoModelForCausalLM if available; Mamba models may require trust_remote_code.
+from transformers import AutoModelForCausalLM
+model = AutoModelForCausalLM.from_pretrained(
+    base_model_id,
+    trust_remote_code=True,
+    torch_dtype=torch.float16 if model_device.type == "cuda" else torch.float32,
+)
+model.to(model_device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(model_device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=64,
+        do_sample=False,
+        pad_token_id=tokenizer.pad_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+RESULT = {"text": output_text}

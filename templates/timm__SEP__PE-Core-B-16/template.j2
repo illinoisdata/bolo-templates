@@ -1,0 +1,53 @@
+{% set repo_id = repo_id | default("timm/PE-Core-B-16") %}
+{% set device = device | default("cuda:0") %}
+{% set labels_list = labels_list | default(["a dog", "a cat", "a donut", "a beignet"]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+labels_list = {{ labels_list }}
+
+import json
+from urllib.parse import urlparse
+from urllib.request import urlopen
+
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+import open_clip
+
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+model_cfg = cfg.get("model_cfg", {})
+vision_cfg = model_cfg.get("vision_cfg", {})
+text_cfg = model_cfg.get("text_cfg", {})
+pretrained_cfg = cfg.get("pretrained_cfg", {})
+
+model, _, preprocess = open_clip.create_model_and_transforms("PE-Core-B-16", pretrained=None)
+model = model.to(device)
+model.eval()
+tokenizer = open_clip.get_tokenizer(pretrained_cfg.get("hf_model_name", repo_id))
+
+image_url = "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/beignets-task-guide.png"
+parsed = urlparse(image_url)
+if parsed.scheme in ("http", "https"):
+    image = Image.open(urlopen(image_url)).convert("RGB")
+else:
+    image = Image.open(image_url).convert("RGB")
+
+image_input = preprocess(image).unsqueeze(0).to(device)
+text = tokenizer(labels_list, context_length=model.context_length).to(device)
+
+with torch.no_grad():
+    if device.startswith("cuda"):
+        ctx = torch.cuda.amp.autocast()
+    else:
+        ctx = torch.autocast(device_type="cpu", enabled=False)
+    with ctx:
+        image_features = model.encode_image(image_input, normalize=True)
+        text_features = model.encode_text(text, normalize=True)
+        text_probs = (100.0 * image_features @ text_features.T).softmax(dim=-1)
+
+output = list(zip(labels_list, [float(p) for p in text_probs[0].detach().cpu()]))
+
+RESULT = {"label_probabilities": output}

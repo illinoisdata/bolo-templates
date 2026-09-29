@@ -1,37 +1,31 @@
 {% set repo_id = repo_id | default("unsloth/orpheus-3b-0.1-pretrained") %}
 {% set device = device | default("cuda:0") %}
-{% set text_prompt = text_prompt | default("Hello! Please describe the experience of a friendly, high-quality text-to-speech voice.") %}
-{% set max_new_tokens = max_new_tokens | default(256) %}
-{% set temperature = temperature | default(0.7) %}
+{% set prompt = prompt | default('Hello, how are you today?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_prompt = """{{ text_prompt }}"""
-max_new_tokens = {{ max_new_tokens }}
-temperature = {{ temperature }}
+prompt = "{{ prompt }}"
 
 import torch
-from pathlib import Path
+from huggingface_hub import hf_hub_download
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForCausalLM.from_pretrained(repo_id)
+model_path = hf_hub_download(repo_id=repo_id, filename="model-00001-of-00002.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="model-00002-of-00002.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+model = AutoModelForCausalLM.from_pretrained(repo_id, torch_dtype=torch.bfloat16, device_map=None)
 model = model.to(device)
 model.eval()
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
 
-inputs = tokenizer(text_prompt, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
-prompt_length = inputs["input_ids"].shape[-1]
+inputs = tokenizer(prompt, return_tensors="pt").to(device)
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=32, do_sample=False)
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-generated_tokens = model.generate(
-    **inputs,
-    max_new_tokens=max_new_tokens,
-    temperature=temperature,
-    do_sample=True,
-)
-
-generated_text = tokenizer.decode(
-    generated_tokens[0][prompt_length:],
-    skip_special_tokens=True,
-)
-
-RESULT = {"generated_text": generated_text}
+RESULT = {"text": output_text}

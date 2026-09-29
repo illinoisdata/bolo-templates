@@ -1,21 +1,24 @@
 {% set repo_id = repo_id | default("dwzhu/e5-base-4k") %}
 {% set device = device | default("cuda:0") %}
-{% set input_texts = input_texts | default(['query: how much protein should a female eat', 'query: summit define', 'passage: As a general guideline, the CDC\'s average requirement of protein for women ages 19 to 70 is 46 grams per day. But, as you can see from this chart, you\'ll need to increase that if you\'re expecting or training for a marathon. Check out the chart below to see how much protein you should be eating each day.', 'passage: Definition of summit for English Language Learners. : 1  the highest point of a mountain : the top of a mountain. : 2  the highest level. : 3  a meeting or series of meetings between the leaders of two or more governments.']) %}
-{% set max_length = max_length | default(4096) %}
-{% set max_original_positions = max_original_positions | default(512) %}
-{% set encode_max_length = encode_max_length | default(4096) %}
+{% set query_text = query_text | default('query: how much protein should a female eat') %}
+{% set passage_text = passage_text | default('passage: As a general guideline, the CDC\'s average requirement of protein for women ages 19 to 70 is 46 grams per day.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_texts = {{ input_texts }}
-max_length = {{ max_length }}
-max_original_positions = {{ max_original_positions }}
-encode_max_length = {{ encode_max_length }}
+query_text = "{{ query_text }}"
+passage_text = "{{ passage_text }}"
 
-from transformers import AutoTokenizer, AutoModel
 import torch
 import torch.nn.functional as F
-import numpy as np
-import os
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
 def average_pool(last_hidden_states: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
     last_hidden = last_hidden_states.masked_fill(~attention_mask[..., None].bool(), 0.0)
@@ -25,32 +28,25 @@ def get_position_ids(input_ids: torch.Tensor, max_original_positions: int = 512,
     position_ids = list(range(input_ids.size(1)))
     factor = max(encode_max_length // max_original_positions, 1)
     if input_ids.size(1) <= max_original_positions:
-        position_ids = [pid * factor for pid in position_ids]
+        position_ids = [(pid * factor) for pid in position_ids]
     position_ids = torch.tensor(position_ids, dtype=torch.long)
     position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
     return position_ids
 
-# Load tokenizer and model
-
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModel.from_pretrained(repo_id, torch_dtype=torch.float16 if 'cuda' in device else torch.float32)
 model.to(device)
 model.eval()
 
-# Pre-process input
-
-batch_dict = tokenizer(input_texts, max_length=max_length, padding=True, truncation=True, return_tensors="pt")
-batch_dict["position_ids"] = get_position_ids(batch_dict["input_ids"], max_original_positions, encode_max_length)
-for k, v in batch_dict.items():
-    batch_dict[k] = v.to(device)
-
-# Run inference
+texts = [query_text, passage_text]
+batch_dict = tokenizer(texts, max_length=4096, padding=True, truncation=True, return_tensors='pt')
+batch_dict['position_ids'] = get_position_ids(batch_dict['input_ids'], max_original_positions=512, encode_max_length=4096)
+batch_dict = {k: v.to(device) for k, v in batch_dict.items()}
 
 with torch.no_grad():
     outputs = model(**batch_dict)
-    embeddings = average_pool(outputs.last_hidden_state, batch_dict["attention_mask"])
+    embeddings = average_pool(outputs.last_hidden_state, batch_dict['attention_mask'])
     embeddings = F.normalize(embeddings, p=2, dim=1)
+    score = (embeddings[0] @ embeddings[1]).item()
 
-# Post-process & build RESULT dict
-
-RESULT = {"embeddings": embeddings}
+RESULT = {"similarity": score, "embeddings": embeddings.detach().cpu().tolist()}

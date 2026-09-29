@@ -1,34 +1,46 @@
 {% set repo_id = repo_id | default("abhigoyal/vllm-eagle-llama-68m-random") %}
 {% set device = device | default("cuda:0") %}
-{% set prompt = prompt | default("Hello, how are you?") %}
-{% set max_new_tokens = max_new_tokens | default(20) %}
-{% set temperature = temperature | default(1.0) %}
+{% set text_input = text_input | default('Hello, how are you?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
-max_new_tokens = {{ max_new_tokens }}
-temperature = {{ temperature }}
+text_input = "{{ text_input }}"
 
 import json
+import safetensors.torch as st
 import torch
 from huggingface_hub import hf_hub_download
-from transformers import LlamaConfig, LlamaForCausalLM, LlamaTokenizer
+from transformers import AutoTokenizer, AutoModelForCausalLM, LlamaConfig
 
-config_path = hf_hub_download(repo_id, filename="config.json")
-with open(config_path, "r", encoding="utf-8") as config_file:
-    raw_config = json.load(config_file)
-model_config_data = raw_config.get("model", raw_config)
-llama_config = LlamaConfig(**model_config_data)
-base_model_name = model_config_data.get("_name_or_path", repo_id)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-tokenizer = LlamaTokenizer.from_pretrained(base_model_name, use_fast=False)
-model = LlamaForCausalLM.from_pretrained(repo_id, config=llama_config).to(device)
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+model_cfg = cfg["model"]
+
+config = LlamaConfig(**model_cfg)
+
+tokenizer_name = model_cfg.get("_name_or_path") or "JackFram/llama-68m"
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, use_fast=False)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+state_dict = st.load_file(weights_path, device="cpu")
+model = AutoModelForCausalLM.from_config(config)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(prompt, return_tensors="pt")
+inputs = tokenizer(text_input, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    outputs = model.generate(**inputs, max_new_tokens=max_new_tokens, temperature=temperature)
-generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=16,
+        do_sample=False,
+        pad_token_id=tokenizer.pad_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
 
-RESULT = {"generated_text": generated_text}
+RESULT = {"output": output_text}

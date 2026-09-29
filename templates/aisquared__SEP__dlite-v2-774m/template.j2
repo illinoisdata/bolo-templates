@@ -1,0 +1,27 @@
+{% set repo_id = repo_id | default("aisquared/dlite-v2-774m") %}
+{% set task = task | default("text-generation") %}
+{% set model = model | default(repo_id) %}
+{% set device = device | default("cuda:0") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set tokenizer_padding_side = tokenizer_padding_side | default("left") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+tokenizer_padding_side = {{ tokenizer_padding_side | tojson }}
+
+from transformers import AutoTokenizer, pipeline
+
+tokenizer = AutoTokenizer.from_pretrained(model, padding_side=tokenizer_padding_side)
+if not hasattr(tokenizer, "additional_special_tokens"):
+    tokenizer.additional_special_tokens = []
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=tokenizer,
+    device=device,
+    trust_remote_code=True,
+)
+RESULT = pipe(input_prompt)

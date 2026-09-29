@@ -1,0 +1,86 @@
+{% set repo_id = repo_id | default("ibm-nasa-geospatial/Prithvi-EO-2.0-300M-TL") %}
+{% set device = device | default("cuda:0") %}
+{% set data_files = data_files | default([
+  '/u/yunqili4/projects/ML-code-generation/data/image1.jpeg',
+  '/u/yunqili4/projects/ML-code-generation/data/image2.jpeg',
+  '/u/yunqili4/projects/ML-code-generation/data/doc.jpeg',
+  '/u/yunqili4/projects/ML-code-generation/data/image1.jpeg'
+]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+data_files = {{ data_files }}
+
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="Prithvi_EO_V2_300M_TL.pt")
+prithvi_path = hf_hub_download(repo_id=repo_id, filename="prithvi_mae.py")
+repo_dir = str(Path(prithvi_path).parent)
+if repo_dir not in sys.path:
+    sys.path.insert(0, repo_dir)
+
+from prithvi_mae import PrithviMAE
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+pretrained_cfg = config["pretrained_cfg"]
+pretrained_cfg["patch_size"] = tuple(pretrained_cfg["patch_size"])
+pretrained_cfg["img_size"] = (pretrained_cfg["img_size"], pretrained_cfg["img_size"])
+
+img_size = pretrained_cfg["img_size"][0]
+num_frames = pretrained_cfg["num_frames"]
+in_chans = pretrained_cfg["in_chans"]
+
+model = PrithviMAE(
+    img_size=pretrained_cfg["img_size"],
+    patch_size=pretrained_cfg["patch_size"],
+    num_frames=num_frames,
+    in_chans=in_chans,
+    embed_dim=pretrained_cfg["embed_dim"],
+    depth=pretrained_cfg["depth"],
+    num_heads=pretrained_cfg["num_heads"],
+    decoder_embed_dim=pretrained_cfg["decoder_embed_dim"],
+    decoder_depth=pretrained_cfg["decoder_depth"],
+    decoder_num_heads=pretrained_cfg["decoder_num_heads"],
+    mlp_ratio=pretrained_cfg["mlp_ratio"],
+    norm_pix_loss=pretrained_cfg["norm_pix_loss"],
+    coords_encoding=pretrained_cfg["coords_encoding"],
+    coords_scale_learn=pretrained_cfg["coords_scale_learn"],
+    mask_ratio=0.0,
+)
+state_dict = torch.load(weights_path, map_location="cpu")
+if isinstance(state_dict, dict) and "state_dict" in state_dict:
+    state_dict = state_dict["state_dict"]
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+images = []
+for path in data_files[:num_frames]:
+    if str(path).startswith(("http://", "https://")):
+        raise ValueError("URL inputs are not supported for this validation pipeline.")
+    img = Image.open(path).convert("RGB").resize((img_size, img_size))
+    arr = np.array(img).astype(np.float32)
+    arr = np.concatenate([arr, arr[:, :, :3]], axis=2) if arr.shape[2] == 3 else arr
+    arr = arr[:, :, :in_chans]
+    images.append(arr)
+
+x = np.stack(images, axis=0)
+x = torch.from_numpy(x).permute(0, 3, 1, 2).unsqueeze(0).to(device)
+mean = torch.tensor(pretrained_cfg["mean"], device=device).view(1, 1, in_chans, 1, 1)
+std = torch.tensor(pretrained_cfg["std"], device=device).view(1, 1, in_chans, 1, 1)
+x = (x - mean) / std
+x = x.permute(0, 2, 1, 3, 4)
+
+with torch.no_grad():
+    output = model(x)
+if isinstance(output, tuple):
+    output = output[0]
+RESULT = {"output": output.detach().cpu().numpy() if torch.is_tensor(output) else output}

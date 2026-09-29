@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("timm/vit_large_patch16_224.augreg_in21k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+image_path = {{ image_path | tojson }}
+
+from PIL import Image
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+image = Image.open(image_path).convert("RGB")
+
+RESULT = pipe(image)

@@ -1,50 +1,37 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("InvokeAI/ip_adapter_sd_image_encoder") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 
-from io import BytesIO
-from pathlib import Path
-import json
+import os
 import requests
-import numpy as np
 import torch
-from PIL import Image, ImageOps
-from transformers import AutoModel
+from safetensors.torch import load_file
+from PIL import Image
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
-IMAGE_SIZE = 224
-CLIP_IMAGE_MEAN = np.array([0.48145466, 0.4578275, 0.40821073], dtype=np.float32)
-CLIP_IMAGE_STD = np.array([0.26862954, 0.26130258, 0.27577711], dtype=np.float32)
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+repo_dir = os.path.dirname(config_path)
 
-def load_image(path: str) -> Image.Image:
-    if path.startswith(("http://", "https://")):
-        response = requests.get(path)
-        response.raise_for_status()
-        return Image.open(BytesIO(response.content)).convert("RGB")
-    return Image.open(path).convert("RGB")
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
 
-def preprocess(image: Image.Image) -> torch.Tensor:
-    image = ImageOps.fit(
-        image,
-        (IMAGE_SIZE, IMAGE_SIZE),
-        method=Image.BICUBIC,
-        centering=(0.5, 0.5),
-    )
-    array = np.asarray(image).astype(np.float32) / 255.0
-    normalized = (array - CLIP_IMAGE_MEAN) / CLIP_IMAGE_STD
-    tensor = torch.from_numpy(normalized).permute(2, 0, 1).unsqueeze(0)
-    return tensor
-
-model = AutoModel.from_pretrained(repo_id).to(device)
+model = CLIPVisionModelWithProjection.from_pretrained(repo_dir, torch_dtype=torch.float16)
+state_dict = load_file(weights_path)
+state_dict.pop("vision_model.embeddings.position_ids", None)
+model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
 model.eval()
-
-image = load_image(image_path)
-pixel_values = preprocess(image).to(device)
+inputs = CLIPImageProcessor(image_size=224, crop_size={"height": 224, "width": 224})(images=image, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    outputs = model(pixel_values=pixel_values)
+    outputs = model(**inputs)
 
-image_embedding = outputs.pooler_output.cpu().tolist()
-
-RESULT = {"image_embedding": image_embedding}
+RESULT = {"image_embeds": outputs.image_embeds, "last_hidden_state": outputs.last_hidden_state}

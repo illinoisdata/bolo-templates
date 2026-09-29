@@ -1,38 +1,36 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("facebook/mcontriever-msmarco") %}
-{% set text_inputs = text_inputs | default(["What makes Contriever well-suited for dense retrieval?", "Describe how mContriever represents queries and passages."]) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('What is the main topic of the provided text?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_inputs = {{ text_inputs }}
+text = {{ text | tojson }}
 
-from pathlib import Path
-
-import numpy as np
 import torch
-import torch.nn.functional as F
-from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModel
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+model = AutoModel.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
 
-encoded_inputs = tokenizer(
-    text_inputs,
-    padding=True,
-    truncation=True,
-    return_tensors="pt",
-)
-encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-outputs = model(**encoded_inputs)
-last_hidden_state = outputs.last_hidden_state
-attention_mask = encoded_inputs["attention_mask"].unsqueeze(-1)
+with torch.no_grad():
+    outputs = model(**inputs)
+    token_embeddings = outputs.last_hidden_state
+    attention_mask = inputs["attention_mask"].unsqueeze(-1).type_as(token_embeddings)
+    sum_embeddings = (token_embeddings * attention_mask).sum(dim=1)
+    sum_mask = attention_mask.sum(dim=1).clamp(min=1e-9)
+    embedding = sum_embeddings / sum_mask
 
-pooled = (last_hidden_state * attention_mask).sum(dim=1)
-mask_sum = attention_mask.sum(dim=1).clamp(min=1)
-mean_pooled = pooled / mask_sum
-normalized_embeddings = F.normalize(mean_pooled, p=2, dim=1, eps=1e-12)
-embeddings = normalized_embeddings.detach().cpu().numpy()
-
-RESULT = {
-    "query_embeddings": embeddings,
-}
+RESULT = {"embedding": embedding.squeeze(0).detach().cpu().numpy()}

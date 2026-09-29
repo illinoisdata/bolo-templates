@@ -1,0 +1,14 @@
+{% set repo_id = repo_id | default("solidrust/gemma-2-9b-it-AWQ") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = pipe(input_prompt)

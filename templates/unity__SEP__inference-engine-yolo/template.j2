@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("unity/inference-engine-yolo") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set model_filename = model_filename | default('models/yolov8n.onnx') %}
+{% set confidence_threshold = confidence_threshold | default(0.25) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+model_filename = "{{ model_filename }}"
+confidence_threshold = {{ confidence_threshold }}
+
+import io
+import requests
+import numpy as np
+from PIL import Image
+from huggingface_hub import hf_hub_download
+import onnxruntime as ort
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    response = requests.get(image_path, timeout=30)
+    response.raise_for_status()
+    image = Image.open(io.BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model_path = hf_hub_download(repo_id=repo_id, filename=model_filename)
+providers = ["CPUExecutionProvider"]
+session_options = ort.SessionOptions()
+session_options.intra_op_num_threads = 1
+session_options.inter_op_num_threads = 1
+session = ort.InferenceSession(model_path, sess_options=session_options, providers=providers)
+input_name = session.get_inputs()[0].name
+input_dtype = session.get_inputs()[0].type
+input_shape = session.get_inputs()[0].shape
+_, _, h, w = input_shape
+if not isinstance(h, int):
+    h = 640
+if not isinstance(w, int):
+    w = 640
+image = image.resize((w, h))
+img = np.array(image).astype(np.float32) / 255.0
+img = np.transpose(img, (2, 0, 1))[None, ...]
+if input_dtype == "tensor(float16)":
+    img = img.astype(np.float16)
+outputs = session.run(None, {input_name: img})
+RESULT = {"outputs": [out.tolist() if hasattr(out, "tolist") else out for out in outputs]}

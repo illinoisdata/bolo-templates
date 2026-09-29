@@ -1,0 +1,48 @@
+{% set repo_id = repo_id | default("facebook/timesformer-base-finetuned-k400") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("video-classification") %}
+{% set input_video = input_video | default("/u/yunqili4/projects/ML-code-generation/data/video.avi") %}
+{% set sample_frame_count = sample_frame_count | default(8) %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_video = {{ input_video | tojson }}
+sample_frame_count = {{ sample_frame_count | tojson }}
+
+import numpy as np
+import cv2
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+def _read_video_frames(path: str):
+    cap = cv2.VideoCapture(path)
+    if not cap.isOpened():
+        raise RuntimeError(f"Unable to open video file at {path}")
+    frames = []
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    cap.release()
+    if not frames:
+        raise ValueError(f"No frames were extracted from {path}")
+    return frames
+
+
+def _sample_frames(frames, count: int):
+    if len(frames) >= count:
+        indices = np.linspace(0, len(frames) - 1, count, dtype=int)
+        return [frames[idx] for idx in indices.tolist()]
+    sampled = frames.copy()
+    last_frame = frames[-1]
+    while len(sampled) < count:
+        sampled.append(last_frame)
+    return sampled
+
+_video_frames = _read_video_frames(input_video)
+sampled_frames = _sample_frames(_video_frames, sample_frame_count)
+video_inputs = [sampled_frames]
+RESULT = pipe(video_inputs)

@@ -1,0 +1,37 @@
+{% set image = image | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("Xenova/segformer-b0-finetuned-ade-512-512") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image = "{{ image }}"
+
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from transformers import SegformerImageProcessor, SegformerForSemanticSegmentation
+
+if image.startswith(("http://", "https://")):
+    import requests
+    image = Image.open(requests.get(image, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image).convert("RGB")
+
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="onnx/model.onnx")
+
+processor = SegformerImageProcessor.from_pretrained(repo_id)
+model = SegformerForSemanticSegmentation.from_pretrained('nvidia/segformer-b0-finetuned-ade-512-512')
+model.to(device)
+model.eval()
+
+inputs = processor(images=image, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+segmentation = processor.post_process_semantic_segmentation(outputs, target_sizes=[image.size[::-1]])[0]
+
+RESULT = {"segmentation": segmentation.detach().cpu().numpy()}

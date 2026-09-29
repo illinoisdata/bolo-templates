@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("litert-community/Phi-4-mini-instruct") %}
+{% set device = device | default("cuda:0") %}
+{% set weight_filename = weight_filename | default("phi4_q8_ekv1280.tflite") %}
+{% set prompt = prompt | default("Write a short haiku about artificial intelligence.") %}
+{% set max_tokens = max_tokens | default(64) %}
+{% set temperature = temperature | default(0.0) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+weight_filename = "{{ weight_filename }}"
+prompt = "{{ prompt }}"
+max_tokens = {{ max_tokens }}
+temperature = {{ temperature }}
+
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename=weight_filename)
+with open(weights_path, "rb") as f:
+    header = f.read(16)
+RESULT = {"output": {"model_path": weights_path, "header_bytes": list(header)}}

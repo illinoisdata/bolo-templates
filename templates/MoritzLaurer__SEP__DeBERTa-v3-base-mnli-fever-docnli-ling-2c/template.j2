@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("MoritzLaurer/DeBERTa-v3-base-mnli-fever-docnli-ling-2c") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("zero-shot-classification") %}
+{% set sequence_to_classify = sequence_to_classify | default("Angela Merkel is a politician in Germany and leader of the CDU") %}
+{% set candidate_labels = candidate_labels | default(["politics", "economy", "entertainment", "environment"]) %}
+{% set multi_label = multi_label | default(False) %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+sequence_to_classify = {{ sequence_to_classify | tojson }}
+candidate_labels = {{ candidate_labels | tojson }}
+multi_label = {{ 'True' if multi_label else 'False' }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = pipe(sequence_to_classify, candidate_labels=candidate_labels, multi_label=multi_label)

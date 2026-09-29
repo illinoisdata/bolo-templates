@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("protectai/codebert-base-Malicious_URLs-onnx") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set input_prompt = input_prompt | default("https://security-example.com/login?user=admin") %}
+
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+
+from optimum.onnxruntime import ORTModelForSequenceClassification
+from transformers import AutoTokenizer, pipeline
+
+if device.startswith("cuda"):
+    pipeline_device = int(device.split(":")[-1])
+else:
+    pipeline_device = -1
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = ORTModelForSequenceClassification.from_pretrained(repo_id)
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=tokenizer,
+    device=pipeline_device,
+    top_k=None,
+)
+
+model_inputs = input_prompt
+
+RESULT = {"predictions": pipe(model_inputs)}

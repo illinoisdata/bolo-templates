@@ -1,44 +1,42 @@
 {% set repo_id = repo_id | default("mixedbread-ai/mxbai-rerank-base-v2") %}
 {% set device = device | default("cuda:0") %}
-{% set prompt = prompt | default("Who wrote 'To Kill a Mockingbird'?") %}
-{% set max_new_tokens = max_new_tokens | default(64) %}
-{% set temperature = temperature | default(0.8) %}
+{% set query = query | default("Who wrote 'To Kill a Mockingbird'?") %}
+{% set documents = documents | default([
+  "'To Kill a Mockingbird' is a novel by Harper Lee published in 1960. It was immediately successful, winning the Pulitzer Prize, and has become a classic of modern American literature.",
+  "The novel 'Moby-Dick' was written by Herman Melville and first published in 1851. It is considered a masterpiece of American literature and deals with complex themes of obsession, revenge, and the conflict between good and evil.",
+  "Harper Lee, an American novelist widely known for her novel 'To Kill a Mockingbird', was born in 1926 in Monroeville, Alabama. She received the Pulitzer Prize for Fiction in 1961.",
+  "Jane Austen was an English novelist known primarily for her six major novels, which interpret, critique and comment upon the British landed gentry at the end of the 18th century.",
+  "The 'Harry Potter' series, which consists of seven fantasy novels written by British author J.K. Rowling, is among the most popular and critically acclaimed books of the modern era.",
+  "'The Great Gatsby', a novel written by American author F. Scott Fitzgerald, was published in 1925. The story is set in the Jazz Age and follows the life of millionaire Jay Gatsby and his pursuit of Daisy Buchanan."
+]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
-max_new_tokens = {{ max_new_tokens }}
-temperature = {{ temperature }}
+query = {{ query | tojson }}
+documents = {{ documents | tojson }}
 
 import torch
-from pathlib import Path
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
-model = AutoModelForCausalLM.from_pretrained(repo_id).to(device)
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+
+model = AutoModelForSequenceClassification.from_pretrained(repo_id, torch_dtype=torch.float16 if "cuda" in device else torch.float32)
+model.to(device)
 model.eval()
-if tokenizer.pad_token_id is None:
-    tokenizer.pad_token_id = tokenizer.eos_token_id
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
 
-tokenized_inputs = tokenizer(
-    prompt,
-    return_tensors="pt",
-    truncation=True,
-)
-tokenized_inputs = {key: value.to(device) for key, value in tokenized_inputs.items()}
+pairs = [(query, doc) for doc in documents]
+enc = tokenizer([q for q, d in pairs], [d for q, d in pairs], padding=True, truncation=True, return_tensors="pt")
+enc = {k: v.to(device) for k, v in enc.items()}
+with torch.no_grad():
+    logits = model(**enc).logits
+scores = logits.detach().float().cpu().view(-1).tolist()
+ranked_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
+rankings = [{"corpus_id": i, "score": float(scores[i])} for i in ranked_indices]
 
-generated_outputs = model.generate(
-    **tokenized_inputs,
-    max_new_tokens=max_new_tokens,
-    temperature=temperature,
-    pad_token_id=tokenizer.eos_token_id,
-)
-
-prompt_length = tokenized_inputs["input_ids"].shape[-1]
-new_token_ids = generated_outputs[0, prompt_length:]
-generated_text = tokenizer.decode(
-    new_token_ids,
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-)
-
-RESULT = {"generated_text": generated_text}
+RESULT = {"scores": scores, "rankings": rankings}

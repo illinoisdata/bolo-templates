@@ -1,0 +1,24 @@
+{% set repo_id = repo_id | default("spacy/en_core_web_sm") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Apple is looking at buying U.K. startup for $1 billion. I saw it in New York.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import spacy
+
+nlp = spacy.blank("en")
+doc = nlp(text)
+
+RESULT = {
+    "text": doc.text,
+    "tokens": [token.text for token in doc],
+    "lemmas": [token.lemma_ for token in doc],
+    "pos": [token.pos_ for token in doc],
+    "tags": [token.tag_ for token in doc],
+    "deps": [token.dep_ for token in doc],
+    "ents": [
+        {"text": ent.text, "label": ent.label_, "start": ent.start_char, "end": ent.end_char}
+        for ent in doc.ents
+    ],
+}

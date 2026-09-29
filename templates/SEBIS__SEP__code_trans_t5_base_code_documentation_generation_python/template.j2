@@ -1,37 +1,33 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("SEBIS/code_trans_t5_base_code_documentation_generation_python") %}
-{% set input_code = input_code | default("def e ( message , exit_code = None ) : print_log ( message , YELLOW , BOLD ) if exit_code is not None : sys . exit ( exit_code )") %}
-{% set max_length = max_length | default(512) %}
-{% set num_beams = num_beams | default(4) %}
-{% set prefix = prefix | default("function documentation generation python: ") %}
+{% set device = device | default("cuda:0") %}
+{% set code_text = code_text | default("def e ( message , exit_code = None ) : print_log ( message , YELLOW , BOLD ) if exit_code is not None : sys . exit ( exit_code )") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_code = "{{ input_code }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-prefix = "{{ prefix }}"
+code_text = "{{ code_text }}"
 
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+
 model.to(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model.eval()
 
-prefixed_input = prefix + input_code
-model_inputs = tokenizer(
-    prefixed_input,
+inputs = tokenizer(
+    "function documentation generation python: " + code_text,
     return_tensors="pt",
-    max_length=max_length,
     truncation=True,
 )
-model_inputs = {k: v.to(device) for k, v in model_inputs.items()}
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_tokens = model.generate(
-    **model_inputs,
-    max_length=max_length,
-    num_beams=num_beams,
-)
-documentation = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_length=64,
+        num_beams=4,
+    )
 
-RESULT = {"documentation": documentation}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

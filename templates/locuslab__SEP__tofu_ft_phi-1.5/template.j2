@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("locuslab/tofu_ft_phi-1.5") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set cuda_runtime_lib = cuda_runtime_lib | default("/workspace/.pip/nvidia/cuda_runtime/lib") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_prompt = {{ input_prompt | tojson }}
+cuda_runtime_lib = "{{ cuda_runtime_lib }}"
+
+import os
+
+ld_library_path = os.environ.get("LD_LIBRARY_PATH", "")
+ld_paths = [path for path in ld_library_path.split(":") if path]
+if cuda_runtime_lib not in ld_paths:
+    ld_paths.insert(0, cuda_runtime_lib)
+    os.environ["LD_LIBRARY_PATH"] = ":".join(ld_paths)
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+if pipe.model.generation_config.bos_token_id is None:
+    bos_token_id = pipe.tokenizer.bos_token_id
+    if bos_token_id is not None:
+        pipe.model.generation_config.bos_token_id = bos_token_id
+
+if pipe.model.generation_config.eos_token_id is None:
+    eos_token_id = pipe.tokenizer.eos_token_id
+    if eos_token_id is not None:
+        pipe.model.generation_config.eos_token_id = eos_token_id
+
+preprocessed_input = input_prompt
+
+RESULT = pipe(preprocessed_input)

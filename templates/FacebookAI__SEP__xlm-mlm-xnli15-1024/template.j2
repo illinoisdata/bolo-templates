@@ -1,0 +1,21 @@
+{% set repo_id = repo_id | default("FacebookAI/xlm-mlm-xnli15-1024") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") -%}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") -%}
+repo_id = "{{ repo_id }}"
+task = "{{ task }}"
+device = "{{ device }}"
+masked_prompt = "{{ masked_prompt }}"
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+
+pipeline_output = pipe(text)
+
+RESULT = {
+    "predictions": pipeline_output,
+}

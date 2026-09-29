@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("Commencis/Commencis-LLM") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Faiz oranı yükseldiğinde kredi maliyetim nasıl etkilenir?") %}
+{% set max_new_tokens = max_new_tokens | default(1024) %}
+{% set do_sample = do_sample | default(True) %}
+{% set temperature = temperature | default(0.5) %}
+{% set top_p = top_p | default(0.9) %}
+{% set top_k = top_k | default(50) %}
+{% set repetition_penalty = repetition_penalty | default(1.0) %}
+{% set return_full_text = return_full_text | default(True) %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+model = repo_id
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+do_sample = {{ do_sample }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+top_k = {{ top_k }}
+repetition_penalty = {{ repetition_penalty }}
+return_full_text = {{ return_full_text }}
+
+from transformers import pipeline
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    device=device,
+)
+
+RESULT = pipe(
+    input_prompt,
+    max_new_tokens=max_new_tokens,
+    do_sample=do_sample,
+    temperature=temperature,
+    top_p=top_p,
+    top_k=top_k,
+    repetition_penalty=repetition_penalty,
+    return_full_text=return_full_text,
+)

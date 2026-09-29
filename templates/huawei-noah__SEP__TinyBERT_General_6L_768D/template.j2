@@ -1,34 +1,31 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("huawei-noah/TinyBERT_General_6L_768D") %}
-{% set text = text | default("Example sentence for TinyBERT inference.") %}
-{% set max_length = max_length | default(128) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The quick brown fox jumps over the lazy dog.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-max_length = {{ max_length }}
 
-from pathlib import Path
+import torch
+from transformers import BertTokenizer, BertModel
+from huggingface_hub import hf_hub_download
 
-import numpy as np
-from transformers import AutoModel, AutoTokenizer
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+tokenizer = BertTokenizer(vocab_file=vocab_path)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-inputs = tokenizer(
-    text,
-    padding="max_length",
-    truncation=True,
-    max_length=max_length,
-    return_tensors="pt",
-)
-inputs = {key: tensor.to(device) for key, tensor in inputs.items()}
+model = BertModel.from_pretrained(repo_id)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
 
-outputs = model(**inputs)
-last_hidden_state = outputs.last_hidden_state.detach().cpu().numpy()
-cls_embedding = last_hidden_state[:, 0, :]
+with torch.no_grad():
+    outputs = model(**inputs)
 
 RESULT = {
-    "last_hidden_state": last_hidden_state,
-    "cls_embedding": cls_embedding,
+    "last_hidden_state": outputs.last_hidden_state,
+    "pooler_output": getattr(outputs, "pooler_output", None),
 }

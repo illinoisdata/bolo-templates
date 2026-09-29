@@ -1,0 +1,53 @@
+{% set repo_id = repo_id | default("bibabobbb/kronons-btc-special") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default('BTC price movement') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+
+import json
+from pathlib import Path
+
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+weights_path = hf_hub_download(repo_id=repo_id, filename='model.safetensors')
+repo_dir = Path(config_path).parent
+
+config = json.loads(Path(config_path).read_text())
+state_dict = load_file(weights_path)
+
+class KrononsBTCModel(torch.nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        d_model = config['d_model']
+        self.embed = torch.nn.Embedding(1024, d_model)
+        self.fc1 = torch.nn.Linear(d_model, config['ff_dim'])
+        self.act = torch.nn.GELU()
+        self.fc2 = torch.nn.Linear(config['ff_dim'], 2)
+
+    def forward(self, x):
+        x = self.embed(x).mean(dim=1)
+        x = self.act(self.fc1(x))
+        return self.fc2(x)
+
+model = KrononsBTCModel(config).to(device)
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+
+input_ids = torch.tensor([[min(ord(c), 1023) for c in text_input][:32]], device=device, dtype=torch.long)
+if input_ids.shape[1] == 0:
+    input_ids = torch.zeros((1, 1), device=device, dtype=torch.long)
+logits = model(input_ids)
+probabilities = torch.softmax(logits, dim=-1).detach().cpu().tolist()[0]
+predicted_class = int(torch.tensor(probabilities).argmax().item())
+
+RESULT = {
+    'logits': logits.detach().cpu().tolist(),
+    'probabilities': probabilities,
+    'predicted_class': predicted_class,
+    'config': config,
+    'missing_keys': missing,
+    'unexpected_keys': unexpected,
+}

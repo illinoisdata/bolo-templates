@@ -1,0 +1,38 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("notmahi/dobb-e") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import torch
+import timm
+from PIL import Image
+from timm.data import resolve_data_config, create_transform
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+weights_path = hf_hub_download(repo_id=repo_id, filename='model.safetensors')
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+
+if isinstance(image_path, str) and image_path.startswith(('http://', 'https://')):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+model = timm.create_model('resnet34', pretrained=False, num_classes=0, in_chans=3)
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict)
+model = model.to(device)
+model.eval()
+
+config = resolve_data_config({}, model=model)
+transform = create_transform(**config, is_training=False)
+input_tensor = transform(image).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    output_value = model(input_tensor)
+
+RESULT = {"output": output_value.detach().cpu()}

@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("explosion-testing/bert-test") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("{mask}") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+from huggingface_hub import hf_hub_download
+from transformers import pipeline, PreTrainedTokenizerFast
+
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer = PreTrainedTokenizerFast(tokenizer_file=tokenizer_path)
+mask_token_literal = "[MASK]"
+tokenizer.mask_token = mask_token_literal
+tokenizer.mask_token_id = tokenizer.convert_tokens_to_ids(mask_token_literal)
+pipe = pipeline(task=task, model=repo_id, tokenizer=tokenizer, device=device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

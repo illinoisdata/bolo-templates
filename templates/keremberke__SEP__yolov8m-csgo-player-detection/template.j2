@@ -1,0 +1,48 @@
+{% set repo_id = repo_id | default("keremberke/yolov8m-csgo-player-detection") %}
+{% set device = device | default("cuda:0") %}
+{% set image = image | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set conf = conf | default(0.25) %}
+{% set iou = iou | default(0.45) %}
+{% set agnostic_nms = agnostic_nms | default(false) %}
+{% set max_det = max_det | default(1000) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image = "{{ image }}"
+conf = {{ conf }}
+iou = {{ iou }}
+agnostic_nms = {{ agnostic_nms }}
+max_det = {{ max_det }}
+
+import os
+from urllib.parse import urlparse
+
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from ultralytics import YOLO
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="best.pt")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+if isinstance(image, str) and urlparse(image).scheme in ("http", "https"):
+    input_image = Image.open(__import__("requests").get(image, stream=True).raw).convert("RGB")
+else:
+    input_image = Image.open(image).convert("RGB")
+
+model = YOLO(weights_path)
+results = model.predict(input_image, conf=conf, iou=iou, agnostic_nms=agnostic_nms, max_det=max_det, device=device, verbose=False)
+result = results[0]
+boxes = result.boxes
+
+output_boxes = []
+if boxes is not None and len(boxes) > 0:
+    for b in boxes:
+        cls_id = int(b.cls.item())
+        output_boxes.append({
+            "xyxy": [float(x) for x in b.xyxy[0].tolist()],
+            "conf": float(b.conf.item()),
+            "cls": cls_id,
+            "name": model.names.get(cls_id, str(cls_id)),
+        })
+
+RESULT = {"boxes": output_boxes}

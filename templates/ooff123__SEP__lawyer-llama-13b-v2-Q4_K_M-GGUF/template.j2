@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("ooff123/lawyer-llama-13b-v2-Q4_K_M-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('lawyer-llama-13b-v2-q4_k_m.gguf') %}
+{% set prompt = prompt | default('The meaning to life and the universe is') %}
+{% set max_tokens = max_tokens | default(64) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+max_tokens = {{ max_tokens }}
+
+import os
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+n_ctx = 2048
+n_gpu_layers = -1 if device.startswith('cuda') else 0
+llm = Llama(
+    model_path=model_path,
+    n_ctx=n_ctx,
+    n_gpu_layers=n_gpu_layers,
+    verbose=False,
+)
+
+result = llm(
+    prompt,
+    max_tokens=max_tokens,
+    temperature=0.7,
+    top_p=0.95,
+    stop=["</s>"],
+)
+
+output_text = result["choices"][0]["text"]
+RESULT = {"text": output_text}

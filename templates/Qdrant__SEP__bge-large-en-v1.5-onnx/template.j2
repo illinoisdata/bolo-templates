@@ -1,11 +1,39 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Qdrant/bge-large-en-v1.5-onnx") %}
+{% set device = device | default("cuda:0") %}
+{% set text_a = text_a | default('Query: what is machine learning?') %}
+{% set text_b = text_b | default('Passage: machine learning is a field of study that gives computers the ability to learn without being explicitly programmed.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-import transformers
-print(transformers.__version__)
-print([name for name in dir(transformers) if name.startswith("ORT")])
-print(hasattr(transformers.models, "ort"))
-import inspect
-import pkgutil
-print([name for name in pkgutil.iter_modules(transformers.__path__)])
+text_a = "{{ text_a }}"
+text_b = "{{ text_b }}"
+
+import os
+import numpy as np
+import onnxruntime as ort
+from huggingface_hub import hf_hub_download
+from tokenizers import Tokenizer
+from transformers import PreTrainedTokenizerFast
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.onnx")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer = PreTrainedTokenizerFast(tokenizer_object=Tokenizer.from_file(tokenizer_path), unk_token="[UNK]", pad_token="[PAD]", cls_token="[CLS]", sep_token="[SEP]", mask_token="[MASK]")
+
+session_options = ort.SessionOptions()
+session_options.intra_op_num_threads = 1
+session_options.inter_op_num_threads = 1
+session = ort.InferenceSession(model_path, sess_options=session_options, providers=["CPUExecutionProvider"])
+
+features = tokenizer(text_a, text_b, padding=True, truncation=True, return_tensors="np")
+ort_inputs = {k: v for k, v in features.items() if k in {i.name for i in session.get_inputs()}}
+if "token_type_ids" in {i.name for i in session.get_inputs()} and "token_type_ids" not in ort_inputs:
+    ort_inputs["token_type_ids"] = np.zeros_like(ort_inputs["input_ids"])
+outputs = session.run(None, ort_inputs)
+embeddings = np.asarray(outputs[0])
+if embeddings.ndim == 2 and embeddings.shape[0] == 2:
+    a = embeddings[0]
+    b = embeddings[1]
+    similarity = float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+else:
+    similarity = float(np.asarray(embeddings).reshape(-1)[0])
+
+RESULT = {"embeddings": embeddings, "similarity": similarity}

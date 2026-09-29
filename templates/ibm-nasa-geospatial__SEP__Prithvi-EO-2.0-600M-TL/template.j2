@@ -1,0 +1,83 @@
+{% set repo_id = repo_id | default("ibm-nasa-geospatial/Prithvi-EO-2.0-600M-TL") %}
+{% set device = device | default("cuda:0") %}
+{% set data_files = data_files | default(['/u/yunqili4/projects/ML-code-generation/data/image1.jpeg', '/u/yunqili4/projects/ML-code-generation/data/image2.jpeg', '/u/yunqili4/projects/ML-code-generation/data/doc.jpeg']) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+data_files = {{ data_files }}
+
+import json
+from io import BytesIO
+from urllib.parse import urlparse
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="Prithvi_EO_V2_600M_TL.pt")
+module_path = hf_hub_download(repo_id=repo_id, filename="prithvi_mae.py")
+
+import importlib.util
+spec = importlib.util.spec_from_file_location("prithvi_mae", module_path)
+prithvi_mae = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(prithvi_mae)
+PrithviMAE = prithvi_mae.PrithviMAE
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+pretrained_cfg = cfg["pretrained_cfg"]
+
+mean = torch.tensor(pretrained_cfg["mean"], dtype=torch.float32)
+std = torch.tensor(pretrained_cfg["std"], dtype=torch.float32)
+img_size = pretrained_cfg["img_size"]
+num_frames = pretrained_cfg["num_frames"]
+in_chans = pretrained_cfg["in_chans"]
+
+model = PrithviMAE(**pretrained_cfg)
+state = torch.load(weights_path, map_location="cpu")
+if isinstance(state, dict) and "state_dict" in state:
+    state = state["state_dict"]
+if any(k.startswith("module.") for k in state.keys()):
+    state = {k.replace("module.", "", 1): v for k, v in state.items()}
+model.load_state_dict(state, strict=True)
+model.to(device)
+model.eval()
+
+def load_image(path_or_url):
+    if isinstance(path_or_url, str) and urlparse(path_or_url).scheme in ("http", "https"):
+        import requests
+        img = Image.open(BytesIO(requests.get(path_or_url, timeout=30).content)).convert("RGB")
+    else:
+        img = Image.open(path_or_url).convert("RGB")
+    return img
+
+frames = []
+for p in data_files:
+    img = load_image(p).resize((img_size, img_size))
+    arr = torch.from_numpy(np.array(img)).float() / 255.0
+    arr = arr.permute(2, 0, 1)
+    frames.append(arr)
+
+while len(frames) < num_frames:
+    frames.append(frames[-1].clone())
+frames = frames[:num_frames]
+video = torch.stack(frames, dim=1)  # (C, T, H, W)
+if video.shape[0] != in_chans:
+    if video.shape[0] == 3 and in_chans == 6:
+        video = torch.cat([video, video], dim=0)
+    else:
+        video = video[:in_chans]
+video = (video * 255.0 - mean[:, None, None, None]) / std[:, None, None, None]
+video = video.unsqueeze(0).to(device)
+
+with torch.no_grad():
+    out = model(video)
+
+if isinstance(out, dict):
+    output = {k: (v.detach().cpu().numpy() if torch.is_tensor(v) else v) for k, v in out.items()}
+else:
+    output = out.detach().cpu().numpy() if torch.is_tensor(out) else out
+
+RESULT = {"output": output}

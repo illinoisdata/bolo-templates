@@ -1,0 +1,14 @@
+{% set repo_id = repo_id | default("openmmlab/upernet-swin-base") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-segmentation") %}
+{% set input_data = input_data | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+task = "{{ task }}"
+model = "{{ repo_id }}"
+device = "{{ device }}"
+input_data = "{{ input_data }}"
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(input_data)

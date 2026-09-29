@@ -1,49 +1,41 @@
 {% set repo_id = repo_id | default("mrm8488/bert2bert_shared-german-finetuned-summarization") %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("Der Bericht hebt hervor, dass neue Technologien die Forschung beschleunigen können.") %}
-{% set tokenizer_max_length = tokenizer_max_length | default(512) %}
-{% set generation_max_length = generation_max_length | default(64) %}
-{% set generation_min_length = generation_min_length | default(8) %}
-{% set generation_num_beams = generation_num_beams | default(4) %}
-{% set generation_no_repeat_ngram_size = generation_no_repeat_ngram_size | default(3) %}
+{% set text = text | default('Wie geht man nach schrecklichen Ereignissen am besten auf die Ängste und Sorgen von Kindern ein? Therapeuten haben eine klare Botschaft. Die Welt ist voller Gefahren, Verbrechen und Schrecken - Krieg, Terrorismus, Umweltzerstörung und eben auch Kindesmissbrauch. Soll man mit Kindern darüber reden, und wie? Die Antwort hängt auch vom Alter des Kindes ab.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-tokenizer_max_length = {{ tokenizer_max_length }}
-generation_max_length = {{ generation_max_length }}
-generation_min_length = {{ generation_min_length }}
-generation_num_beams = {{ generation_num_beams }}
-generation_no_repeat_ngram_size = {{ generation_no_repeat_ngram_size }}
-
-from pathlib import Path
+text = {{ text | tojson }}
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import BertTokenizerFast, EncoderDecoderModel
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+model = EncoderDecoderModel.from_pretrained(repo_id).to(device)
 model.eval()
 
-inputs = tokenizer(
-    text_input,
-    padding="max_length",
-    truncation=True,
-    max_length=tokenizer_max_length,
-    return_tensors="pt",
-)
-input_ids = inputs.input_ids.to(device)
-attention_mask = inputs.attention_mask.to(device)
+tokenizer_dir = tokenizer_json_path.rsplit('/', 1)[0]
+tokenizer = BertTokenizerFast.from_pretrained(tokenizer_dir)
+
+inputs = tokenizer(text, padding="max_length", truncation=True, max_length=512, return_tensors="pt")
+input_ids = inputs["input_ids"].to(device)
+attention_mask = inputs["attention_mask"].to(device)
 
 with torch.no_grad():
-    generated_tokens = model.generate(
+    output_ids = model.generate(
         input_ids=input_ids,
         attention_mask=attention_mask,
-        max_length=generation_max_length,
-        min_length=generation_min_length,
-        num_beams=generation_num_beams,
-        no_repeat_ngram_size=generation_no_repeat_ngram_size,
+        max_length=64,
+        num_beams=4,
+        length_penalty=2.0,
+        no_repeat_ngram_size=3,
         early_stopping=True,
     )
+summary = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-summary = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0].strip()
 RESULT = {"summary": summary}

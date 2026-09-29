@@ -1,26 +1,37 @@
 {% set repo_id = repo_id | default("ddemszky/supervised_finetuning_hist0_is_question_switchboard_question_detection.json_bs32_lr0.000063") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("Are you coming to the meeting?") %}
+{% set text = text | default('Is this a question?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import os
 import torch
+from transformers import AutoTokenizer, AutoConfig, BertForSequenceClassification
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSequenceClassification.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+local_dir = os.path.dirname(config_path)
+tokenizer = AutoTokenizer.from_pretrained(local_dir, use_fast=False)
+config = AutoConfig.from_pretrained(local_dir)
+model = BertForSequenceClassification(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(text, return_tensors="pt")
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
 inputs = {k: v.to(device) for k, v in inputs.items()}
-
 with torch.no_grad():
     outputs = model(**inputs)
+    logits = outputs.logits
+    probs = torch.softmax(logits, dim=-1)
+    pred_idx = int(torch.argmax(probs, dim=-1).item())
+    pred_label = model.config.id2label.get(str(pred_idx), model.config.id2label.get(pred_idx, str(pred_idx)))
 
-logits = outputs.logits
-probabilities = torch.softmax(logits, dim=-1)[0].cpu().tolist()
-prediction = int(torch.argmax(logits, dim=-1)[0].cpu())
-label = model.config.id2label[prediction]
-
-RESULT = {"label": label, "scores": probabilities}
+RESULT = {"text": text, "logits": logits.detach().cpu().tolist(), "probabilities": probs.detach().cpu().tolist(), "predicted_label": pred_label}

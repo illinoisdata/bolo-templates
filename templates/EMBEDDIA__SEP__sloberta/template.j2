@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("EMBEDDIA/sloberta") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+{% set huggingface_cache_dir = huggingface_cache_dir | default("/workspace/.cache/huggingface") %}
+{% set tokenizer_model_max_length = tokenizer_model_max_length | default(514) %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+huggingface_cache_dir = {{ huggingface_cache_dir | tojson }}
+tokenizer_model_max_length = {{ tokenizer_model_max_length | tojson }}
+
+import json
+from pathlib import Path
+
+from huggingface_hub import hf_hub_download
+from transformers import PreTrainedTokenizerFast, pipeline
+
+cache_path = Path(huggingface_cache_dir)
+cache_path.mkdir(parents=True, exist_ok=True)
+
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json", cache_dir=str(cache_path))
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json", cache_dir=str(cache_path))
+
+with open(special_tokens_file, "r", encoding="utf-8") as f:
+    special_tokens_map = json.load(f)
+
+mask_token_entry = special_tokens_map.get("mask_token")
+if isinstance(mask_token_entry, dict):
+    mask_token_entry = mask_token_entry.get("content")
+
+tokenizer = PreTrainedTokenizerFast(
+    tokenizer_file=tokenizer_file,
+    bos_token=special_tokens_map.get("bos_token"),
+    eos_token=special_tokens_map.get("eos_token"),
+    unk_token=special_tokens_map.get("unk_token"),
+    pad_token=special_tokens_map.get("pad_token"),
+    sep_token=special_tokens_map.get("sep_token"),
+    cls_token=special_tokens_map.get("cls_token"),
+    mask_token=mask_token_entry,
+    additional_special_tokens=special_tokens_map.get("additional_special_tokens"),
+    model_max_length=tokenizer_model_max_length,
+)
+
+pipe = pipeline(task=task, model=repo_id, tokenizer=tokenizer, device=device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

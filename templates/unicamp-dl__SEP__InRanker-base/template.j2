@@ -1,62 +1,38 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("unicamp-dl/InRanker-base") %}
-{% set query = query | default("What is the best way to learn deep learning?") %}
-{% set docs = [
-    "The capital of France is Paris",
-    "Learn deep learning with InRanker and transformers"
-] %}
-{% set generation_max_new_tokens = generation_max_new_tokens | default(16) %}
-{% set generation_num_beams = generation_num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set query = query | default('What is the best way to learn deep learning?') %}
+{% set docs = docs | default(['The capital of France is Paris', 'Learn deep learning with InRanker and transformers']) %}
+{% set model_max_length = model_max_length | default(512) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query = "{{ query }}"
-docs = {{ docs | tojson }}
-generation_max_new_tokens = {{ generation_max_new_tokens }}
-generation_num_beams = {{ generation_num_beams }}
-
-import json
-import os
+docs = {{ docs }}
+model_max_length = {{ model_max_length }}
 
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-device_obj = torch.device(device)
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+spiece_file = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device_obj)
+model = T5ForConditionalGeneration.from_pretrained(repo_id, local_files_only=True)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False, local_files_only=True)
+model.to(device)
+model.eval()
 
-prompt_template = "query: {query} document: {doc} relevance:"
-input_texts = [prompt_template.format(query=query, doc=doc) for doc in docs]
-encoded_inputs = tokenizer(
-    input_texts,
-    return_tensors="pt",
-    padding="longest",
-    truncation=True,
-)
-encoded_inputs = {key: value.to(device_obj) for key, value in encoded_inputs.items()}
+scores = []
+for doc in docs:
+    enc = tokenizer(query, doc, truncation=True, max_length=model_max_length, return_tensors="pt")
+    enc = {k: v.to(device) for k, v in enc.items()}
+    decoder_input_ids = torch.tensor([[model.config.decoder_start_token_id]], device=device)
+    with torch.no_grad():
+        outputs = model(**enc, decoder_input_ids=decoder_input_ids, return_dict=True)
+        score = outputs.logits[0, 0, 0].float().detach().cpu().item()
+    scores.append(score)
 
-generated_outputs = model.generate(
-    **encoded_inputs,
-    max_new_tokens=generation_max_new_tokens,
-    num_beams=generation_num_beams,
-)
-generated_outputs = generated_outputs.cpu()
-decoded_outputs = tokenizer.batch_decode(generated_outputs, skip_special_tokens=True)
-normalized_outputs = [output.strip() for output in decoded_outputs]
-
-normalized_scores = []
-for output in normalized_outputs:
-    try:
-        normalized_scores.append(float(output))
-    except ValueError:
-        normalized_scores.append(output)
-
-scored_docs = [
-    {"doc": doc, "score": score}
-    for doc, score in zip(docs, normalized_scores)
-]
-
-RESULT = {
-    "decoded_outputs": normalized_outputs,
-    "scored_docs": scored_docs,
-}
+sorted_docs = [doc for _, doc in sorted(zip(scores, docs), key=lambda x: x[0], reverse=True)]
+RESULT = {"scores": scores, "sorted_docs": sorted_docs}

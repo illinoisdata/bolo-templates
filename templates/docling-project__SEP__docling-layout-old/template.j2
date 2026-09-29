@@ -1,0 +1,46 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+{% set repo_id = repo_id | default("docling-project/docling-layout-old") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import os
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from transformers import AutoImageProcessor, AutoModelForObjectDetection
+
+if str(image_path).startswith(("http://", "https://")):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+processor = AutoImageProcessor.from_pretrained(os.path.dirname(preprocessor_path), local_files_only=True)
+model = AutoModelForObjectDetection.from_pretrained(os.path.dirname(config_path), local_files_only=True)
+state_dict = torch.load(weights_path, map_location="cpu") if weights_path.endswith(".bin") else None
+if state_dict is not None:
+    model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+inputs = processor(images=image, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+# Post-process detections
+orig_size = torch.tensor([image.size[::-1]])
+results = processor.post_process_object_detection(outputs, threshold=0.3, target_sizes=orig_size)
+result = results[0]
+boxes = result["boxes"].detach().cpu().tolist()
+scores = result["scores"].detach().cpu().tolist()
+labels = [model.config.id2label[int(i)] for i in result["labels"].detach().cpu().tolist()]
+
+RESULT = {"boxes": boxes, "scores": scores, "labels": labels}

@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("unsloth/Qwen2.5-14B-Instruct-bnb-4bit") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") -%}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") -%}
+{% set generation_kwargs = generation_kwargs | default({"max_new_tokens": 256, "temperature": 0.1}) -%}
+
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+generation_kwargs = {{ generation_kwargs | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+preprocessed_prompt = input_prompt
+RESULT = pipe(preprocessed_prompt, **generation_kwargs)
+RESULT = {"inference": RESULT}

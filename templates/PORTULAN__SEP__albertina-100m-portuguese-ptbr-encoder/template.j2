@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("PORTULAN/albertina-100m-portuguese-ptbr-encoder") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default('fill-mask') %}
+{% set masked_prompt = masked_prompt | default('A culinária brasileira é rica em sabores e {mask}, tornando-se um dos maiores patrimônios do país.') %}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+from transformers import pipeline
+import torch
+
+pipe = pipeline(task=task, model=model, device=device, torch_dtype=torch.float32)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

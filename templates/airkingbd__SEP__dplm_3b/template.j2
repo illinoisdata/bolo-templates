@@ -1,34 +1,49 @@
 {% set repo_id = repo_id | default("airkingbd/dplm_3b") %}
 {% set device = device | default("cuda:0") %}
-{% set input_sequence = input_sequence | default("MKTAYIAKQRQISFVKSHFSRQ") %}
-{% set max_new_tokens = max_new_tokens | default(64) %}
-{% set num_return_sequences = num_return_sequences | default(1) %}
-{% set temperature = temperature | default(1.0) %}
+{% set input_sequence = input_sequence | default('MKTIIALSYIFCLVFADYKDDDDK') %}
 
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-input_sequence = {{ input_sequence | tojson }}
-max_new_tokens = {{ max_new_tokens | int }}
-num_return_sequences = {{ num_return_sequences | int }}
-temperature = {{ temperature | float }}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_sequence = "{{ input_sequence }}"
 
 import os
 import torch
-from transformers import AutoModelForMaskedLM, AutoTokenizer
+from transformers import AutoTokenizer, EsmForMaskedLM
+from huggingface_hub import hf_hub_download
 
-device = torch.device(device)
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin.index.json")
+for shard in [
+    "pytorch_model-00001-of-00004.bin",
+    "pytorch_model-00002-of-00004.bin",
+    "pytorch_model-00003-of-00004.bin",
+    "pytorch_model-00004-of-00004.bin",
+    "special_tokens_map.json",
+    "tokenizer_config.json",
+    "vocab.txt",
+]:
+    hf_hub_download(repo_id=repo_id, filename=shard)
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+model_dir = os.path.dirname(config_file)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token is not None else tokenizer.cls_token
+
+model = EsmForMaskedLM.from_pretrained(
+    model_dir,
+    local_files_only=True,
+    torch_dtype=torch.float32,
+)
+model.to(device)
 model.eval()
 
 inputs = tokenizer(input_sequence, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**inputs)
+    logits = model(**inputs).logits
+    probs = torch.softmax(logits, dim=-1)
+    output_ids = torch.argmax(probs, dim=-1)
+    output_sequence = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
 
-logits = outputs.logits
-predicted_ids = logits.argmax(dim=-1)
-predicted_sequence = tokenizer.batch_decode(predicted_ids, skip_special_tokens=True)
-RESULT = {"predicted_sequence": predicted_sequence}
+RESULT = {"output_sequence": output_sequence}

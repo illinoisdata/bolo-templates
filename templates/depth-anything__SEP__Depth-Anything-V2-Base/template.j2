@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("depth-anything/Depth-Anything-V2-Base") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set model_filename = model_filename | default('depth_anything_v2_vitb.pth') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+model_filename = "{{ model_filename }}"
+
+import os
+from pathlib import Path
+import urllib.request
+
+import cv2
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+
+from depth_anything_v2.dpt import DepthAnythingV2
+
+model_path = hf_hub_download(repo_id=repo_id, filename=model_filename)
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    url = image_path
+    resp = urllib.request.urlopen(url)
+    image_array = np.asarray(bytearray(resp.read()), dtype=np.uint8)
+    raw_img = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+else:
+    raw_img = cv2.imread(image_path)
+
+model = DepthAnythingV2(encoder='vitb', features=128, out_channels=[96, 192, 384, 768])
+state_dict = torch.load(model_path, map_location='cpu')
+model.load_state_dict(state_dict)
+model = model.to(device)
+model.eval()
+
+depth = model.infer_image(raw_img)
+RESULT = {"depth": depth}

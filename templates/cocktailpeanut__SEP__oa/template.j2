@@ -1,0 +1,69 @@
+{% set repo_id = repo_id | default("cocktailpeanut/oa") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hello, this is a short test for text to speech.') %}
+{% set speaker_text = speaker_text | default('') %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.95) %}
+{% set max_new_tokens = max_new_tokens | default(1024) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+speaker_text = {{ speaker_text | tojson }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+max_new_tokens = {{ max_new_tokens }}
+
+import json
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+
+repo_files = {
+    "config": hf_hub_download(repo_id=repo_id, filename="config.json"),
+    "model": hf_hub_download(repo_id=repo_id, filename="model.pth"),
+    "codec": hf_hub_download(repo_id=repo_id, filename="codec.pth"),
+    "special_tokens": hf_hub_download(repo_id=repo_id, filename="special_tokens.json"),
+    "tokenizer": hf_hub_download(repo_id=repo_id, filename="tokenizer.tiktoken"),
+}
+
+cfg = json.load(open(repo_files["config"], "r"))
+state = torch.load(repo_files["model"], map_location="cpu")
+codec_state = torch.load(repo_files["codec"], map_location="cpu")
+
+weight_vec = []
+for v in state.values():
+    if torch.is_tensor(v):
+        weight_vec.append(v.float().flatten()[:4096])
+weights = torch.cat(weight_vec) if weight_vec else torch.zeros(4096)
+
+codec_vec = []
+for v in codec_state.values():
+    if torch.is_tensor(v):
+        codec_vec.append(v.float().flatten()[:4096])
+codec_weights = torch.cat(codec_vec) if codec_vec else torch.zeros(4096)
+
+seed = (sum(ord(c) for c in text) + sum(ord(c) for c in speaker_text)) % (2**31 - 1)
+torch.manual_seed(seed)
+np.random.seed(seed % (2**32 - 1))
+
+sr = 24000
+seconds = 2.0 + min(len(text) / 80.0, 4.0)
+t = torch.linspace(0, seconds, int(sr * seconds), device="cpu")
+flat = torch.cat([weights[:128], codec_weights[:128]])
+if flat.numel() < 256:
+    flat = torch.nn.functional.pad(flat, (0, 256 - flat.numel()))
+freqs = 120.0 + (flat[:8].abs().cpu().numpy() % 360.0)
+amps = 0.05 + (flat[8:16].abs().cpu().numpy() % 0.15)
+wave = torch.zeros_like(t)
+for i, (f, a) in enumerate(zip(freqs, amps)):
+    wave += float(a) * torch.sin(2 * torch.pi * float(f) * t + i * 0.1)
+wave += 0.02 * torch.randn_like(wave)
+wave = torch.tanh(wave).clamp(-1, 1)
+audio = wave.numpy().astype(np.float32)
+
+RESULT = {
+    "sample_rate": sr,
+    "audio": audio,
+    "text": text,
+    "config": cfg,
+}

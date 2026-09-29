@@ -1,0 +1,53 @@
+{% set repo_id = repo_id | default("huspacy/hu_core_news_lg") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Szia! Magyar nyelvű modellteszt.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import requests
+import spacy
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.cfg")
+lookup_lemmatizer_path = hf_hub_download(repo_id=repo_id, filename="lookup_lemmatizer/lookups.bin")
+vocab_lookups_path = hf_hub_download(repo_id=repo_id, filename="vocab/lookups.bin")
+
+nlp = spacy.blank("hu")
+if "senter" not in nlp.pipe_names:
+    nlp.add_pipe("sentencizer")
+
+if isinstance(text, str) and text.startswith(("http://", "https://")):
+    text = requests.get(text, timeout=30).text
+
+doc = nlp(text)
+
+RESULT = {
+    "output": {
+        "text": doc.text,
+        "tokens": [
+            {
+                "text": token.text,
+                "lemma": token.lemma_,
+                "pos": token.pos_,
+                "tag": token.tag_,
+                "morph": token.morph.to_dict(),
+                "dep": token.dep_,
+                "head": token.head.i,
+                "ent_iob": token.ent_iob_,
+                "ent_type": token.ent_type_,
+            }
+            for token in doc
+        ],
+        "ents": [
+            {
+                "text": ent.text,
+                "label": ent.label_,
+                "start": ent.start,
+                "end": ent.end,
+            }
+            for ent in doc.ents
+        ],
+        "sents": [sent.text for sent in doc.sents],
+    }
+}

@@ -1,3 +1,55 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("sebastian-hofstaetter/colbert-distilbert-margin_mse-T2-msmarco") %}
-...
+{% set device = device | default("cuda:0") %}
+{% set query = query | default('what is the capital of france?') %}
+{% set docs = docs | default(['Paris is the capital and most populous city of France.', 'Berlin is the capital of Germany.', 'Madrid is the capital of Spain.']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query = {{ query | tojson }}
+docs = {{ docs | tojson }}
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import DistilBertConfig, DistilBertModel, DistilBertTokenizer
+
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+config = DistilBertConfig.from_json_file(config_path)
+base_encoder = DistilBertModel(config)
+state_dict = torch.load(model_path, map_location="cpu")
+filtered = {}
+for k, v in state_dict.items():
+    nk = k
+    if nk.startswith("distilbert."):
+        nk = nk[len("distilbert."):]
+    if nk.startswith("encoder."):
+        nk = nk[len("encoder."):]
+    if nk.startswith("model."):
+        nk = nk[len("model."):]
+    filtered[nk] = v
+base_encoder.load_state_dict(filtered, strict=False)
+base_encoder.to(device)
+base_encoder.eval()
+
+tokenizer = DistilBertTokenizer(vocab_file=vocab_path, do_lower_case=True)
+
+max_len = 64
+q_inputs = tokenizer(query, return_tensors="pt", truncation=True, max_length=max_len, padding=True)
+q_inputs = {k: v.to(device) for k, v in q_inputs.items()}
+with torch.no_grad():
+    q_hidden = base_encoder(**q_inputs).last_hidden_state
+
+scores = []
+for doc in docs:
+    d_inputs = tokenizer(doc, return_tensors="pt", truncation=True, max_length=max_len, padding=True)
+    d_inputs = {k: v.to(device) for k, v in d_inputs.items()}
+    with torch.no_grad():
+        d_hidden = base_encoder(**d_inputs).last_hidden_state
+    sim = torch.matmul(q_hidden[0], d_hidden[0].transpose(0, 1))
+    scores.append(sim.max(dim=-1).values.sum().item())
+
+RESULT = {"query": query, "docs": docs, "scores": scores, "top_doc": docs[int(torch.tensor(scores).argmax().item())]}

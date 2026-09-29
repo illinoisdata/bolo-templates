@@ -1,30 +1,32 @@
 {% set repo_id = repo_id | default("chathuranga-jayanath/codet5-small-v9") %}
 {% set device = device | default("cuda:0") %}
-{% set prompt = prompt | default("Generate a Python function that calculates the Fibonacci sequence.") %}
-{% set max_length = max_length | default(256) %}
-{% set num_beams = num_beams | default(5) %}
-{% set output_filename = output_filename | default("generated.txt") %}
+{% set text = text | default('def add(a, b):\n    return a + b\n\nprint(add(2, 3))') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-output_filename = "{{ output_filename }}"
+text = {{ text | tojson }}
 
-from pathlib import Path
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+_ = hf_hub_download(repo_id=repo_id, filename="merges.txt")
 
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+model.to(device)
+model.eval()
 
-inputs = tokenizer(prompt, return_tensors="pt")
-inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+output_ids = model.generate(**inputs, max_new_tokens=64, num_beams=4)
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-decoded_outputs = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-generated_text = decoded_outputs[0] if decoded_outputs else ""
-
-RESULT = {"generated_text": generated_text}
+RESULT = {"generated_text": output_text}

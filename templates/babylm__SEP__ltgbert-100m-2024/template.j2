@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("babylm/ltgbert-100m-2024") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+
+task = {{ task | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+
+from transformers import pipeline
+from transformers.modeling_utils import PreTrainedModel
+
+if not hasattr(PreTrainedModel, "all_tied_weights_keys"):
+    def _ltgbert_all_tied_weights_keys(self):
+        val = getattr(self, "_tied_weights_keys", None)
+        return val if val is not None else {}
+    PreTrainedModel.all_tied_weights_keys = property(_ltgbert_all_tied_weights_keys)
+
+_original_adjust_missing_and_unexpected_keys = PreTrainedModel._adjust_missing_and_unexpected_keys
+
+def _ltgbert_adjust_missing_and_unexpected_keys(self, loading_info):
+    ignore = getattr(self, "_keys_to_ignore_on_load_unexpected", None)
+    if isinstance(ignore, list):
+        self._keys_to_ignore_on_load_unexpected = set(ignore)
+    return _original_adjust_missing_and_unexpected_keys(self, loading_info)
+
+PreTrainedModel._adjust_missing_and_unexpected_keys = _ltgbert_adjust_missing_and_unexpected_keys
+
+pipe = pipeline(task=task, model=repo_id, device=device, trust_remote_code=True)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

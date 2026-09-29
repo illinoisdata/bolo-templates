@@ -1,0 +1,42 @@
+{% set repo_id = repo_id | default("CrabInHoney/urlbert-tiny-v4-phishing-classifier") %}
+{% set device = device | default("cuda:0") %}
+{% set test_url_1 = test_url_1 | default('https://huggingface.co/') %}
+{% set test_url_2 = test_url_2 | default('https://hu991ngface.com.ru/') %}
+{% set label_good = label_good | default('good') %}
+{% set label_phish = label_phish | default('fish') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+test_url_1 = "{{ test_url_1 }}"
+test_url_2 = "{{ test_url_2 }}"
+label_good = "{{ label_good }}"
+label_phish = "{{ label_phish }}"
+
+from transformers import pipeline
+
+classifier = pipeline(
+    "text-classification",
+    model=repo_id,
+    tokenizer=repo_id,
+    device=0 if str(device).startswith("cuda") else -1,
+    top_k=None,
+)
+
+urls = [test_url_1, test_url_2]
+raw_outputs = classifier(urls)
+id2label = {0: label_good, 1: label_phish}
+output = []
+for url, pred in zip(urls, raw_outputs):
+    scores = {}
+    best_label = None
+    best_score = None
+    for item in pred:
+        label = item["label"]
+        score = float(item["score"])
+        label_idx = int(label.split("_")[-1]) if isinstance(label, str) and label.startswith("LABEL_") else int(label)
+        scores[id2label[label_idx]] = score
+        if best_score is None or score > best_score:
+            best_score = score
+            best_label = id2label[label_idx]
+    output.append({"url": url, "scores": scores, "predicted_label": best_label})
+
+RESULT = {"output": output}

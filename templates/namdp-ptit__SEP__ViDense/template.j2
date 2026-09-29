@@ -1,34 +1,60 @@
 {% set repo_id = repo_id | default("namdp-ptit/ViDense") %}
 {% set device = device | default("cuda:0") %}
-{% set sentences = sentences | default(["Tỉnh nào có diện tích lớn nhất Việt Nam", "Tỉnh nào có diện tích nhỏ nhất Việt Nam", "Tỉnh nào có diện tích rộng nhất Việt Nam"]) %}
+{% set text1 = text1 | default('Tỉnh nào có diện tích lớn nhất Việt Nam') %}
+{% set text2 = text2 | default('Tỉnh nào có diện tích nhỏ nhất Việt Nam') %}
+{% set text3 = text3 | default('Tỉnh nào có diện tích rộng nhất Việt Nam') %}
+{% set max_length = max_length | default(64) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-sentences = {{ sentences }}
+text1 = "{{ text1 }}"
+text2 = "{{ text2 }}"
+text3 = "{{ text3 }}"
+max_length = {{ max_length }}
 
-import os
 import torch
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+sentencepiece_path = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-# Preprocess input
-inputs = tokenizer(sentences, return_tensors="pt", padding=True)
+
+def mean_pooling(attention_mask, outputs):
+    last_hidden = outputs.last_hidden_state
+    mask = attention_mask.unsqueeze(-1).type_as(last_hidden)
+    return (last_hidden * mask).sum(dim=1) / mask.sum(dim=1).clamp(min=1e-9)
+
+
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    use_fast=True,
+    local_files_only=True,
+)
+model = AutoModel.from_pretrained(
+    repo_id,
+    local_files_only=True,
+)
+model.to(device)
+model.eval()
+
+sentences = [text1, text2, text3]
+inputs = tokenizer(sentences, return_tensors='pt', padding=True, truncation=True, max_length=max_length)
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Inference
 with torch.no_grad():
     outputs = model(**inputs)
-    last_hidden = outputs.last_hidden_state
-    attention_mask = inputs["attention_mask"]
-    pooled = (last_hidden * attention_mask.unsqueeze(-1)).sum(1) / attention_mask.sum(-1).unsqueeze(-1)
-
-# Post-process & build RESULT dict
-cosine_sim_1 = torch.nn.functional.cosine_similarity(pooled[0].unsqueeze(0), pooled[1].unsqueeze(0))
-cosine_sim_2 = torch.nn.functional.cosine_similarity(pooled[0].unsqueeze(0), pooled[2].unsqueeze(0))
+    embeddings = mean_pooling(inputs['attention_mask'], outputs)
+    embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
+    cosine_sim_12 = torch.nn.functional.cosine_similarity(embeddings[0].unsqueeze(0), embeddings[1].unsqueeze(0)).item()
+    cosine_sim_13 = torch.nn.functional.cosine_similarity(embeddings[0].unsqueeze(0), embeddings[2].unsqueeze(0)).item()
 
 RESULT = {
-    "cosine_sim_1": cosine_sim_1.item(),
-    "cosine_sim_2": cosine_sim_2.item()
+    "embeddings": embeddings.detach().cpu(),
+    "cosine_similarity_12": cosine_sim_12,
+    "cosine_similarity_13": cosine_sim_13,
 }

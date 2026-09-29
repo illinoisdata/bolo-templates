@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("Ultralytics/YOLOv8") %}
+{% set device = device | default("cuda:0") %}
+{% set model_file = model_file | default("yolov8n.pt") %}
+{% set image1 = image1 | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+model_file = "{{ model_file }}"
+image1 = "{{ image1 }}"
+
+from pathlib import Path
+import torch
+from PIL import Image
+import requests
+from ultralytics import YOLO
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename=model_file)
+
+if str(image1).startswith(("http://", "https://")):
+    image = Image.open(requests.get(image1, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image1).convert("RGB")
+
+model = YOLO(weights_path)
+results = model.predict(source=image, device=device, verbose=False)
+result = results[0]
+
+boxes = result.boxes
+output_boxes = None if boxes is None else boxes.xyxy.cpu().numpy()
+output_scores = None if boxes is None else boxes.conf.cpu().numpy()
+output_classes = None if boxes is None else boxes.cls.cpu().numpy()
+output_names = result.names
+
+RESULT = {
+    "boxes": output_boxes,
+    "scores": output_scores,
+    "classes": output_classes,
+    "names": output_names,
+}

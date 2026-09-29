@@ -1,0 +1,127 @@
+{% set repo_id = repo_id | default("BAAI/Emu3-VisionTokenizer") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-feature-extraction") %}
+{% set image_input_path = image_input_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+{% set repo_cache_dir = repo_cache_dir | default("/workspace/BAAI-Emu3-VisionTokenizer") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+image_input_path = {{ image_input_path | tojson }}
+repo_cache_dir = {{ repo_cache_dir | tojson }}
+
+from pathlib import Path
+import importlib.util
+import sys
+import types
+
+import torch
+from huggingface_hub import snapshot_download
+from transformers import pipeline
+
+# ---------------------
+# Load tokenizer/processor & model
+# ---------------------
+repo_local_dir = Path(
+    snapshot_download(repo_id=repo_id, repo_type="model", local_dir=repo_cache_dir)
+)
+
+package_name = "emu3visionvq"
+package = types.ModuleType(package_name)
+package.__path__ = [str(repo_local_dir)]
+sys.modules[package_name] = package
+
+
+def _load_repo_module(module_basename: str):
+    module_name = f"{package_name}.{module_basename}"
+    module_path = repo_local_dir / f"{module_basename}.py"
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    setattr(package, module_basename, module)
+    spec.loader.exec_module(module)
+    return module
+
+config_module = _load_repo_module("configuration_emu3visionvq")
+modeling_module = _load_repo_module("modeling_emu3visionvq")
+image_processing_module = _load_repo_module("image_processing_emu3visionvq")
+
+Emu3VisionVQConfig = config_module.Emu3VisionVQConfig
+Emu3VisionVQModel = modeling_module.Emu3VisionVQModel
+Emu3VisionVQImageProcessor = image_processing_module.Emu3VisionVQImageProcessor
+
+config = Emu3VisionVQConfig.from_pretrained(repo_local_dir)
+model = Emu3VisionVQModel.from_pretrained(repo_local_dir, config=config)
+processor = Emu3VisionVQImageProcessor.from_pretrained(repo_local_dir)
+
+
+class Emu3VisionVQFeatureExtractorWrapper(torch.nn.Module):
+
+    def __init__(self, base_model: Emu3VisionVQModel):
+        super().__init__()
+        self.base_model = base_model
+        self.config = base_model.config
+
+    def forward(self, pixel_values, **kwargs):
+        if pixel_values.ndim == 4:
+            pixel_values = pixel_values.unsqueeze(1)
+        features = self.base_model.encoder(pixel_values)
+        features = features.flatten(2)
+        return (features,)
+
+    @property
+    def device(self):
+        return self.base_model.device
+
+    @property
+    def dtype(self):
+        return self.base_model.dtype
+
+
+class TemporalEmu3VisionVQImageProcessor:
+
+    def __init__(self, base_processor, frames: int):
+        self.base_processor = base_processor
+        self.frames = max(1, frames)
+
+    def __call__(self, images, **kwargs):
+        processed = self.base_processor(images, **kwargs)
+        pixel_values = processed["pixel_values"]
+        if pixel_values.ndim == 4:
+            pixel_values = pixel_values.unsqueeze(1)
+        pixel_values = pixel_values.repeat(1, self.frames, 1, 1, 1)
+        processed["pixel_values"] = pixel_values
+        return processed
+
+    def __getattr__(self, name):
+        return getattr(self.base_processor, name)
+
+
+temporal_processor = TemporalEmu3VisionVQImageProcessor(
+    processor, frames=config.temporal_downsample_factor
+)
+
+wrapped_model = Emu3VisionVQFeatureExtractorWrapper(model)
+torch_device = torch.device(device)
+wrapped_model.to(torch_device)
+wrapped_model.eval()
+
+if torch_device.type == "cuda":
+    pipeline_device = torch_device.index if torch_device.index is not None else 0
+else:
+    pipeline_device = -1
+
+# ---------------------
+# Pre-process input
+# ---------------------
+pipe = pipeline(
+    task=task,
+    model=wrapped_model,
+    image_processor=temporal_processor,
+    device=pipeline_device,
+)
+
+# ---------------------
+# Run inference
+# ---------------------
+RESULT = pipe(image_input_path, return_tensors=True)

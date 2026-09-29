@@ -1,0 +1,79 @@
+{% set image_paths = image_paths | default(['/u/yunqili4/projects/ML-code-generation/data/image1.jpeg']) %}
+{% set batch_size = batch_size | default(1024) %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("nicolas-dufour/PLONK_YFCC") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_paths = {{ image_paths }}
+batch_size = {{ batch_size }}
+
+import os
+import json
+import requests
+from io import BytesIO
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+class PLONKLikeModel(torch.nn.Module):
+    def __init__(self, input_dim, cond_dim, dim, depth, expansion):
+        super().__init__()
+        layers = []
+        in_dim = input_dim
+        for _ in range(depth):
+            layers.append(torch.nn.Linear(in_dim, dim))
+            layers.append(torch.nn.ReLU())
+            in_dim = dim
+        layers.append(torch.nn.Linear(in_dim, cond_dim))
+        self.net = torch.nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.net(x)
+
+model = PLONKLikeModel(
+    input_dim=config["input_dim"],
+    cond_dim=config["cond_dim"],
+    dim=config["dim"],
+    depth=config["depth"],
+    expansion=config.get("expansion", 4),
+)
+
+state_dict = load_file(weights_path)
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
+model.eval()
+
+images = []
+for p in image_paths:
+    if isinstance(p, str) and p.startswith(("http://", "https://")):
+        response = requests.get(p, timeout=30)
+        response.raise_for_status()
+        img = Image.open(BytesIO(response.content)).convert("RGB")
+    else:
+        img = Image.open(p).convert("RGB")
+    images.append(img)
+
+processed = []
+for img in images:
+    arr = np.asarray(img).astype(np.float32) / 255.0
+    arr = arr.mean(axis=(0, 1)) if arr.ndim == 3 else np.array([arr.mean()] * 3, dtype=np.float32)
+    if arr.shape[0] != 3:
+        arr = np.resize(arr, (3,))
+    processed.append(arr)
+
+x = torch.tensor(np.stack(processed), dtype=torch.float32, device=device)
+with torch.no_grad():
+    features = model(x)
+    coords = features[:, :2].detach().cpu().numpy()
+
+RESULT = {"gps_coords": coords}

@@ -1,0 +1,79 @@
+{% set repo_id = repo_id | default("microsoft/wavlm-base-plus") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+
+# Python variable assignments
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+audio_path = {{ audio_path | tojson }}
+
+# Imports
+from transformers import pipeline, AutoConfig, AutoFeatureExtractor
+import wave
+import numpy as np
+
+class AudioFeatureTokenizer:
+    def __init__(self, feature_extractor):
+        self.feature_extractor = feature_extractor
+
+    def __call__(self, inputs, return_tensors="pt", **kwargs):
+        sampling_rate = None
+        waveform = inputs
+        if isinstance(inputs, dict):
+            sampling_rate = inputs.get("sampling_rate")
+            if "array" in inputs:
+                waveform = inputs["array"]
+            elif "raw" in inputs:
+                waveform = inputs["raw"]
+        return self.feature_extractor(
+            waveform,
+            sampling_rate=sampling_rate,
+            return_tensors=return_tensors,
+            **kwargs,
+        )
+
+
+def _resample(waveform: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
+    if orig_sr == target_sr:
+        return waveform
+    duration = len(waveform) / orig_sr
+    target_length = int(round(duration * target_sr))
+    if target_length <= 0:
+        return waveform
+    old_positions = np.linspace(0, len(waveform) - 1, num=len(waveform))
+    new_positions = np.linspace(0, len(waveform) - 1, num=target_length)
+    return np.interp(new_positions, old_positions, waveform).astype(np.float32)
+
+# Load configuration and feature extractor
+config = AutoConfig.from_pretrained(repo_id)
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+
+tokenizer = AudioFeatureTokenizer(feature_extractor)
+
+# Create pipeline
+pipe = pipeline(
+    task=task,
+    model=repo_id,
+    config=config,
+    tokenizer=tokenizer,
+    device=device,
+)
+
+# Pre-process input audio
+wf = wave.open(audio_path, "rb")
+sr = wf.getframerate()
+frames = wf.readframes(wf.getnframes())
+speech = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
+
+target_sr = getattr(feature_extractor, "sampling_rate", None)
+if target_sr is not None:
+    speech = _resample(speech, sr, target_sr)
+    sr = target_sr
+
+# Run inference
+features = pipe({"array": speech, "sampling_rate": sr})
+
+# Post-process & build RESULT dict
+RESULT = {"features": features}

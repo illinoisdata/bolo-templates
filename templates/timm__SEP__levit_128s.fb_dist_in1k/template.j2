@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("timm/levit_128s.fb_dist_in1k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set model = model | default(repo_id) %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+repo_id = "{{ repo_id }}"
+task = "{{ task }}"
+model = "{{ model }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+from PIL import Image
+from transformers import pipeline
+
+image = Image.open(image_path).convert("RGB")
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(image)

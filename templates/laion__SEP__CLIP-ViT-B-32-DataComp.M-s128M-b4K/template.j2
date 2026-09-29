@@ -1,0 +1,63 @@
+{% set repo_id = repo_id | default("laion/CLIP-ViT-B-32-DataComp.M-s128M-b4K") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text_prompt = text_prompt | default('a photo of a cat, a dog, and a car') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text_prompt = "{{ text_prompt }}"
+
+import json
+import os
+import requests
+from io import BytesIO
+from PIL import Image
+import torch
+from huggingface_hub import hf_hub_download
+import open_clip
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+model_cfg = config.get("model_cfg", {})
+preprocess_cfg = config.get("preprocess_cfg", {})
+
+def load_image(path_or_url):
+    if str(path_or_url).startswith(("http://", "https://")):
+        img = Image.open(BytesIO(requests.get(path_or_url, timeout=30).content))
+    else:
+        img = Image.open(path_or_url)
+    return img.convert("RGB")
+
+model, _, preprocess = open_clip.create_model_and_transforms(
+    model_cfg.get("model_name", "ViT-B-32"),
+    pretrained=None,
+    precision="fp32",
+    device=device,
+)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict)
+model = model.to(device)
+model.eval()
+
+image = load_image(image_path)
+image_input = preprocess(image).unsqueeze(0).to(device)
+texts = open_clip.tokenize([text_prompt]).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_input)
+    text_features = model.encode_text(texts)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logit_scale = model.logit_scale.exp()
+    logits_per_image = logit_scale * image_features @ text_features.T
+    probs = logits_per_image.softmax(dim=-1)
+
+RESULT = {
+    "text_prompt": text_prompt,
+    "probabilities": probs.squeeze(0).detach().cpu().tolist(),
+    "logits": logits_per_image.squeeze(0).detach().cpu().tolist(),
+}

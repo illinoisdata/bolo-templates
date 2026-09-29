@@ -1,24 +1,44 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("circulus/kobart-trans-polite-v2") %}
-{% set text_input = text_input | default("안녕하세요. 오늘 하루 어떠세요?") %}
-{% set max_new_tokens = max_new_tokens | default(128) %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-text_input = {{ text_input | tojson }}
-max_new_tokens = {{ max_new_tokens }}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('안녕하세요. 문장을 더 정중한 표현으로 바꿔주세요.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
 
-import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+# Load tokenizer/model from the downloaded repo files.
+tokenizer = AutoTokenizer.from_pretrained(
+    tokenizer_json_path.rsplit('/', 1)[0],
+    use_fast=True,
+)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    config_path.rsplit('/', 1)[0],
+    torch_dtype=torch.float32,
+)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(text_input, return_tensors="pt", truncation=True)
-inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_tokens = model.generate(**inputs, max_new_tokens=max_new_tokens)
-generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=64,
+        num_beams=4,
+        do_sample=False,
+    )
 
-RESULT = {"generated_text": generated_text}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+RESULT = {"output_text": output_text}

@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("agentlans/multilingual-e5-small-aligned-sentiment") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("This product is surprisingly good and I am very happy with it.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+model = AutoModelForSequenceClassification.from_pretrained(
+    repo_id,
+    config=config_path,
+    state_dict=None,
+)
+import safetensors.torch
+model.load_state_dict(safetensors.torch.load_file(weights_path, device="cpu"))
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    tokenizer_file=tokenizer_json_path,
+    tokenizer_config=tokenizer_config_path,
+    special_tokens_map_file=special_tokens_map_path,
+)
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    logits = model(**inputs).logits
+
+if logits.numel() == 1:
+    output = float(logits.squeeze().detach().cpu().item())
+else:
+    output = logits.detach().cpu().tolist()
+
+RESULT = {"output": output}

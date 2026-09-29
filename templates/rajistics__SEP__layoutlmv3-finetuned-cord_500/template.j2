@@ -1,0 +1,61 @@
+{% set repo_id = repo_id | default("rajistics/layoutlmv3-finetuned-cord_500") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("token-classification") -%}
+{% set input_text = input_text | default("Menu Item Price Total") -%}
+{% set max_coordinate = max_coordinate | default(1000) -%}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_text = {{ input_text | tojson }}
+max_coordinate = {{ max_coordinate }}
+
+from transformers import LayoutLMv3Tokenizer, pipeline
+
+class LayoutLMv3TokenizerWithDefaultBoxes(LayoutLMv3Tokenizer):
+    """Extends LayoutLMv3Tokenizer to synthesize bounding boxes for plain text."""
+
+    def __init__(self, *args, max_coordinate: int = 1000, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._max_coordinate = max_coordinate if max_coordinate and max_coordinate > 0 else 1000
+
+    def __call__(self, text, text_pair=None, boxes=None, **kwargs):
+        prepared_text, prepared_boxes = self._prepare_words_and_boxes(text, boxes)
+        return super().__call__(
+            text=prepared_text,
+            text_pair=text_pair,
+            boxes=prepared_boxes,
+            **kwargs,
+        )
+
+    def _prepare_words_and_boxes(self, text, boxes):
+        if boxes is not None:
+            return text, boxes
+        if isinstance(text, str):
+            words = [token for token in text.split() if token]
+            return words, self._generate_boxes_for(words)
+        if isinstance(text, (list, tuple)):
+            if text and isinstance(text[0], (list, tuple)):
+                words = [list(example) for example in text]
+                return words, [self._generate_boxes_for(example) for example in words]
+            words = list(text)
+            return words, self._generate_boxes_for(words)
+        return text, boxes
+
+    def _generate_boxes_for(self, words):
+        if not words:
+            return []
+        stride = max(1, self._max_coordinate // len(words))
+        boxes = []
+        for index in range(len(words)):
+            x0 = min(index * stride, self._max_coordinate)
+            x1 = min(x0 + stride, self._max_coordinate)
+            if x1 <= x0:
+                x1 = min(x0 + 1, self._max_coordinate)
+            boxes.append([x0, 0, x1, self._max_coordinate])
+        return boxes
+
+tokenizer = LayoutLMv3TokenizerWithDefaultBoxes.from_pretrained(repo_id, max_coordinate=max_coordinate)
+pipe = pipeline(task=task, model=repo_id, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_text)
+RESULT = {"predictions": RESULT}

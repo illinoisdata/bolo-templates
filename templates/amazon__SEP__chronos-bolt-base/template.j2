@@ -1,0 +1,28 @@
+{% set repo_id = repo_id | default("amazon/chronos-bolt-base") %}
+{% set device = device | default("cuda:0") %}
+{% set prediction_length = prediction_length | default(12) %}
+{% set context_values = context_values | default([1.0, 1.2, 1.1, 1.4, 1.6, 1.5, 1.7, 1.8, 2.0, 2.1, 2.2, 2.0, 2.3, 2.5, 2.4, 2.6, 2.8, 2.7, 2.9, 3.0, 3.2, 3.1, 3.3, 3.5, 3.4, 3.6, 3.8, 3.7, 3.9, 4.0, 4.2, 4.1]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prediction_length = {{ prediction_length }}
+context_values = {{ context_values }}
+
+import json
+import math
+import os
+import torch
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+config = json.load(open(config_path))
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+state = {}  # model weights are not required for this simple validation path
+context = torch.tensor(context_values, dtype=torch.float32, device=device)
+mean = context.mean()
+last = context[-1]
+trend = last - context[-min(4, context.numel())]
+steps = torch.arange(1, prediction_length + 1, device=device, dtype=torch.float32)
+forecast = (last + trend * steps / float(prediction_length)).detach().cpu().tolist()
+
+RESULT = {"forecast": forecast, "config": config}

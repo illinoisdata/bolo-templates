@@ -1,26 +1,35 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-es-it") %}
 {% set device = device | default("cuda:0") %}
-{% set source_text = source_text | default("Hola, ¿cómo estás?") %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(4) %}
+{% set text = text | default('Hola, ¿cómo estás?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_text = """{{ source_text }}"""
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text = "{{ text }}"
 
-import os
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import MarianMTModel, MarianTokenizer
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+
+tokenizer = MarianTokenizer(
+    vocab=vocab_path,
+    source_spm=source_spm_path,
+    target_spm=target_spm_path,
+    tokenizer_file=None,
+)
+model = MarianMTModel.from_pretrained(repo_id, local_files_only=True)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(source_text, return_tensors="pt", truncation=True, max_length=max_length)
-inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs = tokenizer([text], return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_tokens = model.generate(**inputs, num_beams=4, max_length=128)
+output_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
-generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
-translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0].strip()
-
-RESULT = {"translation": translation}
+RESULT = {"translation": output_text}

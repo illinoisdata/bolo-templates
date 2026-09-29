@@ -1,35 +1,42 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("airkingbd/dplm_650m") %}
-{% set sequence = sequence | default("ACDEFGHIKLMNPQRSTVWY") %}
+{% set device = device | default("cuda:0") %}
+{% set input_sequence = input_sequence | default('MKTIIALSYIFCLVFADYKDDDDK') %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-sequence = "{{ sequence }}"
+input_sequence = "{{ input_sequence }}"
 
-from pathlib import Path
-
+import json
+import os
 import torch
-from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoConfig, AutoTokenizer, EsmForMaskedLM
 
-device = torch.device(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+_hf_special_tokens = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_hf_tokenizer_config = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id)
-model = model.to(device)
+config = AutoConfig.from_pretrained(config_path)
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_path), use_fast=False)
+model = EsmForMaskedLM.from_pretrained(os.path.dirname(model_path), config=config, local_files_only=True)
+model.to(device)
 model.eval()
 
-tokenizer_inputs = tokenizer(sequence, return_tensors="pt")
-input_ids = tokenizer_inputs["input_ids"].to(device)
-attention_mask = tokenizer_inputs.get("attention_mask")
-if attention_mask is not None:
-    attention_mask = attention_mask.to(device)
-
-model_inputs = {"input_ids": input_ids}
-if attention_mask is not None:
-    model_inputs["attention_mask"] = attention_mask
+inputs = tokenizer(input_sequence, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**model_inputs)
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probs = torch.softmax(logits, dim=-1)
+    token_ids = torch.argmax(probs, dim=-1)
+    decoded = tokenizer.batch_decode(token_ids, skip_special_tokens=True)
 
-sequence_representation = outputs.last_hidden_state[:, 0, :].detach().cpu()
-
-RESULT = {"sequence_representation": sequence_representation}
+RESULT = {
+    "input_sequence": input_sequence,
+    "logits_shape": list(logits.shape),
+    "predicted_tokens": token_ids[0].detach().cpu().tolist(),
+    "decoded_sequence": decoded[0],
+}

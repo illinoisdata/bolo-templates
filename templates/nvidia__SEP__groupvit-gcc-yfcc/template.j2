@@ -1,0 +1,23 @@
+{% set repo_id = repo_id | default("nvidia/groupvit-gcc-yfcc") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("zero-shot-image-classification") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+{% set candidate_labels = candidate_labels | default(["a photo of a cat", "a photo of a dog"]) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+image_path = "{{ image_path }}"
+candidate_labels = {{ candidate_labels | tojson }}
+
+from PIL import Image
+from transformers import pipeline
+
+# Load the pipeline
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+# Pre-process input
+image = Image.open(image_path)
+
+# Inference
+RESULT = pipe(image, candidate_labels=candidate_labels)

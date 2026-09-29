@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("timm/coatnet_2_rw_224.sw_in12k_ft_in1k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") -%}
+{% set image_input = image_input | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") -%}
+
+task = {{ task | tojson }}
+image_input = {{ image_input | tojson }}
+model_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+
+from PIL import Image
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model_id, device=device)
+
+preprocessed_image = Image.open(image_input).convert("RGB")
+
+inference_outputs = pipe(preprocessed_image)
+
+RESULT = {"predictions": inference_outputs}

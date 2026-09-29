@@ -1,43 +1,40 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("syssec-utd/py39-pylingual-v1-statement") %}
-{% set prompt = prompt | default("Teams must rotate their encryption keys regularly and audit all privileged access.") %}
-{% set prefix = prefix | default("summarize: ") %}
-{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set device = device | default("cuda:0") %}
+{% set max_length = max_length | default(128) %}
 {% set num_beams = num_beams | default(4) %}
-{% set min_length = min_length | default(30) %}
-{% set result_filename = result_filename | default("generated_text.txt") %}
+{% set input_text = input_text | default('def add(a, b):\n    return a + b') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = """{{ prompt }}"""
-prefix = "{{ prefix }}"
-max_new_tokens = {{ max_new_tokens }}
+max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-min_length = {{ min_length }}
-result_filename = "{{ result_filename }}"
-
-from pathlib import Path
+input_text = {{ input_text | tojson }}
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+# The model is a CodeT5 checkpoint; load tokenizer/model from the repo.
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-prefixed_prompt = f"{prefix}{prompt}"
-inputs = tokenizer(prefixed_prompt, return_tensors="pt")
+inputs = tokenizer(input_text, return_tensors="pt", truncation=True)
 inputs = {k: v.to(device) for k, v in inputs.items()}
-generated_tokens = model.generate(
-    **inputs,
-    max_new_tokens=max_new_tokens,
-    min_length=min_length,
-    num_beams=num_beams,
-    early_stopping=True,
-)
 
-generated_tokens = generated_tokens.cpu()
-generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0].strip()
-RESULT = {"generated_text": generated_text}
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_length=max_length,
+        num_beams=num_beams,
+    )
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

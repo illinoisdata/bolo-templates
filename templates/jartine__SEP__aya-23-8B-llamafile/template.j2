@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("jartine/aya-23-8B-llamafile") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('aya-23-8B.Q6_K.llamafile') %}
+{% set prompt = prompt | default('Write a short multilingual greeting in English, French, and Arabic.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+import os
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+file_size = os.path.getsize(model_path)
+
+RESULT = {"model_path": model_path, "file_size": file_size, "prompt": prompt}

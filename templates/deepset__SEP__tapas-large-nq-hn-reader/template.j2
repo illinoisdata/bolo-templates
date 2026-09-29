@@ -1,7 +1,48 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("deepset/tapas-large-nq-hn-reader") %}
-import inspect
-from transformers import AutoTokenizer
+{% set device = device | default("cuda:0") %}
+{% set table_html = table_html | default('<table><tr><th>Year</th><th>City</th><th>Country</th></tr><tr><td>2018</td><td>Paris</td><td>France</td></tr><tr><td>2019</td><td>Berlin</td><td>Germany</td></tr><tr><td>2020</td><td>Tokyo</td><td>Japan</td></tr></table>') %}
+{% set query = query | default('Which city is in Germany?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+table_html = "{{ table_html }}"
+query = "{{ query }}"
 
-tokenizer = AutoTokenizer.from_pretrained("deepset/tapas-large-nq-hn-reader")
-print(inspect.signature(tokenizer.convert_logits_to_predictions))
+import pandas as pd
+import torch
+from transformers import TapasTokenizer, TapasForQuestionAnswering
+from huggingface_hub import hf_hub_download
+from io import StringIO
+
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+html = table_html
+if isinstance(html, str) and html.lstrip().startswith("http"):
+    import requests
+    html = requests.get(html, timeout=30).text
+
+table = pd.read_html(StringIO(html))[0].astype(str)
+
+tokenizer = TapasTokenizer(vocab_file=vocab_path)
+model = TapasForQuestionAnswering.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(table=table, queries=query, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+
+selected = torch.argmax(logits, dim=-1)
+selected_indices = selected.nonzero(as_tuple=False).flatten().tolist()
+answer_cells = []
+for idx in selected_indices:
+    if idx < len(table):
+        answer_cells.append(table.iloc[idx, 1])
+
+RESULT = {"answer": answer_cells[0] if answer_cells else ""}

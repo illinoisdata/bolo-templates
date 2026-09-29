@@ -1,0 +1,55 @@
+{% set repo_id = repo_id | default("deepdml/faster-distil-whisper-large-v3.5") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set language = language | default('en') %}
+{% set task = task | default('transcribe') %}
+{% set compute_type = compute_type | default('int8') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+language = "{{ language }}"
+task = "{{ task }}"
+compute_type = "{{ compute_type }}"
+
+import os
+from pathlib import Path
+from urllib.parse import urlparse
+from tempfile import NamedTemporaryFile
+
+from huggingface_hub import hf_hub_download
+from faster_whisper import WhisperModel
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocabulary.json")
+
+if str(audio_path).startswith(("http://", "https://")):
+    import requests
+    r = requests.get(audio_path, timeout=30)
+    r.raise_for_status()
+    suffix = Path(urlparse(audio_path).path).suffix or ".wav"
+    tmp = NamedTemporaryFile(suffix=suffix, delete=False)
+    tmp.write(r.content)
+    tmp.flush()
+    tmp.close()
+    audio_source = tmp.name
+else:
+    audio_source = audio_path
+
+model = WhisperModel(
+    model_size_or_path=os.path.dirname(model_path),
+    device="cpu",
+    compute_type=compute_type,
+)
+
+segments, info = model.transcribe(audio_source, language=language, task=task)
+text = "".join(segment.text for segment in segments)
+
+RESULT = {
+    "text": text,
+    "language": info.language,
+    "language_probability": info.language_probability,
+    "duration": info.duration,
+}

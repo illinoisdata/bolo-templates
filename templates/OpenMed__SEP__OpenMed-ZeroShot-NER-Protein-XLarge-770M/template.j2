@@ -1,0 +1,21 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Protein-XLarge-770M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The Maillard reaction is responsible for the browning of many foods.') %}
+{% set entity_labels = entity_labels | default(['protein', 'protein_complex', 'protein_enum', 'protein_family_or_group', 'protein_variant']) %}
+{% set threshold = threshold | default(0.5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+entity_labels = {{ entity_labels | tojson }}
+threshold = {{ threshold }}
+
+from huggingface_hub import hf_hub_download
+import torch
+import json
+from pathlib import Path
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+config = json.load(open(config_path))
+RESULT = {"config_keys": list(config.keys()), "weights_path": weights_path}

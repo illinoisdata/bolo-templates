@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("facebook/vjepa2-vitg-fpc64-384") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("video-classification") %}
+{% set input_video = input_video | default("/u/yunqili4/projects/ML-code-generation/data/video.avi") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_video = "{{ input_video }}"
+
+from transformers import pipeline, AutoVideoProcessor
+
+# Load processor
+processor = AutoVideoProcessor.from_pretrained(repo_id)
+
+# Create pipeline (loads classification model automatically)
+pipe = pipeline(task=task, model=repo_id, feature_extractor=processor, device=device)
+
+# Patch config for pipeline compatibility
+pipe.model.config.num_frames = pipe.model.config.frames_per_clip
+
+RESULT = pipe(input_video)

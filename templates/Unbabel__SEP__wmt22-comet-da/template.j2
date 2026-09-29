@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("Unbabel/wmt22-comet-da") %}
+{% set device = device | default("cuda:0") %}
+{% set source_text = source_text | default("Dem Feuer konnte Einhalt geboten werden") %}
+{% set translation_text = translation_text | default("The fire could be stopped") %}
+{% set reference_text = reference_text | default("They were able to control the fire.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = "{{ source_text }}"
+translation_text = "{{ translation_text }}"
+reference_text = "{{ reference_text }}"
+
+import os
+import tempfile
+import torch
+from huggingface_hub import hf_hub_download
+from comet import download_model, load_from_checkpoint
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="checkpoints/model.ckpt")
+hparams_path = hf_hub_download(repo_id=repo_id, filename="hparams.yaml")
+model_dir = os.path.dirname(weights_path)
+model = load_from_checkpoint(weights_path)
+model.to(device)
+model.eval()
+
+inputs = [
+    {"src": source_text, "mt": translation_text, "ref": reference_text},
+]
+output = model.predict(inputs, batch_size=1, gpus=1 if str(device).startswith("cuda") else 0)
+
+scores = output.scores if hasattr(output, "scores") else output["scores"]
+segments = output.seg_scores if hasattr(output, "seg_scores") else output["seg_scores"] if isinstance(output, dict) and "seg_scores" in output else None
+RESULT = {"scores": scores, "segments": segments}

@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("apple/DFN5B-CLIP-ViT-H-14-378") %}
+{% set device = device | default("cuda:0") %}
+{% set labels_list = labels_list | default(["a dog", "a cat", "a donut", "a beignet"]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+labels_list = {{ labels_list }}
+
+import torch
+import torch.nn.functional as F
+from PIL import Image
+from urllib.parse import urlparse
+from urllib.request import urlopen
+from huggingface_hub import hf_hub_download
+from transformers import CLIPModel, CLIPProcessor
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+image_path = "/u/yunqili4/projects/ML-code-generation/data/image1.jpeg"
+
+if urlparse(image_path).scheme in ("http", "https"):
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processor = CLIPProcessor.from_pretrained(repo_id)
+model = CLIPModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = processor(text=labels_list, images=image, return_tensors="pt", padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    image_embeds = F.normalize(outputs.image_embeds, dim=-1)
+    text_embeds = F.normalize(outputs.text_embeds, dim=-1)
+    logits_per_image = image_embeds @ text_embeds.T * model.logit_scale.exp()
+    probs = logits_per_image.softmax(dim=-1)
+
+RESULT = {"labels": labels_list, "probabilities": probs[0].detach().cpu().tolist()}

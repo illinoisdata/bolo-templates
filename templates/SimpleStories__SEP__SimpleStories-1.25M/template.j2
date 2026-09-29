@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("SimpleStories/SimpleStories-1.25M") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('The curious cat looked at the') %}
+{% set max_new_tokens = max_new_tokens | default(80) %}
+{% set temperature = temperature | default(0.7) %}
+{% set do_sample = do_sample | default(true) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+do_sample = {{ do_sample }}
+
+import torch
+from transformers import AutoTokenizer, LlamaForCausalLM
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = LlamaForCausalLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt", add_special_tokens=False)
+input_ids = inputs.input_ids.to(device)
+
+with torch.no_grad():
+    output_ids = model.generate(
+        input_ids=input_ids,
+        max_new_tokens=max_new_tokens,
+        temperature=temperature,
+        do_sample=do_sample,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

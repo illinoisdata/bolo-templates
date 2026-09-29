@@ -1,36 +1,42 @@
+{% set text = text | default("Le 0ctobre 1894, [START] Dreyfvs [END] est arrêté à Paris, accusé d'espionnage pour l'Allemagne — un événement qui déch1ra la société fr4nçaise pendant des années.") %}
+{% set max_length = max_length | default(32) %}
+{% set num_beams = num_beams | default(5) %}
 {% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("impresso-project/nel-mgenre-multilingual") %}
-{% set input_strings = input_strings | default(["Le 0ctobre 1894, [START] Dreyfvs [END] est arrêté à Paris, accusé d'espionnage pour l'Allemagne — un événement qui déchira la société française pendant des années."]) %}
-{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_strings = {{ input_strings }}
-max_new_tokens = {{ max_new_tokens }}
+text = {{ text | tojson }}
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
 
-from pathlib import Path
-import json
+import os
+import sys
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
 
-if isinstance(input_strings, str):
-    input_strings = [input_strings]
+repo_dir = os.path.dirname(model_path)
+script_path = hf_hub_download(repo_id=repo_id, filename="generic_nel.py")
 
-encoded_inputs = tokenizer(
-    input_strings,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, use_fast=False, tokenizer_file=None)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_dir, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-generated_ids = model.generate(
-    **encoded_inputs,
-    max_new_tokens=max_new_tokens,
-)
+from importlib.util import spec_from_file_location, module_from_spec
+spec = spec_from_file_location("generic_nel", script_path)
+generic_nel = module_from_spec(spec)
+spec.loader.exec_module(generic_nel)
+NelPipeline = generic_nel.NelPipeline
 
-generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+nel_pipeline = NelPipeline(model=model, tokenizer=tokenizer, device=0 if str(device).startswith("cuda") else -1)
+output = nel_pipeline(text, max_length=max_length, num_beams=num_beams)
 
-RESULT = {"generated_texts": generated_texts}
+RESULT = {"output": output}

@@ -1,0 +1,34 @@
+{% set repo_id = repo_id | default("mesolitica/emotion-analysis-nanot5-small-malaysian-cased") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set eos_token = eos_token | default("<|endoftext|>") %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+eos_token = {{ eos_token | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSequenceClassification.from_pretrained(repo_id)
+eos_token_id = tokenizer.convert_tokens_to_ids(eos_token)
+if eos_token_id is None:
+    eos_token_id = tokenizer.eos_token_id
+if eos_token_id is not None:
+    model.config.eos_token_id = eos_token_id
+model = model.to(device)
+
+prepared_prompt = input_prompt
+if eos_token:
+    prompt_stripped = prepared_prompt.rstrip()
+    if not prompt_stripped.endswith(eos_token):
+        prepared_prompt = f"{prompt_stripped} {eos_token}"
+    else:
+        prepared_prompt = prompt_stripped
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(prepared_prompt)
+RESULT = {"inference": RESULT}

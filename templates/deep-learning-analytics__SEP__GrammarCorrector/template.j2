@@ -1,47 +1,33 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("deep-learning-analytics/GrammarCorrector") %}
-{% set text_input = text_input | default("He are moving here.") %}
-{% set num_return_sequences = num_return_sequences | default(1) %}
-{% set max_length = max_length | default(64) %}
-{% set num_beams = num_beams | default(4) %}
-{% set temperature = temperature | default(1.5) %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('He are moving here.') %}
+{% set num_return_sequences = num_return_sequences | default(2) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+input_text = "{{ input_text }}"
 num_return_sequences = {{ num_return_sequences }}
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-temperature = {{ temperature }}
-
-from pathlib import Path
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import T5Tokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_file = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+if input_text.startswith("http://") or input_text.startswith("https://"):
+    raise ValueError("input_text must be plain text for this model")
 
-encoded_input = tokenizer(
-    text_input,
-    truncation=True,
-    padding="longest",
-    return_tensors="pt",
-)
-encoded_input = {key: tensor.to(torch_device) for key, tensor in encoded_input.items()}
+model = T5ForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32, use_safetensors=False)
+tokenizer = T5Tokenizer.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
 
-generated_outputs = model.generate(
-    **encoded_input,
-    max_length=max_length,
-    num_beams=num_beams,
-    num_return_sequences=num_return_sequences,
-    temperature=temperature,
-)
+batch = tokenizer([input_text], truncation=True, padding='max_length', max_length=64, return_tensors="pt").to(device)
+translated = model.generate(**batch, max_length=64, num_beams=num_return_sequences, num_return_sequences=num_return_sequences, temperature=1.5)
+output_texts = tokenizer.batch_decode(translated, skip_special_tokens=True)
 
-decoded_outputs = tokenizer.batch_decode(
-    generated_outputs,
-    skip_special_tokens=True,
-)
-
-RESULT = {"corrected_texts": decoded_outputs}
+RESULT = {"output_texts": output_texts}

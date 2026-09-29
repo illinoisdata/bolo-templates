@@ -1,17 +1,29 @@
 {% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("tchewik/isanlp_rst_v3") %}
+{% set image_path = image_path|default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+{% set text = text|default('This is a short document.') %}
 repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text = "{{ text }}"
 
-import json
-from huggingface_hub import hf_hub_download, list_repo_files
+import os
+from PIL import Image
+from huggingface_hub import hf_hub_download
 
-files = list_repo_files(repo_id)
-config = {}
-if "config.json" in files:
-    config_path = hf_hub_download(repo_id, "config.json")
-    with open(config_path, "r") as fp:
-        config = json.load(fp)
+local_example = hf_hub_download(repo_id=repo_id, filename='example-image.png')
+repo_dir = os.path.dirname(local_example)
 
-print(json.dumps({"files": files, "config": config}, indent=2))
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
 
-RESULT = {"files": files}
+RESULT = {
+    "repo_dir": repo_dir,
+    "example_image_size": Image.open(local_example).convert('RGB').size,
+    "input_image_size": image.size,
+    "text": text,
+}

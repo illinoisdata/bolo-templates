@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("katuni4ka/tiny-random-orion") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, pipeline
+
+model_id = model
+config = AutoConfig.from_pretrained(model_id, trust_remote_code=True, rope_scaling=None)
+tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(model_id, config=config, trust_remote_code=True)
+model = model.to(device)
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt, do_sample=False, use_cache=False)

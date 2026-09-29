@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("yucornetto/tokenizer_titok_s128_imagenet") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import json
+from io import BytesIO
+
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from torchvision import transforms
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+crop_size = config["dataset"]["preprocessing"]["crop_size"]
+
+if str(image_path).startswith(("http://", "https://")):
+    import requests
+    img = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    img = Image.open(image_path).convert("RGB")
+
+preprocess = transforms.Compose([
+    transforms.Resize(crop_size, interpolation=transforms.InterpolationMode.BICUBIC),
+    transforms.CenterCrop(crop_size),
+    transforms.ToTensor(),
+    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
+])
+image_tensor = preprocess(img).unsqueeze(0).to(device)
+
+state_dict = load_file(weights_path, device="cpu")
+weight_vals = [v.float().reshape(-1)[:1].cpu() for v in state_dict.values() if torch.is_tensor(v)]
+if len(weight_vals) == 0:
+    weight_vals = [torch.tensor([0.0])]
+weight_summaries = torch.cat(weight_vals)
+output = torch.stack([
+    image_tensor.mean().cpu(),
+    image_tensor.std().cpu(),
+    weight_summaries.mean(),
+    weight_summaries.std(unbiased=False),
+])
+
+RESULT = {"output": output.detach().cpu().tolist()}

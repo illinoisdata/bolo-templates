@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("timpal0l/mdeberta-v3-base-squad2") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Where do I live?') %}
+{% set context = context | default('My name is Tim and I live in Sweden.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+import torch
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+
+# load tokenizer/model
+_tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+_model = AutoModelForQuestionAnswering.from_pretrained(repo_id)
+_model.to(device)
+_model.eval()
+
+inputs = _tokenizer(question, context, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = _model(**inputs)
+
+start_idx = int(torch.argmax(outputs.start_logits, dim=-1).item())
+end_idx = int(torch.argmax(outputs.end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+answer_tokens = inputs["input_ids"][0, start_idx:end_idx + 1]
+answer = _tokenizer.decode(answer_tokens, skip_special_tokens=True)
+
+RESULT = {"answer": answer, "start_logits": outputs.start_logits[0].detach().cpu().tolist(), "end_logits": outputs.end_logits[0].detach().cpu().tolist()}

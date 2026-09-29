@@ -1,40 +1,42 @@
-{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
 {% set repo_id = repo_id | default("vikp/surya_det2") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set device = device | default("cuda:0") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 
-from io import BytesIO
-from pathlib import Path
-
-import requests
-from PIL import Image
+import os
+import numpy as np
 import torch
-from torch.nn.functional import interpolate
-from transformers import AutoImageProcessor, AutoModelForSemanticSegmentation
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from transformers import AutoImageProcessor, SegformerForSemanticSegmentation
 
-torch_device = torch.device(device)
-processor = AutoImageProcessor.from_pretrained(repo_id)
-model = AutoModelForSemanticSegmentation.from_pretrained(repo_id, ignore_mismatched_sizes=True).to(torch_device)
+# Download model files
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+# Load processor and model
+processor = AutoImageProcessor.from_pretrained(repo_id, local_files_only=False)
+model = SegformerForSemanticSegmentation.from_pretrained(repo_id, local_files_only=False, ignore_mismatched_sizes=True)
+model.to(device)
 model.eval()
 
-is_url = image_path.startswith("http://") or image_path.startswith("https://")
-if is_url:
-    response = requests.get(image_path)
-    image = Image.open(BytesIO(response.content)).convert("RGB")
+# Load input image
+if image_path.startswith(("http://", "https://")):
+    import requests
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
 else:
     image = Image.open(image_path).convert("RGB")
 
-inputs = processor(image, return_tensors="pt")
-inputs = {k: v.to(torch_device) for k, v in inputs.items()}
+inputs = processor(images=image, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
 with torch.no_grad():
     outputs = model(**inputs)
 
 logits = outputs.logits
-seg = torch.argmax(logits, dim=1).float().unsqueeze(1)
-seg_resized = interpolate(seg, size=image.size[::-1], mode="nearest").squeeze(1).to(torch.int64)
-segmentation = seg_resized[0].cpu().numpy()
-segmentation_image = Image.fromarray(segmentation.astype("uint8"))
+pred = torch.argmax(logits, dim=1)
 
-RESULT = {"segmentation": segmentation_image}
+RESULT = {"logits": logits.detach().cpu().numpy(), "prediction": pred.detach().cpu().numpy()}

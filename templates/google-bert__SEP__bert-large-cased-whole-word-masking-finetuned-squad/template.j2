@@ -1,0 +1,42 @@
+{% set repo_id = repo_id | default("google-bert/bert-large-cased-whole-word-masking-finetuned-squad") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What does BERT stand for?') %}
+{% set context = context | default('BERT stands for Bidirectional Encoder Representations from Transformers. It was developed by Google.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = {{ question | tojson }}
+context = {{ context | tojson }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+# Ensure model files are present; tokenizer loads from repo id using cached files.
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForQuestionAnswering.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits
+end_logits = outputs.end_logits
+start_idx = int(torch.argmax(start_logits, dim=-1).item())
+end_idx = int(torch.argmax(end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+
+input_ids = inputs["input_ids"][0][start_idx:end_idx + 1]
+answer = tokenizer.decode(input_ids, skip_special_tokens=True)
+
+RESULT = {"answer": answer, "start_logits": start_logits.detach().cpu().numpy(), "end_logits": end_logits.detach().cpu().numpy()}

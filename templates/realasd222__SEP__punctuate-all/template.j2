@@ -1,0 +1,56 @@
+{% set repo_id = repo_id | default("realasd222/punctuate-all") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('hello how are you doing today i hope everything is fine') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import json
+import numpy as np
+from huggingface_hub import hf_hub_download
+from tokenizers import Tokenizer
+import onnxruntime as ort
+
+onnx_filename = hf_hub_download(repo_id=repo_id, filename="onnx/model_quantized.onnx")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+id2label = {int(k): v for k, v in config["id2label"].items()}
+
+tokenizer = Tokenizer.from_file(tokenizer_path)
+providers = ["CUDAExecutionProvider", "CPUExecutionProvider"] if device.startswith("cuda") else ["CPUExecutionProvider"]
+sess_options = ort.SessionOptions()
+sess_options.intra_op_num_threads = 1
+sess_options.inter_op_num_threads = 1
+session = ort.InferenceSession(onnx_filename, sess_options=sess_options, providers=providers)
+
+encoded = tokenizer.encode(text)
+input_ids = np.array([encoded.ids], dtype=np.int64)
+attention_mask = np.array([encoded.attention_mask], dtype=np.int64)
+
+inputs = {inp.name: arr for inp, arr in zip(session.get_inputs(), [input_ids, attention_mask])}
+logits = session.run(None, inputs)[0]
+pred_ids = logits.argmax(axis=-1)[0]
+
+words = []
+current = ""
+for token, pred_id in zip(encoded.tokens, pred_ids):
+    label = id2label[int(pred_id)]
+    if token in {"<s>", "</s>", "<pad>"}:
+        continue
+    if token.startswith("▁"):
+        if current:
+            words.append(current)
+        current = token[1:]
+    else:
+        current += token
+    if label != "0":
+        current += label
+if current:
+    words.append(current)
+
+punctuated_text = " ".join(words)
+RESULT = {"text": punctuated_text}

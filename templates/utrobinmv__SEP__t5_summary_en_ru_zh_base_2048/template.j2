@@ -1,40 +1,49 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("utrobinmv/t5_summary_en_ru_zh_base_2048") %}
-{% set input_text = input_text | default("Videos say approved vaccines are dangerous, but evidence shows otherwise.") %}
-{% set prompt_prefix = prompt_prefix | default("summary: ") %}
-{% set max_new_tokens = max_new_tokens | default(200) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Videos that say approved vaccines are dangerous and cause autism, cancer or infertility are among those that will be taken down, the company said. The policy includes the termination of accounts of anti-vaccine influencers. Tech giants have been criticised for not doing more to counter false health information on their sites.') %}
+{% set prefix = prefix | default('summary: ') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set do_sample = do_sample | default(false) %}
 {% set num_beams = num_beams | default(4) %}
-{% set max_source_length = max_source_length | default(2048) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = {{ input_text | tojson }}
-prompt_prefix = {{ prompt_prefix | tojson }}
+text = "{{ text }}"
+prefix = "{{ prefix }}"
 max_new_tokens = {{ max_new_tokens }}
+do_sample = {{ do_sample }}
 num_beams = {{ num_beams }}
-max_source_length = {{ max_source_length }}
 
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+added_tokens_file = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+special_tokens_map_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+generation_config_file = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    repo_id,
+    local_files_only=True,
+    torch_dtype=torch.float32,
+)
+model.to(device)
 model.eval()
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
 
-prompt = prompt_prefix + input_text
-encoded_inputs = tokenizer(
-    prompt,
-    return_tensors="pt",
-    truncation=True,
-    max_length=max_source_length,
-)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True, use_fast=False, legacy=True)
+inputs = tokenizer(prefix + text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_tokens = model.generate(
-    **encoded_inputs,
-    max_new_tokens=max_new_tokens,
-    num_beams=num_beams,
-)
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=do_sample,
+        num_beams=num_beams,
+    )
 
-decoded_outputs = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-RESULT = {"summaries": decoded_outputs}
+output_text = tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
+RESULT = {"output": output_text}

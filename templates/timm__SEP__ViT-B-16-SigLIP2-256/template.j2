@@ -1,0 +1,45 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set labels_list = labels_list | default(['a dog', 'a cat', 'a donut', 'a beignet']) %}
+{% set repo_id = repo_id | default("timm/ViT-B-16-SigLIP2-256") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+labels_list = {{ labels_list }}
+
+import os
+import torch
+from PIL import Image
+from urllib.parse import urlparse
+from urllib.request import urlopen
+from huggingface_hub import hf_hub_download
+from open_clip import create_model_from_pretrained, get_tokenizer
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model, preprocess = create_model_from_pretrained(f"hf-hub:{repo_id}", device=device)
+tokenizer = get_tokenizer(f"hf-hub:{repo_id}")
+
+image_tensor = preprocess(image).unsqueeze(0).to(device)
+text = tokenizer(labels_list, context_length=model.context_length).to(device)
+
+with torch.no_grad():
+    if device.startswith("cuda"):
+        autocast_ctx = torch.cuda.amp.autocast()
+    else:
+        autocast_ctx = torch.autocast(device_type="cpu", dtype=torch.bfloat16)
+    with autocast_ctx:
+        image_features = model.encode_image(image_tensor, normalize=True)
+        text_features = model.encode_text(text, normalize=True)
+        text_probs = torch.sigmoid(image_features @ text_features.T * model.logit_scale.exp() + model.logit_bias)
+
+RESULT = {"labels": labels_list, "probabilities": text_probs[0].detach().cpu().tolist()}

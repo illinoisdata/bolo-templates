@@ -1,60 +1,45 @@
+{% set sentence1 = sentence1 | default('Earth observation satellites provide valuable data for climate monitoring.') %}
+{% set sentence2 = sentence2 | default('Satellite imagery can help track changes in global weather patterns.') %}
 {% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("nasa-impact/indus-sde-st-v0.2") %}
-{% set input_text_a = input_text_a | default("NASA is preparing missions to study Martian sample return strategies.") %}
-{% set input_text_b = input_text_b | default("Martian sample return is a priority for NASA's scientific program.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text_a = "{{ input_text_a }}"
-input_text_b = "{{ input_text_b }}"
+sentence1 = "{{ sentence1 }}"
+sentence2 = "{{ sentence2 }}"
 
-from pathlib import Path
-import json
-
+import os
 import torch
-import torch.nn.functional as F
-from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModel
 
-def mean_pooling(model_output, attention_mask):
-    token_embeddings = model_output.last_hidden_state
-    expanded_mask = (
-        attention_mask.unsqueeze(-1)
-        .expand(token_embeddings.size())
-        .float()
-    )
-    sum_embeddings = torch.sum(token_embeddings * expanded_mask, dim=1)
-    sum_mask = expanded_mask.sum(dim=1).clamp(min=1e-9)
-    return sum_embeddings / sum_mask
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_file = hf_hub_download(repo_id=repo_id, filename="merges.txt")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
-encoded_inputs = tokenizer(
-    [input_text_a, input_text_b],
-    padding=True,
-    truncation=True,
-    return_tensors="pt",
-)
-encoded_inputs = {
-    key: tensor.to(device) for key, tensor in encoded_inputs.items()
-}
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_file), use_fast=True)
+model = AutoModel.from_pretrained(repo_id, torch_dtype=torch.bfloat16 if torch.cuda.is_available() and "cuda" in device else None)
+model.to(device)
+model.eval()
+
+inputs = tokenizer([sentence1, sentence2], padding=True, truncation=True, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    model_outputs = model(**encoded_inputs)
-
-sentence_embeddings = mean_pooling(
-    model_outputs, encoded_inputs["attention_mask"]
-)
-
-embedding_values = [embedding.cpu().tolist() for embedding in sentence_embeddings]
-similarity_score = float(
-    F.cosine_similarity(
-        sentence_embeddings[0:1],
-        sentence_embeddings[1:2],
-        dim=1,
-    ).item()
-)
+    outputs = model(**inputs)
+    last_hidden = outputs.last_hidden_state.float()
+    attention_mask = inputs["attention_mask"].unsqueeze(-1).float()
+    masked = last_hidden * attention_mask
+    embeddings = masked.sum(dim=1) / attention_mask.sum(dim=1).clamp(min=1)
+    embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
+    similarity = torch.nn.functional.cosine_similarity(embeddings[0], embeddings[1], dim=0)
 
 RESULT = {
-    "sentence_embeddings": embedding_values,
-    "similarity_score": similarity_score,
+    "embeddings": embeddings.detach().cpu().numpy(),
+    "similarity": similarity.detach().cpu().item(),
 }

@@ -1,0 +1,61 @@
+{% set repo_id = repo_id | default("Andron00e/YetAnother_Open-Llama-3B-LoRA-OpenOrca") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Question: What is the capital of France? Answer:') %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
+{% set do_sample = do_sample | default(false) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.9) %}
+{% set torch_dtype = torch_dtype | default('bfloat16') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+do_sample = {{ do_sample }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+torch_dtype = "{{ torch_dtype }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.model")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+model_dir = os.path.dirname(model_path)
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+model = AutoModelForCausalLM.from_pretrained(
+    model_dir,
+    torch_dtype=getattr(torch, torch_dtype),
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=do_sample,
+        temperature=temperature if do_sample else None,
+        top_p=top_p if do_sample else None,
+        pad_token_id=tokenizer.eos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+RESULT = {"text": output_text}

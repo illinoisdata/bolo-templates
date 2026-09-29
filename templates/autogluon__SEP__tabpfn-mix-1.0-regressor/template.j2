@@ -1,0 +1,73 @@
+{% set repo_id = repo_id | default("autogluon/tabpfn-mix-1.0-regressor") %}
+{% set device = device | default("cuda:0") %}
+{% set n_rows = n_rows | default(8) %}
+{% set n_features = n_features | default(6) %}
+{% set seed = seed | default(0) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+n_rows = {{ n_rows }}
+n_features = {{ n_features }}
+seed = {{ seed }}
+
+import json
+import math
+import os
+import numpy as np
+import pandas as pd
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+state_dict = load_file(weights_path, device="cpu")
+
+class TabPFNMixRegressor(torch.nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.n_features = int(config["n_features"])
+        self.dim = int(config["dim"])
+        self.n_layers = int(config["n_layers"])
+        self.n_heads = int(config["n_heads"])
+        self.feature_proj = torch.nn.Linear(1, self.dim)
+        self.layers = torch.nn.ModuleList([
+            torch.nn.TransformerEncoderLayer(
+                d_model=self.dim,
+                nhead=self.n_heads,
+                dim_feedforward=self.dim * 4,
+                dropout=float(config.get("attn_dropout", 0.0)),
+                batch_first=True,
+                activation="gelu",
+                norm_first=True,
+            )
+            for _ in range(self.n_layers)
+        ])
+        self.head = torch.nn.Sequential(
+            torch.nn.LayerNorm(self.dim),
+            torch.nn.Linear(self.dim, 1),
+        )
+
+    def forward(self, x):
+        h = self.feature_proj(x.unsqueeze(-1))
+        for layer in self.layers:
+            h = layer(h)
+        pooled = h.mean(dim=1)
+        return self.head(pooled).squeeze(-1)
+
+model = TabPFNMixRegressor(config)
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
+model.eval()
+
+torch.manual_seed(seed)
+np.random.seed(seed)
+X = torch.randn(n_rows, n_features, device=device)
+
+with torch.no_grad():
+    output = model(X)
+
+RESULT = {"predictions": output.detach().cpu().numpy().tolist(), "missing_keys": missing, "unexpected_keys": unexpected}

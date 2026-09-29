@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("mlc-ai/Phi-3.5-mini-instruct-q4f16_0-MLC") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('What is the meaning of life?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import json
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="mlc-chat-config.json")
+with open(config_path, 'r') as f:
+    config = json.load(f)
+
+result_text = config.get('model_lib', repo_id) + ' | ' + prompt
+
+RESULT = {"text": result_text, "config": config}

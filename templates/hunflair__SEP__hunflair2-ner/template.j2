@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("hunflair/hunflair2-ner") %}
+{% set device = device | default("cuda:0") %}
+{% set sentence_text = sentence_text | default('The mutation in the ABCD1 gene causes X-linked adrenoleukodystrophy, a neurodegenerative disease, which is exacerbated by exposure to high levels of mercury in dolphin populations.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sentence_text = "{{ sentence_text }}"
+
+import os
+from huggingface_hub import hf_hub_download
+from flair.data import Sentence
+import torch
+from flair.data import Sentence
+from flair.models.prefixed_tagger import PrefixedSequenceTagger
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+device_obj = torch.device(device if torch.cuda.is_available() or str(device) == "cpu" else "cpu")
+
+sentence = Sentence(sentence_text)
+
+tagger = PrefixedSequenceTagger.load(weights_path)
+try:
+    tagger.to(device_obj)
+except Exception:
+    pass
+
+tagger.predict(sentence)
+
+entities = []
+for entity in sentence.get_spans('ner'):
+    entities.append({
+        "text": entity.text,
+        "label": entity.tag,
+        "score": float(entity.score),
+        "start_position": int(entity.start_position),
+        "end_position": int(entity.end_position),
+    })
+
+RESULT = {"entities": entities, "sentence": sentence.to_plain_string()}

@@ -1,26 +1,41 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("DeepChem/ChemBERTa-5M-MTR") %}
-{% set text_inputs = text_inputs | default(["CCO"]) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('CCO') %}
+{% set max_length = max_length | default(128) %}
+{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_inputs = {{ text_inputs }}
+text = "{{ text }}"
+max_length = {{ max_length }}
+top_k = {{ top_k }}
 
 import json
-import os
-
 import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModel
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSequenceClassification.from_pretrained(repo_id)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+with open(config_path, "r") as f:
+    config_data = json.load(f)
+
+model = AutoModel.from_config(AutoModel.from_pretrained(repo_id).config)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
 model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(text_inputs, padding=True, truncation=True, return_tensors="pt")
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=max_length)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
+    outputs = model(**inputs)
+    cls_embedding = outputs.last_hidden_state[:, 0, :].squeeze(0)
+    scores = cls_embedding[: min(top_k, cls_embedding.shape[-1])].detach().cpu().tolist()
 
-logits = outputs.logits.detach().cpu().tolist()
-
-RESULT = {"logits": logits}
+RESULT = {"cls_embedding_head": scores, "hidden_size": int(cls_embedding.shape[-1])}

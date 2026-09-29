@@ -1,35 +1,33 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("peft-internal-testing/tiny-clip-text-2") %}
-{% set prompt = prompt | default("A minimalist description of a cat") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('a photo of a cat') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
+text = "{{ text }}"
 
-from pathlib import Path
-import json
-
+import os
 import torch
 from transformers import AutoTokenizer, CLIPTextModelWithProjection
+from huggingface_hub import hf_hub_download
 
-device = torch.device(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = CLIPTextModelWithProjection.from_pretrained(repo_id)
-model = model.to(device)
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_path), local_files_only=True)
+model = CLIPTextModelWithProjection.from_pretrained(os.path.dirname(config_path), local_files_only=True)
+model.to(device)
+model.eval()
 
-inputs = tokenizer(
-    prompt,
-    padding="max_length",
-    truncation=True,
-    max_length=tokenizer.model_max_length,
-    return_tensors="pt",
-)
-inputs = {key: value.to(device) for key, value in inputs.items()}
-
+inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
     outputs = model(**inputs)
 
-text_embeddings = outputs.text_embeds
-text_embeddings = text_embeddings[0].cpu().tolist()
+output_value = outputs.text_embeds.detach().cpu().numpy()
 
-RESULT = {"text_embeddings": text_embeddings}
+RESULT = {"text_embeds": output_value}

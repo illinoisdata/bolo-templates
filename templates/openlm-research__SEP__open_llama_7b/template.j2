@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("openlm-research/open_llama_7b") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set model = model | default(repo_id) %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set use_fast = use_fast | default(False) %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+use_fast = {{ use_fast | tojson | replace('false', 'False') | replace('true', 'True') }}
+
+from transformers import LlamaTokenizer, pipeline
+
+tokenizer = LlamaTokenizer.from_pretrained(model, use_fast=use_fast)
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt)

@@ -1,42 +1,27 @@
 {% set repo_id = repo_id | default("bmd1905/vietnamese-correction-v2") %}
 {% set device = device | default("cuda:0") %}
-{% set text_samples = [
-    "côn viec kin doanh thì rất kho khan nên toi quyết dinh chuyển sang nghề khac",
-    "toi dang là sinh diên nam hai ở truong đạ hoc khoa jọc tự nhiên , trogn năm ke tiep toi sẽ chọn chuyen nganh về trí tue nhana tạo",
-    "Tôi đang học AI ở trun tam AI viet nam",
-    "Nhưng sức huỷ divt của cơn bão mitch vẫn chưa thấm vào đâu lsovớithảm hoạ tại Bangladesh ăm 1970",
-    "Lần này anh Phươngqyết xếp hàng mua bằng được 1 chiếc",
-    "một số chuyen gia tài chính ngâSn hànG của Việt Nam cũng chung quan điểmnày",
-    "Cac so liệu cho thay ngươi dân viet nam đang sống trong 1 cuôc sóng không duojc nhu mong đọi",
-    "Nefn kinh té thé giới đang đúng trươc nguyen co của mọt cuoc suy thoai",
-    "Khong phai tất ca nhưng gi chung ta thấy dideu là sụ that",
-    "chinh phủ luôn cố găng het suc để naggna cao chat luong nền giáo duc cua nuoc nhà",
-    "nèn kinh te thé giới đang đứng trươc nguy co của mọt cuoc suy thoai",
-    "kinh tế viet nam dang dứng truoc 1 thoi ky đổi mơi chưa tung có tienf lệ trong lịch sử"
-] %}
-{% set max_length = max_length | default(512) %}
+{% set text = text | default("côn viec kin doanh thì rất kho khan nên toi quyết dinh chuyển sang nghề khac  ") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_samples = {{ text_samples | tojson }}
-max_length = {{ max_length }}
+text = "{{ text }}"
 
-import os
+import torch
+from transformers import MBartForConditionalGeneration, BartphoTokenizer
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+tokenizer = BartphoTokenizer.from_pretrained(repo_id)
+model = MBartForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+inputs = tokenizer([text], return_tensors="pt", padding=True, truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_length=512,
+        num_beams=4,
+    )
+output_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
 
-inputs = tokenizer(
-    text_samples,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-    max_length=max_length,
-)
-inputs = {key: value.to(device) for key, value in inputs.items()}
-
-generated_tokens = model.generate(**inputs, max_length=max_length)
-corrected_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-
-RESULT = {"corrected_texts": corrected_texts}
+RESULT = {"output": output_text}

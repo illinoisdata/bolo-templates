@@ -1,0 +1,73 @@
+{% set repo_id = repo_id | default("koboldcpp/mmproj") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('qwen2.5-vl-7b-vision-mmproj-f16.gguf') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set prompt = prompt | default('Describe the image in one sentence.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+
+import os
+import urllib.request
+from pathlib import Path
+from PIL import Image
+import numpy as np
+from huggingface_hub import hf_hub_download
+import gguf
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+reader = gguf.GGUFReader(model_path)
+fields = reader.fields
+
+def get_str(key, default=''):
+    if key in fields:
+        val = fields[key].parts[0]
+        if isinstance(val, bytes):
+            return val.decode('utf-8', errors='ignore')
+        return str(val)
+    return default
+
+def get_arr(key):
+    if key in fields:
+        parts = fields[key].parts
+        out = []
+        for x in parts:
+            if isinstance(x, bytes):
+                out.append(x.decode('utf-8', errors='ignore'))
+            else:
+                out.append(str(x))
+        return out
+    return []
+
+arch = get_str('general.architecture', '')
+mmproj = {
+    'repo_id': repo_id,
+    'filename': quant_filename,
+    'architecture': arch,
+    'description': get_str('general.description', ''),
+    'block_count': int(fields['n_layer'].parts[0]) if 'n_layer' in fields else None,
+    'embedding_length': int(fields['embedding_length'].parts[0]) if 'embedding_length' in fields else None,
+    'feed_forward_length': int(fields['feed_forward_length'].parts[0]) if 'feed_forward_length' in fields else None,
+    'attention_head_count': int(fields['attention.head_count'].parts[0]) if 'attention.head_count' in fields else None,
+    'rope_dimension_count': int(fields['attention.head_count_kv'].parts[0]) if 'attention.head_count_kv' in fields else None,
+    'rope_freq_base': float(fields['rope.freq_base'].parts[0]) if 'rope.freq_base' in fields else None,
+    'image_token_count': int(fields['clip.vision.image_token_count'].parts[0]) if 'clip.vision.image_token_count' in fields else None,
+    'mmproj_type': get_str('clip.vision.proj_type', ''),
+}
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    with urllib.request.urlopen(image_path) as response:
+        image = Image.open(response).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+image_array = np.array(image)
+RESULT = {
+    'mmproj_metadata': mmproj,
+    'image_size': image.size,
+    'image_mode': image.mode,
+    'image_array': image_array,
+    'prompt': prompt,
+}

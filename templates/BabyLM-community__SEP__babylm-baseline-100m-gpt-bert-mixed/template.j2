@@ -1,0 +1,75 @@
+{% set repo_id = repo_id | default("BabyLM-community/babylm-baseline-100m-gpt-bert-mixed") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt_text = prompt_text | default('The quick brown fox') %}
+{% set max_new_tokens = max_new_tokens | default(12) %}
+{% set mask_text = mask_text | default('The quick brown [MASK]') %}
+{% set top_k = top_k | default(5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt_text = "{{ prompt_text }}"
+max_new_tokens = {{ max_new_tokens }}
+mask_text = "{{ mask_text }}"
+top_k = {{ top_k }}
+
+import os
+import sys
+import torch
+from huggingface_hub import hf_hub_download
+from importlib.util import spec_from_file_location, module_from_spec
+
+config_path = hf_hub_download(repo_id=repo_id, filename="configuration_gpt_bert.py")
+modeling_path = hf_hub_download(repo_id=repo_id, filename="modeling_gpt_bert.py")
+repo_root = os.path.dirname(config_path)
+sys.path.insert(0, repo_root)
+
+spec_cfg = spec_from_file_location("{{ repo_id }}.configuration_gpt_bert", config_path)
+configuration_gpt_bert = module_from_spec(spec_cfg)
+sys.modules[spec_cfg.name] = configuration_gpt_bert
+spec_cfg.loader.exec_module(configuration_gpt_bert)
+
+spec_model = spec_from_file_location("{{ repo_id }}.modeling_gpt_bert", modeling_path)
+modeling_gpt_bert = module_from_spec(spec_model)
+sys.modules[spec_model.name] = modeling_gpt_bert
+spec_model.loader.exec_module(modeling_gpt_bert)
+
+config = configuration_gpt_bert.ModelConfig.from_pretrained(repo_root)
+if not hasattr(config, "max_position_embeddings"):
+    config.max_position_embeddings = 512
+if not hasattr(config, "num_hidden_layers"):
+    config.num_hidden_layers = 12
+if not hasattr(config, "num_layers"):
+    config.num_layers = config.num_hidden_layers
+state_dict = torch.load(hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin"), map_location=device)
+model = modeling_gpt_bert.GPTBERTForCausalLM(config)
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
+
+def encode(text):
+    return torch.tensor([[ord(c) % config.vocab_size for c in text]], dtype=torch.long, device=device)
+
+def decode(ids):
+    return ''.join(chr(int(i)) for i in ids if int(i) != 0)
+
+inputs = encode(prompt_text)
+with torch.no_grad():
+    generated = inputs.clone()
+    for _ in range(max_new_tokens):
+        out = model(input_ids=generated)
+        logits = out[0] if isinstance(out, tuple) else out.logits
+        next_token = torch.argmax(logits[:, -1, :], dim=-1, keepdim=True)
+        generated = torch.cat([generated, next_token], dim=1)
+    generated_text = decode(generated[0].tolist())
+
+mask_inputs = encode(mask_text)
+masked_predictions = []
+with torch.no_grad():
+    out = model(input_ids=mask_inputs)
+    logits = out[0] if isinstance(out, tuple) else out.logits
+    for idx, ch in enumerate(mask_text):
+        if ch == '[' and mask_text[idx:idx+6] == '[MASK]':
+            top_ids = torch.topk(logits[0, idx], k=top_k).indices.tolist()
+            masked_predictions.append([str(t) for t in top_ids])
+            break
+
+RESULT = {"generated_text": generated_text, "masked_predictions": masked_predictions}

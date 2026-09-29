@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("Intel/dynamic_tinybert") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default("What is the number I told you?") %}
+{% set context = context | default("remember the number 123456, I'll ask you later.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = {{ question | tojson }}
+context = {{ context | tojson }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+model = AutoModelForQuestionAnswering.from_pretrained(repo_id, local_files_only=True)
+state_dict = torch.load(weights_path, map_location="cpu")
+state_dict = {k: v for k, v in state_dict.items() if not k.startswith("fit_dense.") and k != "bert.embeddings.position_ids"}
+model.load_state_dict(state_dict, strict=False)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits
+end_logits = outputs.end_logits
+start_idx = int(torch.argmax(start_logits, dim=-1).item())
+end_idx = int(torch.argmax(end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+answer_ids = inputs["input_ids"][0, start_idx:end_idx + 1].detach().cpu().tolist()
+answer = tokenizer.decode(answer_ids, skip_special_tokens=True).strip()
+
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx}

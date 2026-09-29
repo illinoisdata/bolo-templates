@@ -1,52 +1,56 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("recogna-nlp/ptt5-base-summ-xlsum") %}
-{% set text_input = text_input | default("""O homem, Wilmer Antonio Marin, conhecido como Hugo, seria um alto comandante das Forças Armadas Revolucionárias da Colômbia (Farc), o maior grupo rebelde do país. Ele é acusado de ter perpetrado um ataque num clube noturno em fevereiro que matou 35 pessoas e feriu 160. Hugo também estaria envolvido no assassinato do empresário japonês Chikao Muramatsu que foi encontrado morto a tiros em novembro, quase três anos depois de ter sido seqüestrado. Golpe O resgate de US$ 19 milhões (R$ 55 milhões) tinha sido pedido para a libertação de Muramatsu. As autoridades colombianas acreditam que a detenção de Hugo representa um grande golpe na estrutura da Farc em Bogotá. Wilmer Antonio Marin é acusado de administrar uma rede de seqüestros que teria, como alvo, empresários ricos e estrangeiros. Ele seria reponsável por seqüestrá-los no meio da rua e levá-los para as montanhas onde a guerrilha tem suas bases.""") %}
-{% set min_length = min_length | default(32) %}
-{% set max_length = max_length | default(256) %}
-{% set num_beams = num_beams | default(5) %}
-{% set top_k = top_k | default(5) %}
-{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("""
+A tendência de queda da taxa de juros no Brasil é real, é visível”, disse Meirelles, que participou na capital americana de uma série de reuniões e encontros com banqueiros e investidores que aconteceram paralelamente às reuniões do Fundo Monetário Internacional (FMI) e do Banco Mundial (Bird) no fim de semana.
+Para o presidente do BC, a atual política econômica do governo e a manutenção da taxa de inflação dentro da meta são fatores que garantem queda na taxa de juros a longo prazo.
+“Mas é importante que nós não olhemos para isso apenas no curto prazo. Temos que olhar no médio e longo prazos”, disse Meirelles.
+Para ele, o trabalho que o Banco Central tem feito para conter a inflação dentro da meta vai gerar queda gradual da taxa de juros.
+BC do ano
+Neste domingo, Meirelles participou da cerimônia de entrega do prêmio “Banco Central do ano”, oferecido pela revista The Banker à instituição que preside.
+“Este é um sinal importante de reconhecimento do nosso trabalho, de que o Brasil está indo na direção correta”, disse ele.
+Segundo Meirelles, o Banco Central do Brasil está sendo percebido como uma instituição comprometida com a meta de inflação.
+“Isso tem um ganho importante, na medida em que os agentes formadores de preços começam a apostar que a inflação vai estar na meta, que isso é levado a sério no Brasil”, completou.
+O presidente do Banco Central disse ainda que a crise política brasileira não foi um assunto de interesse prioritário dos investidores que encontrou no fim de semana.
+""") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = {{ text_input | tojson }}
-min_length = {{ min_length }}
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-top_k = {{ top_k }}
-no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+text = r"""{{ text }}"""
+max_length = 256
+min_length = 32
+num_beams = 5
+no_repeat_ngram_size = 3
 
-from pathlib import Path
-
+import os
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import T5Tokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-device = torch.device(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+model_dir = os.path.dirname(model_path)
+
+tokenizer = T5Tokenizer.from_pretrained(model_dir)
+target_device = device if (device.startswith("cuda") and torch.cuda.is_available()) else "cpu"
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir).to(target_device)
 model.eval()
 
-encoded_inputs = tokenizer(
-    text_input,
-    return_tensors="pt",
-    truncation=True,
-    max_length=512,
-)
-encoded_inputs = {key: tensor.to(device) for key, tensor in encoded_inputs.items()}
-
-generation_kwargs = {
-    "max_length": max_length,
-    "min_length": min_length,
-    "num_beams": num_beams,
-    "no_repeat_ngram_size": no_repeat_ngram_size,
-}
-if top_k is not None:
-    generation_kwargs["top_k"] = top_k
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(target_device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    summary_ids = model.generate(**encoded_inputs, **generation_kwargs)
+    summary_ids = model.generate(
+        **inputs,
+        max_length=max_length,
+        min_length=min_length,
+        num_beams=num_beams,
+        no_repeat_ngram_size=no_repeat_ngram_size,
+        early_stopping=True,
+    )
 
-summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+output_text = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
 
-RESULT = {"summary": summary}
+RESULT = {"summary": output_text}

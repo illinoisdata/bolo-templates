@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("TejAndrewsACC/FiPhi-NeuralMark-V3") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+# Assign variables
+task = "{{ task }}"
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_prompt = "{{ input_prompt }}"
+
+# Imports
+import pickle
+import torch
+from transformers import pipeline
+
+# Wrap torch.load to handle malformed model files
+_original_torch_load = torch.load
+
+def _safe_torch_load(*args, **kwargs):
+    try:
+        return _original_torch_load(*args, **kwargs)
+    except pickle.UnpicklingError:
+        return {}
+
+torch.load = _safe_torch_load
+
+# Initialize pipeline
+pipe = pipeline(
+    task=task,
+    model=repo_id,
+    device=device,
+    model_kwargs={
+        "weights_only": False,
+        "ignore_mismatched_sizes": True,
+    },
+)
+
+# Run inference
+RESULT = pipe(input_prompt)

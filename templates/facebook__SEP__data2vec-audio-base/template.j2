@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("facebook/data2vec-audio-base") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set input_audio = input_audio | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_audio = "{{ input_audio }}"
+
+from transformers import pipeline, AutoFeatureExtractor
+import soundfile as sf
+
+class AudioFeatureTokenizer:
+    def __init__(self, extractor):
+        self.extractor = extractor
+        self.sampling_rate = extractor.sampling_rate
+
+    def __call__(self, audio_input, return_tensors="pt", sampling_rate=None, **kwargs):
+        sampling_rate = sampling_rate or self.sampling_rate
+        return self.extractor(
+            audio_input,
+            sampling_rate=sampling_rate,
+            return_tensors=return_tensors,
+            **kwargs,
+        )
+
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+tokenizer = AudioFeatureTokenizer(feature_extractor)
+pipe = pipeline(
+    task=task,
+    model=repo_id,
+    tokenizer=tokenizer,
+    feature_extractor=feature_extractor,
+    device=device,
+)
+
+audio_samples, sampling_rate = sf.read(input_audio)
+raw_features = pipe(audio_samples, sampling_rate=sampling_rate)
+RESULT = {"features": raw_features}

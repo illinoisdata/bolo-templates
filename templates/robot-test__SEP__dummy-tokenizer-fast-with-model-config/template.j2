@@ -1,19 +1,30 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("robot-test/dummy-tokenizer-fast-with-model-config") %}
-{% set input_text = input_text | default("The quick brown fox jumps over the lazy dog.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hello, world!') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
+text = "{{ text }}"
 
-import json
-from pathlib import Path
-
+import os
+from huggingface_hub import hf_hub_download
 from transformers import AutoTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-encoded = tokenizer(input_text)
-input_ids = encoded["input_ids"]
-tokens = tokenizer.convert_ids_to_tokens(input_ids)
+# Load tokenizer from the downloaded local files.
+tokenizer = AutoTokenizer.from_pretrained(
+    os.path.dirname(tokenizer_config_path),
+    use_fast=True,
+)
 
-RESULT = {"input_ids": input_ids, "tokens": tokens}
+enc = tokenizer(text, return_tensors="pt")
+output = {
+    "input_ids": enc["input_ids"].tolist(),
+    "attention_mask": enc["attention_mask"].tolist(),
+    "tokens": tokenizer.convert_ids_to_tokens(enc["input_ids"][0]),
+}
+
+RESULT = {"output": output}

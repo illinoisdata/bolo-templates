@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("speechbrain/lang-id-voxlingua107-ecapa") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+from pathlib import Path
+import torch
+import torchaudio
+from speechbrain.inference.classifiers import EncoderClassifier
+from huggingface_hub import hf_hub_download
+
+_ = hf_hub_download(repo_id=repo_id, filename="classifier.ckpt")
+_ = hf_hub_download(repo_id=repo_id, filename="embedding_model.ckpt")
+_ = hf_hub_download(repo_id=repo_id, filename="normalizer.ckpt")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="hyperparams.yaml")
+_ = hf_hub_download(repo_id=repo_id, filename="label_encoder.txt")
+
+if audio_path.startswith(("http://", "https://")):
+    waveform, sr = torchaudio.load(torchaudio.utils.download_asset(audio_path))
+else:
+    waveform, sr = torchaudio.load(audio_path)
+
+classifier = EncoderClassifier.from_hparams(
+    source=repo_id,
+    savedir=str(Path(hf_hub_download(repo_id=repo_id, filename="classifier.ckpt")).parent),
+    run_opts={"device": device},
+)
+
+prediction = classifier.classify_batch(waveform.to(device))
+label = prediction[3][0]
+score = prediction[1].exp()[0]
+
+RESULT = {
+    "prediction": prediction,
+    "label": label,
+    "score": score.detach().cpu(),
+}

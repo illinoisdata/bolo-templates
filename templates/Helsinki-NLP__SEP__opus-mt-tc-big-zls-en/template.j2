@@ -1,37 +1,43 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-zls-en") %}
-{% set source_texts = source_texts | default(["Да не би случайно Том да остави Мери да кара колата?", "Какво е времето днес?"]) %}
-{% set max_length = max_length | default(128) %}
+{% set device = device | default("cuda:0") %}
+{% set src_text = src_text | default('Да не би случайно Том да остави Мери да кара колата?') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 {% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_texts = {{ source_texts }}
-max_length = {{ max_length }}
+src_text = {{ src_text | tojson }}
+max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
 
+from huggingface_hub import hf_hub_download
 import torch
-from pathlib import Path
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import MarianMTModel, MarianTokenizer
 
-torch_device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+# Tokenizer/model load from downloaded files
 
-inputs = tokenizer(
-    source_texts,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-    max_length=max_length,
-).to(torch_device)
+tokenizer = MarianTokenizer(vocab=vocab_path, source_spm=source_spm_path, target_spm=target_spm_path)
+model = MarianMTModel.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-generated_ids = model.generate(
-    **inputs,
-    num_beams=num_beams,
-    max_length=max_length,
-)
+if isinstance(src_text, str):
+    inputs = [src_text]
+else:
+    inputs = src_text
+
+encoded = tokenizer(inputs, return_tensors="pt", padding=True, truncation=True)
+encoded = {k: v.to(device) for k, v in encoded.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(**encoded, num_beams=num_beams, max_new_tokens=max_new_tokens)
 
 translations = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-
 RESULT = {"translations": translations}

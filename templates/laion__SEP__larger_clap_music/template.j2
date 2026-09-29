@@ -1,0 +1,24 @@
+{% set repo_id = repo_id | default("laion/larger_clap_music") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("zero-shot-audio-classification") %}
+{% set candidate_labels = candidate_labels | default(["Sound of a dog", "Sound of vaccum cleaner"]) %}
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+
+# Python variable assignments
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+candidate_labels = {{ candidate_labels | tojson }}
+audio_path = {{ audio_path | tojson }}
+
+# Imports
+from transformers import pipeline
+
+# Load pipeline
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+# Pre-process input
+input_audio = audio_path
+
+# Run inference
+RESULT = pipe(input_audio, candidate_labels=candidate_labels)

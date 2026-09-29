@@ -1,56 +1,60 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("UrukHan/t5-russian-summarization") %}
-{% set input_texts = input_texts | default(["Запад после начала российской специальной операции по демилитаризации Украины ввел несколько раундов новых экономических санкций. В Кремле новые ограничения назвали серьезными, но отметили, что Россия готовилась к ним заранее."]) %}
-{% set prefix = prefix | default("summarize: ") %}
-{% set max_length = max_length | default(200) %}
-{% set min_length = min_length | default(30) %}
+{% set device = device | default("cuda:0") %}
+{% set max_input_length = max_input_length | default(256) %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 {% set num_beams = num_beams | default(4) %}
-{% set length_penalty = length_penalty | default(2.0) %}
-{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
-{% set early_stopping = early_stopping | default(true) %}
+{% set task_prefix = task_prefix | default('summarize: ') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_texts = {{ input_texts }}
-prefix = "{{ prefix }}"
-max_length = {{ max_length }}
-min_length = {{ min_length }}
+max_input_length = {{ max_input_length }}
+max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
-length_penalty = {{ length_penalty }}
-no_repeat_ngram_size = {{ no_repeat_ngram_size }}
-early_stopping = {{ early_stopping }}
+task_prefix = "{{ task_prefix }}"
+input_text = "Запад после начала российской специальной операции по демилитаризации Украины ввел несколько раундов новых экономических санкций. В Кремле новые ограничения назвали серьезными, но отметили, что Россия готовилась к ним заранее."
 
 import os
+from urllib.parse import urlparse
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-# Pre-process input
-prefixed_texts = [prefix + text for text in input_texts]
-encoded_inputs = tokenizer(
-    prefixed_texts,
-    padding="longest",
-    truncation=True,
-    max_length=max_length,
-    return_tensors="pt",
+local_tokenizer_dir = os.path.dirname(tokenizer_path)
+
+
+def load_text(text_or_path):
+    if text_or_path.startswith("http://") or text_or_path.startswith("https://"):
+        import requests
+        return requests.get(text_or_path, timeout=30).text
+    with open(text_or_path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+tokenizer = AutoTokenizer.from_pretrained(local_tokenizer_dir, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    repo_id,
+    local_files_only=True,
+    torch_dtype=torch.float32,
 )
-input_ids = encoded_inputs.input_ids.to(device)
-attention_mask = encoded_inputs.attention_mask.to(device)
+model.to(device)
+model.eval()
 
-# Run inference
-outputs = model.generate(
-    input_ids=input_ids,
-    attention_mask=attention_mask,
-    max_length=max_length,
-    min_length=min_length,
-    num_beams=num_beams,
-    length_penalty=length_penalty,
-    no_repeat_ngram_size=no_repeat_ngram_size,
-    early_stopping=early_stopping,
-)
+inputs = tokenizer(task_prefix + input_text, return_tensors="pt", truncation=True, max_length=max_input_length)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Post-process outputs
-summaries = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+    )
 
-RESULT = {"summaries": summaries}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

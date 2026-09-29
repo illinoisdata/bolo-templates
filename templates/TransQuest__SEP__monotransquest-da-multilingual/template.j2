@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("TransQuest/monotransquest-da-multilingual") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") -%}
+{% set source_sentence = source_sentence | default("Reducerea acestor conflicte este importantă pentru conservare.") -%}
+{% set target_sentence = target_sentence | default("Reducing these conflicts is not important for preservation.") -%}
+{% set padding = padding | default(true) -%}
+{% set truncation = truncation | default(true) -%}
+
+task = {{ task | tojson }}
+source_sentence = {{ source_sentence | tojson }}
+target_sentence = {{ target_sentence | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+padding = {{ padding }}
+truncation = {{ truncation }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe((source_sentence, target_sentence), padding=padding, truncation=truncation)

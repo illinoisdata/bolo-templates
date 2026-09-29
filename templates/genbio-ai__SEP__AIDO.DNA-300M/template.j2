@@ -1,0 +1,64 @@
+{% set repo_id = repo_id | default("genbio-ai/AIDO.DNA-300M") %}
+{% set device = device | default("cuda:0") %}
+{% set sequence = sequence | default('ACGTACGTACGT') %}
+{% set max_length = max_length | default(128) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sequence = "{{ sequence }}"
+max_length = {{ max_length }}
+
+import os
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import BertConfig, BertTokenizer
+from transformers.models.bert.modeling_bert import BertForMaskedLM
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+def load_json(path):
+    with open(path, "r") as f:
+        return json.load(f)
+
+config_dict = load_json(config_path)
+config_dict["vocab_size"] = int(config_dict.get("vocab_size", 16))
+config_dict["hidden_size"] = int(config_dict.get("hidden_size", 1024))
+config_dict["num_hidden_layers"] = int(config_dict.get("num_hidden_layers", 24))
+config_dict["num_attention_heads"] = int(config_dict.get("num_attention_heads", 16))
+config_dict["intermediate_size"] = int(config_dict.get("intermediate_size", 2688))
+config_dict["max_position_embeddings"] = int(config_dict.get("max_position_embeddings", 4000))
+config_dict["type_vocab_size"] = int(config_dict.get("type_vocab_size", 2))
+config_dict["pad_token_id"] = int(config_dict.get("pad_token_id", 0))
+config_dict["hidden_act"] = "gelu"
+config_dict["architectures"] = ["BertForMaskedLM"]
+config = BertConfig(**config_dict)
+
+vocab_tokens = ["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]", "A", "C", "G", "T", "N", "a", "c", "g", "t", "n", "."]
+vocab_file = os.path.join(os.path.dirname(config_path), "vocab.txt")
+with open(vocab_file, "w") as f:
+    f.write("\n".join(vocab_tokens))
+
+tokenizer = BertTokenizer(vocab_file=vocab_file, do_lower_case=False)
+model = BertForMaskedLM(config)
+from safetensors.torch import load_file
+state_dict = load_file(weights_path)
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+if os.path.isfile(sequence):
+    with open(sequence, "r") as f:
+        sequence = f.read().strip()
+
+inputs = tokenizer(sequence, return_tensors="pt", truncation=True, max_length=max_length)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+logits = outputs.logits
+pred_ids = torch.argmax(logits, dim=-1)
+
+RESULT = {
+    "logits": logits.detach().cpu(),
+    "pred_ids": pred_ids.detach().cpu(),
+}

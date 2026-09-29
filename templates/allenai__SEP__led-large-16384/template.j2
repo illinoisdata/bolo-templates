@@ -1,38 +1,44 @@
 {% set repo_id = repo_id | default("allenai/led-large-16384") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("AllenAI's LED is designed to summarize and answer questions over long documents with 16K tokens of context. Provide a concise summary of the input content.") %}
-{% set input_max_length = input_max_length | default(4096) %}
-{% set max_new_tokens = max_new_tokens | default(256) %}
-{% set num_beams = num_beams | default(4) %}
+{% set text_input = text_input | default("The Longformer Encoder-Decoder model is designed for long documents. Summarize the following passage: AllenAI's LED can process very long inputs by extending position embeddings.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = """{{ input_text }}"""
-input_max_length = {{ input_max_length }}
-max_new_tokens = {{ max_new_tokens }}
-num_beams = {{ num_beams }}
+text_input = {{ text_input | tojson }}
 
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, LEDForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(torch_device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-tokenized_inputs = tokenizer(
-    input_text,
-    return_tensors="pt",
-    truncation=True,
-    max_length=input_max_length,
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    config=config_path,
+    tokenizer_file=None,
+    use_fast=False,
 )
-tokenized_inputs = {key: value.to(torch_device) for key, value in tokenized_inputs.items()}
+model = LEDForConditionalGeneration.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-generated_ids = model.generate(
-    **tokenized_inputs,
-    max_new_tokens=max_new_tokens,
-    num_beams=num_beams,
-)
-summary_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+inputs = tokenizer(text_input, return_tensors="pt", truncation=True, max_length=2048)
+input_ids = inputs["input_ids"].to(device)
+attention_mask = inputs["attention_mask"].to(device)
 
-RESULT = {"summary": summary_text}
+with torch.no_grad():
+    generated_ids = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        max_new_tokens=64,
+        num_beams=4,
+    )
+
+output_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"text": output_text}

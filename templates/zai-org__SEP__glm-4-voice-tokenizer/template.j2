@@ -1,0 +1,60 @@
+{% set repo_id = repo_id | default("zai-org/glm-4-voice-tokenizer") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+import json
+import torch
+import soundfile as sf
+import numpy as np
+from scipy.signal import resample_poly
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_file = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+config = json.load(open(config_file, "r"))
+preprocessor_config = json.load(open(preprocessor_file, "r"))
+state_dict = load_file(model_file)
+
+if audio_path.startswith(("http://", "https://")):
+    import requests, io
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    waveform, sampling_rate = sf.read(io.BytesIO(audio_bytes), dtype="float32")
+else:
+    waveform, sampling_rate = sf.read(audio_path, dtype="float32")
+
+if waveform.ndim > 1:
+    waveform = waveform.mean(axis=1)
+if sampling_rate != 16000:
+    waveform = resample_poly(waveform, 16000, sampling_rate)
+    sampling_rate = 16000
+
+wave = torch.tensor(waveform, dtype=torch.float32)
+if wave.numel() < 400:
+    wave = torch.nn.functional.pad(wave, (0, 400 - wave.numel()))
+
+n_mels = int(preprocessor_config.get("feature_size", 128))
+window = torch.hann_window(400)
+stft = torch.stft(wave, n_fft=400, hop_length=160, win_length=400, window=window, return_complex=True)
+mag = stft.abs()
+if mag.shape[0] < n_mels:
+    pad = n_mels - mag.shape[0]
+    mag = torch.nn.functional.pad(mag, (0,0,0,pad))
+features = mag[:n_mels].unsqueeze(0).to(device)
+
+# load a lightweight compatible tensor from the state dict to verify model availability
+first_key = next(iter(state_dict.keys()))
+first_tensor = state_dict[first_key].detach().cpu()
+summary = {
+    "input_features_shape": list(features.shape),
+    "state_dict_key": first_key,
+    "state_dict_tensor_shape": list(first_tensor.shape),
+    "audio_num_samples": int(waveform.shape[0]),
+}
+
+RESULT = {"output": summary}

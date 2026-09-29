@@ -1,35 +1,52 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("iarfmoose/t5-base-question-generator") %}
-{% set answer_text = answer_text | default("The Eiffel Tower") %}
-{% set context_text = context_text | default("The Eiffel Tower is a wrought-iron lattice tower on the Champ de Mars in Paris.") %}
-{% set generation_max_new_tokens = generation_max_new_tokens | default(64) %}
-{% set generation_num_beams = generation_num_beams | default(5) %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-answer_text = {{ answer_text | tojson }}
-context_text = {{ context_text | tojson }}
-generation_max_new_tokens = {{ generation_max_new_tokens }}
-generation_num_beams = {{ generation_num_beams }}
+{% set device = device | default("cuda:0") %}
+{% set answer = answer | default('The Eiffel Tower is located in Paris.') %}
+{% set context = context | default('The Eiffel Tower is one of the most famous landmarks in the world. It is located in Paris, France, and attracts millions of visitors every year.') %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
+{% set num_beams = num_beams | default(4) %}
+{% set do_sample = do_sample | default(false) %}
+{% set top_p = top_p | default(0.95) %}
 
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+answer = "{{ answer }}"
+context = "{{ context }}"
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
+do_sample = {{ do_sample }}
+top_p = {{ top_p }}
+
+import os
 import torch
-from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+model_dir = os.path.dirname(weights_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False, legacy=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-input_prompt = f"<answer> {answer_text} <context> {context_text}"
-encoded_inputs = tokenizer(input_prompt, return_tensors="pt")
-input_ids = encoded_inputs["input_ids"].to(device)
-attention_mask = encoded_inputs["attention_mask"].to(device)
+prompt = f"<answer> {answer} <context> {context}"
+inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(
-    input_ids=input_ids,
-    attention_mask=attention_mask,
-    max_new_tokens=generation_max_new_tokens,
-    num_beams=generation_num_beams,
-)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+        do_sample=do_sample,
+        top_p=top_p,
+    )
 
-generated_question = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-RESULT = {"generated_question": generated_question}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"question": output_text}

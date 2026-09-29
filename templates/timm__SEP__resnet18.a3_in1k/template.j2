@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("timm/resnet18.a3_in1k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set image = image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+# Python variable assignments
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+image = "{{ image }}"
+
+# Imports
+from transformers import pipeline
+
+# Pipeline creation
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+# Inference
+RESULT = pipe(image)

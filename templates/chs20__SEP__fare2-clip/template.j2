@@ -1,0 +1,53 @@
+{% set repo_id = repo_id | default("chs20/fare2-clip") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set categories = categories | default(['tench', 'goldfish', 'great white shark', 'tiger shark', 'hammerhead', 'electric ray', 'stingray', 'cock', 'hen', 'ostrich']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+categories = {{ categories }}
+
+import json
+import torch
+import open_clip
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename='open_clip_pytorch_model.bin')
+config_path = hf_hub_download(repo_id=repo_id, filename='open_clip_config.json')
+
+with open(config_path, 'r') as f:
+    model_cfg = json.load(f)
+
+model_name = model_cfg.get('model_cfg', {}).get('vision_cfg', {}).get('layers', None)
+model, _, preprocess = open_clip.create_model_and_transforms(
+    'ViT-L-14',
+    pretrained=weights_path,
+    device='cpu',
+)
+model = model.to(device)
+model.eval()
+
+if isinstance(image_path, str) and image_path.startswith(('http://', 'https://')):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+image_input = preprocess(image).unsqueeze(0).to(device)
+text_tokens = open_clip.tokenize(categories).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_input)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logit_scale = model.logit_scale.exp()
+    logits = logit_scale * image_features @ text_features.T
+    probs = logits.softmax(dim=-1)
+
+RESULT = {
+    'categories': categories,
+    'probabilities': probs.squeeze(0).detach().cpu().tolist(),
+}

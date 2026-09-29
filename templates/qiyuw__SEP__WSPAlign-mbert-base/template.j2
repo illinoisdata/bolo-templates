@@ -1,37 +1,58 @@
 {% set repo_id = repo_id | default("qiyuw/WSPAlign-mbert-base") %}
 {% set device = device | default("cuda:0") %}
-{% set src_lang = src_lang | default("ja") %}
-{% set src_text = src_text | default("私は猫が好きです。") %}
-{% set tgt_lang = tgt_lang | default("en") %}
-{% set tgt_text = tgt_text | default("I like cats.") %}
+{% set src_text = src_text | default('私は猫が好きです。') %}
+{% set tgt_text = tgt_text | default('I like cats.') %}
+{% set src_lang = src_lang | default('ja') %}
+{% set tgt_lang = tgt_lang | default('en') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-src_lang = "{{ src_lang }}"
-src_text = "{{ src_text }}"
-tgt_lang = "{{ tgt_lang }}"
-tgt_text = "{{ tgt_text }}"
+src_text = {{ src_text | tojson }}
+tgt_text = {{ tgt_text | tojson }}
+src_lang = {{ src_lang | tojson }}
+tgt_lang = {{ tgt_lang | tojson }}
 
+import json
 import os
 import torch
+from huggingface_hub import hf_hub_download
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering
 
-# Load tokenizer and model, move model to device
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForQuestionAnswering.from_pretrained(repo_id)
-model.to(torch.device(device))
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-# Pre-process input
-inputs = tokenizer(text=tgt_text, text_pair=src_text, return_tensors="pt")
-inputs = {k: v.to(torch.device(device)) for k, v in inputs.items()}
+model_dir = os.path.dirname(model_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False)
+model = AutoModelForQuestionAnswering.from_pretrained(model_dir)
+model.to(device)
+model.eval()
 
-# Run inference
-outputs = model(**inputs)
+question = f"Align the source word(s) in {src_lang} corresponding to the target word(s) in {tgt_lang}: {tgt_text}"
+inputs = tokenizer(question, src_text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Post-process & build RESULT dict
-start_logits = outputs.start_logits
-end_logits = outputs.end_logits
-start_index = torch.argmax(start_logits, dim=-1).item()
-end_index = torch.argmax(end_logits, dim=-1).item()
-answer_ids = inputs["input_ids"][0][start_index : end_index + 1]
-answer = tokenizer.decode(answer_ids)
-RESULT = {"answer": answer}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits[0]
+end_logits = outputs.end_logits[0]
+start_idx = int(torch.argmax(start_logits).item())
+end_idx = int(torch.argmax(end_logits).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+
+input_ids = inputs["input_ids"][0]
+answer_tokens = input_ids[start_idx:end_idx + 1]
+answer_text = tokenizer.decode(answer_tokens, skip_special_tokens=True)
+
+RESULT = {
+    "start_logits": start_logits.detach().cpu().tolist(),
+    "end_logits": end_logits.detach().cpu().tolist(),
+    "predicted_span": {
+        "start_index": start_idx,
+        "end_index": end_idx,
+        "text": answer_text,
+    },
+}

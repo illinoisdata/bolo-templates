@@ -1,0 +1,21 @@
+{% set repo_id = repo_id | default("openGPT-X/Teuken-7B-base-v0.6") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens | tojson }}
+
+from gptx_tokenizer import SPTokenizer
+from transformers import pipeline
+
+tokenizer = SPTokenizer.from_pretrained(repo_id)
+pipe = pipeline(task=task, model=repo_id, tokenizer=tokenizer, device=device)
+
+preprocessed_input = input_prompt
+RESULT = pipe(preprocessed_input, max_new_tokens=max_new_tokens)
+RESULT = {"outputs": RESULT}

@@ -1,0 +1,52 @@
+{% set repo_id = repo_id | default("seeklhy/OmniSQL-7B") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default("Create a SQL query for the provided database schema and question.") %}
+{% set db_details = db_details | default("CREATE TABLE example_table (id INTEGER, name TEXT);") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+db_details = "{{ db_details }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_file = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True, local_files_only=True)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    trust_remote_code=True,
+    local_files_only=True,
+)
+model = model.to(device)
+model.eval()
+
+prompt = f"""-- Your SQL query
+Take a deep breath and think step by step to find the correct SQL query.'''\n\nDatabase schema:\n{db_details}\n\nQuestion: {question}\n"""
+chat_prompt = tokenizer.apply_chat_template(
+    [{"role": "user", "content": prompt}],
+    add_generation_prompt=True,
+    tokenize=False,
+)
+inputs = tokenizer(chat_prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        eos_token_id=tokenizer.eos_token_id,
+        max_new_tokens=128,
+        do_sample=False,
+    )
+
+input_len = inputs["input_ids"].shape[-1]
+response = tokenizer.decode(output_ids[0][input_len:], skip_special_tokens=True)
+
+RESULT = {"response": response}

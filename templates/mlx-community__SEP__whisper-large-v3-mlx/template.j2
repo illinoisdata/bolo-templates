@@ -1,0 +1,46 @@
+{% set audio_file = audio_file | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set repo_id = repo_id | default("mlx-community/whisper-large-v3-mlx") %}
+{% set device = device | default("cuda:0") %}
+{% set language = language | default('en') %}
+{% set task = task | default('transcribe') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_file = "{{ audio_file }}"
+language = "{{ language }}"
+task = "{{ task }}"
+
+import os
+from pathlib import Path
+from urllib.parse import urlparse
+from urllib.request import urlopen
+
+from huggingface_hub import hf_hub_download
+
+input_path = audio_file
+if input_path.startswith("http://") or input_path.startswith("https://"):
+    parsed = urlparse(input_path)
+    local_name = os.path.basename(parsed.path) or "audio.wav"
+    local_path = Path("/tmp") / local_name
+    with urlopen(input_path) as response, open(local_path, "wb") as f:
+        f.write(response.read())
+    speech_file = str(local_path)
+else:
+    speech_file = input_path
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="weights.npz")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+try:
+    import mlx_whisper
+    output = mlx_whisper.transcribe(
+        speech_file,
+        path_or_hf_repo=repo_id,
+        language=language,
+        task=task,
+    )
+except ImportError:
+    from transformers import pipeline
+    asr = pipeline("automatic-speech-recognition", model="openai/whisper-large-v3", device=-1)
+    output = asr(speech_file)
+
+RESULT = {"output": output}

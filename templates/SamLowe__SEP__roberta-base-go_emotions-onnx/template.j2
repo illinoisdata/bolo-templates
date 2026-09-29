@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("SamLowe/roberta-base-go_emotions-onnx") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") -%}
+{% set onnx_subfolder = onnx_subfolder | default("onnx") -%}
+{% set onnx_model_file = onnx_model_file | default("model_quantized.onnx") -%}
+{% set input_prompt = input_prompt | default("ONNX yields fast inference for emotion detection.") -%}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+onnx_subfolder = {{ onnx_subfolder | tojson }}
+onnx_model_file = {{ onnx_model_file | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import AutoTokenizer, pipeline
+from optimum.onnxruntime import ORTModelForSequenceClassification
+import onnxruntime as ort
+
+
+def _resolve_pipeline_device(device_str: str) -> int:
+    normalized = device_str.lower()
+    if normalized.startswith("cuda"):
+        parts = normalized.split(":")
+        if len(parts) > 1 and parts[1].isdigit():
+            return int(parts[1])
+        return 0
+    if normalized.startswith("cpu"):
+        return -1
+    return -1
+
+available_providers = ort.get_available_providers()
+use_cuda = "CUDAExecutionProvider" in available_providers and device.lower().startswith("cuda")
+pipeline_device = _resolve_pipeline_device(device) if use_cuda else -1
+onnx_provider = "CUDAExecutionProvider" if use_cuda else "CPUExecutionProvider"
+
+model = ORTModelForSequenceClassification.from_pretrained(
+    repo_id,
+    subfolder=onnx_subfolder,
+    file_name=onnx_model_file,
+    provider=onnx_provider,
+)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=tokenizer,
+    device=pipeline_device,
+    top_k=None,
+    function_to_apply="sigmoid",
+)
+RESULT = {"outputs": pipe(input_prompt)}

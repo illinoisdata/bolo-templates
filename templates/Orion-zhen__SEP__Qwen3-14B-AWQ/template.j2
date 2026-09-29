@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("Orion-zhen/Qwen3-14B-AWQ") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Write a short haiku about quantized language models.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    trust_remote_code=True,
+    torch_dtype=torch.float16,
+    device_map="auto" if device.startswith("cuda") else None,
+    low_cpu_mem_usage=True,
+)
+if not device.startswith("cuda"):
+    model.to(device)
+model.eval()
+
+messages = [
+    {"role": "system", "content": "You are a concise assistant."},
+    {"role": "user", "content": prompt},
+]
+input_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=64,
+        do_sample=False,
+        pad_token_id=tokenizer.eos_token_id,
+    )
+
+output_text = tokenizer.decode(generated[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+
+RESULT = {"text": output_text}

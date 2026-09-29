@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("facebook/vjepa2-vitg-fpc64-384-ssv2") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("video-classification") %}
+{% set num_frames = num_frames | default(64) %}
+{% set input_video = input_video | default("/u/yunqili4/projects/ML-code-generation/data/video.avi") %}
+{% set video_backend = video_backend | default("pyav") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+num_frames = {{ num_frames }}
+input_video = {{ input_video | tojson }}
+video_backend = {{ video_backend | tojson }}
+
+from types import MethodType
+from transformers import pipeline
+from transformers.video_utils import load_video
+
+pipe = pipeline(task=task, model=repo_id, device=device, num_frames=num_frames)
+
+
+def _fetch_videos_with_pyav(self, video_url_or_urls, sample_indices_fn=None):
+    if isinstance(video_url_or_urls, list):
+        return list(
+            zip(*[
+                _fetch_videos_with_pyav(self, video_url_or_urls=item, sample_indices_fn=sample_indices_fn)
+                for item in video_url_or_urls
+            ])
+        )
+    return load_video(video_url_or_urls, backend=video_backend, sample_indices_fn=sample_indices_fn)
+
+pipe.video_processor.fetch_videos = MethodType(_fetch_videos_with_pyav, pipe.video_processor)
+RESULT = pipe(input_video)

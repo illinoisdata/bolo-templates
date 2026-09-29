@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("ivrit-ai/whisper-large-v3-ct2") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set task = task | default('transcribe') %}
+{% set language = language | default('he') %}
+{% set beam_size = beam_size | default(5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+task = "{{ task }}"
+language = "{{ language }}"
+beam_size = {{ beam_size }}
+
+import numpy as np
+import soundfile as sf
+from faster_whisper import WhisperModel
+
+
+def load_audio(input_path_or_url):
+    if str(input_path_or_url).startswith(("http://", "https://")):
+        raise ValueError("URL inputs are not supported for audio in this inference script")
+    audio, sample_rate = sf.read(input_path_or_url)
+    if audio.ndim > 1:
+        audio = np.mean(audio, axis=1)
+    if sample_rate != 16000:
+        try:
+            import librosa
+            audio = librosa.resample(audio.astype(np.float32), orig_sr=sample_rate, target_sr=16000)
+        except Exception:
+            raise
+    return audio.astype(np.float32)
+
+
+model = WhisperModel(repo_id, device="cpu", compute_type="int8")
+audio = load_audio(audio_path)
+segments, info = model.transcribe(audio, task=task, language=language, beam_size=beam_size)
+text = "".join(segment.text for segment in segments).strip()
+
+RESULT = {"text": text, "language": info.language, "language_probability": info.language_probability}

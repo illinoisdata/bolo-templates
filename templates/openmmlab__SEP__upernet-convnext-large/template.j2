@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("openmmlab/upernet-convnext-large") %}
+{% set device = device | default("cuda:0") %}
+{%- set task = task | default("image-segmentation") -%}
+{%- set model = model | default(repo_id) -%}
+{%- set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") -%}
+
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+image_path = {{ image_path | tojson }}
+
+from PIL import Image
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+input_image = Image.open(image_path).convert("RGB")
+RESULT = pipe(input_image)

@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("Xenova/clip-vit-base-patch32") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set candidate_labels = candidate_labels | default(['a photo of a cat', 'a photo of a dog', 'a photo of a person', 'a photo of a car']) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+candidate_labels = {{ candidate_labels }}
+
+import requests
+import torch
+from PIL import Image
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+from transformers import CLIPModel, CLIPImageProcessor, CLIPTokenizer
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+image_processor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="onnx/model.onnx")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processor = CLIPImageProcessor.from_pretrained(repo_id)
+tokenizer = CLIPTokenizer.from_pretrained(repo_id)
+model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+model.to(device)
+model.eval()
+
+inputs = processor(images=image, return_tensors="pt")
+text_inputs = tokenizer(candidate_labels, padding=True, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+text_inputs = {k: v.to(device) for k, v in text_inputs.items()}
+with torch.no_grad():
+    image_features = model.get_image_features(**inputs)
+    text_features = model.get_text_features(**text_inputs)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logits = 100.0 * image_features @ text_features.T
+    probs = logits.softmax(dim=-1).squeeze(0)
+RESULT = {"candidate_labels": candidate_labels, "probabilities": probs.detach().cpu().tolist()}

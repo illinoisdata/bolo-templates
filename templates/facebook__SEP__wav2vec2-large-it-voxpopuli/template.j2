@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("facebook/wav2vec2-large-it-voxpopuli") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+
+# Python variable assignments
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+audio_path = {{ audio_path | tojson }}
+
+# Imports
+import os
+import soundfile as sf
+import torch
+import torchaudio
+
+# Ensure CUDA runtime libraries are discoverable
+cuda_lib_path = "/workspace/.pip/nvidia/cu13/lib"
+current_ld = os.environ.get("LD_LIBRARY_PATH", "")
+ld_paths = current_ld.split(os.pathsep) if current_ld else []
+if cuda_lib_path not in ld_paths:
+    os.environ["LD_LIBRARY_PATH"] = os.pathsep.join(filter(None, [cuda_lib_path, current_ld]))
+
+from transformers import pipeline, Wav2Vec2FeatureExtractor
+
+# Load feature extractor and pipeline
+feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(repo_id)
+pipe = pipeline(task=task, model=repo_id, tokenizer=feature_extractor, feature_extractor=feature_extractor, device=device)
+
+# Pre-process input
+waveform_np, original_sr = sf.read(audio_path)
+if waveform_np.ndim == 1:
+    waveform_tensor = torch.from_numpy(waveform_np).unsqueeze(0)
+else:
+    waveform_tensor = torch.from_numpy(waveform_np.T)
+if waveform_tensor.shape[0] > 1:
+    waveform_tensor = waveform_tensor.mean(dim=0, keepdim=True)
+waveform_tensor = waveform_tensor.float()
+target_sr = feature_extractor.sampling_rate
+if original_sr != target_sr:
+    resampler = torchaudio.transforms.Resample(orig_freq=original_sr, new_freq=target_sr)
+    waveform_tensor = resampler(waveform_tensor)
+audio_input = waveform_tensor.squeeze(0).cpu().numpy()
+
+# Run inference
+RESULT = pipe(audio_input, sampling_rate=target_sr)

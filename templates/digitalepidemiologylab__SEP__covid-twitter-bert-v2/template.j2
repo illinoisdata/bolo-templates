@@ -1,53 +1,49 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("digitalepidemiologylab/covid-twitter-bert-v2") %}
-{% set input_sentence = input_sentence | default("In places with a lot of people, it's a good idea to wear a [MASK].") %}
-{% set top_k = top_k | default(5) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("In places with a lot of people, it\'s a good idea to wear a [MASK].") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_sentence = "{{ input_sentence }}"
-top_k = {{ top_k }}
-
-import json
-import os
+text = "{{ text }}"
 
 import torch
-from transformers import AutoModelForMaskedLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForMaskedLM, AutoConfig
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForMaskedLM.from_pretrained(repo_id)
-torch_device = torch.device(device)
-model.to(torch_device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+model_dir = config_path.rsplit("/", 1)[0]
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True, local_files_only=True)
+config = AutoConfig.from_pretrained(model_dir, local_files_only=True)
+model = AutoModelForMaskedLM.from_config(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+state_dict = {k: v for k, v in state_dict.items() if not k.startswith("bert.pooler") and not k.startswith("cls.seq_relationship")}
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
 model.eval()
 
-encoded_input = tokenizer(input_sentence, return_tensors="pt")
-encoded_input = {key: tensor.to(torch_device) for key, tensor in encoded_input.items()}
-input_ids = encoded_input["input_ids"]
-mask_positions = torch.where(input_ids[0] == tokenizer.mask_token_id)[0]
-mask_position = mask_positions[0].item()
-
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+mask_token_id = tokenizer.mask_token_id
+mask_positions = (inputs["input_ids"] == mask_token_id).nonzero(as_tuple=False)
 with torch.no_grad():
-    outputs = model(**encoded_input)
-logits = outputs.logits
-mask_token_logits = logits[0, mask_position, :]
-softmaxed = torch.softmax(mask_token_logits, dim=-1)
-topk = torch.topk(mask_token_logits, k=top_k, dim=-1)
-topk_indices = topk.indices
-topk_token_ids = topk_indices.cpu().tolist()
-topk_scores = softmaxed[topk_indices].cpu().tolist()
+    logits = model(**inputs).logits
 
 results = []
-base_input_ids = input_ids[0]
-for token_id, score in zip(topk_token_ids, topk_scores):
-    filled_ids = base_input_ids.clone()
-    filled_ids[mask_position] = token_id
-    sequence = tokenizer.decode(filled_ids, skip_special_tokens=False)
-    results.append(
-        {
-            "sequence": sequence,
-            "score": score,
-            "token": token_id,
-            "token_str": tokenizer.convert_ids_to_tokens(token_id),
-        }
-    )
+for pos in mask_positions:
+    batch_idx, token_idx = pos.tolist()
+    scores = logits[batch_idx, token_idx]
+    probs = torch.softmax(scores, dim=-1)
+    topk = torch.topk(probs, k=5)
+    results.append({
+        "masked_index": token_idx,
+        "candidates": [
+            {"token": int(tok), "token_str": tokenizer.decode([tok]).strip(), "score": float(score)}
+            for score, tok in zip(topk.values.tolist(), topk.indices.tolist())
+        ],
+    })
 
-RESULT = {"fill_mask": results}
+RESULT = {"output": results}

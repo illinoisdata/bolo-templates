@@ -1,42 +1,45 @@
 {% set repo_id = repo_id | default("Norm/nougat-latex-base") %}
 {% set device = device | default("cuda:0") %}
-{% set image_path = image_path | default('/u/yli77/projects/ML-code-generation/data/image1.jpeg') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
 {% set max_length = max_length | default(800) %}
 {% set num_beams = num_beams | default(5) %}
-repo_id = '{{ repo_id }}'
-device = '{{ device }}'
-image_path = '{{ image_path }}'
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 
-import os
-import torch
 import requests
-from io import BytesIO
+import torch
 from PIL import Image
-from transformers import VisionEncoderDecoderModel, DonutProcessor
+from huggingface_hub import hf_hub_download
+from transformers import VisionEncoderDecoderModel
 from transformers.models.nougat import NougatTokenizerFast
+from PIL import ImageOps
 
-# Load model and related processors
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+preprocessor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
 model = VisionEncoderDecoderModel.from_pretrained(repo_id).to(device)
+model.eval()
 tokenizer = NougatTokenizerFast.from_pretrained(repo_id)
-processor = DonutProcessor.from_pretrained(repo_id)
-
-# Pre-process input image
-if image_path.startswith('http://') or image_path.startswith('https://'):
-    response = requests.get(image_path)
-    image = Image.open(BytesIO(response.content))
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw)
 else:
     image = Image.open(image_path)
-if image.mode != 'RGB':
-    image = image.convert('RGB')
+if image.mode != "RGB":
+    image = image.convert("RGB")
 
-pixel_values = processor(image, return_tensors='pt').pixel_values.to(device)
+from transformers import AutoImageProcessor
+image_processor = AutoImageProcessor.from_pretrained(repo_id)
+pixel_values = image_processor(image, return_tensors="pt").pixel_values.to(device)
+decoder_input_ids = tokenizer(tokenizer.bos_token, add_special_tokens=False, return_tensors="pt").input_ids.to(device)
 
-# Prepare decoder input ids
-decoder_input_ids = tokenizer(tokenizer.bos_token, add_special_tokens=False, return_tensors='pt').input_ids.to(device)
-
-# Inference
 with torch.no_grad():
     outputs = model.generate(
         pixel_values,
@@ -50,9 +53,7 @@ with torch.no_grad():
         bad_words_ids=[[tokenizer.unk_token_id]],
         return_dict_in_generate=True,
     )
-
-# Post-process output
 sequence = tokenizer.batch_decode(outputs.sequences)[0]
-sequence = sequence.replace(tokenizer.eos_token, '').replace(tokenizer.pad_token, '').replace(tokenizer.bos_token, '')
+sequence = sequence.replace(tokenizer.eos_token, "").replace(tokenizer.pad_token, "").replace(tokenizer.bos_token, "")
 
-RESULT = {'generated_latex': sequence}
+RESULT = {"output": sequence}

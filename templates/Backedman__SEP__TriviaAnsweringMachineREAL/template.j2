@@ -1,0 +1,88 @@
+{% set repo_id = repo_id | default("Backedman/TriviaAnsweringMachineREAL") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Who developed the theory of relativity?') %}
+{% set top_k = top_k | default(1) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = {{ question | tojson }}
+top_k = {{ top_k }}
+
+import os
+import json
+import pickle
+import sys
+from huggingface_hub import hf_hub_download
+
+base_dir = os.path.dirname(hf_hub_download(repo_id=repo_id, filename="requirements.txt"))
+if base_dir not in sys.path:
+    sys.path.append(base_dir)
+
+question_lower = question.lower()
+keywords = {
+    "Current Events": ["president", "election", "war", "covid", "pandemic", "current", "today"],
+    "Fine Arts": ["painting", "artist", "art", "sculpture", "monet", "picasso", "da vinci"],
+    "Geography": ["city", "country", "river", "mountain", "capital", "sea", "ocean"],
+    "History": ["war", "empire", "histor", "president", "king", "queen", "revolution"],
+    "Literature": ["novel", "poem", "play", "author", "literature", "shakespeare"],
+    "Mythology": ["god", "goddess", "myth", "mythology", "zeus", "hera"],
+    "Philosophy": ["philosophy", "ethics", "metaphysics", "kant", "plato", "aristotle"],
+    "Religion": ["religion", "church", "bible", "quran", "buddha", "islam", "christian"],
+    "Science": ["physics", "chemistry", "biology", "scientist", "theory", "cell", "atom"],
+    "Social Science": ["economics", "society", "government", "politics", "psychology", "sociology"],
+}
+
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+category_files = {
+    "Current Events": hf_hub_download(repo_id=repo_id, filename="models/Current Events_tfidf.pkl"),
+    "Fine Arts": hf_hub_download(repo_id=repo_id, filename="models/Fine Arts_tfidf.pkl"),
+    "Geography": hf_hub_download(repo_id=repo_id, filename="models/Geography_tfidf.pkl"),
+    "History": hf_hub_download(repo_id=repo_id, filename="models/History_tfidf.pkl"),
+    "Literature": hf_hub_download(repo_id=repo_id, filename="models/Literature_tfidf.pkl"),
+    "Mythology": hf_hub_download(repo_id=repo_id, filename="models/Mythology_tfidf.pkl"),
+    "Philosophy": hf_hub_download(repo_id=repo_id, filename="models/Philosophy_tfidf.pkl"),
+    "Religion": hf_hub_download(repo_id=repo_id, filename="models/Religion_tfidf.pkl"),
+    "Science": hf_hub_download(repo_id=repo_id, filename="models/Science_tfidf.pkl"),
+    "Social Science": hf_hub_download(repo_id=repo_id, filename="models/Social Science_tfidf.pkl"),
+    "Trash": hf_hub_download(repo_id=repo_id, filename="models/Trash_tfidf.pkl"),
+}
+
+best_cat = "Trash"
+best_score = -1
+for cat, words in keywords.items():
+    score = sum(1 for w in words if w in question_lower)
+    if score > best_score:
+        best_score = score
+        best_cat = cat
+category = best_cat
+
+with open(category_files[category], "rb") as f:
+    tfidf_data = pickle.load(f)
+
+predicted_answer = None
+confidence = 0.1
+if isinstance(tfidf_data, dict):
+    vectorizer = tfidf_data.get("vectorizer")
+    answer_map = tfidf_data.get("answer_map")
+    model = tfidf_data.get("model", tfidf_data)
+    if vectorizer is not None and answer_map is not None:
+        X = vectorizer.transform([question])
+        if hasattr(model, "predict_proba"):
+            probs = model.predict_proba(X)[0]
+            idx = int(probs.argmax())
+            predicted_answer = answer_map[idx] if isinstance(answer_map, (list, tuple)) else answer_map.get(idx, str(idx))
+            confidence = float(probs[idx])
+        elif hasattr(model, "predict"):
+            pred = model.predict(X)
+            predicted_answer = pred[0] if hasattr(pred, "__len__") else pred
+            confidence = 0.5
+else:
+    model = tfidf_data
+    if hasattr(model, "predict"):
+        pred = model.predict([question])
+        predicted_answer = pred[0] if hasattr(pred, "__len__") else pred
+        confidence = 0.5
+
+if predicted_answer is None:
+    predicted_answer = category
+
+RESULT = {"answer": predicted_answer, "confidence": confidence, "category": category}

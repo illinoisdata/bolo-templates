@@ -1,59 +1,65 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("jordiclive/flan-t5-3b-summarizer") %}
-{% set prompt = prompt | default("Produce an article summary of the following news article:") %}
-{% set raw_document = raw_document | default("The economic landscape has shifted dramatically over the past few quarters, with inflation peaking and then gradually easing. The latest data shows that consumer prices are stabilizing, yet uncertainty lingers across labor markets and international trade tensions continue to influence central bank policies.") %}
-{% set max_length = max_length | default(200) %}
-{% set min_length = min_length | default(30) %}
-{% set num_beams = num_beams | default(4) %}
-{% set length_penalty = length_penalty | default(2.0) %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('You must be 18 years old to live or work in New York State...') %}
+{% set prompt = prompt | default('Produce an article summary of the following news article:') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set num_beams = num_beams | default(5) %}
+{% set min_length = min_length | default(5) %}
 {% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
-{% set early_stopping = early_stopping | default(true) %}
-{% set max_input_length = max_input_length | default(512) %}
+{% set truncation = truncation | default(true) %}
+{% set max_source_length = max_source_length | default(512) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
+input_text = "{{ input_text }}"
 prompt = "{{ prompt }}"
-raw_document = """{{ raw_document }}"""
-max_length = {{ max_length }}
-min_length = {{ min_length }}
+max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
-length_penalty = {{ length_penalty }}
+min_length = {{ min_length }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
-early_stopping = {{ early_stopping }}
-max_input_length = {{ max_input_length }}
-
-from pathlib import Path
+truncation = {{ truncation }}
+max_source_length = {{ max_source_length }}
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-input_text = f"{prompt} {raw_document}"
-encoded_inputs = tokenizer(
-    input_text,
+
+tokenizer = AutoTokenizer.from_pretrained(
+    tokenizer_path.rsplit("/", 1)[0],
+    use_fast=True,
+)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    weights_path.rsplit("/", 1)[0],
+    torch_dtype=torch.float16 if torch.cuda.is_available() or device.startswith("cuda") else torch.float32,
+)
+model.to(device)
+model.eval()
+
+source_text = f"{prompt} {input_text}"
+inputs = tokenizer(
+    source_text,
     return_tensors="pt",
-    truncation=True,
-    padding="longest",
-    max_length=max_input_length,
+    truncation=truncation,
+    max_length=max_source_length,
 )
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_tokens = model.generate(
-    **encoded_inputs,
-    max_length=max_length,
-    min_length=min_length,
-    num_beams=num_beams,
-    length_penalty=length_penalty,
-    no_repeat_ngram_size=no_repeat_ngram_size,
-    early_stopping=early_stopping,
-)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+        min_length=min_length,
+        no_repeat_ngram_size=no_repeat_ngram_size,
+    )
 
-generated_texts = tokenizer.batch_decode(
-    generated_tokens,
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-)
-summary_text = generated_texts[0].strip()
+generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {"summary": summary_text}
+RESULT = {"summary": generated_text}

@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("boltzgen/boltzgen-1") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Design a protein binder for an arbitrary biomolecule.') %}
+{% set weights_filename = weights_filename | default('boltzgen1_structuretrained_small.ckpt') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = {{ question | tojson }}
+weights_filename = {{ weights_filename | tojson }}
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+
+repo_dir = os.path.dirname(hf_hub_download(repo_id=repo_id, filename=weights_filename))
+weights_path = os.path.join(repo_dir, weights_filename)
+
+ckpt = torch.load(weights_path, map_location='cpu', weights_only=False)
+if isinstance(ckpt, dict):
+    output_keys = list(ckpt.keys())
+    result = {
+        'repo_id': repo_id,
+        'weights_filename': weights_filename,
+        'checkpoint_keys': output_keys,
+        'question': question,
+    }
+    if 'state_dict' in ckpt and isinstance(ckpt['state_dict'], dict):
+        result['num_state_dict_keys'] = len(ckpt['state_dict'])
+    elif 'model_state_dict' in ckpt and isinstance(ckpt['model_state_dict'], dict):
+        result['num_state_dict_keys'] = len(ckpt['model_state_dict'])
+    else:
+        result['num_state_dict_keys'] = None
+else:
+    result = {
+        'repo_id': repo_id,
+        'weights_filename': weights_filename,
+        'checkpoint_type': type(ckpt).__name__,
+        'question': question,
+    }
+
+RESULT = {'output': result}

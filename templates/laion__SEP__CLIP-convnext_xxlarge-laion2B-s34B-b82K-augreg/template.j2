@@ -1,0 +1,60 @@
+{% set repo_id = repo_id | default("laion/CLIP-convnext_xxlarge-laion2B-s34B-b82K-augreg") %}
+{% set device = device | default("cuda:0") %}
+{% set text_prompt = text_prompt | default('a photo of a cat, a dog, and a car') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_prompt = "{{ text_prompt }}"
+
+import json
+import os
+import torch
+import requests
+from PIL import Image
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+import open_clip
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+def load_image(image_path_or_url):
+    if str(image_path_or_url).startswith(("http://", "https://")):
+        return Image.open(BytesIO(requests.get(image_path_or_url, timeout=30).content)).convert("RGB")
+    return Image.open(image_path_or_url).convert("RGB")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+model_cfg = cfg.get("model_cfg", {})
+preprocess_cfg = cfg.get("preprocess_cfg", {})
+
+model_name = model_cfg.get("vision_cfg", {}).get("timm_model_name", "convnext_xxlarge")
+pretrained = None
+
+tokenizer = open_clip.get_tokenizer("ViT-H-14")
+model, _, preprocess = open_clip.create_model_and_transforms(
+    model_name,
+    pretrained=pretrained,
+    device=device,
+    precision="fp32",
+    force_quick_gelu=False,
+    cache_dir=None,
+)
+
+state_dict = torch.load(weights_path, map_location="cpu")
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
+model.eval()
+
+image = load_image("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg")
+image_tensor = preprocess(image).unsqueeze(0).to(device)
+text_tokens = tokenizer([text_prompt]).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_tensor)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    similarity = (image_features @ text_features.T).squeeze().item()
+
+RESULT = {"similarity": similarity, "image_features": image_features.squeeze(0).detach().cpu(), "text_features": text_features.squeeze(0).detach().cpu()}

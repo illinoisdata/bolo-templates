@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("baffo32/decapoda-research-llama-7B-hf") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set max_new_tokens = max_new_tokens | default(256) %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+model = repo_id
+
+from transformers import pipeline
+from transformers.tokenization_utils_tokenizers import TokenizersBackend
+
+
+def _safe_convert_token_to_id_with_added_voc(self, token):
+    token_str = str(token)
+    index = self._tokenizer.token_to_id(token_str)
+    if index is None:
+        unk_index = self._tokenizer.token_to_id(str(self.unk_token))
+        if unk_index is not None:
+            return unk_index
+        return 0
+    return index
+
+TokenizersBackend._convert_token_to_id_with_added_voc = _safe_convert_token_to_id_with_added_voc
+
+pipe = pipeline(task=task, model=model, device=device)
+
+prompt = input_prompt
+
+RESULT = pipe(prompt, max_new_tokens=max_new_tokens)
+RESULT = {"generated_text": RESULT}

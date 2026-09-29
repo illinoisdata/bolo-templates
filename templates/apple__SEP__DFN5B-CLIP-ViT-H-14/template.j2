@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("apple/DFN5B-CLIP-ViT-H-14") %}
+{% set device = device | default("cuda:0") %}
+{% set labels_list = labels_list | default(["a dog", "a cat", "a donut", "a beignet"]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+labels_list = {{ labels_list }}
+image_path = "/u/yunqili4/projects/ML-code-generation/data/image1.jpeg"
+
+import torch
+from PIL import Image
+from transformers import CLIPModel, CLIPImageProcessor, CLIPTokenizer
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+image_processor = CLIPImageProcessor()
+tokenizer = CLIPTokenizer.from_pretrained(repo_id)
+model = CLIPModel.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+if str(image_path).startswith(("http://", "https://")):
+    from urllib.request import urlopen
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+image_inputs = image_processor(images=image, return_tensors="pt")
+text_inputs = tokenizer(labels_list, return_tensors="pt", padding=True, truncation=True)
+image_inputs = {k: v.to(device) for k, v in image_inputs.items()}
+text_inputs = {k: v.to(device) for k, v in text_inputs.items()}
+
+with torch.no_grad():
+    image_outputs = model.vision_model(pixel_values=image_inputs["pixel_values"])
+    text_outputs = model.text_model(input_ids=text_inputs["input_ids"], attention_mask=text_inputs["attention_mask"])
+    image_features = model.visual_projection(image_outputs.pooler_output)
+    text_features = model.text_projection(text_outputs.pooler_output)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logits = image_features @ text_features.T * model.logit_scale.exp()
+    probs = torch.softmax(logits, dim=-1)[0].detach().cpu().tolist()
+
+RESULT = {"labels": labels_list, "probabilities": probs}

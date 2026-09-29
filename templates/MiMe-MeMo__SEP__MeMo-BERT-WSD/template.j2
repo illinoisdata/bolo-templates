@@ -1,0 +1,28 @@
+{% set repo_id = repo_id | default("MiMe-MeMo/MeMo-BERT-WSD") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set input_prompt = input_prompt | default("Men havde Gud vendt sig fra ham, saa kunde han ogsaa vende sig fra Gud.") %}
+{% set model = model | default(repo_id) %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from huggingface_hub import hf_hub_download
+import json
+from transformers import pipeline
+from transformers.models.xlm_roberta.tokenization_xlm_roberta import XLMRobertaTokenizer
+
+# Download tokenizer.json from the model repo and build a vocab list
+tokenizer_json_file = hf_hub_download(repo_id=model, filename="tokenizer.json")
+with open(tokenizer_json_file, 'r') as f:
+    tokenizer_json = json.load(f)
+vocab_dict = tokenizer_json["model"]["vocab"]
+vocab_list = [(token, 0.0) for token, _ in sorted(vocab_dict.items(), key=lambda x: x[1])]
+
+# Initialize slow tokenizer with corrected vocab
+tokenizer = XLMRobertaTokenizer(vocab=vocab_list)
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt)

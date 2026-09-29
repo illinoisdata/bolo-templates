@@ -1,0 +1,56 @@
+{% set repo_id = repo_id | default("onnx-community/Kokoro-82M-ONNX") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Life is like a box of chocolates. You never know what you\'re gonna get.') %}
+{% set voice = voice | default('af_sky') %}
+{% set model_name = model_name | default('model.onnx') %}
+{% set speed = speed | default(1.0) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+voice = {{ voice | tojson }}
+model_name = {{ model_name | tojson }}
+speed = float({{ speed }})
+
+import json
+import re
+import numpy as np
+import onnxruntime as ort
+from huggingface_hub import hf_hub_download
+
+onnx_path = hf_hub_download(repo_id=repo_id, filename=f"onnx/{model_name}")
+voice_path = hf_hub_download(repo_id=repo_id, filename=f"voices/{voice}.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+with open(config_path, "r", encoding="utf-8") as f:
+    tokenizer_obj = json.load(f)
+
+vocab = tokenizer_obj.get("model", {}).get("vocab", {})
+
+# Simple deterministic tokenizer compatible with available vocab when possible.
+# Prefer exact token matches from vocab for words/punctuation, otherwise character fallback.
+def tokenize(text):
+    pieces = re.findall(r"\w+|[^\w\s]", text, flags=re.UNICODE)
+    ids = []
+    for piece in pieces:
+        if piece in vocab:
+            ids.append(vocab[piece])
+        else:
+            ids.extend([vocab[ch] for ch in piece if ch in vocab])
+    return ids
+
+tokens = tokenize(text)
+assert len(tokens) <= 510, len(tokens)
+voices = np.fromfile(voice_path, dtype=np.float32).reshape(-1, 1, 256)
+ref_s = voices[len(tokens)]
+tokens = np.array([[0, *tokens, 0]], dtype=np.int64)
+
+providers = ["CPUExecutionProvider"]
+if device.startswith("cuda"):
+    providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+so = ort.SessionOptions()
+so.intra_op_num_threads = 1
+so.inter_op_num_threads = 1
+sess = ort.InferenceSession(onnx_path, sess_options=so, providers=providers)
+audio = sess.run(None, {"input_ids": tokens, "style": ref_s, "speed": np.array([speed], dtype=np.float32)})[0]
+
+RESULT = {"audio": audio}

@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("seyonec/ChemBERTa-zinc-base-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_smiles = masked_smiles | default("CC{mask}CC") %}
+
+repo_id = "{{ repo_id }}"
+task = "{{ task }}"
+masked_smiles = "{{ masked_smiles }}"
+device = "{{ device }}"
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+mask_token = pipe.tokenizer.mask_token
+text = masked_smiles.replace("{mask}", mask_token)
+
+RESULT = pipe(text)

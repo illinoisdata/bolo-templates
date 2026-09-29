@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("abhilash88/age-gender-prediction") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set input_data = input_data | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+{% set crop_size = crop_size | default({"height": 224, "width": 224}) %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+model = repo_id
+device = {{ device | tojson }}
+input_data = {{ input_data | tojson }}
+crop_size = {{ crop_size | tojson }}
+
+from transformers import AutoImageProcessor, pipeline
+
+processor = AutoImageProcessor.from_pretrained(model)
+processor.crop_size = crop_size
+pipe = pipeline(task=task, model=model, device=device, image_processor=processor)
+RESULT = pipe(input_data)

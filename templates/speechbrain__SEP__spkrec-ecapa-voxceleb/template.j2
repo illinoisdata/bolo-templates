@@ -1,0 +1,55 @@
+{% set repo_id = repo_id | default("speechbrain/spkrec-ecapa-voxceleb") %}
+{% set device = device | default("cuda:0") %}
+{% set audio1 = audio1 | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+{% set audio2 = audio2 | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+{% set threshold = threshold | default(0.25) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio1 = "{{ audio1 }}"
+audio2 = "{{ audio2 }}"
+threshold = {{ threshold }}
+
+import os
+import tempfile
+from pathlib import Path
+from urllib.parse import urlparse
+
+import torch
+import torchaudio
+from huggingface_hub import hf_hub_download
+from speechbrain.inference.speaker import SpeakerRecognition
+
+
+def load_audio(path_or_url):
+    if str(path_or_url).startswith(("http://", "https://")):
+        fd, tmp_path = tempfile.mkstemp(suffix=Path(urlparse(path_or_url).path).suffix or ".wav")
+        os.close(fd)
+        import urllib.request
+        urllib.request.urlretrieve(path_or_url, tmp_path)
+        path_or_url = tmp_path
+    signal, sr = torchaudio.load(path_or_url)
+    if signal.ndim == 1:
+        signal = signal.unsqueeze(0)
+    return signal, sr
+
+
+hyperparams_path = hf_hub_download(repo_id=repo_id, filename="hyperparams.yaml")
+classifier_ckpt = hf_hub_download(repo_id=repo_id, filename="classifier.ckpt")
+embedding_model_ckpt = hf_hub_download(repo_id=repo_id, filename="embedding_model.ckpt")
+mean_var_norm_emb_ckpt = hf_hub_download(repo_id=repo_id, filename="mean_var_norm_emb.ckpt")
+
+verification = SpeakerRecognition.from_hparams(
+    source=repo_id,
+    hparams_file=hyperparams_path,
+    savedir=str(Path(hyperparams_path).parent),
+    run_opts={"device": device},
+)
+
+sig1, sr1 = load_audio(audio1)
+sig2, sr2 = load_audio(audio2)
+
+score, prediction = verification.verify_batch(sig1.to(device), sig2.to(device))
+score = float(score.squeeze().item())
+prediction = int(prediction.squeeze().item())
+
+RESULT = {"score": score, "prediction": prediction}

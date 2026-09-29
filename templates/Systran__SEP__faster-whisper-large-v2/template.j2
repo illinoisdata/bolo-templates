@@ -1,0 +1,69 @@
+{% set repo_id = repo_id | default("Systran/faster-whisper-large-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set task = task | default('transcribe') %}
+{% set language = language | default('en') %}
+{% set beam_size = beam_size | default(5) %}
+{% set compute_type = compute_type | default('float16') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+task = "{{ task }}"
+language = "{{ language }}"
+beam_size = {{ beam_size }}
+compute_type = "{{ compute_type }}"
+
+import os
+from pathlib import Path
+import tempfile
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from faster_whisper import WhisperModel
+from scipy.io import wavfile
+from urllib.parse import urlparse
+from urllib.request import urlopen
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocabulary.txt")
+
+if audio_path.startswith(("http://", "https://")):
+    parsed = urlparse(audio_path)
+    suffix = Path(parsed.path).suffix or ".wav"
+    with urlopen(audio_path) as resp:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
+            f.write(resp.read())
+            audio_file = f.name
+else:
+    audio_file = audio_path
+
+model_dir = str(Path(model_path).parent)
+use_device = "cuda" if device.startswith("cuda") and torch.cuda.is_available() else "cpu"
+if use_device == "cuda":
+    model = WhisperModel(model_dir, device=use_device, compute_type=compute_type)
+else:
+    model = WhisperModel(model_dir, device=use_device, compute_type="int8")
+
+sample_rate, audio = wavfile.read(audio_file)
+if audio.dtype.kind in ("i", "u"):
+    max_val = np.iinfo(audio.dtype).max
+    audio = audio.astype(np.float32) / max_val
+else:
+    audio = audio.astype(np.float32)
+
+segments, info = model.transcribe(audio, task=task, language=language, beam_size=beam_size)
+texts = []
+segment_list = []
+for segment in segments:
+    segment_list.append({"start": float(segment.start), "end": float(segment.end), "text": segment.text})
+    texts.append(segment.text)
+
+RESULT = {
+    "language": info.language,
+    "language_probability": float(info.language_probability),
+    "duration": float(info.duration),
+    "text": "".join(texts),
+    "segments": segment_list,
+}

@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("fxmarty/onnx-tiny-random-gpt2-with-merge") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set model_file = model_file | default("decoder_model_merged.onnx") %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
+{% set temperature = temperature | default(1.0) %}
+{% set repetition_penalty = repetition_penalty | default(1.0) %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+model_file = {{ model_file | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+repetition_penalty = {{ repetition_penalty }}
+
+import onnxruntime as ort
+from optimum.onnxruntime import ORTModelForCausalLM
+from transformers import AutoTokenizer, pipeline
+
+available_providers = ort.get_available_providers()
+use_cuda_provider = device.lower().startswith("cuda") and "CUDAExecutionProvider" in available_providers
+if use_cuda_provider:
+    pipeline_device = int(device.split(":")[-1])
+    ort_provider = "CUDAExecutionProvider"
+else:
+    pipeline_device = -1
+    ort_provider = "CPUExecutionProvider" if "CPUExecutionProvider" in available_providers else available_providers[0]
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = ORTModelForCausalLM.from_pretrained(repo_id, file_name=model_file, provider=ort_provider)
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=pipeline_device)
+RESULT = pipe(
+    input_prompt,
+    max_new_tokens=max_new_tokens,
+    temperature=temperature,
+    repetition_penalty=repetition_penalty,
+)

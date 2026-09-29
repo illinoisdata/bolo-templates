@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("studio-ousia/luke-japanese-base-lite") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+masked_prompt = "{{ masked_prompt }}"
+
+from collections.abc import Mapping
+import inspect
+
+from transformers import pipeline
+from transformers.models.mluke import tokenization_mluke
+
+_mluke_init = tokenization_mluke.MLukeTokenizer.__init__
+_mluke_signature = inspect.signature(_mluke_init)
+
+def _fixed_mluke_init(*args, **kwargs):
+    bound = _mluke_signature.bind_partial(*args, **kwargs)
+    vocab = bound.arguments.get("vocab")
+    if isinstance(vocab, Mapping):
+        bound.arguments["vocab"] = [(token, float(score)) for token, score in vocab.items()]
+    return _mluke_init(**bound.arguments)
+
+tokenization_mluke.MLukeTokenizer.__init__ = _fixed_mluke_init
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

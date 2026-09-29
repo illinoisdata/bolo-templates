@@ -1,0 +1,42 @@
+{% set image1 = image1 | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set image2 = image2 | default('/u/yunqili4/projects/ML-code-generation/data/image2.jpeg') %}
+{% set repo_id = repo_id | default("facebook/map-anything-apache") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image1 = "{{ image1 }}"
+image2 = "{{ image2 }}"
+
+import json
+import requests
+import torch
+import numpy as np
+from PIL import Image
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config = json.load(open(config_path))
+state_dict = load_file(weights_path)
+
+if isinstance(image1, str) and image1.startswith(("http://", "https://")):
+    image1 = Image.open(BytesIO(requests.get(image1, timeout=30).content)).convert("RGB")
+else:
+    image1 = Image.open(image1).convert("RGB")
+if isinstance(image2, str) and image2.startswith(("http://", "https://")):
+    image2 = Image.open(BytesIO(requests.get(image2, timeout=30).content)).convert("RGB")
+else:
+    image2 = Image.open(image2).convert("RGB")
+
+img1_arr = np.asarray(image1.resize((32, 32)))
+img2_arr = np.asarray(image2.resize((32, 32)))
+RESULT = {
+    "config_keys": list(config.keys()),
+    "num_weight_tensors": len(state_dict),
+    "sample_weight_keys": list(state_dict.keys())[:10],
+    "image1_mean": float(img1_arr.mean()),
+    "image2_mean": float(img2_arr.mean()),
+    "pixel_diff_mean": float(np.abs(img1_arr.astype(np.float32) - img2_arr.astype(np.float32)).mean()),
+}

@@ -1,30 +1,29 @@
 {% set repo_id = repo_id | default("cointegrated/rut5-base") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("Hello, world!") %}
-{% set max_length = max_length | default(50) %}
-{% set num_beams = num_beams | default(1) %}
+{% set text = text | default('Привет! Перефразируй: Я люблю машинное обучение.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text = "{{ text }}"
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
 model.to(device)
+model.eval()
 
-inputs = tokenizer(input_text, return_tensors="pt", padding=True)
+inputs = tokenizer(text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=32)
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-generated_ids = model.generate(
-    input_ids=inputs["input_ids"],
-    attention_mask=inputs["attention_mask"],
-    max_length=max_length,
-    num_beams=num_beams,
-)
-
-generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-RESULT = {"generated_text": generated_text}
+RESULT = {"text": output_text}

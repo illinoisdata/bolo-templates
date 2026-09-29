@@ -1,5 +1,0 @@
-{% set device = device | default("cuda:0") %}
-{% set repo_id = repo_id | default("M-CLIP/XLM-Roberta-Large-Vit-L-14") %}
-repo_id = "debug"
-import transformers as _transformers
-print([name for name in dir(_transformers.utils) if 'device' in name])

@@ -1,0 +1,48 @@
+{% set repo_id = repo_id | default("timm/dla34.in1k") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+{% set topk = topk | default(5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+topk = {{ topk }}
+
+import json
+from urllib.request import urlopen
+
+import timm
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weight_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+model_name = repo_id.split("/")[-1]
+model = timm.create_model(model_name, pretrained=False, num_classes=config.get("num_classes", 1000))
+state_dict = timm.models.load_state_dict(weight_path)
+model.load_state_dict(state_dict)
+model = model.to(device)
+model.eval()
+
+data_cfg = timm.data.resolve_model_data_config(model)
+transform = timm.data.create_transform(**data_cfg, is_training=False)
+input_tensor = transform(image).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    logits = model(input_tensor)
+    probs = logits.softmax(dim=1)
+    top_probs, top_indices = torch.topk(probs, k=topk, dim=1)
+
+RESULT = {
+    "top_probabilities": top_probs.squeeze(0).tolist(),
+    "top_indices": top_indices.squeeze(0).tolist(),
+}

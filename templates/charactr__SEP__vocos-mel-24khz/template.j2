@@ -1,0 +1,30 @@
+{% set repo_id = repo_id | default("charactr/vocos-mel-24khz") %}
+{% set device = device | default("cuda:0") %}
+{% set mel_steps = mel_steps | default(100) %}
+{% set mel_channels = mel_channels | default(256) %}
+{% set seed = seed | default(0) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+mel_steps = {{ mel_steps }}
+mel_channels = {{ mel_channels }}
+seed = {{ seed }}
+
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from vocos import Vocos
+
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.yaml")
+
+torch.manual_seed(seed)
+mel = torch.randn(1, mel_steps, mel_channels, device=device)
+
+vocos = Vocos.from_pretrained(repo_id).to(device)
+vocos.eval()
+with torch.no_grad():
+    audio = vocos.decode(mel)
+
+output_audio = audio.detach().cpu().numpy() if isinstance(audio, torch.Tensor) else np.asarray(audio)
+
+RESULT = {"audio": output_audio}

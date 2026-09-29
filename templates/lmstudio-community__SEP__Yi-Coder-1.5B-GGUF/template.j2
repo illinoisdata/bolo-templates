@@ -1,0 +1,30 @@
+{% set repo_id = repo_id | default("lmstudio-community/Yi-Coder-1.5B-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('Yi-Coder-1.5B-Q4_K_M.gguf') %}
+{% set prompt = prompt | default('Write a Python function to compute the Fibonacci sequence up to n terms.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+import os
+import subprocess
+import sys
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+model_dir = os.path.dirname(weights_path)
+
+# GGUF models are loaded with llama-cpp-python if available.
+# Install it on demand only when missing.
+try:
+    from llama_cpp import Llama
+except Exception:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "llama-cpp-python"])
+    from llama_cpp import Llama
+
+llm = Llama(model_path=weights_path, n_ctx=1024, n_threads=max(os.cpu_count() or 1, 1), n_gpu_layers=0, verbose=False)
+completion = llm(prompt, max_tokens=128, temperature=0.0, top_p=1.0)
+generated_text = completion["choices"][0]["text"]
+
+RESULT = {"generated_text": generated_text}

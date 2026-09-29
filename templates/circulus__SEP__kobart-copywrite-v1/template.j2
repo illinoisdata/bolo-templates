@@ -1,36 +1,36 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("circulus/kobart-copywrite-v1") %}
-{% set text = text | default("이 제품의 장점을 광고 문구로 작성하세요.") %}
-{% set max_length = max_length | default(50) %}
-{% set num_beams = num_beams | default(4) %}
-{% set num_return_sequences = num_return_sequences | default(1) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('오늘은 좋은 하루입니다.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-num_return_sequences = {{ num_return_sequences }}
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import torch
 import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
 
-# Pre-process input
+
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_file), local_files_only=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(os.path.dirname(model_file), local_files_only=True)
+model.to(device)
+model.eval()
+
 inputs = tokenizer(text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_new_tokens=32,
+        num_beams=4,
+        do_sample=False,
+    )
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-# Run inference
-generated_ids = model.generate(
-    **inputs,
-    max_length=max_length,
-    num_beams=num_beams,
-    num_return_sequences=num_return_sequences
-)
-
-# Post-process & build RESULT dict
-generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-
-RESULT = {"generated_texts": generated_texts}
+RESULT = {"generated_text": output_text}

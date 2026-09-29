@@ -1,0 +1,48 @@
+{% set repo_id = repo_id | default("timm/vit_base_patch16_clip_224.laion400m_e32") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text_prompt = text_prompt | default('a photo of a cat') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text_prompt = "{{ text_prompt }}"
+
+import requests
+import torch
+from PIL import Image
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+from open_clip import create_model_and_transforms, get_tokenizer
+
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+open_clip_weights_file = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model, _, preprocess_val = create_model_and_transforms(
+    "ViT-B-16",
+    pretrained=None,
+    device=device,
+)
+state_dict = torch.load(open_clip_weights_file, map_location="cpu", weights_only=False)
+if isinstance(state_dict, dict) and "state_dict" in state_dict:
+    state_dict = state_dict["state_dict"]
+model.load_state_dict(state_dict, strict=False)
+model.eval()
+model.to(device)
+
+image_tensor = preprocess_val(image).unsqueeze(0).to(device)
+text_tokenizer = get_tokenizer("ViT-B-16")
+text_tokens = text_tokenizer([text_prompt]).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_tensor)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    similarity = (image_features @ text_features.T).squeeze().item()
+
+RESULT = {"similarity": similarity, "image_features": image_features.detach().cpu().tolist(), "text_features": text_features.detach().cpu().tolist()}

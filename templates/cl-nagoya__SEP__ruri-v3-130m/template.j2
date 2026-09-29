@@ -1,0 +1,29 @@
+{% set repo_id = repo_id | default("cl-nagoya/ruri-v3-130m") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default("川べりでサーフボードを持った人たちがいます") %}
+{% set texts = texts | default(["川べりでサーフボードを持った人たちがいます", "サーファーたちが川べりに立っています", "トピック: 瑠璃色のサーファー", "検索クエリ: 瑠璃色はどんな色？", "検索文書: 瑠璃色（るりいろ）は、紫みを帯びた濃い青。名は、半貴石の瑠璃（ラピスラズリ、英: lapis lazuli）による。JIS慣用色名では「こい紫みの青」（略号 dp-pB）と定義している[1][2]。"] ) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+texts = {{ texts }}
+
+import torch
+import torch.nn.functional as F
+from sentence_transformers import SentenceTransformer
+
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+device_obj = torch.device(device)
+model = SentenceTransformer(repo_id, device=str(device_obj))
+
+embeddings = model.encode(texts, convert_to_tensor=True, normalize_embeddings=True)
+similarities = F.cosine_similarity(embeddings.unsqueeze(0), embeddings.unsqueeze(1), dim=2)
+
+RESULT = {
+    "embeddings": embeddings,
+    "similarities": similarities,
+}

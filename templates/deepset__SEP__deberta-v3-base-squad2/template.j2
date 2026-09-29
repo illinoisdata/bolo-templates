@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("deepset/deberta-v3-base-squad2") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What is the model fine-tuned for?') %}
+{% set context = context | default('This is the deepset/deberta-v3-base-squad2 model, fine-tuned using the SQuAD 2.0 dataset for extractive question answering, including unanswerable questions.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = {{ question | tojson }}
+context = {{ context | tojson }}
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+spm_path = hf_hub_download(repo_id=repo_id, filename="spm.model")
+
+model = AutoModelForQuestionAnswering.from_pretrained(repo_id, torch_dtype=torch.float32)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits
+end_logits = outputs.end_logits
+start_idx = int(torch.argmax(start_logits, dim=-1).item())
+end_idx = int(torch.argmax(end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+
+input_ids = inputs["input_ids"][0]
+answer_tokens = input_ids[start_idx:end_idx + 1]
+answer = tokenizer.decode(answer_tokens, skip_special_tokens=True).strip()
+
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx}

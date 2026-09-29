@@ -1,0 +1,25 @@
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("jaimevera1107/moderation-topics") %}
+{% set input_text = input_text | default('This discussion includes harassment, hate speech, and spam.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+
+import os
+
+from huggingface_hub import snapshot_download
+from bertopic import BERTopic
+
+repo_dir = snapshot_download(repo_id=repo_id)
+
+topic_model = BERTopic.load(repo_dir)
+assigned_topic, topic_probs = topic_model.transform([input_text])
+info = topic_model.get_topic_info()
+output_topics = topic_model.get_topic(assigned_topic[0])
+
+RESULT = {
+    "topic": int(assigned_topic[0]),
+    "probabilities": None if topic_probs is None else topic_probs[0].tolist(),
+    "topic_info": info.to_dict(orient="records"),
+    "top_words": output_topics,
+}

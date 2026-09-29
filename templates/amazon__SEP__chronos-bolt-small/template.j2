@@ -1,0 +1,36 @@
+{% set repo_id = repo_id | default("amazon/chronos-bolt-small") %}
+{% set device = device | default("cuda:0") %}
+{% set context = context | default([1.0, 2.0, 3.0, 2.5, 4.0, 5.0, 6.5, 7.0]) %}
+{% set prediction_length = prediction_length | default(12) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+context = {{ context }}
+prediction_length = {{ prediction_length }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from chronos import BaseChronosPipeline
+
+config_path = hf_hub_download(repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id, filename="model.safetensors")
+_ = config_path
+_ = weights_path
+
+pipe = BaseChronosPipeline.from_pretrained(
+    repo_id,
+    device_map=device,
+    torch_dtype=torch.float32,
+)
+
+context_tensor = torch.tensor(context, dtype=torch.float32)
+forecast = pipe.predict(
+    inputs=context_tensor,
+    prediction_length=prediction_length,
+)
+
+if isinstance(forecast, torch.Tensor):
+    output = forecast.detach().cpu().tolist()
+else:
+    output = forecast
+
+RESULT = {"forecast": output}

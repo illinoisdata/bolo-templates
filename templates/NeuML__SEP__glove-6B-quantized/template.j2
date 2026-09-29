@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("NeuML/glove-6B-quantized") %}
+{% set device = device | default("cuda:0") %}
+{% set input_words = input_words | default(['word']) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_words = {{ input_words }}
+
+import json
+import os
+import numpy as np
+from huggingface_hub import hf_hub_download
+from staticvectors import StaticVectors
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+model = StaticVectors(repo_id)
+output = model.embeddings(input_words)
+
+RESULT = {"embeddings": output}

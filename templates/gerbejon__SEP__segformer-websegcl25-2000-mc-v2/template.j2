@@ -1,0 +1,52 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("gerbejon/segformer-websegcl25-2000-mc-v2") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import json
+import os
+import torch
+from PIL import Image
+from transformers import AutoImageProcessor, SegformerForSemanticSegmentation
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+id2label_path = hf_hub_download(repo_id=repo_id, filename="id2label_mc.json")
+
+with open(id2label_path, "r") as f:
+    id2label = json.load(f)
+
+processor = AutoImageProcessor.from_pretrained(os.path.dirname(preprocessor_path), local_files_only=True)
+model = SegformerForSemanticSegmentation.from_pretrained(os.path.dirname(weights_path), local_files_only=True)
+model.to(device)
+model.eval()
+
+if image_path.startswith(("http://", "https://")):
+    from urllib.request import urlopen
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = processor(images=image, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    upsampled = torch.nn.functional.interpolate(logits, size=image.size[::-1], mode="bilinear", align_corners=False)
+    segmentation = upsampled.argmax(dim=1)[0].detach().cpu()
+
+label_map = {int(k): v for k, v in id2label.items()}
+unique_labels = torch.unique(segmentation).tolist()
+segments = [label_map[int(i)] for i in unique_labels]
+
+RESULT = {
+    "segmentation": segmentation.numpy(),
+    "unique_class_ids": unique_labels,
+    "unique_class_names": segments,
+}

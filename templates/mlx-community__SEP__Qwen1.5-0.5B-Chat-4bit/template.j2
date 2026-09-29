@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("mlx-community/Qwen1.5-0.5B-Chat-4bit") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Hello! Write a short, friendly greeting.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+
+model = AutoModelForCausalLM.from_pretrained(repo_id, device_map=None, torch_dtype=torch.float32, ignore_mismatched_sizes=True)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model.to(device)
+inputs = tokenizer(prompt, return_tensors='pt').to(device)
+output_ids = model.generate(**inputs, max_new_tokens=32, do_sample=False)
+text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"text": text}

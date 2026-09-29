@@ -1,22 +1,33 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Rostlab/prot_albert") %}
-{% set sequence = sequence | default('M T E Y K L V V V G A G G V G K S A L T I Q L I Q') %}
-repo_id = '{{ repo_id }}'
-device = '{{ device }}'
-sequence = '{{ sequence }}'
+{% set device = device | default("cuda:0") %}
+{% set text = text|default('M A L W M R L L P L L L A L A L W G P D P A A A A A V V S A A A A A') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
 
+import os
 import torch
-from transformers import AlbertTokenizer, AlbertModel
+from huggingface_hub import hf_hub_download
+from transformers import AlbertTokenizer, AlbertForMaskedLM, AlbertConfig
 
-tokenizer = AlbertTokenizer.from_pretrained(repo_id)
-model = AlbertModel.from_pretrained(repo_id)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+config = AlbertConfig.from_json_file(config_path)
+tokenizer = AlbertTokenizer(vocab_file=vocab_path)
+model = AlbertForMaskedLM(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+state_dict = {k: v for k, v in state_dict.items() if not k.startswith(("sop_classifier.", "albert.pooler."))}
+model.load_state_dict(state_dict, strict=False)
 model.to(device)
+model.eval()
 
-inputs = tokenizer(sequence, return_tensors='pt')
+inputs = tokenizer(text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
     outputs = model(**inputs)
+    output_value = outputs.logits.cpu().numpy()
 
-embeddings = outputs.last_hidden_state
-RESULT = {'embeddings': embeddings}
+RESULT = {"output": output_value}

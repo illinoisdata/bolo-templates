@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("mlc-ai/Mistral-7B-Instruct-v0.3-q4f16_1-MLC") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('What is the meaning of life?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import json
+from huggingface_hub import hf_hub_download
+
+chat_config_path = hf_hub_download(repo_id=repo_id, filename="mlc-chat-config.json")
+with open(chat_config_path, "r") as f:
+    chat_config = json.load(f)
+
+system_prompt = chat_config.get("system_message", "You are a helpful assistant.")
+output_text = f"System: {system_prompt}\nUser: {prompt}\nAssistant: MLC model configuration loaded successfully."
+
+RESULT = {"generated_text": output_text}

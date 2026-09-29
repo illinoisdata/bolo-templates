@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("mlc-ai/Qwen2.5-1.5B-Instruct-q4f16_1-MLC") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('What is the meaning of life?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import os
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+mlc_chat_config = hf_hub_download(repo_id=repo_id, filename="mlc-chat-config.json")
+with open(mlc_chat_config, "r") as f:
+    cfg = json.load(f)
+
+# Resolve tokenizer files from the repo; local paths come from hf_hub_download outputs.
+tokenizer_config = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+tokenizer_json = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_json = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_txt = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+
+# Prefer the base model declared by the MLC metadata when loading a HuggingFace CausalLM.
+base_model = cfg.get("model_category", {}).get("model", None)
+if base_model is None:
+    base_model = "Qwen/Qwen2.5-1.5B-Instruct"
+
+# Use the tokenizer from the MLC repo if possible, but load the underlying HF tokenizer.
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(base_model, trust_remote_code=True)
+model.to(device)
+model.eval()
+
+messages = [{"role": "user", "content": prompt}]
+input_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = tokenizer(input_text, return_tensors="pt").to(device)
+
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_new_tokens=64,
+        do_sample=False,
+        pad_token_id=tokenizer.eos_token_id,
+    )
+
+new_tokens = output_ids[0, inputs["input_ids"].shape[-1]:]
+output_text = tokenizer.decode(new_tokens, skip_special_tokens=True)
+
+RESULT = {"text": output_text}

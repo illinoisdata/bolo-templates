@@ -1,47 +1,48 @@
 {% set repo_id = repo_id | default("alan-turing-institute/mt5-large-finetuned-mnli-xtreme-xnli") %}
 {% set device = device | default("cuda:0") %}
-{% set sequence_to_classify = sequence_to_classify | default("¿A quién vas a votar en 2020?") %}
-{% set candidate_labels = candidate_labels | default(["Europa", "salud pública", "política"]) %}
-{% set hypothesis_template = hypothesis_template | default("Este ejemplo es {}.") %}
+{% set sequence_to_classify = sequence_to_classify | default('¿A quién vas a votar en 2020?') %}
+{% set candidate_labels = candidate_labels | default(['Europa', 'salud pública', 'política']) %}
+{% set hypothesis_template = hypothesis_template | default('Este ejemplo es {}.') %}
+{% set entailment_label = entailment_label | default('▁0') %}
+{% set neutral_label = neutral_label | default('▁1') %}
+{% set contradiction_label = contradiction_label | default('▁2') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-sequence_to_classify = "{{ sequence_to_classify }}"
-candidate_labels = {{ candidate_labels }}
-hypothesis_template = "{{ hypothesis_template }}"
-from transformers import MT5ForConditionalGeneration, T5Tokenizer
-import json
-import os
+sequence_to_classify = {{ sequence_to_classify | tojson }}
+candidate_labels = {{ candidate_labels | tojson }}
+hypothesis_template = {{ hypothesis_template | tojson }}
+entailment_label = {{ entailment_label | tojson }}
+neutral_label = {{ neutral_label | tojson }}
+contradiction_label = {{ contradiction_label | tojson }}
+
 import torch
 from torch.nn.functional import softmax
-tokenizer = T5Tokenizer.from_pretrained(repo_id, use_fast=False)
-model = MT5ForConditionalGeneration.from_pretrained(repo_id).to(device)
+from transformers import T5Tokenizer, MT5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+tokenizer = T5Tokenizer.from_pretrained(repo_id)
+model = MT5ForConditionalGeneration.from_pretrained(repo_id, config=config_path, local_files_only=True)
+model.to(device)
 model.eval()
-task_prefix = "xnli: premise: "
-label_tokens = ["▁0", "▁1", "▁2"]
-label_token_ids = tokenizer.convert_tokens_to_ids(label_tokens)
-def make_xnli_sequence(label: str) -> str:
-    return f"{task_prefix}{sequence_to_classify} hypothesis: {hypothesis_template.format(label)}"
-candidate_sequences = [make_xnli_sequence(label) for label in candidate_labels]
-encoded_inputs = tokenizer(candidate_sequences, return_tensors="pt", padding=True)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
-generated = model.generate(
-    **encoded_inputs,
-    output_scores=True,
-    return_dict_in_generate=True,
-    num_beams=1,
-)
-scores = generated.scores[0]
-scores = scores[:, label_token_ids]
-entailment_scores = scores[:, 0]
-contradiction_scores = scores[:, 2]
-entail_vs_contra_scores = torch.stack([entailment_scores, contradiction_scores], dim=1)
-entail_vs_contra_probas = softmax(entail_vs_contra_scores, dim=1)
-entailment_probabilities = softmax(entailment_scores, dim=0)
-label_entailment_probabilities = dict(
-    zip(candidate_labels, entailment_probabilities.tolist())
-)
-RESULT = {
-    "label_entailment_probabilities": label_entailment_probabilities,
-    "entailment_vs_contradiction_probabilities": entail_vs_contra_probas.detach().cpu().tolist(),
-    "generated_sequences": generated.sequences.detach().cpu().tolist(),
-}
+
+label_inds = tokenizer.convert_tokens_to_ids([entailment_label, neutral_label, contradiction_label])
+
+def process_nli(premise: str, hypothesis: str):
+    return ''.join(['xnli: premise: ', premise, ' hypothesis: ', hypothesis])
+
+pairs = [(sequence_to_classify, hypothesis_template.format(label)) for label in candidate_labels]
+seqs = [process_nli(premise=premise, hypothesis=hypothesis) for premise, hypothesis in pairs]
+inputs = tokenizer(seqs, return_tensors="pt", padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    out = model.generate(**inputs, output_scores=True, return_dict_in_generate=True, num_beams=1)
+
+scores = out.scores[0]
+scores = scores[:, label_inds]
+entail_scores = scores[:, 0]
+entail_probas = softmax(entail_scores, dim=0)
+RESULT = {"labels": candidate_labels, "entailment_probabilities": entail_probas.detach().cpu().tolist(), "pairs": seqs}

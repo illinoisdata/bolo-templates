@@ -1,25 +1,39 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("tunib/electra-ko-base") %}
-{% set text_input = text_input | default("한국어와 English가 섞인 예시 문장입니다.") %}
-device = "{{ device }}"
+{% set device = device | default("cuda:0") %}
+{% set text = text|default('튜닙은 자연어처리 테크 스타트업입니다.') %}
 repo_id = "{{ repo_id }}"
-text_input = "{{ text_input }}"
-
-import json
-import os
+device = "{{ device }}"
+text = "{{ text }}"
 
 import torch
-from transformers import AutoModelForPreTraining, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id)
-model = model.to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-encoded_input = tokenizer(text_input, return_tensors="pt")
-encoded_input = {k: v.to(device) for k, v in encoded_input.items()}
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    vocab_file=vocab_path,
+    tokenizer_file=None,
+)
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-model_output = model(**encoded_input)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
 
-logits = model_output.logits.detach().cpu().tolist()
+last_hidden_state = outputs.last_hidden_state
+pooler_output = getattr(outputs, "pooler_output", None)
+if pooler_output is None:
+    pooler_output = last_hidden_state[:, 0]
 
-RESULT = {"logits": logits}
+RESULT = {
+    "last_hidden_state": last_hidden_state,
+    "pooler_output": pooler_output,
+}

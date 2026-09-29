@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("breezedeus/cnstd-ppocr-ch_PP-OCRv5_det") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set det_limit_side_len = det_limit_side_len | default(960) %}
+{% set det_limit_type = det_limit_type | default('max') %}
+{% set det_thresh = det_thresh | default(0.3) %}
+{% set det_box_thresh = det_box_thresh | default(0.6) %}
+{% set det_unclip_ratio = det_unclip_ratio | default(1.6) %}
+{% set use_dilation = use_dilation | default(false) %}
+{% set score_mode = score_mode | default('fast') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+det_limit_side_len = {{ det_limit_side_len }}
+det_limit_type = "{{ det_limit_type }}"
+det_thresh = {{ det_thresh }}
+det_box_thresh = {{ det_box_thresh }}
+det_unclip_ratio = {{ det_unclip_ratio }}
+use_dilation = {{ use_dilation }}
+score_mode = "{{ score_mode }}"
+
+import numpy as np
+from PIL import Image
+import onnxruntime as ort
+from huggingface_hub import hf_hub_download
+import requests
+from io import BytesIO
+
+onnx_path = hf_hub_download(repo_id=repo_id, filename="ch_PP-OCRv5_det_infer.onnx")
+_ = hf_hub_download(repo_id=repo_id, filename="config.yaml")
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+img = np.array(image).astype(np.float32)
+img = img[:, :, ::-1] / 255.0
+img = (img - np.array([0.485, 0.456, 0.406], dtype=np.float32)) / np.array([0.229, 0.224, 0.225], dtype=np.float32)
+img = np.transpose(img, (2, 0, 1))[None, ...]
+
+providers = ["CPUExecutionProvider"]
+session_options = ort.SessionOptions()
+session_options.intra_op_num_threads = 1
+session_options.inter_op_num_threads = 1
+session = ort.InferenceSession(onnx_path, sess_options=session_options, providers=providers)
+input_name = session.get_inputs()[0].name
+output = session.run(None, {input_name: img})[0]
+
+RESULT = {"output": output}

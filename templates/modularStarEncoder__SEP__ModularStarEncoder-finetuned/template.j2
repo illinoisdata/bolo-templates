@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("modularStarEncoder/ModularStarEncoder-finetuned") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+import sys, types
+# Disable strict dataclass validation for custom code
+import huggingface_hub.dataclasses as _dataclasses
+
+def _no_strict(*args, **kwargs):
+    if args and isinstance(args[0], type):
+        return args[0]
+    return lambda cls: cls
+
+_dataclasses.strict = _no_strict
+
+# Stub out transformers dependency version check module to avoid import-time checks
+_stub = types.ModuleType('transformers.dependency_versions_check')
+_stub.dep_version_check = lambda *args, **kwargs: None
+sys.modules['transformers.dependency_versions_check'] = _stub
+
+from transformers import pipeline, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+pipe = pipeline(task=task, model=repo_id, tokenizer=tokenizer, device=device, trust_remote_code=True)
+# Monkey-patch postprocess to handle list outputs without `.tolist()`
+pipe.postprocess = lambda model_outputs, **kwargs: model_outputs[0]
+RESULT = pipe(input_prompt)

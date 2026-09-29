@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("deepset/gbert-large") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Berlin ist die {mask} von Deutschland.") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+masked_prompt = "{{ masked_prompt }}"
+
+from transformers import BertConfig, BertTokenizer, pipeline
+
+config = BertConfig.from_pretrained(repo_id)
+tokenizer = BertTokenizer.from_pretrained(repo_id, do_lower_case=False)
+pipe = pipeline(task=task, model=repo_id, tokenizer=tokenizer, config=config, device=device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

@@ -1,0 +1,62 @@
+{% set repo_id = repo_id | default("unsloth/Qwen3-4B") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Give me a short introduction to large language models.') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.8) %}
+{% set top_k = top_k | default(20) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+top_k = {{ top_k }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
+
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+index_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+gen_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    low_cpu_mem_usage=True,
+    trust_remote_code=True,
+)
+model.to(device)
+model.eval()
+
+messages = [{"role": "user", "content": prompt}]
+text = tokenizer.apply_chat_template(
+    messages,
+    tokenize=False,
+    add_generation_prompt=True,
+    enable_thinking=False,
+)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=True,
+        temperature=temperature,
+        top_p=top_p,
+        top_k=top_k,
+    )
+output_ids = generated_ids[0][inputs["input_ids"].shape[1]:]
+output = tokenizer.decode(output_ids, skip_special_tokens=True).strip()
+
+RESULT = {"output": output}

@@ -1,0 +1,42 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("OpenGVLab/InternViT-300M-448px-V2_5") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import os
+import sys
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from transformers import AutoConfig, AutoModel, CLIPImageProcessor
+
+config_file = hf_hub_download(repo_id=repo_id, filename='config.json')
+weights_path = hf_hub_download(repo_id=repo_id, filename='model.safetensors')
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename='preprocessor_config.json')
+modeling_path = hf_hub_download(repo_id=repo_id, filename='modeling_intern_vit.py')
+configuration_path = hf_hub_download(repo_id=repo_id, filename='configuration_intern_vit.py')
+flash_attention_path = hf_hub_download(repo_id=repo_id, filename='flash_attention.py')
+
+repo_dir = os.path.dirname(weights_path)
+sys.path.insert(0, repo_dir)
+
+image = Image.open(image_path).convert('RGB') if os.path.isfile(image_path) else Image.open(__import__('requests').get(image_path, stream=True).raw).convert('RGB')
+image_processor = CLIPImageProcessor.from_pretrained(repo_dir)
+
+config = AutoConfig.from_pretrained(repo_dir, trust_remote_code=True)
+model = AutoModel.from_config(config, trust_remote_code=True).to(device).eval()
+state_dict = torch.load(weights_path, map_location='cpu') if weights_path.endswith('.bin') else None
+if state_dict is not None:
+    model.load_state_dict(state_dict, strict=True)
+else:
+    from safetensors.torch import load_file
+    model.load_state_dict(load_file(weights_path), strict=True)
+
+pixel_values = image_processor(images=image, return_tensors='pt').pixel_values.to(dtype=torch.bfloat16, device=device)
+outputs = model(pixel_values)
+RESULT = {
+    'last_hidden_state': outputs.last_hidden_state,
+}

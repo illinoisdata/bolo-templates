@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("daphne-cornelisse/policy_S10_000_02_27") %}
+{% set device = device | default("cuda:0") %}
+{% set ego_state = ego_state | default([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+ego_state = {{ ego_state | tojson }}
+
+import torch
+import torch.nn as nn
+from safetensors.torch import load_file
+from huggingface_hub import hf_hub_download
+
+class PolicyNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.ego_embed = nn.Sequential(nn.Linear(6, 64), nn.ReLU(), nn.Linear(64, 64))
+        self.partner_embed = nn.Sequential(nn.Linear(6, 64), nn.ReLU(), nn.Linear(64, 64))
+        self.road_map_embed = nn.Sequential(nn.Linear(13, 64), nn.ReLU(), nn.Linear(64, 64))
+        self.shared_embed = nn.Sequential(nn.Linear(192, 128))
+        self.actor = nn.Linear(128, 91)
+        self.critic = nn.Linear(128, 1)
+
+    def forward(self, ego, partner, road):
+        e = self.ego_embed(ego)
+        p = self.partner_embed(partner)
+        r = self.road_map_embed(road)
+        x = torch.cat([e, p, r], dim=-1)
+        h = self.shared_embed(x)
+        return self.actor(h)
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+model = PolicyNet().to(device)
+state_dict = load_file(weights_path, device=device)
+model.load_state_dict(state_dict, strict=False)
+model.eval()
+
+ego = torch.tensor([ego_state], dtype=torch.float32, device=device)
+partner = torch.zeros((1, 6), dtype=torch.float32, device=device)
+road = torch.zeros((1, 13), dtype=torch.float32, device=device)
+
+with torch.no_grad():
+    action = model(ego, partner, road).squeeze(0).detach().cpu().tolist()
+
+RESULT = {"action": action}

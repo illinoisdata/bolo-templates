@@ -1,58 +1,49 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("ibm-research/qcpg-sentences") %}
-{% set input_text = input_text | default("Will this approach work for generating diverse paraphrases?") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Is this going to work or what are we doing here?') %}
 {% set lexical = lexical | default(0.3) %}
 {% set syntactic = syntactic | default(0.5) %}
 {% set semantic = semantic | default(0.8) %}
-{% set max_length = max_length | default(120) %}
-{% set num_beams = num_beams | default(4) %}
-{% set num_return_sequences = num_return_sequences | default(1) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
+text = "{{ text }}"
 lexical = {{ lexical }}
 syntactic = {{ syntactic }}
 semantic = {{ semantic }}
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-num_return_sequences = {{ num_return_sequences }}
 
-from pathlib import Path
+import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-control_ranges = {
-    "lex": (0, 100),
-    "syn": (0, 80),
-    "sem": (0, 95),
+model_dir = "/".join(model_path.split("/")[:-1])
+tokenizer = AutoTokenizer.from_pretrained(model_dir)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir).to(device)
+model.eval()
+
+assert all([0 <= val <= 1 for val in [lexical, syntactic, semantic]])
+names = ["semantic_sim", "lexical_div", "syntactic_div"]
+control = [int(5 * round(val * 100 / 5)) for val in [semantic, lexical, syntactic]]
+ranges = {
+    "captions": {"lex": [0, 90], "syn": [0, 80], "sem": [0, 95]},
+    "sentences": {"lex": [0, 100], "syn": [0, 80], "sem": [0, 95]},
+    "questions": {"lex": [0, 90], "syn": [0, 75], "sem": [0, 95]},
 }
-range_key_map = {
-    "semantic_sim": "sem",
-    "lexical_div": "lex",
-    "syntactic_div": "syn",
-}
-control_names = ["semantic_sim", "lexical_div", "syntactic_div"]
-input_values = [semantic, lexical, syntactic]
-control_tokens = []
-for name, value in zip(control_names, input_values):
-    raw_value = int(5 * round(value * 100 / 5))
-    key = range_key_map[name]
-    min_val, max_val = control_ranges[key]
-    clamped = max(min(raw_value, max_val), min_val)
-    token = f"COND_{name.upper()}_{clamped}"
-    control_tokens.append(token)
+control = {name: max(min(val, ranges["sentences"][name[:3]][1]), ranges["sentences"][name[:3]][0]) for name, val in zip(names, control)}
+control_tokens = [f"COND_{name.upper()}_{control[name]}" for name in names]
+input_text = " ".join(control_tokens) + text
 
-controlled_text = f"{' '.join(control_tokens)} {input_text}"
-inputs = tokenizer(controlled_text, return_tensors="pt").to(device)
-generated_tokens = model.generate(
-    **inputs,
-    max_length=max_length,
-    num_beams=num_beams,
-    num_return_sequences=num_return_sequences,
-    early_stopping=True,
-)
-generated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+inputs = tokenizer(input_text, return_tensors="pt").to(device)
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_length=64, num_beams=4)
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-RESULT = {"generated_texts": generated_texts}
+RESULT = {"generated_text": output_text}

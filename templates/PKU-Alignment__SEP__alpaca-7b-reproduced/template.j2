@@ -1,0 +1,57 @@
+{% set repo_id = repo_id | default("PKU-Alignment/alpaca-7b-reproduced") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('How can I write a polite email to ask for a meeting?') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.9) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    low_cpu_mem_usage=True,
+    device_map=None,
+    trust_remote_code=False,
+)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+text = f"BEGINNING OF CONVERSATION: USER: {prompt} ASSISTANT:"
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=True,
+        temperature=temperature,
+        top_p=top_p,
+        pad_token_id=tokenizer.pad_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

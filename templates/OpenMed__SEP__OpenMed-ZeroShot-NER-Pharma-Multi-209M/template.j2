@@ -1,0 +1,24 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Pharma-Multi-209M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Administration of metformin reduced glucose levels significantly.") %}
+{% set labels = labels | default(["CHE"]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+labels = {{ labels | tojson }}
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="spm.model")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+state = torch.load(model_path, map_location=device)
+RESULT = {"config": cfg, "state_dict_keys": list(state.keys())[:5]}

@@ -1,0 +1,36 @@
+{% set repo_id = repo_id | default("akari000/gpt-2-artificial-vss-40") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Once upon a time,') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens | default(20) }}
+seed = {{ seed | default(42) }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+
+torch.manual_seed(seed)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(seed)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForCausalLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=True,
+        pad_token_id=tokenizer.eos_token_id,
+    )
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": output_text}

@@ -1,51 +1,44 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("google/fnet-base") %}
-{% set fill_mask_text = fill_mask_text | default("Hello I'm a [MASK] model.") %}
-{% set top_k = top_k | default(5) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text|default('Replace me by any text you\'d like.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-fill_mask_text = "{{ fill_mask_text }}"
-top_k = {{ top_k }}
-
-import json
-from pathlib import Path
+text = {{ text | tojson }}
 
 import torch
-from transformers import AutoModelForMaskedLM, AutoTokenizer
+from transformers import FNetTokenizer, FNetModel
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-encoded_input = tokenizer(fill_mask_text, return_tensors="pt")
-encoded_input = {key: value.to(device) for key, value in encoded_input.items()}
+# Load tokenizer/model from the repo snapshot files.
+tokenizer = FNetTokenizer.from_pretrained(
+    repo_id,
+    tokenizer_file=tokenizer_path,
+    sp_model_kwargs={},
+)
+model = FNetModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+encoded_input = tokenizer(
+    text,
+    return_tensors="pt",
+    padding="max_length",
+    truncation=True,
+    max_length=512,
+)
+encoded_input = {k: v.to(device) for k, v in encoded_input.items()}
 
 with torch.no_grad():
-    inference_output = model(**encoded_input)
+    output = model(**encoded_input)
 
-logits = inference_output.logits
-input_ids = encoded_input["input_ids"]
-mask_token_id = tokenizer.mask_token_id
-mask_positions = (input_ids[0] == mask_token_id).nonzero(as_tuple=True)[0]
-
-predictions = []
-for mask_index in mask_positions:
-    position_logits = logits[0, mask_index]
-    scores = torch.softmax(position_logits, dim=-1)
-    topk_scores, topk_indices = torch.topk(scores, top_k, dim=-1)
-    for score, token_id in zip(topk_scores.tolist(), topk_indices.tolist()):
-        filled_ids = input_ids[0].clone()
-        filled_ids[mask_index] = token_id
-        filled_ids_cpu = filled_ids.cpu()
-        sequence = tokenizer.decode(filled_ids_cpu, skip_special_tokens=True)
-        token_str = tokenizer.convert_ids_to_tokens(token_id)
-        predictions.append(
-            {
-                "mask_index": int(mask_index.item()),
-                "token_id": int(token_id),
-                "token_str": token_str,
-                "score": float(score),
-                "sequence": sequence,
-            }
-        )
-
-RESULT = {"fill_mask_predictions": predictions}
+RESULT = {
+    "last_hidden_state": output.last_hidden_state,
+    "pooler_output": output.pooler_output,
+}

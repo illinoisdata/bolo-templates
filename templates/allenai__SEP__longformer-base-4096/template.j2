@@ -1,53 +1,46 @@
 {% set repo_id = repo_id | default("allenai/longformer-base-4096") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("Longformer excels at modeling <mask> documents.") %}
-{% set top_k = top_k | default(5) %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-text = {{ text | tojson }}
-top_k = {{ top_k }}
+{% set text = text | default('Longformer is a transformer model for long documents. It supports sequences of length up to 4096 tokens.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
 
-from transformers import AutoTokenizer, AutoModelForMaskedLM
-import json
-import os
 import torch
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForMaskedLM.from_pretrained(repo_id)
-torch_device = torch.device(device)
-model = model.to(torch_device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+# Load tokenizer and model from downloaded local files.
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    use_fast=True,
+    local_files_only=True,
+)
+model = AutoModelForMaskedLM.from_pretrained(
+    repo_id,
+    local_files_only=True,
+    torch_dtype=torch.float32,
+)
+model.to(device)
 model.eval()
 
-encoded = tokenizer(text, return_tensors="pt")
-encoded = {key: value.to(torch_device) for key, value in encoded.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**encoded)
+    outputs = model(**inputs)
 
-input_ids = encoded["input_ids"]
 logits = outputs.logits
-mask_token_id = tokenizer.mask_token_id
-mask_locations = torch.where(input_ids == mask_token_id)
-batch_indices = mask_locations[0]
-sequence_indices = mask_locations[1]
+predicted_token_ids = torch.argmax(logits, dim=-1)
+predicted_tokens = tokenizer.convert_ids_to_tokens(predicted_token_ids[0].tolist())
 
-mask_predictions = []
-for batch_idx, seq_idx in zip(batch_indices.tolist(), sequence_indices.tolist()):
-    mask_logits = logits[batch_idx, seq_idx]
-    probs = torch.softmax(mask_logits, dim=-1)
-    normalized_top_k = min(top_k, probs.size(-1))
-    top_values, top_indices = torch.topk(probs, k=normalized_top_k)
-    token_ids = top_indices.tolist()
-    tokens = tokenizer.convert_ids_to_tokens(token_ids)
-    scores = top_values.tolist()
-    mask_predictions.append(
-        {
-            "sample_index": batch_idx,
-            "mask_index": seq_idx,
-            "token_ids": token_ids,
-            "tokens": tokens,
-            "scores": scores,
-        }
-    )
-
-RESULT = {"mask_predictions": mask_predictions}
+RESULT = {
+    "logits": logits.detach().cpu(),
+    "predicted_token_ids": predicted_token_ids.detach().cpu(),
+    "predicted_tokens": predicted_tokens,
+}

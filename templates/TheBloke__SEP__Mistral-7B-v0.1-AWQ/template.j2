@@ -1,0 +1,30 @@
+{% set repo_id = repo_id | default("TheBloke/Mistral-7B-v0.1-AWQ") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+import torch
+import types
+from awq import AutoAWQForCausalLM
+from transformers import AutoTokenizer, GenerationConfig, pipeline
+
+model = AutoAWQForCausalLM.from_quantized(repo_id, fuse_layers=True, trust_remote_code=False, safetensors=True)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=False)
+torch_device = torch.device(device)
+model.to(torch_device)
+setattr(model, "device", torch_device)
+
+model.generation_config = GenerationConfig.from_model_config(model.config)
+
+def _can_generate(self, *args, **kwargs):
+    return True
+
+model.can_generate = types.MethodType(_can_generate, model)
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt)

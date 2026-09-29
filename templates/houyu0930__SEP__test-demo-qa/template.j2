@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("houyu0930/test-demo-qa") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What is the model card about?') %}
+{% set context = context | default('This model card describes a transformers model that has been pushed on the Hub and automatically generated.') %}
+{% set max_length = max_length | default(384) %}
+{% set doc_stride = doc_stride | default(128) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+max_length = {{ max_length }}
+doc_stride = {{ doc_stride }}
+
+import os
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
+import torch
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+model_dir = os.path.dirname(weights_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
+model = AutoModelForQuestionAnswering.from_pretrained(model_dir, local_files_only=True)
+model.to(device)
+model.eval()
+
+input_ids = tokenizer(question, context, return_tensors="pt")
+input_ids = {k: v.to(device) for k, v in input_ids.items()}
+with torch.no_grad():
+    outputs = model(**input_ids)
+
+start_logits = outputs.start_logits[0]
+end_logits = outputs.end_logits[0]
+start_index = int(torch.argmax(start_logits).item())
+end_index = int(torch.argmax(end_logits).item())
+if end_index < start_index:
+    end_index = start_index
+answer_tokens = input_ids["input_ids"][0][start_index:end_index + 1]
+answer_text = tokenizer.decode(answer_tokens, skip_special_tokens=True)
+
+RESULT = {"answer": answer_text, "start_index": start_index, "end_index": end_index}

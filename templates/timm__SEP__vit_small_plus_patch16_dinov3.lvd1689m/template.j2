@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("timm/vit_small_plus_patch16_dinov3.lvd1689m") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-feature-extraction") %}
+{% set model = model | default(repo_id) %}
+{% set input_data = input_data | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_data = {{ input_data | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+
+preprocessed_input = input_data
+RESULT = pipe(preprocessed_input)

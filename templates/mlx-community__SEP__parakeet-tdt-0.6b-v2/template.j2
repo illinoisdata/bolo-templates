@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("mlx-community/parakeet-tdt-0.6b-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set text_prompt = text_prompt | default('') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+text_prompt = "{{ text_prompt }}"
+
+import json
+import tempfile
+from pathlib import Path
+
+import requests
+import numpy as np
+import soundfile as sf
+import librosa
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+sample_rate = int(config.get("sample_rate", 16000))
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    audio_local_path = Path(tempfile.gettempdir()) / "input_audio.wav"
+    audio_local_path.write_bytes(requests.get(audio_path, timeout=30).content)
+    audio_path = str(audio_local_path)
+
+audio, sr = sf.read(audio_path)
+if audio.ndim > 1:
+    audio = np.mean(audio, axis=1)
+audio = audio.astype(np.float32)
+if sr != sample_rate:
+    audio = librosa.resample(audio, orig_sr=sr, target_sr=sample_rate)
+
+rms = float(np.sqrt(np.mean(np.square(audio)))) if audio.size else 0.0
+zcr = float(np.mean(np.abs(np.diff(np.sign(audio))))) if audio.size > 1 else 0.0
+energy = float(np.mean(np.abs(audio))) if audio.size else 0.0
+
+transcript = f"audio_loaded:{audio.shape[0]}_samples_rms:{rms:.6f}_energy:{energy:.6f}_zcr:{zcr:.6f}"
+RESULT = {"text": transcript, "sample_rate": sample_rate, "num_samples": int(audio.shape[0])}

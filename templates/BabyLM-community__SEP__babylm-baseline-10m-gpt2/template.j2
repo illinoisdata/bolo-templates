@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("BabyLM-community/babylm-baseline-10m-gpt2") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('The quick brown fox') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+merges_file = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    local_files_only=True,
+)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    local_files_only=True,
+    torch_dtype=torch.float32,
+).to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=20,
+        do_sample=False,
+        pad_token_id=tokenizer.eos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

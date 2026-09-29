@@ -1,26 +1,31 @@
 {% set repo_id = repo_id | default("stanford-nlpxed/uptake-model") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("The patient is showing signs of improvement.") %}
+{% set text = text | default('This is a test sentence for inference.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
+text = {{ text | tojson }}
 
-from pathlib import Path
-import json
 import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
 
-model = AutoModelForSequenceClassification.from_pretrained(repo_id).to(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+weights_path = hf_hub_download(repo_id=repo_id, filename='pytorch_model.bin')
 
-encoded_inputs = tokenizer(input_text, return_tensors="pt", truncation=True)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModel.from_pretrained(repo_id, local_files_only=True)
+state_dict = torch.load(weights_path, map_location='cpu')
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
 
+inputs = tokenizer(text, return_tensors='pt', truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
+    outputs = model(**inputs)
 
-logits = outputs.logits
-logits_cpu = logits.detach().to("cpu")
-logits_list = logits_cpu.tolist()
-
-RESULT = {"logits": logits_list}
+last_hidden_state = outputs.last_hidden_state
+pooler_output = getattr(outputs, 'pooler_output', None)
+RESULT = {
+    'last_hidden_state': last_hidden_state.detach().cpu(),
+    'pooler_output': None if pooler_output is None else pooler_output.detach().cpu(),
+}

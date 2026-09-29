@@ -1,62 +1,71 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("LIAMF-USP/roberta-large-finetuned-race") %}
-{% set question = question | default("What is the capital of France?") %}
-{% set context = context | default("France is a Western European country whose capital city is famous for the Eiffel Tower, art museums, and a rich cultural history.") %}
-{% set options = options | default(["Berlin", "Madrid", "Paris", "Rome"]) %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('The trophy doesn\'t fit in the brown suitcase because it is too ___.') %}
+{% set options = options | default(['big', 'small', 'heavy', 'cheap']) %}
 {% set max_length = max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-question = "{{ question }}"
-context = "{{ context }}"
+question = {{ question | tojson }}
 options = {{ options | tojson }}
 max_length = {{ max_length }}
 
-from pathlib import Path
-import json
-
+import os
 import torch
-import torch.nn.functional as F
-from transformers import AutoTokenizer, AutoModelForMultipleChoice
+from transformers import RobertaTokenizer, RobertaForMultipleChoice
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForMultipleChoice.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
 
-choices_encodings = []
-for option in options:
-    if "_" in question:
-        adjusted_question = question.replace("_", option)
+# Load tokenizer/model from the downloaded repository files.
+tokenizer = RobertaTokenizer.from_pretrained(
+    os.path.dirname(vocab_path),
+    tokenizer_config_file=tokenizer_config_path,
+    special_tokens_map_file=special_tokens_map_path,
+    local_files_only=True,
+)
+model = RobertaForMultipleChoice.from_pretrained(
+    os.path.dirname(weights_path),
+    local_files_only=True,
+)
+model.to(device)
+model.eval()
+
+context = "A person wants to carry a trophy in a suitcase."
+choices_inputs = []
+for ending in options:
+    if question.find("_") != -1:
+        question_option = question.replace("_", ending)
     else:
-        adjusted_question = f"{question} {option}"
-    encoding = tokenizer(
+        question_option = question + " " + ending
+    encoded = tokenizer(
         context,
-        adjusted_question,
+        question_option,
         add_special_tokens=True,
         max_length=max_length,
         padding="max_length",
         truncation=True,
         return_tensors="pt",
     )
-    choices_encodings.append(encoding)
+    choices_inputs.append(encoded)
 
-input_ids = torch.cat([choice["input_ids"] for choice in choices_encodings], dim=0)
-attention_mask = torch.cat([choice["attention_mask"] for choice in choices_encodings], dim=0)
-model_inputs = {
-    "input_ids": input_ids.unsqueeze(0).to(device),
-    "attention_mask": attention_mask.unsqueeze(0).to(device),
-}
+input_ids = torch.cat([x["input_ids"] for x in choices_inputs], dim=0).unsqueeze(0).to(device)
+attention_mask = torch.cat([x["attention_mask"] for x in choices_inputs], dim=0).unsqueeze(0).to(device)
 
 with torch.no_grad():
-    outputs = model(**model_inputs)
-logits = outputs.logits
-probabilities = torch.softmax(logits, dim=-1)
-logits_cpu = logits.squeeze(0).cpu()
-probabilities_cpu = probabilities.squeeze(0).cpu()
-predicted_choice_index = int(logits_cpu.argmax(dim=-1).item())
-predicted_option = options[predicted_choice_index]
+    outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+    logits = outputs.logits
+    probabilities = torch.softmax(logits, dim=-1)
+    predicted_index = int(torch.argmax(logits, dim=-1).item())
+    predicted_option = options[predicted_index]
 
 RESULT = {
-    "options": options,
-    "logits": logits_cpu.tolist(),
-    "probabilities": probabilities_cpu.tolist(),
+    "logits": logits.detach().cpu().tolist(),
+    "probabilities": probabilities.detach().cpu().tolist(),
+    "predicted_index": predicted_index,
     "predicted_option": predicted_option,
 }

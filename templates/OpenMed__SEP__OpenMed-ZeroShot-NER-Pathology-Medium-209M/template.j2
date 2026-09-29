@@ -1,0 +1,24 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Pathology-Medium-209M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Early detection of breast cancer improves survival rates.') %}
+{% set labels = labels | default(['DISEASE']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+labels = {{ labels }}
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+from gliner import GLiNER
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = GLiNER.from_pretrained(repo_id)
+model = model.to(device)
+
+entities = model.predict_entities(text, labels, flat_ner=True, threshold=0.5)
+RESULT = {"entities": entities}

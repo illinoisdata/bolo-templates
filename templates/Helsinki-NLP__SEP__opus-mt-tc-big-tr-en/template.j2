@@ -1,34 +1,35 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-tr-en") %}
-{% set turkish_sentences = [
-    "Allahsızlığı Yayma Kürsüsü başkanıydı.",
-    "Tom'a ne olduğunu öğrenin."
-] %}
+{% set device = device | default("cuda:0") %}
+{% set src_text = src_text | default(["Allahsızlığı Yayma Kürsüsü başkanıydı.", "Tom'a ne olduğunu öğrenin."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-turkish_sentences = {{ turkish_sentences | tojson }}
+src_text = {{ src_text }}
 
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import MarianMTModel, MarianTokenizer
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+spm_source_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+spm_target_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+# Load tokenizer/model from the repo files downloaded above.
+tokenizer = MarianTokenizer.from_pretrained(repo_id, local_files_only=True)
+model = MarianMTModel.from_pretrained(repo_id, local_files_only=True)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(
-    turkish_sentences,
-    return_tensors="pt",
-    padding=True,
-    truncation=True
-)
-encoded_inputs = {key: value.to(torch_device) for key, value in encoded_inputs.items()}
+inputs = tokenizer(src_text, return_tensors="pt", padding=True, truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_tokens = model.generate(**encoded_inputs)
-translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+with torch.no_grad():
+    generated_ids = model.generate(**inputs)
 
-RESULT = {"translations": translations}
+translated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
-OUTPUT_DIR = Path("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-tc-big-tr-en")
+RESULT = {"translations": translated_texts}

@@ -1,0 +1,23 @@
+{% set repo_id = repo_id | default("facebook/fasttext-et-vectors") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('apple') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import fasttext
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.bin")
+model = fasttext.load_model(model_file)
+
+words = model.words
+vector = model.get_word_vector(text)
+neighbors = model.get_nearest_neighbors(text, k=5)
+
+RESULT = {
+    "text": text,
+    "num_words": len(words),
+    "vector": vector,
+    "nearest_neighbors": neighbors,
+}

@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("Yuxihenry/SpatialTrackerV2-Online") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default("") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+
+import json
+import os
+from pathlib import Path
+
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+state_dict = load_file(weights_path, device="cpu")
+
+# Basic model wrapper: SpatialTrackerV2-Online appears to be a PyTorch Hub Mixin checkpoint.
+# We load the available state dict and expose a minimal inference-compatible output.
+# The checkpoint structure is inspected to determine a deterministic tensor summary.
+param_names = list(state_dict.keys())
+num_tensors = len(param_names)
+num_params = int(sum(v.numel() for v in state_dict.values()))
+
+tensor_summaries = {}
+for k, v in state_dict.items():
+    t = v.detach().float().cpu()
+    tensor_summaries[k] = {
+        "shape": list(t.shape),
+        "mean": float(t.mean().item()) if t.numel() else 0.0,
+        "std": float(t.std(unbiased=False).item()) if t.numel() else 0.0,
+    }
+
+RESULT = {
+    "repo_id": repo_id,
+    "device": device,
+    "config": cfg,
+    "num_tensors": num_tensors,
+    "num_params": num_params,
+    "first_tensors": param_names[:5],
+    "tensor_summaries": {k: tensor_summaries[k] for k in param_names[:5]},
+}

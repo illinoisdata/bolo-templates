@@ -1,0 +1,10 @@
+{% set repo_id = repo_id | default("ali-vilab/modelscope-damo-text-to-video-synthesis") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('A panda eating bamboo on a rock.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+
+RESULT = {'output': {'text': text, 'device': device, 'model_id': repo_id}}

@@ -1,0 +1,14 @@
+{% set repo_id = repo_id | default("RedHatAI/Meta-Llama-3.1-8B-Instruct-FP8-dynamic") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = pipe(input_prompt)

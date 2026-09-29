@@ -1,0 +1,21 @@
+{% set repo_id = repo_id | default("pittawat/vit-base-uppercase-english-characters") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set input_image_path = input_image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+{% set image_processor_repo = image_processor_repo | default("google/vit-base-patch16-224-in21k") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_image_path = {{ input_image_path | tojson }}
+image_processor_repo = {{ image_processor_repo | tojson }}
+
+from PIL import Image
+from transformers import AutoImageProcessor, pipeline
+
+image_processor = AutoImageProcessor.from_pretrained(image_processor_repo)
+pipe = pipeline(task=task, model=repo_id, device=device, image_processor=image_processor)
+
+image = Image.open(input_image_path).convert("RGB")
+prediction = pipe(image)
+RESULT = {"outputs": prediction}

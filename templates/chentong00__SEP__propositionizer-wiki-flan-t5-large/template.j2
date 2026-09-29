@@ -1,34 +1,44 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("chentong00/propositionizer-wiki-flan-t5-large") %}
-{% set title = title | default("Leaning Tower of Pisa") %}
-{% set section = section | default("") %}
-{% set content = content | default("Prior to restoration work performed between 1990 and 2001, Leaning Tower of Pisa leaned at an angle of 5.5 degrees, but the tower now leans at about 3.99 degrees. This means the top of the tower is displaced horizontally 3.9 meters (12 ft 10 in) from the center.") %}
-{% set max_new_tokens = max_new_tokens | default(512) %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-title = {{ title | tojson }}
-section = {{ section | tojson }}
-content = {{ content | tojson }}
+{% set device = device | default("cuda:0") %}
+{% set title = title | default('Leaning Tower of Pisa') %}
+{% set section = section | default('') %}
+{% set content = content | default('Prior to restoration work performed between 1990 and 2001, Leaning Tower of Pisa leaned at an angle of 5.5 degrees, but the tower now leans at about 3.99 degrees. This means the top of the tower is displaced horizontally 3.9 meters (12 ft 10 in) from the center.') %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+title = "{{ title }}"
+section = "{{ section }}"
+content = "{{ content }}"
 max_new_tokens = {{ max_new_tokens }}
 
 import json
-import os
-
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+_ = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+_ = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
 
 prompt = f"Title: {title}. Section: {section}. Content: {content}"
-encoding = tokenizer(prompt, return_tensors="pt")
-input_ids = encoding.input_ids.to(device)
-attention_mask = encoding.attention_mask.to(device)
 
-generated_ids = model.generate(input_ids, attention_mask=attention_mask, max_new_tokens=max_new_tokens)
-generated_ids = generated_ids.cpu()
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model = model.to(device)
+model.eval()
 
-generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
-propositions = json.loads(generated_text)
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+try:
+    propositions = json.loads(output_text)
+except json.JSONDecodeError:
+    propositions = [output_text]
 
-RESULT = {"propositions": propositions}
+RESULT = {"output": propositions}

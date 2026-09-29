@@ -1,7 +1,33 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("jinaai/jina-bert-flash-implementation") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The quick brown fox jumps over the lazy dog.') %}
 repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
 
-from huggingface_hub import list_repo_files
-files = list_repo_files(repo_id)
-print(files)
+import torch
+from transformers import AutoConfig, AutoModel, AutoTokenizer, BertTokenizer
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+config = AutoConfig.from_pretrained(config_path, trust_remote_code=True)
+config.use_flash_attn = False
+
+model = AutoModel.from_config(config, trust_remote_code=True)
+model.to(device)
+model.eval()
+
+tokenizer = BertTokenizer.from_pretrained(repo_id, trust_remote_code=True)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+last_hidden_state = outputs.last_hidden_state
+pooled_output = last_hidden_state[:, 0]
+
+RESULT = {
+    "last_hidden_state": last_hidden_state.detach().cpu(),
+    "pooled_output": pooled_output.detach().cpu(),
+}

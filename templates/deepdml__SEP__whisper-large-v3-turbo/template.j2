@@ -1,0 +1,58 @@
+{% set repo_id = repo_id | default("deepdml/whisper-large-v3-turbo") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set task = task | default('transcribe') %}
+{% set language = language | default('en') %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+task = "{{ task }}"
+language = "{{ language }}"
+max_new_tokens = {{ max_new_tokens }}
+
+import os
+import torch
+from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+processor = AutoProcessor.from_pretrained(repo_id)
+
+torch_dtype = torch.float16 if str(device).startswith("cuda") and torch.cuda.is_available() else torch.float32
+model = AutoModelForSpeechSeq2Seq.from_pretrained(
+    repo_id,
+    torch_dtype=torch_dtype,
+    low_cpu_mem_usage=True,
+    use_safetensors=True,
+)
+model.to(device)
+model.eval()
+
+asr_pipe = pipeline(
+    "automatic-speech-recognition",
+    model=model,
+    tokenizer=processor.tokenizer,
+    feature_extractor=processor.feature_extractor,
+    torch_dtype=torch_dtype,
+    device=device,
+)
+
+if str(audio_path).startswith(("http://", "https://")):
+    input_audio = audio_path
+else:
+    input_audio = audio_path
+
+result = asr_pipe(
+    input_audio,
+    generate_kwargs={
+        "task": task,
+        "language": language,
+        "max_new_tokens": max_new_tokens,
+    },
+)
+
+RESULT = {"text": result["text"]}

@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") -%}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") -%}
+{% set max_new_tokens = max_new_tokens | default(256) -%}
+{% set system_prompt = system_prompt | default("You are a helpful assistant that answers clearly.") -%}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+model = repo_id
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens | tojson }}
+system_prompt = {{ system_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    device=device,
+)
+
+conversation = [
+    {"role": "system", "content": system_prompt},
+    {"role": "user", "content": input_prompt},
+]
+
+RESULT = pipe(
+    conversation,
+    max_new_tokens=max_new_tokens,
+)

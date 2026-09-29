@@ -1,0 +1,60 @@
+{% set repo_id = repo_id | default("TalTechNLP/voxlingua107-epaca-tdnn") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set text_input = text_input | default('This is a sample spoken language identification input.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+text_input = "{{ text_input }}"
+
+from pathlib import Path
+import torch
+import soundfile as sf
+from speechbrain.pretrained import EncoderClassifier
+from huggingface_hub import hf_hub_download
+from urllib.parse import urlparse
+import requests
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+hyperparams_path = hf_hub_download(repo_id=repo_id, filename="hyperparams.yaml")
+label_encoder_path = hf_hub_download(repo_id=repo_id, filename="label_encoder.txt")
+classifier_ckpt_path = hf_hub_download(repo_id=repo_id, filename="classifier.ckpt")
+embedding_model_ckpt_path = hf_hub_download(repo_id=repo_id, filename="embedding_model.ckpt")
+normalizer_ckpt_path = hf_hub_download(repo_id=repo_id, filename="normalizer.ckpt")
+model_dir = Path(config_path).parent
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    import io
+    signal, sr = sf.read(io.BytesIO(audio_bytes), dtype="float32")
+else:
+    signal, sr = sf.read(audio_path, dtype="float32")
+
+if signal.ndim > 1:
+    signal = signal.mean(axis=1)
+signal = torch.tensor(signal, dtype=torch.float32)
+
+classifier = EncoderClassifier.from_hparams(
+    source=repo_id,
+    savedir=str(model_dir),
+    run_opts={"device": device},
+)
+
+if signal.dim() == 1:
+    signal = signal.unsqueeze(0)
+
+prediction = classifier.classify_batch(signal.to(device))
+emb = classifier.encode_batch(signal.to(device))
+
+scores = prediction[0].detach().cpu()
+best_score = prediction[1].detach().cpu()
+best_index = prediction[2].detach().cpu()
+best_lang = prediction[3]
+
+RESULT = {
+    "scores": scores,
+    "best_score": best_score,
+    "best_index": best_index,
+    "best_lang": best_lang,
+    "embedding": emb.detach().cpu(),
+}

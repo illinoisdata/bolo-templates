@@ -1,46 +1,42 @@
 {% set repo_id = repo_id | default("FPTAI/vibert-base-cased") %}
 {% set device = device | default("cuda:0") %}
-{% set input_texts = input_texts | default(["I am very satisfied with the service.", "The final result did not meet my expectations."]) %}
+{% set text = text | default('Xin chào, đây là một ví dụ kiểm tra mô hình phân loại văn bản tiếng Việt.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_texts = {{ input_texts }}
+text = {{ text | tojson }}
 
-import json
-from pathlib import Path
-
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSequenceClassification.from_pretrained(repo_id)
-device = torch.device(device)
-model = model.to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+
+tokenizer = AutoTokenizer.from_pretrained(vocab_path.rsplit('/', 1)[0], use_fast=False)
+model = AutoModelForSequenceClassification.from_pretrained(
+    weights_path.rsplit('/', 1)[0],
+    config=config_path,
+    local_files_only=True,
+)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(
-    input_texts,
-    padding=True,
-    truncation=True,
-    return_tensors="pt",
-)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
-logits = outputs.logits
-probabilities = torch.nn.functional.softmax(logits, dim=-1).cpu()
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probs = torch.softmax(logits, dim=-1)
+    pred_id = int(torch.argmax(probs, dim=-1).item())
+    pred_label = model.config.id2label.get(str(pred_id), model.config.id2label.get(pred_id, str(pred_id)))
 
-result_entries = []
-for text, probs in zip(input_texts, probabilities):
-    best_idx = int(torch.argmax(probs).item())
-    label = model.config.id2label[best_idx]
-    result_entries.append(
-        {
-            "text": text,
-            "label": label,
-            "score": float(probs[best_idx]),
-            "probabilities": probs.tolist(),
-        }
-    )
-
-RESULT = {"predictions": result_entries}
+RESULT = {
+    "text": text,
+    "logits": logits.detach().cpu().tolist(),
+    "probabilities": probs.detach().cpu().tolist(),
+    "predicted_class_id": pred_id,
+    "predicted_label": pred_label,
+}

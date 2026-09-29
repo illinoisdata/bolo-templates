@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("huspacy/hu_core_news_md") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Budapesten ma szép az idő, és a Parlament mellett sétáltam a Dunaparton.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import spacy
+from huggingface_hub import hf_hub_download
+from spacy.lookups import load_lookups
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.cfg")
+lookup_lemma_path = hf_hub_download(repo_id=repo_id, filename="lookup_lemmatizer/lookups.bin")
+lookup_vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab/lookups.bin")
+
+nlp = spacy.blank("hu")
+if "sentencizer" not in nlp.pipe_names:
+    nlp.add_pipe("sentencizer")
+if "lemmatizer" not in nlp.pipe_names:
+    nlp.add_pipe("lemmatizer", config={"mode": "lookup", "overwrite": True})
+
+_ = config_path
+_ = lookup_lemma_path
+_ = lookup_vocab_path
+nlp.get_pipe("lemmatizer").lookups = load_lookups("hu", ["lemma_lookup"])
+
+nlp.initialize()
+
+doc = nlp(text)
+
+RESULT = {
+    "text": doc.text,
+    "tokens": [token.text for token in doc],
+    "lemmas": [token.lemma_ for token in doc],
+    "pos": [token.pos_ for token in doc],
+    "tags": [token.tag_ for token in doc],
+    "entities": [
+        {"text": ent.text, "label": ent.label_, "start": ent.start_char, "end": ent.end_char}
+        for ent in doc.ents
+    ],
+    "dependencies": [
+        {"text": token.text, "head": token.head.text, "dep": token.dep_}
+        for token in doc
+    ],
+}

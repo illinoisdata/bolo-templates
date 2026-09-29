@@ -1,24 +1,38 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("drhyrum/bert-tiny-torch-picklebomb") %}
-{% set text_input = text_input | default("The quick brown fox jumps over the lazy dog.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The quick brown fox jumps over the lazy dog.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = """{{ text_input }}"""
+text = "{{ text }}"
 
 import os
-import numpy as np
+import json
 import torch
-from transformers import AutoConfig, AutoModel, AutoTokenizer
+from transformers import BertConfig, BertForMaskedLM, BertTokenizerFast
+from huggingface_hub import hf_hub_download
 
-config = AutoConfig.from_pretrained(repo_id)
-model = AutoModel.from_config(config).to(torch.device(device))
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-encoded = tokenizer(text_input, return_tensors="pt", truncation=True, padding=True)
-encoded = {key: value.to(torch.device(device)) for key, value in encoded.items()}
+with open(config_path, "r") as f:
+    cfg_dict = json.load(f)
+config = BertConfig.from_dict(cfg_dict)
+
+tokenizer = BertTokenizerFast(vocab_file=vocab_path, do_lower_case=True)
+model = BertForMaskedLM(config)
+state_dict = torch.load(weights_path, map_location="cpu", weights_only=False)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**encoded)
+    outputs = model(**inputs)
+    logits = outputs.logits
+    masked_token_id = int(torch.argmax(logits[0, -1], dim=-1).item())
+    masked_token = tokenizer.convert_ids_to_tokens(masked_token_id)
 
-last_hidden_state = outputs.last_hidden_state
-RESULT = {"last_hidden_state": last_hidden_state.cpu()}
+RESULT = {"logits": logits.detach().cpu().tolist(), "predicted_token_id": masked_token_id, "predicted_token": masked_token}

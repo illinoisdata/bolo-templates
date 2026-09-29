@@ -1,48 +1,63 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("hetpandya/t5-base-tapaco") %}
-{% set prefix = prefix | default("paraphrase: ") %}
-{% set sentence = sentence | default("The house will be cleaned by me every Saturday.") %}
+{% set device = device | default("cuda:0") %}
+{% set sentence = sentence | default('The house will be cleaned by me every Saturday.') %}
+{% set prefix = prefix | default('paraphrase: ') %}
 {% set n_predictions = n_predictions | default(5) %}
 {% set top_k = top_k | default(120) %}
-{% set max_length = max_length | default(256) %}
 {% set top_p = top_p | default(0.98) %}
-{% set early_stopping = early_stopping | default(True) %}
+{% set max_length = max_length | default(256) %}
+{% set seed = seed | default(42) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prefix = "{{ prefix }}"
 sentence = "{{ sentence }}"
+prefix = "{{ prefix }}"
 n_predictions = {{ n_predictions }}
 top_k = {{ top_k }}
-max_length = {{ max_length }}
 top_p = {{ top_p }}
-early_stopping = {{ early_stopping }}
+max_length = {{ max_length }}
+seed = {{ seed }}
 
 import os
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
+
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+torch.manual_seed(seed)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(seed)
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = T5ForConditionalGeneration.from_pretrained(repo_id, local_files_only=True)
+model = model.to(device)
+model.eval()
 
-inputs = tokenizer(prefix + sentence, return_tensors="pt", padding=True)
-input_ids = inputs.input_ids.to(device)
-attention_mask = inputs.attention_mask.to(device)
+text = prefix + sentence + " </s>"
+encoding = tokenizer(text, padding="max_length", truncation=True, max_length=max_length, return_tensors="pt")
+input_ids = encoding["input_ids"].to(device)
+attention_mask = encoding["attention_mask"].to(device)
 
-model_outputs = model.generate(
+output_ids = model.generate(
     input_ids=input_ids,
     attention_mask=attention_mask,
     do_sample=True,
-    num_return_sequences=n_predictions,
     max_length=max_length,
     top_k=top_k,
     top_p=top_p,
-    early_stopping=early_stopping,
+    early_stopping=True,
+    num_return_sequences=n_predictions,
 )
 
 outputs = []
-for output in model_outputs:
-    gen = tokenizer.decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-    if gen.lower() != sentence.lower() and gen not in outputs:
-        outputs.append(gen)
+for output in output_ids:
+    generated_sent = tokenizer.decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+    if generated_sent.lower() != sentence.lower() and generated_sent not in outputs:
+        outputs.append(generated_sent)
 
 RESULT = {"paraphrases": outputs}

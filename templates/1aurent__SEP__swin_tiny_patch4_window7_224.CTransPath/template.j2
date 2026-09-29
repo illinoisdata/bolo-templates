@@ -1,0 +1,72 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("1aurent/swin_tiny_patch4_window7_224.CTransPath") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import os
+from io import BytesIO
+from urllib.parse import urlparse
+from urllib.request import urlopen
+
+import torch
+import timm
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+
+class ConvStem(torch.nn.Module):
+    def __init__(self, img_size=224, patch_size=4, in_chans=3, embed_dim=768, norm_layer=None, **kwargs):
+        super().__init__()
+        assert patch_size == 4
+        img_size = timm.layers.helpers.to_2tuple(img_size)
+        patch_size = timm.layers.helpers.to_2tuple(patch_size)
+        self.img_size = img_size
+        self.patch_size = patch_size
+        self.grid_size = (img_size[0] // patch_size[0], img_size[1] // patch_size[1])
+        self.num_patches = self.grid_size[0] * self.grid_size[1]
+        stem = []
+        input_dim, output_dim = 3, embed_dim // 8
+        for _ in range(2):
+            stem.append(torch.nn.Conv2d(input_dim, output_dim, kernel_size=3, stride=2, padding=1, bias=False))
+            stem.append(torch.nn.BatchNorm2d(output_dim))
+            stem.append(torch.nn.ReLU(inplace=True))
+            input_dim = output_dim
+            output_dim *= 2
+        stem.append(torch.nn.Conv2d(input_dim, embed_dim, kernel_size=1))
+        self.proj = torch.nn.Sequential(*stem)
+        self.norm = norm_layer(embed_dim) if norm_layer else torch.nn.Identity()
+
+    def forward(self, x):
+        B, C, H, W = x.shape
+        assert H == self.img_size[0] and W == self.img_size[1]
+        x = self.proj(x)
+        x = x.permute(0, 2, 3, 1)
+        x = self.norm(x)
+        return x
+
+
+weights_path = hf_hub_download(repo_id=repo_id, filename='model.safetensors')
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+
+if urlparse(image_path).scheme in ('http', 'https'):
+    img = Image.open(urlopen(image_path)).convert('RGB')
+else:
+    img = Image.open(image_path).convert('RGB')
+
+model = timm.create_model(
+    model_name=f'hf-hub:{repo_id}',
+    embed_layer=ConvStem,
+    pretrained=True,
+).to(device).eval()
+
+data_config = timm.data.resolve_model_data_config(model)
+transforms = timm.data.create_transform(**data_config, is_training=False)
+inputs = transforms(img).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    output = model(inputs)
+
+RESULT = {"output": output.detach().cpu().numpy()}

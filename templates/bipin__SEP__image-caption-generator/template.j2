@@ -1,0 +1,36 @@
+{% set repo_id = repo_id | default("bipin/image-caption-generator") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(4) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+
+import torch
+from PIL import Image
+from transformers import VisionEncoderDecoderModel, ViTImageProcessor, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from pathlib import Path
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+image = Image.open(image_path)
+if image.mode != "RGB":
+    image = image.convert("RGB")
+
+processor = ViTImageProcessor.from_pretrained(Path(preprocessor_path).parent)
+tokenizer = AutoTokenizer.from_pretrained("gpt2")
+model = VisionEncoderDecoderModel.from_pretrained(Path(model_path).parent)
+model.to(device)
+model.eval()
+
+pixel_values = processor(images=image, return_tensors="pt").pixel_values.to(device)
+output_ids = model.generate(pixel_values, num_beams=num_beams, max_length=max_length)
+caption = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"caption": caption}

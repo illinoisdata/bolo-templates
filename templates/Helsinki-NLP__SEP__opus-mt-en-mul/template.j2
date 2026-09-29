@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-en-mul") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('>>fra<< The book is on the table.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, device_map=None, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated = model.generate(**inputs, num_beams=4, max_new_tokens=128)
+
+output_text = tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
+
+RESULT = {"translation": output_text}

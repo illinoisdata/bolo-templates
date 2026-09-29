@@ -1,0 +1,66 @@
+{% set repo_id = repo_id | default("Orange/Speaker-wavLM-pro") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set max_size = max_size | default(30) %}
+{% set repo_file = repo_file | default('spk_embeddings.py') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+max_size = {{ max_size }}
+repo_file = "{{ repo_file }}"
+
+import os
+import sys
+import torch
+import importlib.util
+import numpy as np
+import soundfile as sf
+from huggingface_hub import hf_hub_download
+from scipy.signal import resample_poly
+
+spk_embeddings_path = hf_hub_download(repo_id=repo_id, filename=repo_file)
+repo_dir = os.path.dirname(spk_embeddings_path)
+sys.path.insert(0, repo_dir)
+
+spec = importlib.util.spec_from_file_location("spk_embeddings", spk_embeddings_path)
+spk_embeddings = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(spk_embeddings)
+EmbeddingsModel = spk_embeddings.EmbeddingsModel
+
+orig_init = torch.nn.Module.__init__
+
+def patched_init(self, *args, **kwargs):
+    orig_init(self, *args, **kwargs)
+    self.all_tied_weights_keys = {}
+
+torch.nn.Module.__init__ = patched_init
+
+model = EmbeddingsModel.from_pretrained(repo_id, trust_remote_code=True)
+model.eval()
+model.to(device)
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    import tempfile
+    import urllib.request
+    with tempfile.NamedTemporaryFile(suffix=os.path.splitext(audio_path)[1]) as tmp:
+        urllib.request.urlretrieve(audio_path, tmp.name)
+        audio, sr = sf.read(tmp.name)
+else:
+    audio, sr = sf.read(audio_path)
+
+if audio.ndim > 1:
+    audio = np.mean(audio, axis=1)
+if sr != 16000:
+    gcd = np.gcd(sr, 16000)
+    audio = resample_poly(audio, 16000 // gcd, sr // gcd)
+    sr = 16000
+
+audio_tensor = torch.tensor(audio, dtype=torch.float32, device=device).unsqueeze(0)
+with torch.no_grad():
+    outputs = model.wavlm(audio_tensor)
+    hidden = outputs.last_hidden_state
+    embedding = model.proj(hidden.mean(dim=1))
+    embedding = torch.nn.functional.normalize(embedding, p=2, dim=-1)
+embedding = embedding.detach().cpu()
+
+RESULT = {"embedding": embedding.numpy(), "shape": list(embedding.shape)}

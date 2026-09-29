@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("Featherless-Chat-Models/Mistral-7B-v0.1") %}
+{% set device = device | default("cuda:0") %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.95) %}
+{% set prompt = prompt | default("Write a short, helpful paragraph about Mistral 7B.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+prompt = {{ prompt | tojson }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_index_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
+    device_map=None,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt").to(device)
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=True,
+        temperature=temperature,
+        top_p=top_p,
+        pad_token_id=tokenizer.eos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": output_text}

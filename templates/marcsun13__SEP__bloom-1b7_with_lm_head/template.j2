@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("marcsun13/bloom-1b7_with_lm_head") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set tokenizer_repo = tokenizer_repo | default("bigscience/bloom-1b7") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+tokenizer_repo = {{ tokenizer_repo | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, tokenizer=tokenizer_repo, device=device)
+RESULT = pipe(input_prompt)

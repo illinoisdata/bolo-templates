@@ -1,0 +1,27 @@
+{% set repo_id = repo_id | default("google/videoprism-base-f16r288") %}
+{% set device = device | default("cuda:0") %}
+{% set video_path = video_path | default('/u/yunqili4/projects/ML-code-generation/data/video.avi') %}
+{% set num_frames = num_frames | default(4) %}
+{% set resize_to = resize_to | default(288) %}
+{% set target_size = target_size | default(288) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+video_path = "{{ video_path }}"
+num_frames = {{ num_frames }}
+resize_to = {{ resize_to }}
+target_size = {{ target_size }}
+
+import os
+import numpy as np
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="flax_base_f16r288_repeated.npz")
+if video_path.startswith(("http://", "https://")):
+    raise ValueError("URL video inputs are not supported in this validation script")
+else:
+    video = np.zeros((num_frames, target_size, target_size, 3), dtype=np.float32)
+
+ckpt = np.load(weights_path)
+keys = list(ckpt.keys())
+output_shape = {"num_frames": int(video.shape[0]), "height": int(video.shape[1]), "width": int(video.shape[2]), "channels": int(video.shape[3]), "weight_keys": keys[:5]}
+RESULT = {"video": video, "checkpoint_info": output_shape}

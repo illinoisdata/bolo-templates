@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Protein-Tiny-60M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The Maillard reaction is responsible for the browning of many foods. Casein micelles are the primary protein component of milk. Starch gelatinization is a key process in cooking pasta and rice. Polyphenols in green tea have antioxidant properties. Omega-3 fatty acids are essential fats found in fish oil.') %}
+{% set labels = labels | default(['protein', 'protein_complex', 'protein_enum', 'protein_family_or_group', 'protein_variant']) %}
+{% set threshold = threshold | default(0.5) %}
+{% set flat_ner = flat_ner | default(True) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+labels = {{ labels | tojson }}
+threshold = {{ threshold }}
+flat_ner = {{ flat_ner }}
+
+import json
+from huggingface_hub import hf_hub_download
+from transformers import AutoConfig
+from gliner import GLiNER
+import gliner.data_processing.tokenizer as gliner_tokenizer
+
+class _SpaceSplitter:
+    def __call__(self, text):
+        start = 0
+        for tok in text.split():
+            idx = text.find(tok, start)
+            yield tok, idx, idx + len(tok)
+            start = idx + len(tok)
+
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+gliner_tokenizer.MultiLangWordsSplitter = lambda *args, **kwargs: _SpaceSplitter()
+
+model = GLiNER.from_pretrained(repo_id)
+model.to(device)
+entities = model.predict_entities(text, labels, flat_ner=flat_ner, threshold=threshold)
+RESULT = {"entities": entities}

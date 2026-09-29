@@ -1,40 +1,32 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-sn-en") %}
-{% set source_text = source_text | default("Mhoro nyika") %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(5) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('This is a test sentence.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_text = "{{ source_text }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text = {{ text | tojson }}
 
-from pathlib import Path
-
+from huggingface_hub import hf_hub_download
+from transformers import MarianMTModel, MarianTokenizer
 import torch
-from transformers import MarianTokenizer, MarianMTModel
 
-tokenizer = MarianTokenizer.from_pretrained(repo_id)
-model = MarianMTModel.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-encoded_inputs = tokenizer(
-    source_text,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-    max_length=max_length,
-)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+model = MarianMTModel.from_pretrained(repo_id)
+tokenizer = MarianTokenizer(vocab=vocab_path, source_spm=source_spm_path, target_spm=target_spm_path)
+model.to(device)
+model.eval()
+
+inputs = tokenizer([text], return_tensors="pt", padding=True, truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    generated_tokens = model.generate(
-        **encoded_inputs,
-        max_length=max_length,
-        num_beams=num_beams,
-    )
+    generated_tokens = model.generate(**inputs, num_beams=6, max_length=512)
 
-translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-translated_text = translation[0]
+translated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
 RESULT = {"translation": translated_text}
-
-OUTPUT_DIR = Path("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-sn-en")

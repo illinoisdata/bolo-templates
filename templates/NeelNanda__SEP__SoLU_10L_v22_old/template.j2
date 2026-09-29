@@ -1,0 +1,36 @@
+{% set repo_id = repo_id | default("NeelNanda/SoLU_10L_v22_old") %}
+{% set device = device | default("cuda:0") %}
+{% set checkpoint_file = checkpoint_file | default('checkpoints/SoLU_10L_v22_046012.pth') %}
+{% set prompt = prompt | default('Hello, my name is') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+checkpoint_file = "{{ checkpoint_file }}"
+prompt = "{{ prompt }}"
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformer_lens import HookedTransformer
+
+checkpoint_path = hf_hub_download(repo_id=repo_id, filename=checkpoint_file)
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+with open(config_path, 'r') as f:
+    cfg = json.load(f)
+for k in ['model_family', 'checkpoint', 'window_size', 'attn_types']:
+    cfg.pop(k, None)
+
+model = HookedTransformer(cfg, move_to_device=False)
+state_dict = torch.load(checkpoint_path, map_location='cpu')
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+input_tokens = model.to_tokens(prompt).to(device)
+with torch.no_grad():
+    logits = model(input_tokens)
+    next_token_logits = logits[0, -1]
+    topk = torch.topk(next_token_logits, k=5)
+    top_tokens = model.to_string(topk.indices)
+    top_values = topk.values.detach().cpu().tolist()
+
+RESULT = {"prompt": prompt, "top_tokens": top_tokens, "top_logits": top_values}

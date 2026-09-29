@@ -1,23 +1,23 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-en-sk") %}
 {% set device = device | default("cuda:0") %}
-{% set source_text = source_text | default("The world needs more peace.") %}
+{% set text = text | default('The house is wonderful and the garden is beautiful.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_text = """{{ source_text }}"""
+text = "{{ text }}"
 
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import MarianMTModel, MarianTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-device_obj = torch.device(device)
-model = model.to(device_obj)
+model = MarianMTModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
 
-inputs = tokenizer(source_text, return_tensors="pt", padding=True, truncation=True)
-inputs = {key: value.to(device_obj) for key, value in inputs.items()}
+batch = tokenizer([text], return_tensors="pt", padding=True, truncation=True)
+batch = {k: v.to(device) for k, v in batch.items()}
 
-generated_tokens = model.generate(**inputs, num_beams=4, max_length=256)
-translated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+with torch.no_grad():
+    generated = model.generate(**batch, num_beams=4, max_length=128)
 
-RESULT = {"translation": translated_text}
+output_text = tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
+RESULT = {"translation": output_text}

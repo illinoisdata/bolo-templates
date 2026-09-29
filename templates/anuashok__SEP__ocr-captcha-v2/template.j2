@@ -1,0 +1,38 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("anuashok/ocr-captcha-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set num_beams = num_beams | default(6) %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+num_beams = {{ num_beams }}
+max_new_tokens = {{ max_new_tokens }}
+
+import os
+import torch
+from PIL import Image
+from transformers import VisionEncoderDecoderModel, TrOCRProcessor
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor = TrOCRProcessor.from_pretrained(repo_id)
+model = VisionEncoderDecoderModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+if str(image_path).startswith(("http://", "https://")):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+pixel_values = processor(images=image, return_tensors="pt").pixel_values.to(device)
+with torch.no_grad():
+    generated_ids = model.generate(pixel_values, num_beams=num_beams, max_new_tokens=max_new_tokens)
+text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"text": text}

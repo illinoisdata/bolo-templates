@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("microsoft/TRELLIS-image-large") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set seed = seed | default(0) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+seed = {{ seed }}
+
+import json
+import os
+from io import BytesIO
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    import requests
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+config_path = hf_hub_download(repo_id=repo_id, filename='pipeline.json')
+with open(config_path, 'r') as f:
+    pipeline_cfg = json.load(f)
+
+ckpt_path = hf_hub_download(repo_id=repo_id, filename='ckpts/ss_enc_conv3d_16l8_fp16.safetensors')
+weights = load_file(ckpt_path, device='cpu')
+
+image_np = np.array(image)
+image_tensor = torch.from_numpy(image_np).to(device)
+RESULT = {
+    'image_size': image.size,
+    'num_weights': len(weights),
+    'config_keys': sorted(list(pipeline_cfg.keys()))[:10],
+    'image_tensor_shape': tuple(image_tensor.shape),
+}

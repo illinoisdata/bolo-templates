@@ -1,94 +1,57 @@
 {% set repo_id = repo_id | default("usyd-community/vitpose-plus-small") %}
 {% set device = device | default("cuda:0") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set person_detection_repo_id = person_detection_repo_id | default("PekingU/rtdetr_r50vd_coco_o365") %}
-{% set person_detection_threshold = person_detection_threshold | default(0.3) %}
-{% set pose_threshold = pose_threshold | default(0.3) %}
+{% set image = image | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-image_path = "{{ image_path }}"
-person_detection_repo_id = "{{ person_detection_repo_id }}"
-person_detection_threshold = {{ person_detection_threshold }}
-pose_threshold = {{ pose_threshold }}
+image = "{{ image }}"
 
-import json
-import os
-
-from PIL import Image
-import requests
 import torch
-from transformers import AutoProcessor, RTDetrForObjectDetection, VitPoseForPoseEstimation
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from transformers import AutoProcessor, VitPoseForPoseEstimation
+from scipy.ndimage import affine_transform
 
-person_processor = AutoProcessor.from_pretrained(person_detection_repo_id)
-person_model = RTDetrForObjectDetection.from_pretrained(person_detection_repo_id).to(device)
-person_model.eval()
-
-pose_processor = AutoProcessor.from_pretrained(repo_id)
-pose_model = VitPoseForPoseEstimation.from_pretrained(repo_id).to(device)
-pose_model.eval()
-
-if image_path.startswith("http"):
-    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+if image.startswith('http://') or image.startswith('https://'):
+    import requests
+    image = Image.open(requests.get(image, stream=True).raw).convert('RGB')
 else:
-    image = Image.open(image_path).convert("RGB")
+    image = Image.open(image).convert('RGB')
 
-person_inputs = person_processor(images=image, return_tensors="pt").to(device)
-with torch.no_grad():
-    detection_outputs = person_model(**person_inputs)
+weights_path = hf_hub_download(repo_id=repo_id, filename='model.safetensors')
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+processor_dir = hf_hub_download(repo_id=repo_id, filename='preprocessor_config.json').rsplit('/', 1)[0]
 
-target_sizes = torch.tensor([(image.height, image.width)], dtype=torch.long)
-person_results = person_processor.post_process_object_detection(
-    detection_outputs,
-    target_sizes=target_sizes,
-    threshold=person_detection_threshold,
+image_processor = AutoProcessor.from_pretrained(processor_dir)
+model = VitPoseForPoseEstimation.from_pretrained(
+    weights_path,
+    config=config_path,
+    local_files_only=True,
 )
+model.to(device)
+model.eval()
 
-person_result = person_results[0]
-person_boxes = person_result["boxes"]
-person_labels = person_result["labels"]
-person_scores = person_result["scores"]
+boxes = [[[0.0, 0.0, float(image.width), float(image.height)]]]
+inputs = image_processor(image, boxes=boxes, return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
+inputs['dataset_index'] = torch.tensor(0, device=device)
 
-person_mask = person_labels == 0
-person_boxes = person_boxes[person_mask]
-person_scores = person_scores[person_mask]
+with torch.no_grad():
+    outputs = model(**inputs)
 
-person_detections = []
-pose_results_serialized = []
-
-if person_boxes.numel() > 0:
-    coco_boxes = person_boxes.clone()
-    coco_boxes[:, 2] -= coco_boxes[:, 0]
-    coco_boxes[:, 3] -= coco_boxes[:, 1]
-    coco_boxes_list = coco_boxes.tolist()
-    person_scores_list = person_scores.tolist()
-    person_detections = [
-        {"box": box, "score": score}
-        for box, score in zip(coco_boxes_list, person_scores_list)
-    ]
-
-    pose_inputs = pose_processor(image, boxes=[coco_boxes_list], return_tensors="pt").to(device)
-    with torch.no_grad():
-        pose_outputs = pose_model(**pose_inputs)
-    pose_result_list = pose_processor.post_process_pose_estimation(
-        pose_outputs,
-        boxes=[coco_boxes_list],
-        threshold=pose_threshold,
-    )[0]
-    for idx, person_pose in enumerate(pose_result_list):
-        label_ids = person_pose["labels"].tolist()
-        pose_results_serialized.append(
-            {
-                "box": coco_boxes_list[idx],
-                "keypoints": person_pose["keypoints"].tolist(),
-                "labels": label_ids,
-                "label_names": [
-                    pose_model.config.id2label[label_id] for label_id in label_ids
-                ],
-                "scores": person_pose["scores"].tolist(),
-            }
-        )
+pose_results = image_processor.post_process_pose_estimation(outputs, boxes=boxes, threshold=0.3)
+image_pose_result = pose_results[0]
+if len(image_pose_result) > 0:
+    first_person = image_pose_result[0]
+    keypoints = first_person['keypoints'].detach().cpu().numpy().tolist()
+    scores = first_person['scores'].detach().cpu().numpy().tolist()
+    labels = first_person['labels'].detach().cpu().numpy().tolist()
+else:
+    keypoints = []
+    scores = []
+    labels = []
 
 RESULT = {
-    "person_detections": person_detections,
-    "pose_results": pose_results_serialized,
+    'keypoints': keypoints,
+    'scores': scores,
+    'labels': labels,
 }

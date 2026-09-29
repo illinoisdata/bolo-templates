@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("rinna/bilingual-gpt-neox-4b-instruction-sft") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("ユーザー: Hello, you are an assistant that helps me learn Japanese.\nシステム: Sure, what can I do for you?\nユーザー: VRはなんですか。\nシステム: ") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set do_sample = do_sample | default(true) %}
+{% set temperature = temperature | default(1.0) %}
+{% set top_p = top_p | default(0.85) %}
+{% set repetition_penalty = repetition_penalty | default(1.1) %}
+{% set tokenizer_use_fast = tokenizer_use_fast | default(false) %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+model = repo_id
+
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+do_sample = {{ do_sample | tojson | replace('true', 'True') | replace('false', 'False') }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+repetition_penalty = {{ repetition_penalty }}
+tokenizer_use_fast = {{ tokenizer_use_fast | tojson | replace('true', 'True') | replace('false', 'False') }}
+
+from transformers import AutoTokenizer, pipeline
+
+tokenizer = AutoTokenizer.from_pretrained(model, use_fast=tokenizer_use_fast)
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=tokenizer,
+    device=device,
+)
+
+RESULT = pipe(
+    input_prompt,
+    max_new_tokens=max_new_tokens,
+    do_sample=do_sample,
+    temperature=temperature,
+    top_p=top_p,
+    repetition_penalty=repetition_penalty,
+)

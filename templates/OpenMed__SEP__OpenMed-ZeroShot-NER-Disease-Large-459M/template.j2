@@ -1,0 +1,27 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Disease-Large-459M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The patient was diagnosed with diabetes mellitus type 2.') %}
+{% set labels = labels | default(['DISEASE']) %}
+{% set threshold = threshold | default(0.5) %}
+{% set flat_ner = flat_ner | default(true) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+labels = {{ labels | tojson }}
+threshold = {{ threshold }}
+flat_ner = {{ flat_ner }}
+
+from huggingface_hub import hf_hub_download
+import torch
+import json
+from gliner import GLiNER
+from gliner.model import GLiNER as _GLiNER
+
+model_dir = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+weights_path = model_dir
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+model = _GLiNER._from_pretrained(model_id=repo_id, revision=None, cache_dir=None, force_download=False, local_files_only=False, proxies={}, token=None, resume_download=False)
+model.to(device)
+entities = model.predict_entities(text, labels, flat_ner=flat_ner, threshold=threshold)
+
+RESULT = {"entities": entities}

@@ -1,24 +1,51 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("facebook/genre-linking-blink") %}
-{% set text_input = text_input | default("Einstein was a [START_ENT] German [END_ENT] physicist.") %}
-{% set num_beams = num_beams | default(5) %}
-{% set num_return_sequences = num_return_sequences | default(5) %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default("Einstein was a [START_ENT] German [END_ENT] physicist.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-num_beams = {{ num_beams }}
-num_return_sequences = {{ num_return_sequences }}
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import os
+prompt = "{{ prompt }}"
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
-inputs = tokenizer([text_input], return_tensors="pt")
+import os
+import pickle
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_file = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+trie_file = hf_hub_download(repo_id=repo_id, filename="kilt_titles_trie_dict.pkl")
+trie_py_file = hf_hub_download(repo_id=repo_id, filename="trie.py")
+
+import importlib.util
+spec = importlib.util.spec_from_file_location("genre_trie", trie_py_file)
+trie_mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(trie_mod)
+Trie = trie_mod.Trie
+
+with open(trie_file, "rb") as f:
+    trie = Trie.load_from_dict(pickle.load(f))
+
+
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_file), local_files_only=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(os.path.dirname(model_file), local_files_only=True)
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer([prompt], return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
-generated_tokens = model.generate(
+
+outputs = model.generate(
     **inputs,
-    num_beams=num_beams,
-    num_return_sequences=num_return_sequences,
+    num_beams=5,
+    num_return_sequences=5,
+    prefix_allowed_tokens_fn=lambda batch_id, sent: trie.get(sent.tolist()),
 )
-decoded_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-RESULT = {"generated_texts": decoded_texts}
+
+output_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("microsoft/wavlm-large") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+audio_path = "{{ audio_path }}"
+
+from transformers import pipeline, AutoFeatureExtractor
+import soundfile as sf
+import torch
+from torchaudio import functional as F
+
+# Custom tokenizer that loads and processes audio files with the shared feature extractor
+def _load_audio(path: str, target_sr: int):
+    audio, sr = sf.read(path)
+    audio = audio.astype("float32")
+    if sr != target_sr:
+        tensor = torch.from_numpy(audio)
+        audio = F.resample(tensor, sr, target_sr).numpy().astype("float32")
+        sr = target_sr
+    return audio, sr
+
+class AudioFeatureTokenizer:
+    def __init__(self, feature_extractor):
+        self.fe = feature_extractor
+        self.sampling_rate = feature_extractor.sampling_rate
+
+    def __call__(self, inputs, **kwargs):
+        audio, sr = _load_audio(inputs, self.sampling_rate)
+        kwargs.setdefault("sampling_rate", sr)
+        return self.fe(audio, **kwargs)
+
+# Load the feature extractor and wrap it for the pipeline
+tokenizer = AudioFeatureTokenizer(AutoFeatureExtractor.from_pretrained(repo_id))
+pipe = pipeline(task=task, model=repo_id, tokenizer=tokenizer, device=device)
+
+# Run inference on the local audio file
+features = pipe(audio_path)
+
+# Build the RESULT dict with the extracted features
+RESULT = {"features": features}

@@ -1,0 +1,30 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Protein-Large-459M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("The Maillard reaction is responsible for the browning of many foods.") %}
+{% set labels = labels | default(["protein", "protein_complex", "protein_enum", "protein_family_or_group", "protein_variant"]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+labels = {{ labels | tojson }}
+
+import os
+import json
+from huggingface_hub import hf_hub_download
+from gliner import GLiNER
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+model_dir = os.path.dirname(weights_path)
+
+with open(config_path, "r", encoding="utf-8") as f:
+    cfg = json.load(f)
+cfg["class_token_index"] = -1
+cfg["vocab_size"] = -1
+with open(os.path.join(model_dir, "gliner_config.json"), "w", encoding="utf-8") as f:
+    json.dump(cfg, f)
+
+model = GLiNER.from_pretrained(model_dir)
+model.to(device)
+entities = model.predict_entities(text, labels, flat_ner=True, threshold=0.5)
+
+RESULT = {"entities": entities}

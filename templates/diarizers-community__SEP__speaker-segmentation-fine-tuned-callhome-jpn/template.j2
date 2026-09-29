@@ -1,0 +1,33 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("diarizers-community/speaker-segmentation-fine-tuned-callhome-jpn") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from scipy.io import wavfile
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    audio_bytes = requests.get(audio_path).content
+    sr, audio = wavfile.read(BytesIO(audio_bytes))
+else:
+    sr, audio = wavfile.read(audio_path)
+
+if audio.ndim > 1:
+    audio = audio.mean(axis=1)
+if audio.dtype.kind in "iu":
+    audio = audio.astype(np.float32) / np.iinfo(audio.dtype).max
+else:
+    audio = audio.astype(np.float32)
+
+signal = torch.from_numpy(audio).to(device)
+RESULT = {"sample_rate": int(sr), "num_samples": int(signal.numel()), "mean_amplitude": float(signal.float().mean().item())}

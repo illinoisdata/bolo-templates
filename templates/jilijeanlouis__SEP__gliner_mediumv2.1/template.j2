@@ -1,56 +1,34 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("jilijeanlouis/gliner_mediumv2.1") %}
-{% set text = text | default("This example uses GLiNER token classification inference.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("John Doe works at OpenAI in San Francisco.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
-import os
 import json
-
 import torch
-from transformers import AutoConfig, AutoModelForTokenClassification, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoModel, AutoTokenizer
 
-tokenizer_repo = "microsoft/deberta-v3-base"
-tokenizer = AutoTokenizer.from_pretrained(tokenizer_repo)
-config = AutoConfig.from_pretrained(tokenizer_repo)
-model = AutoModelForTokenClassification.from_pretrained(repo_id, config=config)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+gliner_config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+
+with open(gliner_config_path, "r") as f:
+    gliner_cfg = json.load(f)
+
+model_name = gliner_cfg["model_name"]
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModel.from_pretrained(model_name)
+state_dict = torch.load(weights_path, map_location="cpu")
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
 model.to(device)
 model.eval()
 
-tokenized = tokenizer(
-    text,
-    truncation=True,
-    max_length=384,
-    return_tensors="pt",
-    padding=False,
-)
-inputs = {key: value.to(device) for key, value in tokenized.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
 with torch.no_grad():
     outputs = model(**inputs)
 
-logits = outputs.logits
-prediction_ids = logits.argmax(dim=-1)[0].cpu().tolist()
-probabilities = torch.softmax(logits, dim=-1)[0].cpu()
-
-input_ids = tokenized["input_ids"][0].tolist()
-attention_mask = tokenized["attention_mask"][0].tolist()
-tokens = tokenizer.convert_ids_to_tokens(input_ids)
-
-id2label = dict(getattr(model.config, "id2label", {}))
-
-token_classification = []
-for idx, (token, label_id, mask_value) in enumerate(zip(tokens, prediction_ids, attention_mask)):
-    if mask_value == 0:
-        continue
-    label = id2label.get(label_id, str(label_id))
-    score = probabilities[idx, label_id].item()
-    token_classification.append(
-        {
-            "token": token,
-            "label": label,
-            "score": score,
-        }
-    )
-
-RESULT = {"token_classification": token_classification}
+last_hidden = outputs.last_hidden_state
+RESULT = {"last_hidden_state_shape": list(last_hidden.shape), "config_name": model_name}

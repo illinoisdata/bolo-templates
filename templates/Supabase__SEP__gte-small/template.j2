@@ -1,0 +1,57 @@
+{% set repo_id = repo_id | default("Supabase/gte-small") %}
+{% set device = device | default("cuda:0") %}
+{% set text_inputs = text_inputs | default(["what is the capital of China?", "how to implement quick sort in python?", "Beijing", "sorting algorithms"]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_inputs = {{ text_inputs }}
+
+import os
+import numpy as np
+import torch
+import torch.nn.functional as F
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+
+def average_pool(last_hidden_states: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+    last_hidden = last_hidden_states.masked_fill(~attention_mask[..., None].bool(), 0.0)
+    return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
+
+
+device_obj = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(
+    os.path.dirname(tokenizer_path),
+    use_fast=True,
+)
+model = AutoModel.from_pretrained(
+    os.path.dirname(model_path),
+    torch_dtype=torch.float32,
+    local_files_only=True,
+)
+model.to(device_obj)
+model.eval()
+
+batch_dict = tokenizer(
+    text_inputs,
+    max_length=512,
+    padding=True,
+    truncation=True,
+    return_tensors="pt",
+)
+batch_dict = {k: v.to(device_obj) for k, v in batch_dict.items()}
+
+with torch.no_grad():
+    outputs = model(**batch_dict)
+    embeddings = average_pool(outputs.last_hidden_state, batch_dict["attention_mask"])
+    embeddings = F.normalize(embeddings, p=2, dim=1)
+    scores = (embeddings[:1] @ embeddings[1:].T) * 100
+
+RESULT = {"embeddings": embeddings.detach().cpu().numpy(), "scores": scores.detach().cpu().numpy()}

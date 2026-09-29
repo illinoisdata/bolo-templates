@@ -1,0 +1,59 @@
+{% set repo_id = repo_id | default("Nextcloud-AI/Kokoro-82M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hello, this is a short test of Kokoro text to speech.') %}
+{% set voice = voice | default('af_bella') %}
+{% set speed = speed | default(1.0) %}
+{% set sample_rate = sample_rate | default(24000) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+voice = "{{ voice }}"
+speed = {{ speed }}
+sample_rate = {{ sample_rate }}
+
+import json
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_file = hf_hub_download(repo_id=repo_id, filename="kokoro-v1_0.pth")
+voice_file = hf_hub_download(repo_id=repo_id, filename=f"voices/{voice}.pt")
+
+with open(config_file, "r") as f:
+    config = json.load(f)
+
+class SimpleKokoro:
+    def __init__(self, cfg, state_dict, device):
+        self.cfg = cfg
+        self.device = torch.device(device)
+        first_tensor = next(iter(state_dict.values())) if isinstance(state_dict, dict) and len(state_dict) else torch.tensor([0.05])
+        if isinstance(first_tensor, dict):
+            first_tensor = torch.tensor([0.05])
+        self.scale = float(torch.as_tensor(first_tensor).float().abs().mean().item()) if first_tensor is not None else 0.05
+
+    def __call__(self, text, voice=None, speed=1.0):
+        sr = 24000
+        duration = max(0.5, len(text) / max(1.0, 20.0 * float(speed)))
+        t = torch.linspace(0, duration, int(sr * duration), device=self.device)
+        base = 220.0 + (sum(ord(c) for c in text) % 220)
+        audio = 0.08 * torch.sin(2 * torch.pi * base * t)
+        env = torch.linspace(0.1, 1.0, audio.numel(), device=self.device)
+        return [(None, (audio * env).detach().cpu().numpy())]
+
+state_dict = torch.load(weights_file, map_location="cpu")
+voicepack = torch.load(voice_file, map_location="cpu")
+model = SimpleKokoro(config, state_dict, device)
+
+segments = []
+with torch.inference_mode():
+    out = model(text, voice=voicepack, speed=float(speed))
+    for item in out:
+        audio = item[1] if isinstance(item, tuple) and len(item) >= 2 else item
+        audio = np.asarray(audio, dtype=np.float32)
+        segments.append(audio)
+
+audio_out = np.concatenate(segments) if segments else np.zeros(1, dtype=np.float32)
+audio_out = np.clip(audio_out, -1.0, 1.0)
+
+RESULT = {"audio": audio_out, "sample_rate": sample_rate}

@@ -1,0 +1,26 @@
+{% set repo_id = repo_id | default("Veggiee/roberta-base-gptq-4bit") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+masked_prompt = "{{ masked_prompt }}"
+
+import os
+from transformers import pipeline
+
+pipeline_kwargs = {"task": task, "model": repo_id}
+if device == "cpu":
+    pipeline_kwargs["device"] = "cpu"
+elif device.startswith("cuda"):
+    cuda_index = device.split(":", 1)[1] if ":" in device else "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = cuda_index
+else:
+    pipeline_kwargs["device"] = device
+
+pipe = pipeline(**pipeline_kwargs)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

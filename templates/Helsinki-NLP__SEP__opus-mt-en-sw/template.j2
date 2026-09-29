@@ -1,26 +1,28 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-en-sw") %}
 {% set device = device | default("cuda:0") %}
-{% set source_text = source_text | default("The quick brown fox jumps over the lazy dog.") %}
-{% set max_length = max_length | default(128) %}
+{% set text = text | default('Hello, how are you?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_text = """{{ source_text }}"""
-max_length = {{ max_length }}
+text = "{{ text }}"
 
-import os
 import torch
-from transformers import MarianTokenizer, MarianMTModel
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-tokenizer = MarianTokenizer.from_pretrained(repo_id)
-model = MarianMTModel.from_pretrained(repo_id).to(device).eval()
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-inputs = tokenizer(source_text, return_tensors="pt").to(device)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_tokens = model.generate(**inputs, max_length=max_length)
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, num_beams=4, max_length=128)
 
-translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-translation = translations[0]
+translation = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 RESULT = {"translation": translation}

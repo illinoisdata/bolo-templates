@@ -1,41 +1,41 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("mustafaaljadery/gemma-2B-10M") %}
-{% set prompt_text = prompt_text | default("Write a concise summary of how advances in AI can benefit society.") %}
-{% set max_new_tokens = max_new_tokens | default(256) %}
-{% set temperature = temperature | default(0.8) %}
-{% set top_p = top_p | default(0.95) %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-prompt_text = {{ prompt_text | tojson }}
-max_new_tokens = {{ max_new_tokens }}
-temperature = {{ temperature }}
-top_p = {{ top_p }}
+{% set device = device | default("cuda:0") %}
+{% set prompt_text = prompt_text | default('Write a short paragraph about why long-context language models are useful.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt_text = "{{ prompt_text }}"
 
 import torch
-from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-torch_device = torch.device(device)
-model = AutoModelForCausalLM.from_pretrained(repo_id).to(torch_device)
+weights_index_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
 model.eval()
 
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
 inputs = tokenizer(prompt_text, return_tensors="pt")
-input_ids = inputs["input_ids"].to(torch_device)
-attention_mask = inputs["attention_mask"].to(torch_device)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
     generated_ids = model.generate(
-        input_ids=input_ids,
-        attention_mask=attention_mask,
-        max_new_tokens=max_new_tokens,
-        temperature=temperature,
-        top_p=top_p,
-        do_sample=True,
+        **inputs,
+        max_new_tokens=128,
+        do_sample=False,
         pad_token_id=tokenizer.eos_token_id,
-        use_cache=True,
+        eos_token_id=tokenizer.eos_token_id,
     )
 
-generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-
-RESULT = {"generated_text": generated_text}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+RESULT = {"output_text": output_text}

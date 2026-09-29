@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("Xenova/detr-resnet-50") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set score_threshold = score_threshold | default(0.9) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+score_threshold = {{ score_threshold }}
+
+import requests
+from PIL import Image
+import torch
+from transformers import DetrImageProcessor, DetrForObjectDetection
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+weight_path = hf_hub_download(repo_id=repo_id, filename="onnx/model.onnx")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processor = DetrImageProcessor.from_pretrained(repo_id)
+model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50").to(device)
+model.eval()
+
+inputs = processor(images=image, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+target_sizes = torch.tensor([image.size[::-1]], device=device)
+results = processor.post_process_object_detection(outputs, threshold=score_threshold, target_sizes=target_sizes)[0]
+
+labels = [model.config.id2label[int(label_id)] for label_id in results["labels"]]
+boxes = results["boxes"].detach().cpu().tolist()
+scores = results["scores"].detach().cpu().tolist()
+
+RESULT = {"labels": labels, "boxes": boxes, "scores": scores}

@@ -1,0 +1,30 @@
+{% set repo_id = repo_id | default("timm/coatnet_nano_rw_224.sw_in1k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set input_image = input_image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_image = {{ input_image | tojson }}
+
+from PIL import Image
+from transformers import pipeline
+
+pipeline_device = -1
+if isinstance(device, str):
+    if device == "cpu":
+        pipeline_device = -1
+    elif device.startswith("cuda"):
+        parts = device.split(":")
+        pipeline_device = int(parts[-1]) if len(parts) > 1 and parts[-1].isdigit() else 0
+    else:
+        pipeline_device = -1
+else:
+    pipeline_device = device
+
+image = Image.open(input_image).convert("RGB")
+
+pipe = pipeline(task=task, model=repo_id, device=pipeline_device)
+prediction = pipe(image)
+RESULT = {"predictions": prediction}

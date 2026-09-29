@@ -1,43 +1,41 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("knkarthick/MEETING_SUMMARY") %}
-{% set input_text = input_text | default("The tower is 324 metres (1,063 ft) tall, about the same height as an 81-storey building, and the tallest structure in Paris. Its base is square, measuring 125 metres (410 ft) on each side.") %}
-{% set max_output_length = max_output_length | default(128) %}
-{% set min_output_length = min_output_length | default(30) %}
-{% set num_beams = num_beams | default(6) %}
-{% set output_file_name = output_file_name | default("summary.txt") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = """{{ input_text }}"""
-max_output_length = {{ max_output_length }}
-min_output_length = {{ min_output_length }}
-num_beams = {{ num_beams }}
-output_file_name = "{{ output_file_name }}"
+text = "{{ text }}"
 
 import os
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+local_dir = os.path.dirname(tokenizer_json_path)
 
-encoded_inputs = tokenizer(
-    input_text,
-    return_tensors="pt",
-    truncation=True,
-)
-encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
+_tokenizer = AutoTokenizer.from_pretrained(local_dir, use_fast=True)
+_model = AutoModelForSeq2SeqLM.from_pretrained(local_dir, torch_dtype=torch.float32)
+_model.to(device)
+_model.eval()
+
+inputs = _tokenizer(text, return_tensors="pt", truncation=True, max_length=1024)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    generated_tokens = model.generate(
-        **encoded_inputs,
-        max_length=max_output_length,
-        min_length=min_output_length,
-        num_beams=num_beams,
+    generated_ids = _model.generate(
+        **inputs,
+        max_length=62,
+        min_length=11,
+        num_beams=6,
+        no_repeat_ngram_size=3,
         early_stopping=True,
+        forced_eos_token_id=_tokenizer.eos_token_id,
     )
 
-summary_tokens = generated_tokens
-summary_outputs = tokenizer.batch_decode(summary_tokens, skip_special_tokens=True)
-summary_text = summary_outputs[0].strip()
+summary = _tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {"summary": summary_text}
+RESULT = {"summary": summary}

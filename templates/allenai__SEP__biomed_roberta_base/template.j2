@@ -1,28 +1,36 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("allenai/biomed_roberta_base") %}
-{% set text = text | default("Clinical note: A patient exhibits persistent cough and fever.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Aspirin inhibits platelet aggregation and is commonly used to reduce the risk of cardiovascular events.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
-import json
-from pathlib import Path
-
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+
+model = AutoModel.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
     outputs = model(**inputs)
 
-hidden_states = outputs.last_hidden_state
-pooled = hidden_states.mean(dim=1).squeeze()
-pooled_embedding = pooled.detach().cpu().tolist()
-
-RESULT = {"pooled_embedding": pooled_embedding}
+last_hidden_state = outputs.last_hidden_state
+pooler_output = getattr(outputs, "pooler_output", None)
+RESULT = {
+    "last_hidden_state": last_hidden_state,
+    "pooler_output": pooler_output,
+}

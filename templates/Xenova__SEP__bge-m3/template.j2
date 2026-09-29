@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("Xenova/bge-m3") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Represent this sentence for searching relevant passages: The quick brown fox jumps over the lazy dog.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import numpy as np
+import torch
+from transformers import AutoTokenizer, AutoModel
+
+# This repo contains ONNX weights for Transformers.js, so use the original base model
+# architecture with standard Hugging Face weights from the base model.
+tokenizer = AutoTokenizer.from_pretrained("BAAI/bge-m3", use_fast=True)
+model = AutoModel.from_pretrained("BAAI/bge-m3")
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=8192)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+last_hidden_state = outputs.last_hidden_state
+attention_mask = inputs["attention_mask"].unsqueeze(-1).to(last_hidden_state.dtype)
+summed = (last_hidden_state * attention_mask).sum(dim=1)
+counts = attention_mask.sum(dim=1).clamp(min=1e-9)
+embedding = summed / counts
+embedding = torch.nn.functional.normalize(embedding, p=2, dim=1)
+
+RESULT = {"embedding": embedding.detach().cpu().numpy()}

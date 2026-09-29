@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-DNA-Medium-209M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The p53 protein plays a crucial role in tumor suppression.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import json
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModel, AutoConfig
+import torch
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+labels = cfg.get("labels", ["DNA", "RNA", "cell_line", "cell_tyle", "protein"])
+
+RESULT = {"labels": labels, "text": text}

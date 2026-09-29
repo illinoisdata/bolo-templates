@@ -1,30 +1,42 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("trituenhantaoio/bert-base-vietnamese-uncased") %}
-{% set input_text = input_text | default("Xin chào! Đây là một đoạn văn bản mẫu để phân loại.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Xin chào, tôi đang kiểm tra mô hình BERT tiếng Việt này.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
+text = "{{ text }}"
 
-import json
-from pathlib import Path
-
+import os
 import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSequenceClassification.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-encoded_inputs = tokenizer(input_text, return_tensors="pt")
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+model_dir = os.path.dirname(weights_path)
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False)
+model = AutoModelForSequenceClassification.from_pretrained(model_dir)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
-
-logits = outputs.logits
-logits_list = logits.squeeze(0).tolist()
-predicted_label = int(logits.argmax(dim=-1).squeeze().item())
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probs = torch.softmax(logits, dim=-1)
+    predicted_class_id = int(torch.argmax(probs, dim=-1).item())
+    confidence = float(torch.max(probs, dim=-1).values.item())
 
 RESULT = {
-    "logits": logits_list,
-    "predicted_label": predicted_label,
+    "text": text,
+    "logits": logits.detach().cpu().tolist(),
+    "probabilities": probs.detach().cpu().tolist(),
+    "predicted_class_id": predicted_class_id,
+    "confidence": confidence,
 }

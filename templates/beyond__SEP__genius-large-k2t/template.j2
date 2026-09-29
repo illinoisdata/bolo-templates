@@ -1,25 +1,45 @@
 {% set repo_id = repo_id | default("beyond/genius-large-k2t") %}
 {% set device = device | default("cuda:0") %}
-{% set sketch = sketch | default("machine learning data science my future work") %}
+{% set text_input = text_input | default('machine learning data science my future work') %}
 {% set max_length = max_length | default(100) %}
 {% set num_beams = num_beams | default(2) %}
 {% set do_sample = do_sample | default(true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-sketch = "{{ sketch }}"
+text_input = {{ text_input | tojson }}
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 do_sample = {{ do_sample }}
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
-import os
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+merges_file = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+special_tokens_map_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-encoded_input = tokenizer(sketch, return_tensors="pt").to(device)
-generated_ids = model.generate(**encoded_input, max_length=max_length, num_beams=num_beams, do_sample=do_sample)
-generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {"generated_text": generated_text}
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text_input, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_length=max_length,
+        num_beams=num_beams,
+        do_sample=do_sample,
+    )
+
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"output": output_text}

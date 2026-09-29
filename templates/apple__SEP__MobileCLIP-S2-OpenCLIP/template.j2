@@ -1,0 +1,57 @@
+{% set repo_id = repo_id | default("apple/MobileCLIP-S2-OpenCLIP") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text1 = text1 | default('a photo of a cat') %}
+{% set text2 = text2 | default('a photo of a dog') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text1 = "{{ text1 }}"
+text2 = "{{ text2 }}"
+
+import json
+from io import BytesIO
+
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from open_clip import create_model_from_pretrained, get_tokenizer
+
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+model, preprocess_val = create_model_from_pretrained(
+    "hf-hub:" + repo_id,
+    pretrained=weights_path,
+    device=device,
+)
+model.eval()
+
+tokenizer = get_tokenizer(config.get("text_cfg", {}).get("hf_tokenizer_name", repo_id))
+
+if isinstance(image_path, str) and image_path.startswith(("http://", "https://")):
+    import requests
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+image_input = preprocess_val(image).unsqueeze(0).to(device)
+texts = tokenizer([text1, text2]).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_input)
+    text_features = model.encode_text(texts)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logit_scale = model.logit_scale.exp()
+    logits = logit_scale * image_features @ text_features.T
+    probs = logits.softmax(dim=-1).squeeze(0)
+
+RESULT = {
+    "texts": [text1, text2],
+    "probabilities": probs.detach().cpu().tolist(),
+    "logits": logits.detach().cpu().tolist(),
+}

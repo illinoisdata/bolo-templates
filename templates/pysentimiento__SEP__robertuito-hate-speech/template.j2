@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("pysentimiento/robertuito-hate-speech") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Este es un comentario de prueba sobre un tema polémico.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, RobertaConfig
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+config = RobertaConfig.from_json_file(config_path)
+model = AutoModelForSequenceClassification.from_config(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+state_dict.pop("roberta.embeddings.position_ids", None)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    tokenizer_file=tokenizer_path,
+    tokenizer_config_file=tokenizer_config_path,
+    special_tokens_map_file=special_tokens_map_path,
+)
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    logits = model(**inputs).logits
+    probs = torch.sigmoid(logits)[0].detach().cpu().tolist()
+
+id2label = model.config.id2label
+scores = {id2label[str(i)] if str(i) in id2label else id2label[i]: probs[i] for i in range(len(probs))}
+prediction = max(scores, key=scores.get)
+
+RESULT = {"text": text, "prediction": prediction, "scores": scores}

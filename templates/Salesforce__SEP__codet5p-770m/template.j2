@@ -1,13 +1,25 @@
 {% set repo_id = repo_id | default("Salesforce/codet5p-770m") %}
 {% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default('def print_hello_world():<extra_id_0>') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
+text_input = "{{ text_input }}"
 
+import torch
+from transformers import AutoTokenizer, T5ForConditionalGeneration
 from huggingface_hub import hf_hub_download
-import json, os
 
-config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
-with open(config_path, "r") as f:
-    tokenizer_config = json.load(f)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 
-RESULT = {"tokenizer_config": tokenizer_config}
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False, legacy=False)
+model = T5ForConditionalGeneration.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(text_input, return_tensors="pt").to(device)
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_length=20)
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+RESULT = {"output_text": output_text}

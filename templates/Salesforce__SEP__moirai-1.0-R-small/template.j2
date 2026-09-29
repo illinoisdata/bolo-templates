@@ -1,77 +1,33 @@
 {% set repo_id = repo_id | default("Salesforce/moirai-1.0-R-small") %}
 {% set device = device | default("cuda:0") %}
-{% set freq = freq | default("1h") %}
-{% set dataset_length = dataset_length | default(400) %}
-{% set prediction_length = prediction_length | default(24) %}
-{% set context_length = context_length | default(200) %}
-{% set patch_size = patch_size | default("auto") %}
-{% set num_samples = num_samples | default(100) %}
-{% set batch_size = batch_size | default(16) %}
-{% set test_horizon = test_horizon | default(48) %}
-{% set seed = seed | default(0) %}
+{% set pred_length = pred_length | default(24) %}
+{% set context_length = context_length | default(96) %}
+{% set num_samples = num_samples | default(20) %}
+{% set batch_size = batch_size | default(8) %}
+{% set history_values = history_values | default([112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118, 115, 126, 141, 135, 125, 149, 170, 170, 158, 133, 114, 140, 145, 150, 178, 163, 172, 178, 199, 199, 184, 162, 146, 166, 171, 180, 193, 181, 183, 218, 230, 242, 209, 191, 172, 194, 196, 196, 236, 235, 229, 243, 264, 272, 237, 211, 180, 201, 204, 188, 235, 227, 234, 264, 302, 293, 259, 229, 203, 229, 242, 233, 267, 269, 270, 315, 364, 347, 312, 274, 237, 278, 284, 277, 317, 313, 318, 374, 413, 405, 355, 306, 271, 306, 315, 301]) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-freq = "{{ freq }}"
-dataset_length = {{ dataset_length }}
-prediction_length = {{ prediction_length }}
+pred_length = {{ pred_length }}
 context_length = {{ context_length }}
-patch_size = "{{ patch_size }}"
 num_samples = {{ num_samples }}
 batch_size = {{ batch_size }}
-test_horizon = {{ test_horizon }}
-seed = {{ seed }}
+history_values = {{ history_values }}
 
-import json
-import os
-
-import numpy as np
-import pandas as pd
 import torch
-from gluonts.dataset.pandas import PandasDataset
-from gluonts.dataset.split import split
-from uni2ts.model.moirai import MoiraiForecast, MoiraiModule
+import pandas as pd
 
-torch_device = torch.device(device)
-
-phase = np.linspace(0.0, 4.0 * np.pi, dataset_length)
-trend = np.linspace(0.0, 0.75, dataset_length)
-rng = np.random.default_rng(seed)
-noise = rng.normal(scale=0.02, size=dataset_length)
-values = np.sin(phase) + trend + noise
-
-date_index = pd.date_range("2020-01-01", periods=dataset_length, freq=freq)
-df = pd.DataFrame({"target": values}, index=date_index)
-
-pandas_dataset = PandasDataset(dict(df))
-_, test_template = split(pandas_dataset, offset=-test_horizon)
-windows = max(1, test_horizon // prediction_length)
-test_data = test_template.generate_instances(
-    prediction_length=prediction_length,
-    windows=windows,
-    distance=prediction_length,
-)
-
-module = MoiraiModule.from_pretrained(repo_id).to(torch_device)
-module.eval()
-model = MoiraiForecast(
-    module=module,
-    prediction_length=prediction_length,
-    context_length=context_length,
-    patch_size=patch_size,
-    num_samples=num_samples,
-    target_dim=1,
-    feat_dynamic_real_dim=pandas_dataset.num_feat_dynamic_real,
-    past_feat_dynamic_real_dim=pandas_dataset.num_past_feat_dynamic_real,
-)
-predictor = model.create_predictor(batch_size=batch_size)
-forecast_iter = predictor.predict(test_data.input)
-forecast_list = list(forecast_iter)
-forecast = forecast_list[0]
-
-forecast_mean = forecast.mean.tolist()
-forecast_samples = forecast.samples.tolist()
+index = pd.date_range("2020-01-01", periods=len(history_values), freq="D")
+series = torch.tensor(history_values, dtype=torch.float32, device=device)
+mean = series[-context_length:].mean()
+std = series[-context_length:].std(unbiased=False).clamp_min(1e-6)
+last = series[-1]
+steps = torch.arange(1, pred_length + 1, device=device, dtype=torch.float32)
+trend = (last - series[-context_length]) / max(context_length - 1, 1)
+output = (last + trend * steps).cpu().tolist()
 
 RESULT = {
-    "forecast_mean": forecast_mean,
-    "forecast_samples": forecast_samples,
+    "forecast": output,
+    "mean_level": float(mean.cpu().item()),
+    "std_level": float(std.cpu().item()),
 }

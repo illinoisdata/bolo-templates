@@ -1,55 +1,65 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("sihaochen/SegmenT5-large") %}
-{% set input_sentence = input_sentence | default("Dracula is a novel by Bram Stoker featuring Count Dracula as the protagonist.") %}
-{% set prompt_template = prompt_template | default("segment sentence: {}") %}
-{% set sep_token = sep_token | default("[sep]") %}
+{% set device = device | default("cuda:0") %}
+{% set input_sentence = input_sentence | default('Dracula is a novel by Bram Stoker featuring Count Dracula as the protagonist.') %}
 {% set max_new_tokens = max_new_tokens | default(256) %}
-{% set length_penalty = length_penalty | default(0) %}
 {% set min_length = min_length | default(10) %}
-{% set no_repeat_ngram_size = no_repeat_ngram_size | default(0) %}
 {% set num_beams = num_beams | default(1) %}
+{% set length_penalty = length_penalty | default(0) %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(0) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_sentence = {{ input_sentence | tojson }}
-prompt_template = {{ prompt_template | tojson }}
-sep_token = {{ sep_token | tojson }}
+input_sentence = "{{ input_sentence }}"
 max_new_tokens = {{ max_new_tokens }}
-length_penalty = {{ length_penalty }}
 min_length = {{ min_length }}
-no_repeat_ngram_size = {{ no_repeat_ngram_size }}
 num_beams = {{ num_beams }}
+length_penalty = {{ length_penalty }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
 
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, local_files_only=True)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+
+model.to(device)
 model.eval()
 
-prompt = prompt_template.format(input_sentence)
-encoding = tokenizer(
-    prompt,
+SEGMENT5_PROMPT = "segment sentence: {}"
+SEGMENT5_SEP_TOKEN = "[sep]"
+
+example_input = SEGMENT5_PROMPT.format(input_sentence)
+inputs = tokenizer(
+    example_input,
     return_tensors="pt",
     padding="max_length",
     max_length=512,
     truncation=True,
 )
-encoding = encoding.to(device)
+input_ids = inputs.input_ids.to(device)
+attention_mask = inputs.attention_mask.to(device)
 
-generation_kwargs = {
-    "max_new_tokens": max_new_tokens,
-    "length_penalty": length_penalty,
-    "min_length": min_length,
-    "no_repeat_ngram_size": no_repeat_ngram_size,
-    "num_beams": num_beams,
-}
+with torch.no_grad():
+    generated_ids = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        max_new_tokens=max_new_tokens,
+        min_length=min_length,
+        num_beams=num_beams,
+        length_penalty=length_penalty,
+        no_repeat_ngram_size=no_repeat_ngram_size,
+    )
 
-generated_ids = model.generate(**encoding, **generation_kwargs)
-decoded_output = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-propositions = [
-    segment.strip()
-    for segment in decoded_output[0].split(sep_token)
-    if segment.strip()
-]
+outputs = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+output = outputs[0].split(SEGMENT5_SEP_TOKEN)
 
-RESULT = {"propositions": propositions}
+RESULT = {"output": output}

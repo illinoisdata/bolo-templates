@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("tokyotech-llm/Swallow-7b-instruct-v0.1") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+# Python variable assignments
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+# Imports
+from transformers import pipeline
+
+# Initialize pipeline
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+# Run inference
+RESULT = pipe(input_prompt)

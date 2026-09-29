@@ -1,0 +1,62 @@
+{% set repo_id = repo_id | default("unsloth/whisper-large-v3") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set task = task | default('transcribe') %}
+{% set language = language | default(none) %}
+{% set chunk_length_s = chunk_length_s | default(none) %}
+{% set batch_size = batch_size | default(1) %}
+{% set max_new_tokens = max_new_tokens | default(444) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+task = "{{ task }}"
+language = {{ language if language is not none else 'None' }}
+chunk_length_s = {{ chunk_length_s if chunk_length_s is not none else 'None' }}
+batch_size = {{ batch_size }}
+max_new_tokens = {{ max_new_tokens }}
+
+import os
+import torch
+from urllib.parse import urlparse
+from huggingface_hub import hf_hub_download
+from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
+
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+torch_dtype = torch.float16 if torch.cuda.is_available() and str(device).startswith("cuda") else torch.float32
+
+model = AutoModelForSpeechSeq2Seq.from_pretrained(
+    repo_id,
+    torch_dtype=torch_dtype,
+    low_cpu_mem_usage=True,
+    use_safetensors=True,
+)
+model.to(device)
+processor = AutoProcessor.from_pretrained(repo_id)
+
+pipe_kwargs = {
+    "model": model,
+    "tokenizer": processor.tokenizer,
+    "feature_extractor": processor.feature_extractor,
+    "torch_dtype": torch_dtype,
+    "device": device,
+}
+if chunk_length_s is not None:
+    pipe_kwargs["chunk_length_s"] = chunk_length_s
+if batch_size is not None:
+    pipe_kwargs["batch_size"] = batch_size
+pipe = pipeline("automatic-speech-recognition", **pipe_kwargs)
+
+audio_input = audio_path
+if urlparse(audio_path).scheme in ("http", "https"):
+    audio_input = audio_path
+
+pipe_generate_kwargs = {"task": task, "max_new_tokens": max_new_tokens}
+if language is not None:
+    pipe_generate_kwargs["language"] = language
+
+result = pipe(audio_input, generate_kwargs=pipe_generate_kwargs)
+RESULT = {"text": result["text"]}

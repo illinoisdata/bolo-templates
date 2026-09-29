@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("rinna/japanese-gpt2-medium") %}
+{% set device = device | default("cuda:0") %}
+{%- set task = task | default("text-generation") -%}
+{%- set model = model | default(repo_id) -%}
+{%- set input_prompt = input_prompt | default("こんにちは、調子はいかがですか？") -%}
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import pipeline, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)
+tokenizer.do_lower_case = True
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt)

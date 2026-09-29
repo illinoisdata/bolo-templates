@@ -1,43 +1,39 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("DeepChem/ChemBERTa-10M-MTR") %}
-{% set text_input = text_input | default("The molecule exhibits hydrogen bonding and interacts with solvents.") %}
-{% set max_length = max_length | default(256) %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-text_input = {{ text_input | tojson }}
-max_length = {{ max_length }}
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default('CCO') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+
 import torch
-import os
-import json
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSequenceClassification.from_pretrained(repo_id)
-model = model.to(device)
-model.eval()
-input_texts = text_input if isinstance(text_input, (list, tuple)) else [text_input]
-encoded_inputs = tokenizer(
-    input_texts,
-    return_tensors="pt",
-    truncation=True,
-    padding=True,
-    max_length=max_length,
-)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+_ = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+_tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+_model = AutoModelForSequenceClassification.from_pretrained(repo_id)
+_model.to(device)
+_model.eval()
+
+inputs = _tokenizer(text_input, return_tensors="pt", padding=True, truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
+    outputs = _model(**inputs)
+
 logits = outputs.logits
-id2label = model.config.id2label or {}
+predicted_index = int(torch.argmax(logits, dim=-1).item())
+predicted_score = float(torch.max(logits, dim=-1).values.item())
 
-def _label_name(index):
-    return id2label.get(index) or id2label.get(str(index)) or f"label_{index}"
-
-batch_predictions = []
-for logits_per_example in logits:
-    prediction = {
-        _label_name(idx): float(value)
-        for idx, value in enumerate(logits_per_example)
-    }
-    batch_predictions.append(prediction)
-
-RESULT = {"predictions": batch_predictions}
+RESULT = {
+    "logits": logits.detach().cpu().tolist(),
+    "predicted_index": predicted_index,
+    "predicted_score": predicted_score,
+}

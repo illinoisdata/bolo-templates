@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("breezedeus/pix2text-mfd") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set detection_thresh = detection_thresh | default(0.3) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+detection_thresh = {{ detection_thresh }}
+
+import requests
+from io import BytesIO
+from PIL import Image
+import numpy as np
+from huggingface_hub import hf_hub_download
+import onnxruntime as ort
+
+model_path = hf_hub_download(repo_id=repo_id, filename="mfd-v20240618.onnx")
+_ = hf_hub_download(repo_id=repo_id, filename="config.yaml")
+
+image_source = image_path
+if isinstance(image_source, str) and image_source.startswith(("http://", "https://")):
+    image = Image.open(BytesIO(requests.get(image_source, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_source).convert("RGB")
+
+providers = ["CPUExecutionProvider"]
+so = ort.SessionOptions()
+so.intra_op_num_threads = 1
+so.inter_op_num_threads = 1
+session = ort.InferenceSession(model_path, sess_options=so, providers=providers)
+input_name = session.get_inputs()[0].name
+input_shape = session.get_inputs()[0].shape
+if len(input_shape) >= 4 and isinstance(input_shape[2], int) and isinstance(input_shape[3], int):
+    target_h, target_w = input_shape[2], input_shape[3]
+else:
+    target_h, target_w = image.size[1], image.size[0]
+resized = image.resize((target_w, target_h))
+x = np.asarray(resized, dtype=np.float32) / 255.0
+x = np.transpose(x, (2, 0, 1))[None, ...]
+outputs = session.run(None, {input_name: x})
+RESULT = {
+    "outputs": [o.tolist() if hasattr(o, 'tolist') else o for o in outputs],
+    "input_shape": list(x.shape),
+}

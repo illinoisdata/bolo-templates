@@ -1,0 +1,42 @@
+{% set repo_id = repo_id | default("LLM4Binary/llm4decompile-1.3b-v1.6") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('int add(int a, int b) { return a + b; }') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+generation_config_file = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+local_device = torch.device(device if torch.cuda.is_available() or device == 'cpu' else 'cpu')
+
+tokenizer = AutoTokenizer.from_pretrained(model_file.rsplit('/', 1)[0], use_fast=True)
+model = AutoModelForCausalLM.from_pretrained(
+    model_file.rsplit('/', 1)[0],
+    torch_dtype=torch.bfloat16 if local_device.type == 'cuda' else torch.float32,
+    low_cpu_mem_usage=True,
+)
+model.to(local_device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(local_device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=64,
+        do_sample=False,
+        pad_token_id=tokenizer.eos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

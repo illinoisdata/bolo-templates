@@ -1,21 +1,40 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("utrobinmv/t5_translate_en_ru_zh_small_1024") %}
-{% set text_to_translate = text_to_translate | default("translate to zh: The purpose of the development is to provide users with a personal synchronized interpreter.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('translate to zh: Цель разработки — предоставить пользователям личного синхронного переводчика.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_to_translate = "{{ text_to_translate }}"
+text = "{{ text }}"
 
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import os
+import torch
+from transformers import T5ForConditionalGeneration, T5Tokenizer
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+model = T5ForConditionalGeneration.from_pretrained(
+    os.path.dirname(model_path),
+    local_files_only=True,
+    torch_dtype=torch.float32,
+)
 model.to(device)
+model.eval()
 
-batch = tokenizer(text_to_translate, return_tensors="pt")
-batch = batch.to(device)
+tokenizer = T5Tokenizer.from_pretrained(
+    os.path.dirname(tokenizer_path),
+    local_files_only=True,
+)
 
-generated_tokens = model.generate(**batch)
-translated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_tokens = model.generate(**inputs, max_new_tokens=64)
+output = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
-RESULT = {"translation": translated_texts}
+RESULT = {"output": output}

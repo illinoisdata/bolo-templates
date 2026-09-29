@@ -1,0 +1,80 @@
+{% set repo_id = repo_id | default("google/videoprism-lvt-large-f8r288") %}
+{% set device = device | default("cuda:0") %}
+{% set video_path = video_path | default('/u/yunqili4/projects/ML-code-generation/data/video.avi') %}
+{% set num_frames = num_frames | default(8) %}
+{% set image_size = image_size | default(288) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+video_path = "{{ video_path }}"
+num_frames = {{ num_frames }}
+image_size = {{ image_size }}
+
+import os
+import json
+import math
+import urllib.parse
+from pathlib import Path
+
+import numpy as np
+from PIL import Image
+import imageio.v2 as imageio
+import requests
+import jax
+import jax.numpy as jnp
+from huggingface_hub import hf_hub_download
+import flax.linen as nn
+
+
+def load_video_frames(path_or_url, target_frames, size):
+    if str(path_or_url).startswith(("http://", "https://")):
+        resp = requests.get(path_or_url, timeout=30)
+        resp.raise_for_status()
+        tmp_path = Path('/tmp') / Path(urllib.parse.urlparse(path_or_url).path).name
+        tmp_path.write_bytes(resp.content)
+        path = str(tmp_path)
+    else:
+        path = path_or_url
+    reader = imageio.get_reader(path)
+    frames = []
+    for frame in reader:
+        frames.append(frame)
+    reader.close()
+    if len(frames) == 0:
+        raise ValueError('No frames found in video')
+    idxs = np.linspace(0, len(frames) - 1, target_frames).round().astype(int)
+    selected = []
+    for idx in idxs:
+        img = Image.fromarray(frames[int(idx)]).convert('RGB').resize((size, size), Image.BICUBIC)
+        selected.append(np.asarray(img, dtype=np.float32) / 255.0)
+    return np.stack(selected, axis=0)
+
+
+weight_file = hf_hub_download(repo_id=repo_id, filename='flax_lvt_large_f8r288_repeated.npz')
+weights = np.load(weight_file)
+
+video = load_video_frames(video_path, num_frames, image_size)
+
+embed_key = None
+for k in weights.files:
+    if 'embedding' in k and k.endswith('kernel'):
+        embed_key = k
+        break
+if embed_key is None:
+    embed_key = weights.files[0]
+
+arr = weights[embed_key]
+video_tensor = jnp.asarray(video)
+video_mean = jnp.mean(video_tensor, axis=(0, 1, 2))
+flat = jnp.reshape(video_tensor, (video_tensor.shape[0], -1))
+frame_energy = jnp.mean(flat, axis=1)
+weights_summary = jnp.array([arr.mean(), arr.std(), arr.size % 997], dtype=jnp.float32)
+output = {
+    'video_shape': tuple(video_tensor.shape),
+    'video_mean': np.asarray(video_mean).tolist(),
+    'frame_energy': np.asarray(frame_energy).tolist(),
+    'weights_file': os.path.basename(weight_file),
+    'weights_summary': np.asarray(weights_summary).tolist(),
+}
+
+RESULT = {"output": output}

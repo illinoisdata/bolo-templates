@@ -1,55 +1,56 @@
 {% set repo_id = repo_id | default("ramsrigouthamg/t5_paraphraser") %}
 {% set device = device | default("cuda:0") %}
-{% set prompt = prompt | default("Which course should I take to get started in data science?") %}
-{% set prefix = prefix | default("paraphrase: ") %}
+{% set sentence = sentence | default("Which course should I take to get started in data science?") %}
 {% set max_length = max_length | default(256) %}
-{% set num_return_sequences = num_return_sequences | default(5) %}
+{% set do_sample = do_sample | default(true) %}
 {% set top_k = top_k | default(120) %}
 {% set top_p = top_p | default(0.98) %}
+{% set num_return_sequences = num_return_sequences | default(10) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
-prefix = "{{ prefix }}"
+sentence = "{{ sentence }}"
 max_length = {{ max_length }}
-num_return_sequences = {{ num_return_sequences }}
+do_sample = {{ do_sample }}
 top_k = {{ top_k }}
 top_p = {{ top_p }}
+num_return_sequences = {{ num_return_sequences }}
 
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import T5ForConditionalGeneration, T5Tokenizer
+from huggingface_hub import hf_hub_download
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = model.to(torch.device(device))
+hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="spiece.model")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+model = T5ForConditionalGeneration.from_pretrained(repo_id)
+tokenizer = T5Tokenizer.from_pretrained(repo_id, use_fast=False)
+model = model.to(device)
 model.eval()
 
-input_sequence = (prefix + prompt).strip()
-encoding = tokenizer(input_sequence, return_tensors="pt")
-input_ids = encoding["input_ids"].to(torch.device(device))
-attention_mask = encoding["attention_mask"].to(torch.device(device))
-with torch.no_grad():
-    outputs = model.generate(
-        input_ids=input_ids,
-        attention_mask=attention_mask,
-        do_sample=True,
-        max_length=max_length,
-        top_k=top_k,
-        top_p=top_p,
-        num_return_sequences=num_return_sequences,
-        early_stopping=True,
-    )
+text = "paraphrase: " + sentence + " </s>"
+encoding = tokenizer(text, padding="max_length", max_length=max_length, truncation=True, return_tensors="pt")
+input_ids = encoding["input_ids"].to(device)
+attention_masks = encoding["attention_mask"].to(device)
 
-generated_texts = tokenizer.batch_decode(outputs, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-paraphrases = []
-for text in generated_texts:
-    normalized = text.strip()
-    if not normalized:
-        continue
-    if normalized.lower() == prompt.lower():
-        continue
-    if normalized in paraphrases:
-        continue
-    paraphrases.append(normalized)
+beam_outputs = model.generate(
+    input_ids=input_ids,
+    attention_mask=attention_masks,
+    do_sample=do_sample,
+    max_length=max_length,
+    top_k=top_k,
+    top_p=top_p,
+    early_stopping=True,
+    num_return_sequences=num_return_sequences,
+)
 
-RESULT = {"paraphrases": paraphrases}
+final_outputs = []
+for beam_output in beam_outputs:
+    sent = tokenizer.decode(beam_output, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+    if sent.lower() != sentence.lower() and sent not in final_outputs:
+        final_outputs.append(sent)
+
+RESULT = {"original": sentence, "paraphrases": final_outputs}

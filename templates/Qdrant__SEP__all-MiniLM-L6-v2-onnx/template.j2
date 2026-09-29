@@ -1,17 +1,45 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Qdrant/all-MiniLM-L6-v2-onnx") %}
-repo_id = "unused"
-import importlib
-modules = [
-    "transformers",
-    "transformers.onnx",
-    "transformers.models.ort",
-    "transformers.ort",
-    "transformers.onnxruntime",
-]
-for mod in modules:
-    try:
-        module = importlib.import_module(mod)
-        print(mod, hasattr(module, "ORTModel"))
-    except ImportError as error:
-        print(mod, "import error", error)
+{% set device = device | default("cuda:0") %}
+{% set text1 = text1 | default('A cat sits on the mat.') %}
+{% set text2 = text2 | default('A feline is resting on a rug.') %}
+{% set max_length = max_length | default(128) %}
+{% set normalize = normalize | default(true) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text1 = {{ text1 | tojson }}
+text2 = {{ text2 | tojson }}
+max_length = {{ max_length }}
+normalize = {{ normalize }}
+
+import numpy as np
+import onnxruntime as ort
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.onnx")
+
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_path.rsplit("/", 1)[0], use_fast=True)
+
+providers = ["CPUExecutionProvider"]
+sess_options = ort.SessionOptions()
+sess_options.intra_op_num_threads = 1
+sess_options.inter_op_num_threads = 1
+session = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
+
+inputs = tokenizer([text1, text2], padding=True, truncation=True, max_length=max_length, return_tensors="np")
+if "token_type_ids" not in inputs:
+    inputs["token_type_ids"] = np.zeros_like(inputs["input_ids"])
+ort_inputs = {k: v.astype(np.int64) if v.dtype.kind in ("i", "u") else v for k, v in inputs.items()}
+
+outputs = session.run(None, ort_inputs)
+embeddings = outputs[0]
+
+if normalize:
+    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    embeddings = embeddings / np.clip(norms, 1e-12, None)
+
+similarity = float(np.sum(embeddings[0] * embeddings[1]))
+
+RESULT = {"embeddings": embeddings, "similarity": similarity}

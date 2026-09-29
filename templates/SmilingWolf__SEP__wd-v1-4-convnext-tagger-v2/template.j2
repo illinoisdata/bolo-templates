@@ -1,0 +1,74 @@
+{% set repo_id = repo_id | default("SmilingWolf/wd-v1-4-convnext-tagger-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set threshold = threshold | default(0.3685) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+threshold = {{ threshold }}
+
+import os
+import json
+import subprocess
+import sys
+import numpy as np
+import requests
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+try:
+    import onnxruntime as ort
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "onnxruntime", "-q"] )
+    import onnxruntime as ort
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.onnx")
+variables_path = hf_hub_download(repo_id=repo_id, filename="variables/variables.index")
+
+with open(variables_path, 'rb') as f:
+    raw = f.read()
+try:
+    text = raw.decode('utf-8')
+except UnicodeDecodeError:
+    text = raw.decode('latin-1')
+data = text.splitlines()
+
+class_names = []
+for line in data:
+    line = line.strip()
+    if not line or line.startswith('['):
+        continue
+    if '\t' in line:
+        parts = line.split('\t')
+    else:
+        parts = line.split(',')
+    if len(parts) >= 2:
+        idx = parts[0].strip()
+        name = parts[1].strip()
+        if idx.isdigit():
+            class_names.append(name)
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    img = Image.open(requests.get(image_path, stream=True).raw).convert('RGB')
+else:
+    img = Image.open(image_path).convert('RGB')
+
+img = img.resize((448, 448), Image.BICUBIC)
+arr = np.asarray(img).astype(np.float32)
+arr = (arr / 255.0 - 0.5) / 0.5
+arr = np.expand_dims(arr, 0)
+
+providers = ['CPUExecutionProvider']
+if device.startswith('cuda'):
+    providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+sess = ort.InferenceSession(model_path, providers=providers)
+input_name = sess.get_inputs()[0].name
+outputs = sess.run(None, {input_name: arr})
+preds = outputs[0][0]
+
+scores = []
+for name, score in zip(class_names, preds):
+    if float(score) >= threshold:
+        scores.append((name, float(score)))
+
+RESULT = {"tags": scores, "all_scores": dict(zip(class_names, map(float, preds[:len(class_names)])))}

@@ -1,0 +1,51 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set batch_size = batch_size | default(1) %}
+{% set pnc = pnc | default(True) %}
+{% set timestamps = timestamps | default(False) %}
+{% set repo_id = repo_id | default("nvidia/canary-180m-flash") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+batch_size = {{ batch_size }}
+pnc = {{ pnc }}
+timestamps = {{ timestamps }}
+
+import os
+import json
+import tempfile
+import torch
+from urllib.parse import urlparse
+from huggingface_hub import hf_hub_download
+from nemo.collections.asr.models import EncDecMultiTaskModel
+
+nemo_path = hf_hub_download(repo_id=repo_id, filename="canary-180m-flash.nemo")
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    import requests
+    audio_local_path = os.path.join(tempfile.gettempdir(), os.path.basename(urlparse(audio_path).path) or "audio.wav")
+    if not os.path.exists(audio_local_path):
+        with requests.get(audio_path, stream=True) as r:
+            r.raise_for_status()
+            with open(audio_local_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+else:
+    audio_local_path = audio_path
+
+model = EncDecMultiTaskModel.restore_from(nemo_path, map_location=device)
+model = model.to(device)
+decode_cfg = model.cfg.decoding
+if hasattr(decode_cfg, "beam") and hasattr(decode_cfg.beam, "beam_size"):
+    decode_cfg.beam.beam_size = 1
+model.change_decoding_strategy(decode_cfg)
+
+output = model.transcribe([audio_local_path], batch_size=batch_size, pnc=str(pnc), timestamps=bool(timestamps))
+first = output[0]
+if hasattr(first, "text"):
+    text = first.text
+else:
+    text = str(first)
+
+RESULT = {"text": text}

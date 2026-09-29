@@ -1,0 +1,48 @@
+{% set repo_id = repo_id | default("ibm-granite/granite-vision-3.3-2b") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('What is shown in the image?') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+image_path = "{{ image_path }}"
+
+import requests
+import torch
+from PIL import Image
+from transformers import AutoProcessor, LlavaNextForConditionalGeneration
+
+model_path = repo_id
+processor = AutoProcessor.from_pretrained(model_path)
+model = LlavaNextForConditionalGeneration.from_pretrained(
+    model_path,
+    torch_dtype=torch.bfloat16,
+).to(device)
+model.eval()
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+conversation = [
+    {
+        "role": "user",
+        "content": [
+            {"type": "image", "url": image_path},
+            {"type": "text", "text": prompt},
+        ],
+    }
+]
+inputs = processor.apply_chat_template(
+    conversation,
+    add_generation_prompt=True,
+    tokenize=True,
+    return_dict=True,
+    return_tensors="pt",
+)
+inputs = {k: v.to(device) if hasattr(v, "to") else v for k, v in inputs.items()}
+output_ids = model.generate(**inputs, max_new_tokens=64)
+output_text = processor.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"text": output_text}

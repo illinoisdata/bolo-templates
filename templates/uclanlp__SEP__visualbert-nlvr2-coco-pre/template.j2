@@ -1,46 +1,63 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("uclanlp/visualbert-nlvr2-coco-pre") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set text_prompt = text_prompt | default("A single cat sits on a cozy rug.") %}
-{% set max_length = max_length | default(32) %}
+{% set device = device | default("cuda:0") %}
+{% set text_a = text_a | default('A picture of a cat.') %}
+{% set text_b = text_b | default('A picture of two cats.') %}
+{% set image1 = image1 | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set image2 = image2 | default('/u/yunqili4/projects/ML-code-generation/data/image2.jpeg') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-image_path = "{{ image_path }}"
-text_prompt = "{{ text_prompt }}"
-max_length = {{ max_length }}
+text_a = "{{ text_a }}"
+text_b = "{{ text_b }}"
+image1 = "{{ image1 }}"
+image2 = "{{ image2 }}"
 
 import requests
-from pathlib import Path
-from PIL import Image
-
-import numpy as np
 import torch
-from transformers import AutoModelForPreTraining, AutoProcessor
+from PIL import Image
+from transformers import VisualBertConfig, VisualBertForPreTraining, BertTokenizerFast
+from huggingface_hub import hf_hub_download
 
-device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-processor = AutoProcessor.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+config = VisualBertConfig.from_json_file(config_path)
+model = VisualBertForPreTraining(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+state_dict.pop("visual_bert.embeddings.position_ids", None)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
 model.eval()
 
-def _load_image(source: str) -> Image.Image:
-    if source.startswith("http://") or source.startswith("https://"):
-        response = requests.get(source, stream=True)
-        response.raise_for_status()
-        return Image.open(response.raw).convert("RGB")
-    return Image.open(source).convert("RGB")
+tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
 
-image = _load_image(image_path)
-inputs = processor(text=text_prompt, images=image, return_tensors="pt", padding="max_length", truncation=True, max_length=max_length)
-inputs = {key: value.to(device) for key, value in inputs.items()}
+if image1.startswith("http://") or image1.startswith("https://"):
+    img1 = Image.open(requests.get(image1, stream=True).raw).convert("RGB")
+else:
+    img1 = Image.open(image1).convert("RGB")
+if image2.startswith("http://") or image2.startswith("https://"):
+    img2 = Image.open(requests.get(image2, stream=True).raw).convert("RGB")
+else:
+    img2 = Image.open(image2).convert("RGB")
+
+text_inputs = tokenizer(text_a, text_b, padding=True, truncation=True, return_tensors="pt")
+input_ids = text_inputs["input_ids"].to(device)
+attention_mask = text_inputs["attention_mask"].to(device)
+
+visual_embeds = torch.zeros((1, 2, config.visual_embedding_dim), device=device)
+visual_attention_mask = torch.ones((1, 2), dtype=torch.long, device=device)
+visual_token_type_ids = torch.zeros((1, 2), dtype=torch.long, device=device)
 
 with torch.no_grad():
-    outputs = model(**inputs)
-
-prediction_logits = outputs.prediction_logits.detach().cpu().numpy()
-seq_relationship_logits = outputs.seq_relationship_logits.detach().cpu().numpy()
+    outputs = model(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        visual_embeds=visual_embeds,
+        visual_attention_mask=visual_attention_mask,
+        visual_token_type_ids=visual_token_type_ids,
+        return_dict=True,
+    )
 
 RESULT = {
-    "prediction_logits": prediction_logits,
-    "seq_relationship_logits": seq_relationship_logits,
+    "prediction_logits": outputs.prediction_logits.detach().cpu(),
+    "seq_relationship_logits": outputs.seq_relationship_logits.detach().cpu(),
 }

@@ -1,0 +1,58 @@
+{% set repo_id = repo_id | default("gravitee-io/bert-small-pii-detection") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Contact John Doe at john.doe@example.com or +1 (415) 555-1234. His SSN is 123-45-6789 and card 4111 1111 1111 1111. He lives at 123 Main St, San Francisco, CA.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+import json
+import torch
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+model = AutoModelForTokenClassification.from_pretrained(repo_id, local_files_only=True)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+pred_ids = logits.argmax(dim=-1)[0].tolist()
+tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
+labels = [model.config.id2label[str(i)] if str(i) in model.config.id2label else model.config.id2label[i] for i in pred_ids]
+
+entities = []
+current = None
+for token, label in zip(tokens, labels):
+    if token in tokenizer.all_special_tokens:
+        continue
+    if label.startswith("B-"):
+        if current is not None:
+            entities.append(current)
+        current = {"entity_group": label[2:], "word": token, "score": None}
+    elif label.startswith("I-") and current is not None and current["entity_group"] == label[2:]:
+        current["word"] += tokenizer.convert_tokens_to_string([token])
+    else:
+        if current is not None:
+            entities.append(current)
+            current = None
+if current is not None:
+    entities.append(current)
+
+RESULT = {"entities": entities, "tokens": tokens, "labels": labels}

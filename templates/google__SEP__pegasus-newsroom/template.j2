@@ -1,43 +1,45 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("google/pegasus-newsroom") %}
-{% set text_input = text_input | default("The city council debated a new budget proposal that allocates additional funding to public health, infrastructure, and education. The plan also creates a small business grant program to support struggling entrepreneurs in under-resourced neighborhoods.") %}
-{% set max_summary_length = max_summary_length | default(128) %}
-{% set min_summary_length = min_summary_length | default(32) %}
-{% set num_beams = num_beams | default(4) %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-text_input = {{ text_input | tojson }}
-max_summary_length = {{ max_summary_length }}
-min_summary_length = {{ min_summary_length }}
+{% set device = device | default("cuda:0") %}
+{% set max_input_length = max_input_length | default(1024) %}
+{% set num_beams = num_beams | default(8) %}
+{% set text = text | default("The stock market rallied today after a new economic report showed stronger-than-expected growth in consumer spending. Analysts said the report eased recession fears and boosted investor confidence across major indices.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+max_input_length = {{ max_input_length }}
 num_beams = {{ num_beams }}
-
-from pathlib import Path
+text = {{ text | tojson }}
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import PegasusTokenizer, PegasusForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+tokenizer = PegasusTokenizer.from_pretrained(repo_id, use_fast=False, local_files_only=True)
+model = PegasusForConditionalGeneration.from_pretrained(repo_id, local_files_only=True)
+model.to(device)
+model.eval()
 
-encoded_inputs = tokenizer(
-    text_input,
+inputs = tokenizer(
+    text,
     return_tensors="pt",
     truncation=True,
-    padding="longest",
+    max_length=max_input_length,
 )
-encoded_inputs = {key: value.to(torch_device) for key, value in encoded_inputs.items()}
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_tokens = model.generate(
-    **encoded_inputs,
-    max_length=max_summary_length,
-    min_length=min_summary_length,
-    num_beams=num_beams,
-    early_stopping=True,
-)
-
-generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-summary = generated_text[0].strip()
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_length=64,
+        num_beams=num_beams,
+        length_penalty=0.8,
+        early_stopping=True,
+    )
+summary = tokenizer.decode(generated[0], skip_special_tokens=True)
 
 RESULT = {"summary": summary}

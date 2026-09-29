@@ -1,0 +1,31 @@
+{% set repo_id = repo_id | default("Mizuiro-sakura/luke-japanese-large-sentiment-analysis-wrime") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set input_prompt = input_prompt | default("すごく楽しかった。また行きたい。") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = {{ task | tojson }}
+model = repo_id
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import pipeline
+from transformers.models.mluke.tokenization_mluke import MLukeTokenizer
+from transformers.convert_slow_tokenizer import SentencePieceExtractor
+from tokenizers.models import Unigram
+from huggingface_hub import hf_hub_download
+import json
+
+# Load SentencePiece model and entity vocab directly from the repo
+spm_file = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+entity_vocab_file = hf_hub_download(repo_id=repo_id, filename="entity_vocab.json")
+with open(entity_vocab_file, encoding="utf-8") as f:
+    entity_vocab = json.load(f)
+# Extract vocab as list of (token, score) for Unigram
+extractor = SentencePieceExtractor(spm_file)
+spm_kwargs = extractor.extract(Unigram)
+# Initialize MLuke tokenizer with correct vocab and entity vocab
+tokenizer = MLukeTokenizer(vocab=spm_kwargs["vocab"], entity_vocab=entity_vocab, **{k: v for k, v in spm_kwargs.items() if k != "vocab"})
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt)

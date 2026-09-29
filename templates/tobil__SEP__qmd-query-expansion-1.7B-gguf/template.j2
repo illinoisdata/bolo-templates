@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("tobil/qmd-query-expansion-1.7B-gguf") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('qmd-query-expansion-1.7B-q4_k_m.gguf') %}
+{% set query = query | default('auth config') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+query = "{{ query }}"
+
+import os
+import requests
+from pathlib import Path
+from huggingface_hub import hf_hub_download
+from PIL import Image
+
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+llm = Llama(
+    model_path=model_path,
+    n_ctx=4096,
+    n_threads=max(1, os.cpu_count() or 1),
+    n_gpu_layers=-1 if str(device).startswith('cuda') else 0,
+    verbose=False,
+)
+
+prompt = f"<|im_start|>user\n/no_think Expand this search query: {query}<|im_end|>\n<|im_start|>assistant\n"
+response = llm(
+    prompt,
+    max_tokens=256,
+    temperature=0.7,
+    top_p=0.95,
+    stop=["<|im_end|>"]
+)
+output_text = response["choices"][0]["text"].strip()
+
+RESULT = {"output": output_text}

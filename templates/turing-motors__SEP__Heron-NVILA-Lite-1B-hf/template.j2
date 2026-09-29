@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("turing-motors/Heron-NVILA-Lite-1B-hf") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('<image>\n画像を説明してください。') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+prompt = {{ prompt | tojson }}
+image_path = {{ image_path | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+
+import requests
+from PIL import Image
+import torch
+from transformers import AutoProcessor, AutoModelForImageTextToText
+
+processor = AutoProcessor.from_pretrained(repo_id, trust_remote_code=True, use_fast=False)
+model = AutoModelForImageTextToText.from_pretrained(repo_id, trust_remote_code=True, dtype=torch.bfloat16)
+model.to(device)
+model.eval()
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+conversation = [{"role": "user", "content": prompt}]
+text = processor.apply_chat_template(conversation, add_generation_prompt=True, tokenize=False)
+inputs = processor(text=text, images=[image], return_tensors="pt")
+inputs = {k: v.to(device) if hasattr(v, 'to') else v for k, v in inputs.items()}
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+input_len = inputs["input_ids"].shape[1]
+output_text = processor.decode(output_ids[0, input_len:], skip_special_tokens=True)
+
+RESULT = {"output": output_text}

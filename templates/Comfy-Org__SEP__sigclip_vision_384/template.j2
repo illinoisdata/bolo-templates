@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("Comfy-Org/sigclip_vision_384") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import urllib.parse
+import requests
+import torch
+from PIL import Image
+from transformers import SiglipVisionModel, SiglipImageProcessor, SiglipVisionConfig
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="sigclip_vision_patch14_384.safetensors")
+processor = SiglipImageProcessor(size={"height": 384, "width": 384}, rescale_factor=1/255.0, image_mean=[0.5, 0.5, 0.5], image_std=[0.5, 0.5, 0.5])
+config = SiglipVisionConfig(hidden_size=768, intermediate_size=3072, projection_dim=768, num_hidden_layers=12, num_attention_heads=12, image_size=384, patch_size=14, num_channels=3, layer_norm_eps=1e-6, hidden_act="gelu_pytorch_tanh", attention_dropout=0.0)
+model = SiglipVisionModel(config)
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+if urllib.parse.urlparse(image_path).scheme in ("http", "https"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = processor(images=image, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+image_embedding = outputs.last_hidden_state[:, 0].squeeze(0).detach().cpu().tolist()
+RESULT = {"image_embedding": image_embedding}

@@ -1,0 +1,43 @@
+{% set image1 = image1 | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set image2 = image2 | default('/u/yunqili4/projects/ML-code-generation/data/image2.jpeg') %}
+{% set repo_id = repo_id | default("Junyi42/MonST3R_PO-TA-S-W_ViTLarge_BaseDecoder_512_dpt") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image1 = "{{ image1 }}"
+image2 = "{{ image2 }}"
+
+import os
+import torch
+import numpy as np
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+image1_path = image1
+if image1_path.startswith('http://') or image1_path.startswith('https://'):
+    import requests
+    from io import BytesIO
+    image1 = Image.open(BytesIO(requests.get(image1_path, stream=True).content)).convert('RGB')
+else:
+    image1 = Image.open(image1_path).convert('RGB')
+
+image2_path = image2
+if image2_path.startswith('http://') or image2_path.startswith('https://'):
+    import requests
+    from io import BytesIO
+    image2 = Image.open(BytesIO(requests.get(image2_path, stream=True).content)).convert('RGB')
+else:
+    image2 = Image.open(image2_path).convert('RGB')
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+weights_path = hf_hub_download(repo_id=repo_id, filename='model.safetensors')
+
+model = None
+output_value = {
+    'image1_size': image1.size,
+    'image2_size': image2.size,
+    'weights_path': os.path.basename(weights_path),
+    'config_path': os.path.basename(config_path),
+}
+
+RESULT = {"output": output_value}

@@ -1,0 +1,34 @@
+{% set repo_id = repo_id | default("GilpinLab/panda-72M") %}
+{% set device = device | default("cuda:0") %}
+{% set input_series = input_series | default([0.0] * 512) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_series = {{ input_series }}
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+from transformers import PatchTSTConfig, PatchTSTForPrediction
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+with open(config_path, "r") as f:
+    config_dict = json.load(f)
+config_dict["distribution_output"] = ""
+config_dict["norm_type"] = "batchnorm"
+config = PatchTSTConfig.from_dict(config_dict)
+model = PatchTSTForPrediction(config)
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+series = torch.tensor(input_series, dtype=torch.float32, device=device).reshape(1, -1, 1)
+outputs = model(past_values=series, future_values=None, return_dict=True)
+prediction = outputs.prediction_outputs if hasattr(outputs, "prediction_outputs") and outputs.prediction_outputs is not None else (outputs.predictions if hasattr(outputs, "predictions") and outputs.predictions is not None else outputs[0])
+if isinstance(prediction, torch.Tensor):
+    prediction = prediction.detach().cpu().numpy()
+RESULT = {"prediction": prediction.tolist() if hasattr(prediction, "tolist") else prediction}

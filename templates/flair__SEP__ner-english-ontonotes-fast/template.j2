@@ -1,0 +1,30 @@
+{% set repo_id = repo_id | default("flair/ner-english-ontonotes-fast") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('On September 1st George Washington won 1 dollar.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+from huggingface_hub import hf_hub_download
+from flair.data import Sentence
+from flair.models import SequenceTagger
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+sentence = Sentence(text)
+tagger = SequenceTagger.load(weights_path)
+tagger.to(device)
+tagger.predict(sentence)
+
+entities = []
+for span in sentence.get_spans("ner"):
+    entities.append({
+        "text": span.text,
+        "label": span.labels[0].value if span.labels else None,
+        "score": span.labels[0].score if span.labels else None,
+        "start_position": span.start_position,
+        "end_position": span.end_position,
+    })
+
+RESULT = {"text": text, "entities": entities}

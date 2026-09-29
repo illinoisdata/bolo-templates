@@ -1,27 +1,38 @@
 {% set repo_id = repo_id | default("csebuetnlp/banglat5_banglaparaphrase") %}
 {% set device = device | default("cuda:0") %}
-{% set input_sentence = input_sentence | default("আমি বাংলায় কথা বলতে ভালোবাসি।") %}
+{% set input_sentence = input_sentence | default('আমি আজ স্কুলে গেছি।') %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_sentence = "{{ input_sentence }}"
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
 
-from pathlib import Path
-
+import os
 import torch
-
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(torch_device)
+model_dir = os.path.dirname(model_path)
 
-encoding = tokenizer(input_sentence, return_tensors="pt", padding=True)
-encoding = {key: value.to(torch_device) for key, value in encoding.items()}
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
+model.to(device)
+model.eval()
 
-generated_tokens = model.generate(**encoding)
+inputs = tokenizer(input_sentence, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-paraphrase = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=True)[0]
+with torch.no_grad():
+    generated_tokens = model.generate(**inputs, max_new_tokens=max_new_tokens, num_beams=num_beams)
 
-RESULT = {"paraphrase": paraphrase}
+decoded_tokens = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"output": decoded_tokens}

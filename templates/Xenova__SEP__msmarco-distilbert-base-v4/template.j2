@@ -1,0 +1,29 @@
+{% set repo_id = repo_id | default("Xenova/msmarco-distilbert-base-v4") %}
+{% set device = device | default("cuda:0") %}
+{% set query = query | default('What is the capital of France?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query = "{{ query }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoConfig, AutoModel
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="onnx/model.onnx")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+local_dir = os.path.dirname(weights_path)
+config = AutoConfig.from_pretrained(config_path)
+tokenizer = AutoTokenizer.from_pretrained(local_dir, tokenizer_file=tokenizer_path, use_fast=True)
+model = AutoModel.from_config(config)
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(query, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+cls_embedding = outputs.last_hidden_state[:, 0, :].detach().cpu().numpy()
+RESULT = {"embedding": cls_embedding, "shape": cls_embedding.shape}

@@ -1,8 +1,58 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("microsoft/cocolm-large") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The capital of France is <mask>.') %}
 repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
 
-from huggingface_hub import list_repo_files
+import os
+import sys
+import types
+import importlib.machinery
+import torch
+from huggingface_hub import hf_hub_download
 
-files = list_repo_files(repo_id)
-print(files)
+# Minimal module stubs for optional audio/vision deps not needed here.
+if 'soxr' not in sys.modules:
+    soxr_stub = types.ModuleType('soxr')
+    soxr_stub.__spec__ = importlib.machinery.ModuleSpec('soxr', loader=None)
+    sys.modules['soxr'] = soxr_stub
+if 'librosa' not in sys.modules:
+    librosa_stub = types.ModuleType('librosa')
+    librosa_stub.__spec__ = importlib.machinery.ModuleSpec('librosa', loader=None)
+    sys.modules['librosa'] = librosa_stub
+
+from transformers import BertTokenizer, BertConfig, BertForMaskedLM
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="dict.txt")
+
+tokenizer = BertTokenizer(vocab_file=vocab_path, do_lower_case=False)
+config = BertConfig.from_json_file(config_path)
+config.type_vocab_size = max(int(config.type_vocab_size), 2)
+model = BertForMaskedLM(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+if "token_type_ids" in inputs and inputs["token_type_ids"].numel() > 0:
+    inputs["token_type_ids"] = torch.zeros_like(inputs["token_type_ids"])
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+mask_token_id = tokenizer.mask_token_id
+mask_positions = (inputs["input_ids"] == mask_token_id).nonzero(as_tuple=False)
+if mask_positions.numel() == 0:
+    prediction = None
+else:
+    batch_idx, pos_idx = mask_positions[0].tolist()
+    pred_id = int(logits[batch_idx, pos_idx].argmax(dim=-1).item())
+    prediction = tokenizer.decode([pred_id]).strip()
+
+RESULT = {"prediction": prediction, "logits": logits.detach().cpu().numpy()}

@@ -1,0 +1,29 @@
+{% set repo_id = repo_id | default("ibm-research/flowstate") %}
+{% set device = device | default("cuda:0") %}
+{% set series = series | default([1.0, 1.2, 1.1, 1.4, 1.35, 1.5, 1.7, 1.65, 1.8, 2.0, 1.95, 2.1, 2.25, 2.2, 2.4, 2.55, 2.5, 2.7, 2.85, 2.8, 3.0, 3.15, 3.1, 3.3, 3.45, 3.4, 3.6, 3.75, 3.7, 3.9, 4.05, 4.0, 4.2, 4.35, 4.3, 4.5, 4.65, 4.6, 4.8, 4.95, 4.9, 5.1, 5.25, 5.2, 5.4, 5.55, 5.5, 5.7, 5.85, 5.8]) %}
+{% set context_length = context_length | default(32) %}
+{% set prediction_length = prediction_length | default(12) %}
+{% set scale_factor = scale_factor | default(1.0) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+series = {{ series }}
+context_length = {{ context_length }}
+prediction_length = {{ prediction_length }}
+scale_factor = {{ scale_factor }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+state_dict = load_file(weights_path)
+keys = sorted(list(state_dict.keys()))
+arr = torch.tensor(series, dtype=torch.float32, device=device)
+trend = torch.nn.functional.avg_pool1d(arr.view(1, 1, -1), kernel_size=min(5, arr.numel()), stride=1, padding=0)
+trend = trend.view(-1)
+if trend.numel() == 0:
+    trend = arr
+base = trend[-1].item() if trend.numel() else arr[-1].item()
+step = (arr[-1] - arr[max(0, arr.numel() - 2)]).item() if arr.numel() > 1 else 0.0
+forecast = torch.stack([torch.tensor(base + scale_factor * step * (i + 1), device=device) for i in range(prediction_length)])
+RESULT = {"forecast": forecast.detach().cpu().numpy(), "state_dict_keys": keys[:10]}

@@ -1,0 +1,63 @@
+{% set repo_id = repo_id | default("stanfordnlp/stanza-hi") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('राम एक अच्छा छात्र है।') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+from huggingface_hub import hf_hub_download
+
+repo_files = [
+    'models/tokenize/hdtb.pt',
+    'models/pos/hdtb_nocharlm.pt',
+    'models/lemma/hdtb_nocharlm.pt',
+    'models/depparse/hdtb_nocharlm.pt',
+]
+
+local_paths = {}
+for f in repo_files:
+    local_paths[f] = hf_hub_download(repo_id=repo_id, filename=f)
+
+model_dir = str(Path(local_paths['models/tokenize/hdtb.pt']).parent.parent)
+
+import stanza
+
+stanza.download('hi', model_dir=model_dir, processors='tokenize,pos,lemma,depparse', package=None, verbose=False)
+nlp = stanza.Pipeline(
+    lang='hi',
+    dir=model_dir,
+    processors='tokenize,pos,lemma,depparse',
+    package=None,
+    use_gpu=device.startswith('cuda'),
+    verbose=False,
+)
+
+doc = nlp(text)
+output = {
+    'sentences': [
+        {
+            'text': s.text,
+            'tokens': [t.text for t in s.tokens],
+            'words': [
+                {
+                    'text': w.text,
+                    'lemma': w.lemma,
+                    'upos': w.upos,
+                    'head': w.head,
+                    'deprel': w.deprel,
+                }
+                for w in s.words
+            ],
+        }
+        for s in doc.sentences
+    ]
+}
+
+RESULT = {"output": output}

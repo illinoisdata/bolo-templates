@@ -1,27 +1,33 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("allenai/wmt19-de-en-6-6-big") %}
-{% set source_text = source_text | default("Maschinelles Lernen ist großartig, nicht wahr?") %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(5) %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-source_text = {{ source_text | tojson }}
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Maschinelles Lernen ist großartig, nicht wahr?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
 
-from pathlib import Path
+import torch
+from transformers import FSMTForConditionalGeneration, FSMTTokenizer
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_src_path = hf_hub_download(repo_id=repo_id, filename="vocab-src.json")
+vocab_tgt_path = hf_hub_download(repo_id=repo_id, filename="vocab-tgt.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+tokenizer = FSMTTokenizer.from_pretrained(repo_id)
+model = FSMTForConditionalGeneration.from_pretrained(repo_id).to(device)
+model.eval()
 
-inputs = tokenizer(source_text, return_tensors="pt", padding=True)
-inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs = tokenizer(text, return_tensors="pt")
+input_ids = inputs["input_ids"].to(device)
+attention_mask = inputs["attention_mask"].to(device) if "attention_mask" in inputs else None
 
-generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
-decoded = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-translation = decoded[0]
+with torch.no_grad():
+    generated = model.generate(input_ids=input_ids, attention_mask=attention_mask)
 
-RESULT = {"translation": translation}
+translated_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+RESULT = {"translation": translated_text}

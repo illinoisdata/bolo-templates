@@ -1,42 +1,40 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Rostlab/prot_xlnet") %}
-{% set text_sequence = text_sequence | default("MGDVEKGKKIFIMKCSQCHTVEKGGKHKTGPNLHGLFGRKTGQAPGYSYTAANKNKGIIWGEDTLMEYLENPKKYIPGTKMIFAGIKG") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('MKTFFVAGVILLLLLSGAQG') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_sequence = "{{ text_sequence }}"
-
-import json
-from pathlib import Path
+text = "{{ text }}"
 
 import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import XLNetConfig, XLNetForSequenceClassification, XLNetTokenizer
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSequenceClassification.from_pretrained(repo_id)
-model.to(torch_device)
+sequence = " ".join(list(text.replace(" ", "")))
+
+tokenizer = XLNetTokenizer(vocab_file=tokenizer_path)
+config = XLNetConfig.from_json_file(config_path)
+model = XLNetForSequenceClassification(config)
+state_dict = torch.load(model_path, map_location="cpu")
+filtered_state_dict = {k: v for k, v in state_dict.items() if not k.startswith("lm_loss.")}
+model.load_state_dict(filtered_state_dict, strict=False)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(text_sequence, return_tensors="pt", truncation=True)
-encoded_inputs = {key: tensor.to(torch_device) for key, tensor in encoded_inputs.items()}
+inputs = tokenizer(sequence, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probabilities = torch.softmax(logits, dim=-1)
+    predicted_class = int(torch.argmax(probabilities, dim=-1).item())
 
-logits = outputs.logits
-probs = torch.softmax(logits, dim=-1)
-score_tensor, pred_tensor = torch.max(probs, dim=-1)
-pred_idx = pred_tensor.item()
-raw_id2label = getattr(model.config, "id2label", None)
-if raw_id2label:
-    id2label = {int(key): value for key, value in raw_id2label.items()}
-else:
-    id2label = {}
-prediction_label = id2label.get(pred_idx, str(pred_idx))
-logits_values = logits[0].cpu().tolist() if logits.dim() == 2 else logits.cpu().tolist()
 RESULT = {
-    "label": prediction_label,
-    "score": float(score_tensor.item()),
-    "logits": logits_values,
+    "logits": logits.detach().cpu().tolist(),
+    "probabilities": probabilities.detach().cpu().tolist(),
+    "predicted_class": predicted_class,
 }

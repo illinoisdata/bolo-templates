@@ -1,0 +1,13 @@
+{% set repo_id = repo_id | default("Habana/llama") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+
+import json
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename='gaudi_config.json')
+with open(config_path, 'r') as f:
+    gaudi_config = json.load(f)
+
+RESULT = {"gaudi_config": gaudi_config}

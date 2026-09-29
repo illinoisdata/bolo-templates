@@ -1,0 +1,23 @@
+{% set repo_id = repo_id | default("yjernite/retribert-base-uncased") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+{% set config_source = config_source | default("bert-base-uncased") %}
+{% set num_hidden_layers = num_hidden_layers | default(8) %}
+{% set model = model | default(repo_id) %}
+
+repo_id = {{ repo_id | tojson }}
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+config_source = {{ config_source | tojson }}
+num_hidden_layers = {{ num_hidden_layers }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import logging as hf_logging, AutoConfig, pipeline
+
+hf_logging.set_verbosity_error()
+config = AutoConfig.from_pretrained(config_source)
+config.num_hidden_layers = num_hidden_layers
+pipe = pipeline(task=task, model=model, tokenizer=model, config=config, device=device)
+RESULT = pipe(input_prompt)

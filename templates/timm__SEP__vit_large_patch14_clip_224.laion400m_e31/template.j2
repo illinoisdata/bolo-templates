@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("timm/vit_large_patch14_clip_224.laion400m_e31") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text_prompts = text_prompts | default(['a photo of a cat', 'a photo of a dog', 'a photo of a car']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text_prompts = {{ text_prompts }}
+
+import json
+import torch
+import requests
+from PIL import Image
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+from transformers import AutoModel, AutoTokenizer, AutoProcessor
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
+model = AutoModel.from_pretrained("openai/clip-vit-large-patch14")
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+inputs = processor(text=text_prompts, images=image, return_tensors="pt", padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    probs = outputs.logits_per_image.softmax(dim=-1).squeeze(0)
+
+RESULT = {
+    "class_probs": probs.detach().cpu().tolist(),
+    "text_prompts": text_prompts,
+    "config": config,
+}

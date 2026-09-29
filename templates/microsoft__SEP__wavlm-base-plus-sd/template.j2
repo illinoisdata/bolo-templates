@@ -1,0 +1,52 @@
+{% set repo_id = repo_id | default("microsoft/wavlm-base-plus-sd") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set threshold = threshold | default(0.5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+threshold = {{ threshold }}
+
+import os
+import torch
+import soundfile as sf
+from urllib.parse import urlparse
+from huggingface_hub import hf_hub_download
+from transformers import Wav2Vec2FeatureExtractor, WavLMForAudioFrameClassification
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(os.path.dirname(preprocessor_path))
+model = WavLMForAudioFrameClassification.from_pretrained(os.path.dirname(config_path))
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
+
+if urlparse(audio_path).scheme in ("http", "https"):
+    import requests
+    audio_bytes = requests.get(audio_path).content
+    with open("/tmp/input_audio.wav", "wb") as f:
+        f.write(audio_bytes)
+    waveform, sample_rate = sf.read("/tmp/input_audio.wav")
+else:
+    waveform, sample_rate = sf.read(audio_path)
+
+if waveform.ndim > 1:
+    waveform = waveform.mean(axis=1)
+
+if sample_rate != 16000:
+    import resampy
+    waveform = resampy.resample(waveform, sample_rate, 16000)
+    sample_rate = 16000
+
+inputs = feature_extractor(waveform, sampling_rate=sample_rate, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    logits = model(**inputs).logits
+    probabilities = torch.sigmoid(logits)[0]
+    labels = (probabilities > threshold).long()
+
+RESULT = {"probabilities": probabilities.detach().cpu().numpy(), "labels": labels.detach().cpu().numpy()}

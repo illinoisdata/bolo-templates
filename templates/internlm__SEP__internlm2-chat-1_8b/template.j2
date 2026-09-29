@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("internlm/internlm2-chat-1_8b") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set max_new_tokens = max_new_tokens | default(256) %}
+{% set do_sample = do_sample | default(False) %}
+{% set use_cache = use_cache | default(False) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+do_sample = {{ do_sample }}
+use_cache = {{ use_cache }}
+
+from transformers import cache_utils, pipeline
+
+cache_utils.Cache.get_max_cache_shape = lambda self, layer_idx=0: None
+
+pipe = pipeline(task=task, model=repo_id, device=device, trust_remote_code=True)
+RESULT = pipe(input_prompt, max_new_tokens=max_new_tokens, do_sample=do_sample, use_cache=use_cache)

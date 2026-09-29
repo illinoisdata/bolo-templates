@@ -1,39 +1,48 @@
 {% set repo_id = repo_id | default("doc2query/stackexchange-title-body-t5-base-v1") %}
 {% set device = device | default("cuda:0") %}
 {% set text = text | default("Python is an interpreted, high-level and general-purpose programming language. Python's design philosophy emphasizes code readability with its notable use of significant whitespace. Its language constructs and object-oriented approach aim to help programmers write clear, logical code for small and large-scale projects.") %}
-{% set max_input_length = max_input_length | default(320) %}
-{% set max_length = max_length | default(64) %}
-{% set do_sample = do_sample | default(true) %}
-{% set top_p = top_p | default(0.95) %}
-{% set num_return_sequences = num_return_sequences | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = "{{ text }}"
-max_input_length = {{ max_input_length }}
-max_length = {{ max_length }}
-do_sample = {{ do_sample }}
-top_p = {{ top_p }}
-num_return_sequences = {{ num_return_sequences }}
+text = {{ text | tojson }}
+num_return_sequences = 5
+max_input_length = 320
+max_new_tokens = 64
 
-import os
-import json
+def _load_text_or_path(value):
+    return value
+
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import T5Tokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-inputs = tokenizer(text, max_length=max_input_length, truncation=True, return_tensors="pt").to(device)
+# tokenizer/model load
+text_input = _load_text_or_path(text)
+tokenizer = T5Tokenizer.from_pretrained(repo_id, local_files_only=True)
+model = T5ForConditionalGeneration.from_pretrained(repo_id, local_files_only=True)
+model.to(device)
+model.eval()
 
-outputs = model.generate(
-    input_ids=inputs.input_ids,
-    attention_mask=inputs.attention_mask,
-    max_length=max_length,
-    do_sample=do_sample,
-    top_p=top_p,
-    num_return_sequences=num_return_sequences
-)
+inputs = tokenizer(text_input, max_length=max_input_length, truncation=True, return_tensors="pt")
+input_ids = inputs["input_ids"].to(device)
+attention_mask = inputs["attention_mask"].to(device)
 
-generated_queries = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+with torch.no_grad():
+    outputs = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        max_length=max_new_tokens,
+        do_sample=True,
+        top_p=0.95,
+        num_return_sequences=num_return_sequences,
+    )
 
-RESULT = {"generated_queries": generated_queries}
+queries = [tokenizer.decode(out, skip_special_tokens=True) for out in outputs]
+
+RESULT = {"queries": queries}

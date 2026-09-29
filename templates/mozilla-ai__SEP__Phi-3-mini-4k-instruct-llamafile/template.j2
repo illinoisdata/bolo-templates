@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("mozilla-ai/Phi-3-mini-4k-instruct-llamafile") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default("Phi-3-mini-4k-instruct.F16.llamafile") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt | default('How to explain Internet for a medieval knight?') }}"
+max_tokens = {{ max_tokens | default(128) }}
+
+import os
+from huggingface_hub import hf_hub_download
+
+llamafile_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+llamafile_dir = os.path.dirname(llamafile_path)
+output = {"llamafile_path": llamafile_path, "llamafile_dir": llamafile_dir, "prompt": prompt, "max_tokens": max_tokens}
+
+RESULT = {"output": output}

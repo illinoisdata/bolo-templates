@@ -1,0 +1,57 @@
+{% set repo_id = repo_id | default("wisdomik/QuiltNet-B-16-PMB") %}
+{% set device = device | default("cuda:0") %}
+{% set candidate_labels = candidate_labels | default('adipose tissue, debris tissue, lymphocytes tissue, mucus tissue, smooth muscle tissue, normal colon mucosa tissue, cancer-associated stroma tissue, colorectal adenocarcinoma epithelium tissue') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+candidate_labels = "{{ candidate_labels }}"
+image_path = "{{ image_path }}"
+
+import torch
+from PIL import Image
+import requests
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+import open_clip
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+open_clip_config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+preprocessor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+if str(image_path).startswith(("http://", "https://")):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+labels = [label.strip() for label in candidate_labels.split(",") if label.strip()]
+
+model, _, processor = open_clip.create_model_and_transforms(
+    model_name="ViT-B-16",
+    pretrained=None,
+    device=device,
+    precision="fp32",
+    force_custom_text=True,
+)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+tokens = open_clip.tokenize(labels)
+image_input = processor(image).unsqueeze(0).to(device)
+tokens = tokens.to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_input)
+    text_features = model.encode_text(tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logits = (100.0 * image_features @ text_features.T)[0]
+    probs = logits.softmax(dim=0)
+
+result = [
+    {"label": label, "score": float(score)}
+    for label, score in sorted(zip(labels, probs.tolist()), key=lambda x: x[1], reverse=True)
+]
+
+RESULT = {"output": result}

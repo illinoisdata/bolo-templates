@@ -1,26 +1,49 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("declare-lab/flan-alpaca-base") %}
-{% set prompt = prompt | default("Describe the main features of instruction-tuned language models.") %}
-{% set max_length = max_length | default(256) %}
-{% set temperature = temperature | default(0.7) %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default("Write an email about an alpaca that likes flan") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set do_sample = do_sample | default(True) %}
+{% set temperature = temperature | default(1.0) %}
+{% set top_p = top_p | default(0.9) %}
+{% set use_fast_tokenizer = use_fast_tokenizer | default(True) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"
-max_length = {{ max_length }}
+max_new_tokens = {{ max_new_tokens }}
+do_sample = {{ do_sample }}
 temperature = {{ temperature }}
+top_p = {{ top_p }}
+use_fast_tokenizer = {{ use_fast_tokenizer }}
 
 import os
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_path), local_files_only=True, use_fast=use_fast_tokenizer)
+model = AutoModelForSeq2SeqLM.from_pretrained(os.path.dirname(config_path), local_files_only=True, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
 inputs = tokenizer(prompt, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(**inputs, max_length=max_length, do_sample=True, temperature=temperature)
-generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=do_sample,
+        temperature=temperature,
+        top_p=top_p,
+    )
 
-RESULT = {"generated_text": generated_text}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output": output_text}

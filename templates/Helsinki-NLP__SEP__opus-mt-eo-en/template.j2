@@ -1,20 +1,32 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-eo-en") %}
 {% set device = device | default("cuda:0") %}
-{% set translation_input = translation_input | default("Saluton, mondo!") %}
+{% set text = text | default('Tere, kuidas sul läheb?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-translation_input = "{{ translation_input }}"
+text = "{{ text }}"
 
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-tokenized_inputs = tokenizer(translation_input, return_tensors="pt")
-tokenized_inputs = {key: value.to(device) for key, value in tokenized_inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, num_beams=4, max_length=128)
+translation = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-generated_tokens = model.generate(**tokenized_inputs)
-translated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-
-RESULT = {"translation": translated_texts}
+RESULT = {"translation": translation}

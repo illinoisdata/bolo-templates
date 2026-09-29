@@ -1,0 +1,15 @@
+{% set repo_id = repo_id | default("tohoku-nlp/bert-base-japanese-char") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("仙台は「{mask}の都」と呼ばれている。") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+masked_prompt = "{{ masked_prompt }}"
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

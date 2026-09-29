@@ -1,35 +1,32 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("german-nlp-group/electra-base-german-uncased") %}
-{% set text_input = text_input | default("Das ist ein Beispielsatz für die Inferenz mit dem Electra-Modell.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Das ist ein kleiner deutscher Beispielsatz.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+text = "{{ text }}"
 
-import json
-from pathlib import Path
-
+import os
 import torch
-from transformers import AutoModelForPreTraining, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, ElectraForPreTraining
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-encoded_text = tokenizer(text_input, return_tensors="pt", padding=True, truncation=True)
-encoded_input = {key: tensor.to(device) for key, tensor in encoded_text.items()}
+# Load tokenizer/model
+_tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_config_path), use_fast=False)
+model = ElectraForPreTraining.from_pretrained(os.path.dirname(config_path), torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-outputs = model(**encoded_input)
+inputs = _tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
 logits = outputs.logits
-predicted_token_ids = logits.argmax(dim=-1)
-
-input_ids = encoded_text["input_ids"].tolist()
-input_tokens = [
-    tokenizer.convert_ids_to_tokens(token_ids)
-    for token_ids in encoded_text["input_ids"]
-]
-
-RESULT = {
-    "input_tokens": input_tokens,
-    "input_ids": input_ids,
-    "predicted_token_ids": predicted_token_ids.tolist(),
-    "logits": logits.detach().cpu().tolist(),
-}
+probabilities = torch.sigmoid(logits)
+RESULT = {"logits": logits.detach().cpu(), "probabilities": probabilities.detach().cpu()}

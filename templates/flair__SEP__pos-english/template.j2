@@ -1,0 +1,30 @@
+{% set repo_id = repo_id | default("flair/pos-english") %}
+{% set device = device | default("cuda:0") %}
+{% set sentence = sentence | default('I love Berlin.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sentence = "{{ sentence }}"
+
+import os
+import sys
+from huggingface_hub import hf_hub_download
+from flair.data import Sentence
+from flair.models import SequenceTagger
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+taggers = SequenceTagger.load(weights_path)
+taggers.to(device)
+
+input_sentence = Sentence(sentence)
+taggers.predict(input_sentence)
+
+output = []
+for span in input_sentence.get_spans("pos"):
+    output.append({
+        "text": span.text,
+        "tag": span.get_label("pos").value,
+        "score": float(span.get_label("pos").score),
+    })
+
+RESULT = {"output": output}

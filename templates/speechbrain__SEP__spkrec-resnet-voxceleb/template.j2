@@ -1,0 +1,41 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set repo_id = repo_id | default("speechbrain/spkrec-resnet-voxceleb") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+import os
+from urllib.parse import urlparse
+
+import torch
+import soundfile as sf
+from huggingface_hub import hf_hub_download
+from speechbrain.inference.speaker import SpeakerRecognition
+
+
+def load_audio(path_or_url):
+    if isinstance(path_or_url, str) and path_or_url.startswith(("http://", "https://")):
+        parsed = urlparse(path_or_url)
+        filename = os.path.basename(parsed.path)
+        local_path = hf_hub_download(repo_id=repo_id, filename=filename)
+        signal, sample_rate = sf.read(local_path, always_2d=True)
+    else:
+        signal, sample_rate = sf.read(path_or_url, always_2d=True)
+    signal = torch.tensor(signal.T, dtype=torch.float32)
+    return signal, sample_rate
+
+
+signal, sample_rate = load_audio(audio_path)
+verification = SpeakerRecognition.from_hparams(
+    source=repo_id,
+    savedir="/workspace/speechbrain_spkrec_resnet_voxceleb",
+    run_opts={"device": device},
+)
+embeddings = verification.encode_batch(signal.to(device))
+score, prediction = verification.verify_batch(signal.to(device), signal.to(device))
+RESULT = {
+    "embeddings": embeddings.detach().cpu(),
+    "score": score.detach().cpu() if torch.is_tensor(score) else score,
+    "prediction": prediction.detach().cpu() if torch.is_tensor(prediction) else prediction,
+}

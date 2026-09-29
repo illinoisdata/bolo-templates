@@ -1,0 +1,26 @@
+{% set repo_id = repo_id | default("zhx123/ftrobertallm") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+
+repo_id = {{ repo_id | tojson }}
+task = {{ task | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+import json
+from huggingface_hub import hf_hub_download
+from transformers import pipeline
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_path, "r+", encoding="utf-8") as config_file:
+    config_dict = json.load(config_file)
+    id2label = config_dict.get("id2label")
+    if id2label is not None:
+        config_dict["id2label"] = {k: str(v) for k, v in id2label.items()}
+        config_file.seek(0)
+        json.dump(config_dict, config_file)
+        config_file.truncate()
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = pipe(input_prompt)

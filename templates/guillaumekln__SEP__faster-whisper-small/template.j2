@@ -1,0 +1,57 @@
+{% set repo_id = repo_id | default("guillaumekln/faster-whisper-small") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set language = language | default('en') %}
+{% set task = task | default('transcribe') %}
+{% set beam_size = beam_size | default(1) %}
+{% set best_of = best_of | default(1) %}
+{% set temperature = temperature | default(0.0) %}
+{% set condition_on_previous_text = condition_on_previous_text | default(False) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+language = "{{ language }}"
+task = "{{ task }}"
+beam_size = {{ beam_size }}
+best_of = {{ best_of }}
+temperature = {{ temperature }}
+condition_on_previous_text = {{ condition_on_previous_text }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from faster_whisper import WhisperModel
+from pathlib import Path
+import urllib.request
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocabulary.txt")
+
+if audio_path.startswith(("http://", "https://")):
+    local_audio_path = str(Path(model_path).parent / "input_audio")
+    urllib.request.urlretrieve(audio_path, local_audio_path)
+    audio_path = local_audio_path
+
+use_cuda = device.startswith("cuda") and torch.cuda.is_available()
+ctranslate2_device = "cuda" if use_cuda else "cpu"
+compute_type = "float16" if use_cuda else "int8"
+model = WhisperModel(Path(model_path).parent.as_posix(), device=ctranslate2_device, compute_type=compute_type)
+
+segments, info = model.transcribe(
+    audio_path,
+    language=language,
+    task=task,
+    beam_size=beam_size,
+    best_of=best_of,
+    temperature=temperature,
+    condition_on_previous_text=condition_on_previous_text,
+)
+
+output_text = "".join(segment.text for segment in segments).strip()
+RESULT = {
+    "text": output_text,
+    "language": info.language,
+    "language_probability": info.language_probability,
+    "duration": info.duration,
+}

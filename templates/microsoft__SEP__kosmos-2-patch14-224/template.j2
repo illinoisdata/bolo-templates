@@ -1,47 +1,44 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("microsoft/kosmos-2-patch14-224") %}
-{% set prompt = prompt | default('<grounding> An image of') %}
-{% set image = image | default('/u/yli77/projects/ML-code-generation/data/image1.jpeg') %}
-{% set use_cache = use_cache | default(True) %}
-{% set max_new_tokens = max_new_tokens | default(128) %}
-repo_id = '{{ repo_id }}'
-device = '{{ device }}'
-prompt = '{{ prompt }}'
-image = '{{ image }}'
-use_cache = {{ use_cache }}
-max_new_tokens = {{ max_new_tokens }}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('<grounding> An image of', true) %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg', true) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+image_path = {{ image_path | tojson }}
 
 import requests
-from PIL import Image
 import torch
+from PIL import Image
 from transformers import AutoProcessor, Kosmos2ForConditionalGeneration
 
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 processor = AutoProcessor.from_pretrained(repo_id)
-model = Kosmos2ForConditionalGeneration.from_pretrained(repo_id)
-model = model.to(device)
+model = Kosmos2ForConditionalGeneration.from_pretrained(repo_id, local_files_only=True, dtype=torch.float32)
+model.to(device)
+model.eval()
 
-if image.startswith('http://') or image.startswith('https://'):
-    image_obj = Image.open(requests.get(image, stream=True).raw).convert('RGB')
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
 else:
-    image_obj = Image.open(image).convert('RGB')
+    image = Image.open(image_path).convert("RGB")
 
-inputs = processor(text=prompt, images=image_obj, return_tensors='pt')
-inputs = {k: v.to(device) for k, v in inputs.items() if isinstance(v, torch.Tensor)}
+inputs = processor(text=prompt, images=image, return_tensors="pt")
+inputs = {k: v.to(device) if hasattr(v, "to") else v for k, v in inputs.items()}
 
 generated_ids = model.generate(
-    pixel_values=inputs['pixel_values'],
-    input_ids=inputs['input_ids'],
-    attention_mask=inputs['attention_mask'],
+    pixel_values=inputs["pixel_values"],
+    input_ids=inputs["input_ids"],
+    attention_mask=inputs["attention_mask"],
     image_embeds=None,
-    image_embeds_position_mask=inputs['image_embeds_position_mask'],
-    use_cache=use_cache,
-    max_new_tokens=max_new_tokens,
+    image_embeds_position_mask=inputs["image_embeds_position_mask"],
+    use_cache=True,
+    max_new_tokens=128,
 )
 
 generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
 processed_text, entities = processor.post_process_generation(generated_text)
 
-RESULT = {
-    'generated_text': processed_text,
-    'entities': entities,
-}
+RESULT = {"generated_text": generated_text, "processed_text": processed_text, "entities": entities}

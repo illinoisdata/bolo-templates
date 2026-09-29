@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("tanganke/clip-vit-base-patch32_resisc45") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-feature-extraction") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+{% set image_processor = image_processor | default("openai/clip-vit-base-patch32") %}
+
+repo_id = "{{ repo_id }}"
+task = "{{ task }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+image_processor = "{{ image_processor }}"
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, image_processor=image_processor, device=device)
+output = pipe(image_path)
+RESULT = {"features": output}

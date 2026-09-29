@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("google/siglip-so400m-patch14-224") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("zero-shot-image-classification") %}
+{% set input_path = input_path | default("/u/yunqili4/projects/ML-code-generation/data/image2.jpeg") %}
+{% set candidate_labels = candidate_labels | default(["cat", "dog", "fox", "bear"]) %}
+{% set hypothesis_template = hypothesis_template | default("{}") %}
+{% set max_text_length = max_text_length | default(16) %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_path = {{ input_path | tojson }}
+candidate_labels = {{ candidate_labels | tojson }}
+hypothesis_template = {{ hypothesis_template | tojson }}
+max_text_length = {{ max_text_length }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+_original_preprocess = pipe.preprocess
+
+def _preprocess_with_short_text(
+    image,
+    candidate_labels=None,
+    hypothesis_template="This is a photo of {}.",
+    timeout=None,
+    tokenizer_kwargs=None,
+):
+    overrides = {"padding": "max_length", "max_length": max_text_length, "truncation": True}
+    if tokenizer_kwargs:
+        overrides.update(tokenizer_kwargs)
+    return _original_preprocess(
+        image,
+        candidate_labels=candidate_labels,
+        hypothesis_template=hypothesis_template,
+        timeout=timeout,
+        tokenizer_kwargs=overrides,
+    )
+
+pipe.preprocess = _preprocess_with_short_text
+RESULT = pipe(
+    input_path,
+    candidate_labels=candidate_labels,
+    hypothesis_template=hypothesis_template,
+)

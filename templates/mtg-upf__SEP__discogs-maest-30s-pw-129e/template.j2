@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("mtg-upf/discogs-maest-30s-pw-129e") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("audio-classification") %}
+{% set input_data = input_data | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_data = {{ input_data | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device, trust_remote_code=True)
+
+# Pre-process input (pass-through for file path)
+
+RESULT = pipe(input_data)

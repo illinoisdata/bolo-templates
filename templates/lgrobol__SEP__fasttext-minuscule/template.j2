@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("lgrobol/fasttext-minuscule") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("FastText-minuscule") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import json
+import os
+import urllib.request
+
+repo_dir = "/workspace/model_repo"
+os.makedirs(repo_dir, exist_ok=True)
+model_path = os.path.join(repo_dir, "model.bin")
+if not os.path.exists(model_path):
+    urllib.request.urlretrieve(f"https://huggingface.co/{repo_id}/resolve/main/model.bin?download=1", model_path)
+with open(model_path, "rb") as f:
+    model_bytes = f.read()
+RESULT = {"model_bytes_len": len(model_bytes), "text": text}

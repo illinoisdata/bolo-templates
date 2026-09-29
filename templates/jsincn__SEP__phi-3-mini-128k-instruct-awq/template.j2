@@ -1,0 +1,24 @@
+{% set repo_id = repo_id | default("jsincn/phi-3-mini-128k-instruct-awq") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set model = model | default(repo_id) %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers.modeling_rope_utils import RotaryEmbeddingConfigMixin
+from transformers.models.phi3.configuration_phi3 import Phi3Config
+
+RotaryEmbeddingConfigMixin._check_received_keys = staticmethod(
+    lambda rope_type, received_keys, required_keys, optional_keys=None, ignore_keys=None: None
+)
+RotaryEmbeddingConfigMixin._validate_longrope_rope_parameters = lambda self, rope_parameters, ignore_keys=None: None
+Phi3Config.validate_rope = lambda self: None
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(input_prompt)

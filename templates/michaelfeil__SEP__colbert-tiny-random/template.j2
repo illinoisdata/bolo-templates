@@ -1,34 +1,47 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("michaelfeil/colbert-tiny-random") %}
-{% set query_text = query_text | default("ColBERT is a dense retrieval architecture built on BERT.") %}
+{% set device = device | default("cuda:0") %}
+{% set query_text = query_text | default('What is the capital of France?') %}
+{% set doc_text = doc_text | default('Paris is the capital and most populous city of France.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query_text = "{{ query_text }}"
+doc_text = "{{ doc_text }}"
 
-import numpy as np
+import os
 import torch
-from pathlib import Path
-from transformers import AutoModel, AutoTokenizer
+import torch.nn.functional as F
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoConfig, AutoModel
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+config = AutoConfig.from_pretrained(config_file)
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_file), use_fast=True)
+model = AutoModel.from_pretrained(os.path.dirname(model_file), config=config, local_files_only=True)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(
-    query_text,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+query_inputs = tokenizer(query_text, return_tensors="pt", truncation=True, padding=False)
+doc_inputs = tokenizer(doc_text, return_tensors="pt", truncation=True, padding=False)
+query_inputs = {k: v.to(device) for k, v in query_inputs.items()}
+doc_inputs = {k: v.to(device) for k, v in doc_inputs.items()}
 
 with torch.no_grad():
-    model_outputs = model(**encoded_inputs)
+    query_outputs = model(**query_inputs)
+    doc_outputs = model(**doc_inputs)
 
-last_hidden_state = model_outputs.last_hidden_state
-attention_mask = encoded_inputs["attention_mask"].unsqueeze(-1)
-pooled = (last_hidden_state * attention_mask).sum(dim=1)
-lengths = attention_mask.sum(dim=1)
-embedding = (pooled / lengths).squeeze(0).cpu().numpy()
+query_emb = query_outputs.last_hidden_state
+query_mask = query_inputs["attention_mask"].unsqueeze(-1)
+query_vec = (query_emb * query_mask).sum(dim=1) / query_mask.sum(dim=1).clamp(min=1)
 
-RESULT = {"query_embedding": embedding}
+doc_emb = doc_outputs.last_hidden_state
+doc_mask = doc_inputs["attention_mask"].unsqueeze(-1)
+doc_vec = (doc_emb * doc_mask).sum(dim=1) / doc_mask.sum(dim=1).clamp(min=1)
+
+score = F.cosine_similarity(query_vec, doc_vec).item()
+RESULT = {"score": score, "query_embedding": query_vec.squeeze(0).detach().cpu().tolist(), "doc_embedding": doc_vec.squeeze(0).detach().cpu().tolist()}

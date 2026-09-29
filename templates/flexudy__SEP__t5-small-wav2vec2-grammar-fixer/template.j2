@@ -1,8 +1,6 @@
 {% set repo_id = repo_id | default("flexudy/t5-small-wav2vec2-grammar-fixer") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("WHEN ARE YOU COMING TOMORROW I AM ASKING BECAUSE OF THE MONEY YOU OWE ME PLEASE GIVE IT TO ME I AM WAITING YOU HAVE BEEN AVOIDING ME SINCE TWO THOUSAND AND THREE") %}
-{% set prefix = prefix | default("fix: { ") %}
-{% set suffix = suffix | default(" } </s>") %}
+{% set input_text = input_text | default('WHEN ARE YOU COMING TOMORROW I AM ASKING BECAUSE OF THE MONEY YOU OWE ME PLEASE GIVE IT TO ME I AM WAITING YOU HAVE BEEN AVOIDING ME SINCE TWO THOUSAND AND THREE') %}
 {% set max_length = max_length | default(256) %}
 {% set num_beams = num_beams | default(4) %}
 {% set repetition_penalty = repetition_penalty | default(1.0) %}
@@ -11,43 +9,40 @@
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-prefix = "{{ prefix }}"
-suffix = "{{ suffix }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 repetition_penalty = {{ repetition_penalty }}
 length_penalty = {{ length_penalty }}
 early_stopping = {{ early_stopping }}
 
-from transformers import T5Tokenizer, T5ForConditionalGeneration
 import torch
-import os
+from transformers import T5Tokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
+
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+hf_hub_download(repo_id=repo_id, filename="spiece.model")
+hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
 tokenizer = T5Tokenizer.from_pretrained(repo_id)
-model = T5ForConditionalGeneration.from_pretrained(repo_id).to(device)
+model = T5ForConditionalGeneration.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-model_input = prefix + input_text + suffix
-input_ids = tokenizer.encode(
-    model_input,
-    return_tensors="pt",
-    max_length=max_length,
-    truncation=True,
-    add_special_tokens=True,
-).to(device)
+inputs = tokenizer("fix: { " + input_text + " } </s>", return_tensors="pt", truncation=True, max_length=256)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-outputs = model.generate(
-    input_ids=input_ids,
-    max_length=max_length,
-    num_beams=num_beams,
-    repetition_penalty=repetition_penalty,
-    length_penalty=length_penalty,
-    early_stopping=early_stopping,
-)
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_length=max_length,
+        num_beams=num_beams,
+        repetition_penalty=repetition_penalty,
+        length_penalty=length_penalty,
+        early_stopping=early_stopping,
+    )
 
-generated_text = tokenizer.decode(
-    outputs[0],
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-)
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
 
-RESULT = {"generated_text": generated_text}
+RESULT = {"output_text": output_text}

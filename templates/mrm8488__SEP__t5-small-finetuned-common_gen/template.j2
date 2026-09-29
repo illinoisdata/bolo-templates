@@ -1,40 +1,35 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("mrm8488/t5-small-finetuned-common_gen") %}
-{% set input_text = input_text | default("apples, oranges, and bananas") %}
-{% set max_length = max_length | default(50) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('generate a sentence with: cat, tree, park') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+prompt = "{{ prompt }}"
 
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, T5Tokenizer
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-torch_device = torch.device(device)
-model = model.to(torch_device)
-model.eval()
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+spiece_file = hf_hub_download(repo_id=repo_id, filename="spiece.model")
 
-tokenizer_inputs = tokenizer(
-    input_text,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-    max_length=512,
-)
-tokenizer_inputs = tokenizer_inputs.to(torch_device)
+_tokenizer = T5Tokenizer(vocab_file=spiece_file)
+_model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+_model.to(device)
+_model.eval()
 
-generated_ids = model.generate(
-    **tokenizer_inputs,
-    max_length=max_length,
-    num_beams=num_beams,
-    early_stopping=True,
-)
+inputs = _tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+with torch.no_grad():
+    generated_ids = _model.generate(
+        **inputs,
+        max_new_tokens=32,
+        num_beams=4,
+        early_stopping=True,
+        no_repeat_ngram_size=3,
+    )
 
-RESULT = {"generated_texts": generated_texts}
+output_text = _tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output": output_text}

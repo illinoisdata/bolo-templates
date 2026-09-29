@@ -1,0 +1,25 @@
+{% set repo_id = repo_id | default("HuggingFaceTB/smollm-135M-instruct-v0.2-Q8_0-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('smollm-135m-instruct-add-basics-q8_0.gguf') %}
+{% set prompt = prompt | default('The meaning to life and the universe is') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+import os
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+llm = Llama(
+    model_path=model_path,
+    n_ctx=2048,
+    n_threads=max(1, os.cpu_count() or 1),
+    n_batch=256,
+    verbose=False,
+)
+
+prompt_text = prompt
+output = llm(prompt_text, max_tokens=64, temperature=0.0, top_p=1.0, stop=["</s>"])
+RESULT = {"output": output["choices"][0]["text"]}

@@ -1,0 +1,31 @@
+{% set text = text | default('Mary had a little lamb') %}
+{% set repo_id = repo_id | default("speechbrain/tts-tacotron2-ljspeech") %}
+{% set device = device | default("cuda:0") %}
+{% set savedir = savedir | default('/workspace/speechbrain_tts_tacotron2_ljspeech') %}
+{% set vocoder_repo_id = vocoder_repo_id | default('speechbrain/tts-hifigan-ljspeech') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+savedir = "{{ savedir }}"
+vocoder_repo_id = "{{ vocoder_repo_id }}"
+
+import os
+import torch
+from speechbrain.inference.TTS import Tacotron2
+from speechbrain.inference.vocoders import HIFIGAN
+
+os.makedirs(savedir, exist_ok=True)
+
+run_device = device
+if run_device.startswith('cuda') and not torch.cuda.is_available():
+    run_device = 'cpu'
+
+acoustic_model = Tacotron2.from_hparams(source=repo_id, savedir=os.path.join(savedir, 'tts'), run_opts={'device': run_device})
+vocoder = HIFIGAN.from_hparams(source=vocoder_repo_id, savedir=os.path.join(savedir, 'vocoder'), run_opts={'device': run_device})
+
+mel_output, mel_length, alignment = acoustic_model.encode_text(text)
+waveforms = vocoder.decode_batch(mel_output)
+output_waveform = waveforms.squeeze(1).detach().cpu()
+
+RESULT = {'waveform': output_waveform, 'mel_output': mel_output.detach().cpu(), 'mel_length': mel_length.detach().cpu(), 'alignment': alignment.detach().cpu()}

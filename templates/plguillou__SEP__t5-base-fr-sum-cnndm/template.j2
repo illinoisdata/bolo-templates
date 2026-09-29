@@ -1,53 +1,43 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("plguillou/t5-base-fr-sum-cnndm") %}
-{% set prefix = prefix | default("summarize: ") %}
-{% set max_length = max_length | default(200) %}
-{% set min_length = min_length | default(30) %}
-{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
-{% set length_penalty = length_penalty | default(2.0) %}
+{% set device = device | default("cuda:0") %}
+{% set article_text = article_text | default('Apollo 11 est une mission du programme spatial américain Apollo au cours de laquelle, pour la première fois, des hommes se sont posés sur la Lune, le lundi 21 juillet 1969. L\'agence spatiale américaine, la NASA, remplit ainsi l\'objectif fixé par le président John F. Kennedy en 1961 de poser un équipage sur la Lune avant la fin de la décennie 1960. Il s\'agissait de démontrer la supériorité des États-Unis sur l\'Union soviétique qui avait été mise à mal par les succès soviétiques au début de l\'ère spatiale dans le contexte de la guerre froide qui oppose alors ces deux pays. Ce défi est lancé alors que la NASA n\'a pas encore placé en orbite un seul astronaute. Grâce à une mobilisation de moyens humains et financiers considérables, l\'agence spatiale rattrape puis dépasse le programme spatial soviétique.') %}
+{% set max_new_tokens = max_new_tokens | default(60) %}
 {% set num_beams = num_beams | default(4) %}
-{% set early_stopping = early_stopping | default(true) %}
-{% set text -%}
-Apollo 11 est une mission du programme spatial américain Apollo au cours de laquelle, pour la première fois, des hommes se sont posés sur la Lune, le lundi 21 juillet 1969. L'agence spatiale américaine, la NASA, remplit ainsi l'objectif fixé par le président John F. Kennedy en 1961 de poser un équipage sur la Lune avant la fin de la décennie 1960. Il s'agissait de démontrer la supériorité des États-Unis sur l'Union soviétique qui avait été mise à mal par les succès soviétiques au début de l'ère spatiale dans le contexte de la guerre froide qui oppose alors ces deux pays. Ce défi est lancé alors que la NASA n'a pas encore placé en orbite un seul astronaute. Grâce à une mobilisation de moyens humains et financiers considérables, l'agence spatiale rattrape puis dépasse le programme spatial soviétique.
-{%- endset %}
-
+{% set do_sample = do_sample | default(false) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prefix = "{{ prefix }}"
-max_length = {{ max_length }}
-min_length = {{ min_length }}
-no_repeat_ngram_size = {{ no_repeat_ngram_size }}
-length_penalty = {{ length_penalty }}
+article_text = "{{ article_text }}"
+max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
-early_stopping = {{ "True" if early_stopping else "False" }}
-text = """{{ text }}"""
+do_sample = {{ do_sample }}
 
-# Imports
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-from pathlib import Path
+from huggingface_hub import hf_hub_download
 
-# Load model and tokenizer
-device = torch.device(device)
+hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="spiece.model")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model.to(device)
+model.eval()
 
-# Pre-process input
-input_text = prefix + text
-inputs = tokenizer(input_text, return_tensors="pt").to(device)
+inputs = tokenizer("summarize: " + article_text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Run inference
-token_ids = model.generate(
-    **inputs,
-    max_length=max_length,
-    min_length=min_length,
-    num_beams=num_beams,
-    length_penalty=length_penalty,
-    no_repeat_ngram_size=no_repeat_ngram_size,
-    early_stopping=early_stopping,
-)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+        do_sample=do_sample,
+    )
 
-# Post-process
-summary = tokenizer.batch_decode(token_ids, skip_special_tokens=True)[0]
+summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
 RESULT = {"summary": summary}

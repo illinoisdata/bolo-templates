@@ -1,0 +1,27 @@
+{% set repo_id = repo_id | default("Rostlab/prot_bert") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") -%}
+{% set masked_prompt = masked_prompt | default("D L I P T S S K L V V {mask} D T S L Q V K K A F F A L V T") -%}
+task = {{ task | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+
+from transformers import BertForMaskedLM, BertTokenizer, pipeline
+
+if device == "cpu":
+    pipeline_device = -1
+elif device.startswith("cuda"):
+    pipeline_device = int(device.split(":", 1)[1]) if ":" in device else 0
+else:
+    pipeline_device = -1
+
+# Load tokenizer and model
+tokenizer = BertTokenizer.from_pretrained(repo_id, do_lower_case=False)
+model = BertForMaskedLM.from_pretrained(repo_id)
+
+# Create pipeline
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=pipeline_device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

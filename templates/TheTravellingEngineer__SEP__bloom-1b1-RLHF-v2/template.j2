@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("TheTravellingEngineer/bloom-1b1-RLHF-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set max_new_tokens = max_new_tokens | default(48) %}
+{% set do_sample = do_sample | default(False) %}
+
+repo_id = {{ repo_id | tojson }}
+task = {{ task | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+do_sample = {{ do_sample }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device, do_sample=do_sample, max_new_tokens=max_new_tokens)
+RESULT = pipe(input_prompt)

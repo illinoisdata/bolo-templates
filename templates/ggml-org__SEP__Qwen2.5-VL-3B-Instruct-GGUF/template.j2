@@ -1,0 +1,48 @@
+{% set repo_id = repo_id | default("ggml-org/Qwen2.5-VL-3B-Instruct-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf') %}
+{% set mmproj_filename = mmproj_filename | default('mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set prompt = prompt | default('Describe the image.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+mmproj_filename = "{{ mmproj_filename }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+
+import os
+import requests
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+mmproj_path = hf_hub_download(repo_id=repo_id, filename=mmproj_filename)
+
+llm = Llama(
+    model_path=model_path,
+    mmproj_path=mmproj_path,
+    n_ctx=2048,
+    n_gpu_layers=-1 if device.startswith('cuda') else 0,
+    verbose=False,
+)
+
+messages = [
+    {
+        'role': 'user',
+        'content': [
+            {'type': 'image_url', 'image_url': {'url': image_path}},
+            {'type': 'text', 'text': prompt},
+        ],
+    }
+]
+
+output = llm.create_chat_completion(messages=messages, max_tokens=128, temperature=0.2)
+
+RESULT = {"output": output}

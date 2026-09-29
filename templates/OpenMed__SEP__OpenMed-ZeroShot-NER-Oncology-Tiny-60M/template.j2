@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Oncology-Tiny-60M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Mutations in KRAS gene drive oncogenic transformation.") %}
+{% set labels = labels | default(["Amino_acid", "Anatomical_system", "Cancer", "Cell", "Cellular_component", "Developing_anatomical_structure", "Gene_or_gene_product", "Immaterial_anatomical_entity", "Multi-tissue_structure", "Organ", "Organism", "Organism_subdivision", "Organism_substance", "Pathological_formation", "Simple_chemical", "Tissue"]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+labels = {{ labels }}
+
+from huggingface_hub import hf_hub_download
+import json
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+with open(config_path, "r", encoding="utf-8") as f:
+    config = json.load(f)
+
+RESULT = {"config": config, "repo_id": repo_id, "device": device, "text": text, "labels": labels}

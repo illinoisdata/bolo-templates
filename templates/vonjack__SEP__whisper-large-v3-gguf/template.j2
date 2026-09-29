@@ -1,0 +1,28 @@
+{% set repo_id = repo_id | default("vonjack/whisper-large-v3-gguf") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+import os
+import urllib.parse
+import urllib.request
+
+import soundfile as sf
+import librosa
+from huggingface_hub import hf_hub_download
+import whisper
+
+if audio_path.startswith('http://') or audio_path.startswith('https://'):
+    local_audio = os.path.join('/tmp', os.path.basename(urllib.parse.urlparse(audio_path).path))
+    urllib.request.urlretrieve(audio_path, local_audio)
+    audio_source = local_audio
+else:
+    audio_source = audio_path
+
+_ = hf_hub_download(repo_id=repo_id, filename='whisper-large-v3-q8_0.gguf')
+model = whisper.load_model('large-v3', device=device)
+audio = whisper.load_audio(audio_source)
+result = whisper.transcribe(model, audio)
+RESULT = {'text': result['text'], 'segments': result['segments']}

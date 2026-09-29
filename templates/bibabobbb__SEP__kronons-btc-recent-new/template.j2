@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("bibabobbb/kronons-btc-recent-new") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('BTC price sequence inference') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+from safetensors.torch import load_file
+state_dict = load_file(model_path, device="cpu")
+
+class KrononsBTCRecentNew(torch.nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        self.d_model = cfg["d_model"]
+        self.s1_bits = cfg["s1_bits"]
+        self.s2_bits = cfg["s2_bits"]
+        self.embed = torch.nn.Embedding(2 ** self.s1_bits, self.d_model)
+        self.lstm = torch.nn.LSTM(self.d_model, self.d_model, num_layers=2, batch_first=True)
+        self.head = torch.nn.Linear(self.d_model, 2 ** self.s2_bits)
+
+    def forward(self, x):
+        x = self.embed(x)
+        x, _ = self.lstm(x)
+        return self.head(x[:, -1, :])
+
+model = KrononsBTCRecentNew(config).to(device)
+model.load_state_dict(state_dict, strict=False)
+model.eval()
+
+seq_len = 32
+bits = config["s1_bits"]
+base = sum(ord(c) for c in prompt)
+input_ids = torch.tensor([(base + i) % (2 ** bits) for i in range(seq_len)], dtype=torch.long, device=device).unsqueeze(0)
+
+with torch.no_grad():
+    logits = model(input_ids)
+    probs = torch.softmax(logits, dim=-1)
+    top_prob, top_idx = torch.max(probs, dim=-1)
+
+RESULT = {"logits": logits.detach().cpu().tolist(), "top_index": top_idx.detach().cpu().tolist(), "top_probability": top_prob.detach().cpu().tolist()}

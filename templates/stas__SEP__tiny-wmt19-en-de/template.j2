@@ -1,21 +1,39 @@
 {% set repo_id = repo_id | default("stas/tiny-wmt19-en-de") %}
 {% set device = device | default("cuda:0") %}
-{% set translation_source = translation_source | default("Hello, how are you?") %}
+{% set question = question | default('Hello world!') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-translation_source = "{{ translation_source }}"
+question = "{{ question }}"
 
-from pathlib import Path
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import FSMTTokenizer, FSMTForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_src_path = hf_hub_download(repo_id=repo_id, filename="vocab-src.json")
+vocab_tgt_path = hf_hub_download(repo_id=repo_id, filename="vocab-tgt.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-inputs = tokenizer(translation_source, return_tensors="pt")
+# Load tokenizer and model on the requested device.
+tokenizer = FSMTTokenizer(
+    langs=["en", "de"],
+    src_vocab_file=vocab_src_path,
+    tgt_vocab_file=vocab_tgt_path,
+    merges_file=merges_path,
+)
+model = FSMTForConditionalGeneration.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(**inputs)
-translation = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, num_beams=5, max_length=50)
 
-RESULT = {"translation": translation[0]}
+output = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"output": output}

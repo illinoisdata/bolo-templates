@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("stanfordnlp/stanza-multilingual") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Barack Obama was born in Hawaii. He was elected president in 2008.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+import stanza
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename='models/langid/ud.pt')
+model_dir = os.path.dirname(weights_path)
+
+pipeline = stanza.Pipeline(lang='multilingual', processors='langid', dir=model_dir, use_gpu=device.startswith('cuda'))
+result = pipeline(text)
+
+RESULT = {"language": result.lang}

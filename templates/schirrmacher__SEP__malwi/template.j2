@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("schirrmacher/malwi") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default('def runcommand(value):\n    output = subprocess.run(value, shell=True, capture_output=True)\n    return [output.stdout, output.stderr]') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = {{ text_input | tojson }}
+
+import json
+import torch
+from safetensors.torch import load_file
+from huggingface_hub import hf_hub_download
+from transformers import DistilBertConfig, DistilBertForSequenceClassification, AutoTokenizer
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+
+with open(config_path, "r") as f:
+    cfg_dict = json.load(f)
+config = DistilBertConfig.from_dict(cfg_dict)
+state_dict = load_file(model_path)
+model = DistilBertForSequenceClassification(config)
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+inputs = tokenizer(text_input, return_tensors="pt", truncation=True, padding=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    probs = torch.softmax(outputs.logits, dim=-1)
+
+RESULT = {"probabilities": probs[0].detach().cpu().tolist(), "predicted_label": int(torch.argmax(probs, dim=-1).item())}

@@ -1,0 +1,31 @@
+{% set repo_id = repo_id | default("rkazants/tiny-mamba") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Hello, my name is') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import torch
+from transformers import AutoTokenizer, MambaForCausalLM
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = MambaForCausalLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated = model.generate(**inputs, max_new_tokens=20, do_sample=False)
+
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+RESULT = {"generated_text": output_text}

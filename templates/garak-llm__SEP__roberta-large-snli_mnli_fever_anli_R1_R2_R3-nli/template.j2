@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("garak-llm/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli") %}
+{% set device = device | default("cuda:0") %}
+{% set premise = premise | default('A soccer game with multiple males playing.') %}
+{% set hypothesis = hypothesis | default('Some men are playing a sport.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+premise = "{{ premise }}"
+hypothesis = "{{ hypothesis }}"
+
+import json
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+
+model_dir = os.path.dirname(weights_path)
+
+tokenizer = AutoTokenizer.from_pretrained(
+    model_dir,
+    use_fast=False,
+)
+model = AutoModelForSequenceClassification.from_pretrained(
+    model_dir,
+    torch_dtype=torch.float32,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(premise, hypothesis, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probs = torch.softmax(logits, dim=-1)
+    pred_id = int(torch.argmax(probs, dim=-1).item())
+    id2label = model.config.id2label
+    label = id2label[str(pred_id)] if isinstance(id2label, dict) and str(pred_id) in id2label else id2label[pred_id]
+
+RESULT = {
+    "label": label,
+    "predicted_class_id": pred_id,
+    "probabilities": probs.squeeze(0).detach().cpu().tolist(),
+}

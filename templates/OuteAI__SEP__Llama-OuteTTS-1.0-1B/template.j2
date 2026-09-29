@@ -1,0 +1,52 @@
+{% set repo_id = repo_id | default("OuteAI/Llama-OuteTTS-1.0-1B") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hello, how are you doing today?') %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_new_tokens = {{ max_new_tokens }}
+
+import json
+import os
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(tokenizer_config_path, "r") as f:
+    tokenizer_config = json.load(f)
+with open(special_tokens_map_path, "r") as f:
+    special_tokens_map = json.load(f)
+
+os.makedirs(os.path.dirname(tokenizer_path), exist_ok=True)
+
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_path), use_fast=True)
+model = AutoModelForCausalLM.from_pretrained(
+    os.path.dirname(weights_path),
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt").to(device)
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=False,
+        pad_token_id=tokenizer.eos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+RESULT = {"text": output_text}

@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("Trendyol/Trendyol-LLM-7b-chat-v1.0") %}
+{% set device = device | default("cuda:0") %}
+{%- set task = task | default("text-generation") %}
+{%- set input_prompt = input_prompt | default("Sen yardımcı bir asistansın. Türkiye'de kaç il olduğunu açıkla.") %}
+{%- set max_new_tokens = max_new_tokens | default(256) %}
+{%- set do_sample = do_sample | default(True) %}
+{%- set temperature = temperature | default(0.3) %}
+{%- set top_k = top_k | default(50) %}
+{%- set top_p = top_p | default(0.9) %}
+{%- set repetition_penalty = repetition_penalty | default(1.1) %}
+{%- set return_full_text = return_full_text | default(True) %}
+{%- set sampling_kwargs = sampling_kwargs | default({
+    "max_new_tokens": max_new_tokens,
+    "do_sample": do_sample,
+    "temperature": temperature,
+    "top_k": top_k,
+    "top_p": top_p,
+    "repetition_penalty": repetition_penalty,
+    "return_full_text": return_full_text
+}) -%}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+sampling_kwargs = {{ sampling_kwargs }}
+
+from transformers import pipeline
+
+pipe = pipeline(
+    task=task,
+    model=repo_id,
+    device=device,
+)
+
+RESULT = pipe(input_prompt, **sampling_kwargs)
+RESULT = {"outputs": RESULT}

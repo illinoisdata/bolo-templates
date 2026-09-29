@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("SparkAudio/Spark-TTS-0.5B") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hello, this is a Spark TTS inference test.') %}
+{% set language = language | default('en') %}
+{% set speaker_name = speaker_name | default('default') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+language = "{{ language }}"
+speaker_name = "{{ speaker_name }}"
+
+import yaml
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+llm_config_path = hf_hub_download(repo_id=repo_id, filename='LLM/config.json')
+llm_weights_path = hf_hub_download(repo_id=repo_id, filename='LLM/model.safetensors')
+bi_codec_config_path = hf_hub_download(repo_id=repo_id, filename='BiCodec/config.yaml')
+bi_codec_weights_path = hf_hub_download(repo_id=repo_id, filename='BiCodec/model.safetensors')
+
+with open(llm_config_path, 'r') as f:
+    llm_config = __import__('json').load(f)
+with open(bi_codec_config_path, 'r') as f:
+    bi_codec_config = yaml.safe_load(f)
+
+llm_state_dict = load_file(llm_weights_path, device='cpu')
+bi_codec_state_dict = load_file(bi_codec_weights_path, device='cpu')
+
+llm_num_params = sum(v.numel() for v in llm_state_dict.values())
+bi_codec_num_params = sum(v.numel() for v in bi_codec_state_dict.values())
+
+prompt = {
+    'text': text,
+    'language': language,
+    'speaker': speaker_name,
+    'llm_hidden_size': llm_config.get('hidden_size', None),
+    'bicodec_num_params': int(bi_codec_num_params),
+    'llm_num_params': int(llm_num_params),
+    'device': device,
+}
+
+RESULT = {'output': prompt}

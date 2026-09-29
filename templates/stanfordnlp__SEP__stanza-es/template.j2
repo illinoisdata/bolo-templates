@@ -1,0 +1,21 @@
+{% set repo_id = repo_id | default("stanfordnlp/stanza-es") %}
+{% set device = device | default("cuda:0") %}
+{% set sentence = sentence | default('Hola, este es un ejemplo de análisis lingüístico.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sentence = "{{ sentence }}"
+
+import os
+import stanza
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename='models/tokenize/combined.pt')
+model_dir = os.path.dirname(os.path.dirname(model_path))
+
+nlp = stanza.Pipeline(lang='es', processors='tokenize', package='combined', dir=model_dir, use_gpu=device.startswith('cuda'), verbose=False)
+doc = nlp(sentence)
+
+RESULT = {
+    'sentences': [[word.text for word in sent.words] for sent in doc.sentences],
+    'tokens': [[token.text for token in sent.tokens] for sent in doc.sentences],
+}

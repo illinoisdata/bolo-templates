@@ -1,0 +1,29 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Chemical-Multi-209M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The patient was administered acetylsalicylic acid for pain relief.') %}
+{% set labels = labels | default(['CHEM']) %}
+{% set threshold = threshold | default(0.5) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+labels = {{ labels | tojson }}
+threshold = {{ threshold }}
+
+from huggingface_hub import hf_hub_download
+from gliner import GLiNER
+
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="spm.model")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+
+model = GLiNER.from_pretrained(repo_id)
+model.to(device)
+
+entities = model.predict_entities(text, labels, flat_ner=True, threshold=threshold)
+
+RESULT = {"entities": entities}

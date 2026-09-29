@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("DAMO-NLP-SG/siglip2-so400m-patch14-384-navit") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default('image-feature-extraction') -%}
+{% set input_image = input_image | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') -%}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_image = "{{ input_image }}"
+
+from transformers import pipeline
+import transformers.image_utils as _image_utils
+if not hasattr(_image_utils, 'VideoInput'):
+    _image_utils.VideoInput = _image_utils.ImageInput
+
+pipe = pipeline(task=task, model=repo_id, device=device, trust_remote_code=True)
+pipe.image_processor.merge_size = 1
+RESULT = pipe(input_image)

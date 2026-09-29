@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("RichardErkhov/Gustavosta_-_MagicPrompt-Dalle-gguf") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('MagicPrompt-Dalle.Q4_K_M.gguf') %}
+{% set prompt = prompt | default('A futuristic city skyline at sunset, cinematic lighting, highly detailed') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+llm = Llama(model_path=model_path, n_ctx=128, n_threads=1, verbose=False)
+output = llm(prompt, max_tokens=64, temperature=0.8, top_p=0.95, stop=["\n"])
+text = output["choices"][0]["text"]
+
+RESULT = {"text": text}

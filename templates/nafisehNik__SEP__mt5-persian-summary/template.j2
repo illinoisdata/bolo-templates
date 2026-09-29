@@ -1,54 +1,50 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("nafisehNik/mt5-persian-summary") %}
-{% set input_text = input_text | default("این یک متن نمونه برای خلاصه سازی اخبار فارسی است.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("به گزارش شانا به نقل از شرکت پالایش گاز شهید هاشمی نژاد، جمعی از کارشناسان این پالایشگاه با هدف معرفی محصول کود گوگرد بنتونیتی به کشاورزان در شانزدهمین نمایشگاه تخصصی کشاورزی، دام، طیور، ماشین آلات و صنایع وابسته در اردبیل حضور پیدا کردند و به معرفی دستاوردهای این شرکت پرداختند.") %}
 {% set num_beams = num_beams | default(2) %}
-{% set max_output_length = max_output_length | default(120) %}
-{% set max_input_length = max_input_length | default(1024) %}
-{% set length_penalty = length_penalty | default(2.0) %}
 {% set repetition_penalty = repetition_penalty | default(1.0) %}
+{% set length_penalty = length_penalty | default(2.0) %}
 {% set early_stopping = early_stopping | default(True) %}
+{% set max_output_length = max_output_length | default(120) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
+text = "{{ text }}"
 num_beams = {{ num_beams }}
-max_output_length = {{ max_output_length }}
-max_input_length = {{ max_input_length }}
-length_penalty = {{ length_penalty }}
 repetition_penalty = {{ repetition_penalty }}
+length_penalty = {{ length_penalty }}
 early_stopping = {{ early_stopping }}
+max_output_length = {{ max_output_length }}
 
-import os
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import torch
+from transformers import AutoModelForSeq2SeqLM, T5Tokenizer
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
 
-encoded = tokenizer(
-    input_text,
-    max_length=max_input_length,
-    padding="max_length",
-    truncation=True,
-    return_tensors="pt",
-    add_special_tokens=True,
-)
-encoded = {key: value.to(device) for key, value in encoded.items()}
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+tokenizer = T5Tokenizer.from_pretrained(repo_id, use_fast=False)
 
-generated_ids = model.generate(
-    input_ids=encoded["input_ids"],
-    attention_mask=encoded["attention_mask"],
-    num_beams=num_beams,
-    max_length=max_output_length,
-    repetition_penalty=repetition_penalty,
-    length_penalty=length_penalty,
-    early_stopping=early_stopping,
-    use_cache=True,
-)
+inputs = tokenizer(text, max_length=1000, padding="max_length", truncation=True, return_attention_mask=True, add_special_tokens=True, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+model = model.to(device)
+model.eval()
 
-decoded = tokenizer.batch_decode(
-    generated_ids,
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-)
-summary = decoded[0] if len(decoded) == 1 else decoded
+with torch.no_grad():
+    generated_ids = model.generate(
+        input_ids=inputs["input_ids"],
+        attention_mask=inputs["attention_mask"],
+        num_beams=num_beams,
+        max_length=max_output_length,
+        repetition_penalty=repetition_penalty,
+        length_penalty=length_penalty,
+        early_stopping=early_stopping,
+        use_cache=True,
+    )
 
-RESULT = {"summary": summary}
+output = tokenizer.decode(generated_ids[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
+
+RESULT = {"output": output}

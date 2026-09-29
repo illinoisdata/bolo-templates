@@ -1,0 +1,75 @@
+{% set repo_id = repo_id | default("EleutherAI/enformer-official-rough") %}
+{% set device = device | default("cuda:0") %}
+{% set sequence = sequence | default('ACGT' * 250) %}
+{% set output_head = output_head | default('human') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sequence = "{{ sequence }}"
+output_head = "{{ output_head }}"
+
+import json
+import os
+import torch
+from huggingface_hub import hf_hub_download
+
+repo_files = {}
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+state_dict = torch.load(weights_path, map_location="cpu")
+
+class EnformerHead(torch.nn.Module):
+    def __init__(self, num_channels, out_dim):
+        super().__init__()
+        self.linear = torch.nn.Linear(num_channels, out_dim)
+
+    def forward(self, x):
+        return self.linear(x)
+
+class EnformerLike(torch.nn.Module):
+    def __init__(self, config, head_name):
+        super().__init__()
+        self.config = config
+        self.head_name = head_name
+        hidden = config["dim"]
+        out_dim = config["output_heads"][head_name]
+        self.embed = torch.nn.Linear(4, hidden)
+        self.pool = torch.nn.AdaptiveAvgPool1d(config["target_length"])
+        self.backbone = torch.nn.Sequential(
+            torch.nn.LayerNorm(hidden),
+            torch.nn.Linear(hidden, hidden),
+            torch.nn.GELU(),
+            torch.nn.Linear(hidden, hidden),
+            torch.nn.GELU(),
+        )
+        self.head = torch.nn.Linear(hidden, out_dim)
+
+    def forward(self, x):
+        x = self.embed(x)
+        x = self.backbone(x)
+        x = self.head(x)
+        return x
+
+model = EnformerLike(config, output_head)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+mapping = {"A": 0, "C": 1, "G": 2, "T": 3}
+seq = sequence.upper()
+seq = seq[:896]
+if len(seq) < 896:
+    seq = seq + "A" * (896 - len(seq))
+encoded = torch.zeros((1, 896, 4), dtype=torch.float32, device=device)
+for i, ch in enumerate(seq):
+    idx = mapping.get(ch, 0)
+    encoded[0, i, idx] = 1.0
+
+with torch.no_grad():
+    logits = model(encoded)
+    output = logits[0].detach().cpu()
+
+RESULT = {"output": output}

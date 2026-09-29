@@ -1,45 +1,61 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("almanach/camembert-large") %}
-{% set fill_text = fill_text | default("Le camembert est <mask> :)") %}
-{% set top_k = top_k | default(5) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Le camembert est <mask> :)') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-fill_text = "{{ fill_text }}"
-top_k = {{ top_k }}
-
-import json
-from pathlib import Path
+text = "{{ text }}"
 
 import torch
-from transformers import AutoModelForMaskedLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import CamembertForMaskedLM, CamembertTokenizer
 
-model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+spm_path = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 
-inputs = tokenizer(fill_text, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+from transformers import AutoConfig
+config = AutoConfig.from_pretrained(config_path)
+
+tokenizer = CamembertTokenizer.from_pretrained(
+    tokenizer_path,
+    special_tokens_map_file=special_tokens_path,
+    tokenizer_config_file=tokenizer_config_path,
+    added_tokens_file=added_tokens_path,
+)
+model = CamembertForMaskedLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
     outputs = model(**inputs)
+    logits = outputs.logits
 
-logits = outputs.logits
-input_ids = inputs["input_ids"]
-mask_positions = (input_ids == tokenizer.mask_token_id).nonzero(as_tuple=True)
-mask_batch_index = mask_positions[0][0].item()
-mask_token_index = mask_positions[1][0].item()
+mask_token_id = tokenizer.mask_token_id
+mask_positions = (inputs["input_ids"] == mask_token_id).nonzero(as_tuple=False)
+mask_pos = mask_positions[0, 1]
+mask_logits = logits[0, mask_pos]
+topk = torch.topk(mask_logits, k=5)
+top_tokens = tokenizer.convert_ids_to_tokens(topk.indices.tolist())
 
-mask_logits = logits[mask_batch_index, mask_token_index]
-num_candidates = min(top_k, mask_logits.size(-1))
-mask_probs = torch.softmax(mask_logits, dim=-1)
-topk_values = torch.topk(mask_logits, k=num_candidates)
-topk_token_ids = topk_values.indices
-candidate_scores = mask_probs[topk_token_ids]
+def build_sequence(token):
+    return tokenizer.decode([tid if tid != mask_token_id else tokenizer.convert_tokens_to_ids(token) for tid in inputs["input_ids"][0].tolist()], skip_special_tokens=False)
 
-filled_sequences = []
-for score, token_id in zip(candidate_scores.tolist(), topk_token_ids.tolist()):
-    candidate_ids = input_ids[mask_batch_index].clone()
-    candidate_ids[mask_token_index] = token_id
-    sequence = tokenizer.decode(candidate_ids.tolist(), skip_special_tokens=False)
-    filled_sequences.append({"sequence": sequence, "score": score, "token": token_id})
+results = []
+for score, token_id, token in zip(topk.values.tolist(), topk.indices.tolist(), top_tokens):
+    seq_ids = inputs["input_ids"][0].clone()
+    seq_ids[mask_pos] = token_id
+    results.append({
+        "sequence": tokenizer.decode(seq_ids.tolist(), skip_special_tokens=False),
+        "score": score,
+        "token": token_id,
+        "token_str": token,
+    })
 
-RESULT = {"fill_mask": filled_sequences}
+RESULT = {"output": results}

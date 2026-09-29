@@ -1,0 +1,53 @@
+{% set input_series = input_series | default([0.0, 1.0, 0.5, -0.2, 0.3, 0.8, 1.2, 0.7, 0.1, -0.1, 0.0, 0.2, 0.4, 0.6, 0.9, 1.1]) %}
+{% set pred_len = pred_len | default(96) %}
+{% set get_prob = get_prob | default(true) %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("SequentialLearning/SuperLinear") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_series = {{ input_series }}
+pred_len = {{ pred_len }}
+get_prob = {{ get_prob }}
+
+import os
+import sys
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoConfig, AutoModelForCausalLM
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_code_path = hf_hub_download(repo_id=repo_id, filename="configuration_super_linear.py")
+model_code_path = hf_hub_download(repo_id=repo_id, filename="modeling_super_linear.py")
+
+repo_dir = os.path.dirname(config_path)
+if repo_dir not in sys.path:
+    sys.path.insert(0, repo_dir)
+
+config = AutoConfig.from_pretrained(repo_dir, trust_remote_code=True, local_files_only=True)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_dir,
+    trust_remote_code=True,
+    local_files_only=True,
+    torch_dtype=torch.float32,
+)
+model.to(device)
+model.eval()
+
+series = torch.tensor(input_series, dtype=torch.float32, device=device)
+if series.ndim == 1:
+    series = series.unsqueeze(0).unsqueeze(0)
+elif series.ndim == 2:
+    series = series.unsqueeze(1)
+
+with torch.no_grad():
+    outputs = model(inputs_embeds=series, pred_len=pred_len, get_prob=get_prob)
+
+preds = outputs.logits
+probs = outputs.attentions if hasattr(outputs, "attentions") else None
+
+RESULT = {
+    "predictions": preds.detach().cpu().numpy(),
+    "expert_probabilities": None if probs is None else probs.detach().cpu().numpy(),
+}

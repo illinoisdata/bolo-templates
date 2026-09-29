@@ -1,41 +1,38 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Seznam/simcse-dist-mpnet-czeng-cs-en") %}
-{% set text_a = text_a | default("Dnes je výborné počasí na procházku po parku.") %}
-{% set text_b = text_b | default("Večer si oblíbím dobrý film a uvařím si čaj.") %}
-{% set max_length = max_length | default(512) %}
+{% set device = device | default("cuda:0") %}
+{% set text1 = text1 | default('Dnes je výborné počasí na procházku po parku.') %}
+{% set text2 = text2 | default('Večer si oblíbím dobrý film a uvařím si čaj.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_a = "{{ text_a }}"
-text_b = "{{ text_b }}"
-max_length = {{ max_length }}
+text1 = "{{ text1 }}"
+text2 = "{{ text2 }}"
 
-from transformers import AutoModel, AutoTokenizer
+import os
 import torch
+from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
 
-model = AutoModel.from_pretrained(repo_id)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+# Load tokenizer/model from downloaded local files
+local_dir = os.path.dirname(weights_path)
+tokenizer = AutoTokenizer.from_pretrained(local_dir, local_files_only=True)
+model = AutoModel.from_pretrained(local_dir, local_files_only=True)
 model.to(device)
 model.eval()
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
 
-inputs = tokenizer(
-    [text_a, text_b],
-    padding=True,
-    truncation=True,
-    max_length=max_length,
-    return_tensors="pt",
-)
-inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs = [text1, text2]
+batch = tokenizer(inputs, max_length=512, padding=True, truncation=True, return_tensors="pt")
+batch = {k: v.to(device) for k, v in batch.items()}
 
 with torch.no_grad():
-    outputs = model(**inputs)
+    outputs = model(**batch)
+    embeddings = outputs.last_hidden_state[:, 0]
+    similarity = torch.nn.functional.cosine_similarity(embeddings[0], embeddings[1], dim=0)
 
-embeddings = outputs.last_hidden_state[:, 0, :]
-similarity = torch.nn.functional.cosine_similarity(embeddings[0:1], embeddings[1:2], dim=1)[0]
-
-embeddings_cpu = embeddings.cpu()
-similarity_value = similarity.cpu().item()
-
-RESULT = {
-    "embeddings": embeddings_cpu.tolist(),
-    "similarity_score": similarity_value,
-}
+RESULT = {"similarity": similarity.item(), "embeddings": embeddings.detach().cpu().numpy()}

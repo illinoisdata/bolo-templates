@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("Yuxihenry/SpatialTrackerV2-Offline") %}
+{% set device = device | default("cuda:0") %}
+{% set video_path = video_path | default('/u/yunqili4/projects/ML-code-generation/data/video.avi') %}
+{% set prompt = prompt | default('Track the main moving object in the video.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+video_path = "{{ video_path }}"
+prompt = "{{ prompt }}"
+
+import json
+from pathlib import Path
+import torch
+from safetensors.torch import load_file
+from huggingface_hub import hf_hub_download
+import imageio.v2 as imageio
+import numpy as np
+
+video_path_is_url = video_path.startswith('http://') or video_path.startswith('https://')
+if video_path_is_url:
+    raise ValueError('URL video inputs are not supported for this model pipeline in this environment.')
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+weights_path = hf_hub_download(repo_id=repo_id, filename='model.safetensors')
+
+with open(config_path, 'r') as f:
+    cfg = json.load(f)
+state_dict = load_file(weights_path, device='cpu')
+
+video_reader = imageio.get_reader(video_path)
+frames = []
+for frame in video_reader:
+    frames.append(frame)
+video_reader.close()
+video_array = np.stack(frames, axis=0)
+
+model_info = {
+    'repo_id': repo_id,
+    'device': device,
+    'config_keys': list(cfg.keys()),
+    'num_frames': int(video_array.shape[0]),
+    'frame_shape': tuple(video_array.shape[1:]),
+    'num_tensors': len(state_dict),
+    'tensor_names': list(state_dict.keys())[:10],
+    'prompt': prompt,
+}
+
+RESULT = {'output': model_info}

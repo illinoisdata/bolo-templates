@@ -1,34 +1,39 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("unography/blip-large-long-cap") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 {% set max_length = max_length | default(250) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 max_length = {{ max_length }}
 
-from io import BytesIO
-from pathlib import Path
-from urllib.parse import urlparse
-
-import requests
+import torch
 from PIL import Image
-from transformers import AutoProcessor, BlipForConditionalGeneration
+from io import BytesIO
+from urllib.request import urlopen
+from huggingface_hub import hf_hub_download
+from transformers import BlipProcessor, BlipForConditionalGeneration
 
-processor = AutoProcessor.from_pretrained(repo_id)
-model = BlipForConditionalGeneration.from_pretrained(repo_id).to(device)
+processor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-parsed_image_path = urlparse(image_path)
-if parsed_image_path.scheme in {"http", "https"}:
-    response = requests.get(image_path, stream=True)
-    response.raise_for_status()
-    raw_image = Image.open(BytesIO(response.content)).convert("RGB")
+processor = BlipProcessor.from_pretrained("{{ repo_id }}")
+
+if image_path.startswith(("http://", "https://")):
+    raw_image = Image.open(BytesIO(urlopen(image_path).read())).convert("RGB")
 else:
     raw_image = Image.open(image_path).convert("RGB")
 
-inputs = processor(raw_image, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
-generated_ids = model.generate(**inputs, max_length=max_length)
-caption = processor.decode(generated_ids[0], skip_special_tokens=True)
+model = BlipForConditionalGeneration.from_pretrained(
+    "{{ repo_id }}",
+    torch_dtype=torch.float16 if str(device).startswith("cuda") else torch.float32,
+)
+model = model.to(device)
+model.eval()
+
+inputs = processor(raw_image, return_tensors="pt").to(device)
+with torch.no_grad():
+    output_ids = model.generate(pixel_values=inputs.pixel_values, max_length=max_length)
+caption = processor.decode(output_ids[0], skip_special_tokens=True)
 
 RESULT = {"caption": caption}

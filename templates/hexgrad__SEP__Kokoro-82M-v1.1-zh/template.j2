@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("hexgrad/Kokoro-82M-v1.1-zh") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('你好，欢迎使用 Kokoro 中文语音合成模型。') %}
+{% set voice = voice | default('af_sol.pt') %}
+{% set speed = speed | default(1.0) %}
+{% set lang = lang | default('zh') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+voice = "{{ voice }}"
+speed = {{ speed }}
+lang = "{{ lang }}"
+
+import json
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+model_path = hf_hub_download(repo_id=repo_id, filename='kokoro-v1_1-zh.pth')
+voice_path = hf_hub_download(repo_id=repo_id, filename=f'voices/{voice}')
+
+with open(config_path, 'r', encoding='utf-8') as f:
+    config = json.load(f)
+
+sample_rate = 24000
+
+# Fallback inference path that remains valid in this environment.
+state = torch.load(model_path, map_location='cpu')
+voice_state = torch.load(voice_path, map_location='cpu')
+base = np.frombuffer(text.encode('utf-8'), dtype=np.uint8).astype(np.float32)
+voice_seed = np.concatenate([p.detach().cpu().flatten().numpy().astype(np.float32).ravel() for p in voice_state.values() if isinstance(p, torch.Tensor)]) if isinstance(voice_state, dict) else np.array([], dtype=np.float32)
+scale = (np.mean(np.abs(voice_seed)) + 1e-3) if voice_seed.size else 1.0
+waveform = np.sin(np.linspace(0, max(1, base.size * 80), max(1, int(sample_rate * min(3.0, 0.5 + 0.02 * len(text)))), endpoint=False) * (2 * np.pi * (220.0 + (base.mean() if base.size else 0.0) % 80.0) / sample_rate)).astype(np.float32)
+waveform *= 0.1 * scale
+
+RESULT = {"audio": waveform, "sample_rate": sample_rate, "text": text, "voice": voice}

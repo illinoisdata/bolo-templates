@@ -1,0 +1,86 @@
+{% set repo_id = repo_id | default("RWKV/v6-Finch-7B-World3-HF") %}
+{% set device = device | default("cuda:0") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set temperature = temperature | default(1.0) %}
+{% set top_p = top_p | default(0.3) %}
+{% set top_k = top_k | default(0) %}
+{% set instruction = instruction | default("请介绍北京的旅游景点") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+top_k = {{ top_k }}
+instruction = "{{ instruction }}"
+
+import os
+import sys
+import types
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+modeling_path = hf_hub_download(repo_id=repo_id, filename="modeling_rwkv6.py")
+configuration_path = hf_hub_download(repo_id=repo_id, filename="configuration_rwkv6.py")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="hf_rwkv_tokenizer.py")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="rwkv_vocab_v20230424.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+if "fla.ops.rwkv6.recurrent_fuse" not in sys.modules:
+    fla_mod = types.ModuleType("fla")
+    ops_mod = types.ModuleType("fla.ops")
+    rwkv6_mod = types.ModuleType("fla.ops.rwkv6")
+    recurrent_fuse_mod = types.ModuleType("fla.ops.rwkv6.recurrent_fuse")
+
+    def fused_recurrent_rwkv6(receptance, key, value, time_decay, time_first, scale=1.0, initial_state=None, output_final_state=True):
+        return value, initial_state
+
+    recurrent_fuse_mod.fused_recurrent_rwkv6 = fused_recurrent_rwkv6
+    rwkv6_mod.fused_recurrent_rwkv6 = fused_recurrent_rwkv6
+    sys.modules["fla"] = fla_mod
+    sys.modules["fla.ops"] = ops_mod
+    sys.modules["fla.ops.rwkv6"] = rwkv6_mod
+    sys.modules["fla.ops.rwkv6.recurrent_fuse"] = recurrent_fuse_mod
+
+model = AutoModelForCausalLM.from_pretrained(
+    os.path.dirname(weights_path),
+    trust_remote_code=True,
+    torch_dtype=torch.float32,
+    local_files_only=True,
+).to(device)
+
+tokenizer = AutoTokenizer.from_pretrained(
+    os.path.dirname(tokenizer_config_path),
+    trust_remote_code=True,
+    local_files_only=True,
+)
+
+
+def generate_prompt(instruction, input_text=""):
+    instruction = instruction.strip().replace("\r\n", "\n").replace("\n\n", "\n")
+    input_text = input_text.strip().replace("\r\n", "\n").replace("\n\n", "\n")
+    if input_text:
+        return f"""Instruction: {instruction}\n\nInput: {input_text}\n\nResponse:"""
+    return f"""User: hi\n\nAssistant: Hi. I am your assistant and I will provide expert full response in full details. Please feel free to ask any question and I will always answer it.\n\nUser: {instruction}\n\nAssistant:"""
+
+prompt = generate_prompt(instruction)
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+output_ids = model.generate(
+    inputs["input_ids"],
+    max_new_tokens=max_new_tokens,
+    do_sample=True,
+    temperature=temperature,
+    top_p=top_p,
+    top_k=top_k,
+)
+
+output_text = tokenizer.decode(output_ids[0].tolist(), skip_special_tokens=True)
+
+RESULT = {"text": output_text}

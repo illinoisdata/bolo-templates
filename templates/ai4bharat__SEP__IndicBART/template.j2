@@ -1,52 +1,62 @@
 {% set repo_id = repo_id | default("ai4bharat/IndicBART") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("Hello, how are you? </s> <2en>") %}
-{% set target_lang = target_lang | default("<2hi>") %}
+{% set text = text | default('I am a boy') %}
+{% set max_length = max_length | default(20) %}
 {% set num_beams = num_beams | default(4) %}
-{% set max_length = max_length | default(50) %}
-
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-input_text = {{ input_text | tojson }}
-target_lang = {{ target_lang | tojson }}
-num_beams = {{ num_beams }}
+{% set target_lang = target_lang | default('en') %}
+{% set source_lang = source_lang | default('en') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
 max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+target_lang = "{{ target_lang }}"
+source_lang = "{{ source_lang }}"
 
-from pathlib import Path
+import os
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-# Load model and tokenizer
-tokenizer = AutoTokenizer.from_pretrained(repo_id, do_lower_case=False, use_fast=False, keep_accents=True)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+spm_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+repo_dir = os.path.dirname(spm_path)
 
-# Pre-process input text
-encoded = tokenizer(input_text, add_special_tokens=False, return_tensors="pt", padding=True)
-input_ids = encoded["input_ids"].to(device)
-attention_mask = encoded["attention_mask"].to(device)
-
-# Prepare generation parameters
-pad_token_id = tokenizer.pad_token_id
-bos_token_id = tokenizer.bos_token_id
-eos_token_id = tokenizer.eos_token_id
-decoder_start_token_id = tokenizer._convert_token_to_id_with_added_voc(target_lang)
-
-# Run inference
-enable_kwargs = dict(
-    input_ids=input_ids,
-    attention_mask=attention_mask,
-    max_length=max_length,
-    num_beams=num_beams,
-    early_stopping=True,
-    pad_token_id=pad_token_id,
-    bos_token_id=bos_token_id,
-    eos_token_id=eos_token_id,
-    decoder_start_token_id=decoder_start_token_id,
-    use_cache=True,
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_dir,
+    do_lower_case=False,
+    use_fast=False,
+    keep_accents=True,
 )
-output_ids = model.generate(**enable_kwargs)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_dir, local_files_only=True)
+model = model.to(device)
+model.eval()
 
-# Post-process output
-generated_text = tokenizer.decode(output_ids[0], skip_special_tokens=True, clean_up_tokenization_spaces=False)
+bos_id = tokenizer._convert_token_to_id_with_added_voc("<s>")
+eos_id = tokenizer._convert_token_to_id_with_added_voc("</s>")
+pad_id = tokenizer._convert_token_to_id_with_added_voc("<pad>")
+decoder_start_token_id = tokenizer._convert_token_to_id_with_added_voc(f"<2{target_lang}>")
 
-RESULT = {"generated_text": generated_text}
+inp = tokenizer(f"{text} </s> <2{source_lang}>", add_special_tokens=False, return_tensors="pt").input_ids.to(device)
+
+with torch.no_grad():
+    generated = model.generate(
+        inp,
+        use_cache=True,
+        num_beams=num_beams,
+        max_length=max_length,
+        min_length=1,
+        early_stopping=True,
+        pad_token_id=pad_id,
+        bos_token_id=bos_id,
+        eos_token_id=eos_id,
+        decoder_start_token_id=decoder_start_token_id,
+    )
+
+decoded_output = tokenizer.decode(generated[0], skip_special_tokens=True, clean_up_tokenization_spaces=False)
+
+RESULT = {"generated_text": decoded_output}

@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("nostrbuild/nsfw-image-detection-large") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set top_k = top_k | default(3) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+top_k = {{ top_k }}
+
+import os
+import torch
+from PIL import Image
+from transformers import AutoImageProcessor, FocalNetForImageClassification
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processor = AutoImageProcessor.from_pretrained(os.path.dirname(preprocessor_path))
+model = FocalNetForImageClassification.from_pretrained(os.path.dirname(weights_path), local_files_only=True)
+model.to(device)
+model.eval()
+
+inputs = processor(images=image, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    probs = torch.softmax(outputs.logits, dim=-1)[0]
+    values, indices = torch.topk(probs, k=min(top_k, probs.shape[-1]))
+
+id2label = model.config.id2label
+predictions = []
+for score, idx in zip(values.tolist(), indices.tolist()):
+    predictions.append({"label": id2label[int(idx)], "score": float(score)})
+
+RESULT = {"predictions": predictions, "top_prediction": predictions[0], "num_classes": int(probs.shape[-1])}

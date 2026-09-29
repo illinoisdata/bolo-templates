@@ -1,35 +1,36 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("dbmdz/electra-base-german-europeana-cased-discriminator") %}
-{% set text = text | default("Dies ist ein Beispieltext auf Deutsch für die Inferenz mit ELECTRA.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Das ist ein kurzer deutscher Beispielsatz.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = "{{ text }}"
-import os
+text = {{ text | tojson }}
 
-import numpy as np
 import torch
-from transformers import AutoModelForPreTraining, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForPreTraining
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+tokenizer = AutoTokenizer.from_pretrained(
+    tokenizer_path.rsplit('/', 1)[0],
+    vocab_file=vocab_path,
+    use_fast=False,
+)
+model = AutoModelForPreTraining.from_pretrained(
+    weights_path.rsplit('/', 1)[0],
+    local_files_only=True,
+)
+model = model.to(device)
 model.eval()
 
-inputs = tokenizer(
-    text,
-    return_tensors="pt",
-    truncation=True,
-    max_length=tokenizer.model_max_length,
-)
-inputs = {key: value.to(device) for key, value in inputs.items()}
-
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
     outputs = model(**inputs)
 
 logits = outputs.logits
-
-discriminator_predictions = logits.argmax(dim=-1)
-
-RESULT = {
-    "logits": logits.detach().cpu().numpy(),
-    "discriminator_predictions": discriminator_predictions.detach().cpu().numpy(),
-}
+probs = torch.sigmoid(logits)
+RESULT = {"text": text, "logits": logits.detach().cpu().tolist(), "probabilities": probs.detach().cpu().tolist()}

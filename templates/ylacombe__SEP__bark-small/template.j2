@@ -1,33 +1,36 @@
+{% set text_prompt = text_prompt | default('Hello, my name is Suno. And, uh — and I like pizza. [laughs] But I also have other interests such as playing tic tac toe.') %}
+{% set history_prompt = history_prompt | default('en_speaker_1') %}
 {% set repo_id = repo_id | default("ylacombe/bark-small") %}
 {% set device = device | default("cuda:0") %}
-{% set text_prompt = text_prompt | default("Hello, I'm Bark, generating a warm spoken greeting.") %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-text_prompt = {{ text_prompt | tojson }}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_prompt = "{{ text_prompt }}"
+history_prompt = "{{ history_prompt }}"
 
-from pathlib import Path
-
+import os
 import numpy as np
-import scipy.io.wavfile
 import torch
-from transformers import AutoModel, AutoProcessor
+from huggingface_hub import hf_hub_download
+from transformers import AutoProcessor, AutoModel
 
-processor = AutoProcessor.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id)
-model = model.to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+processor_path = hf_hub_download(repo_id=repo_id, filename='tokenizer.json')
+_ = hf_hub_download(repo_id=repo_id, filename='tokenizer_config.json')
+_ = hf_hub_download(repo_id=repo_id, filename='special_tokens_map.json')
+_ = hf_hub_download(repo_id=repo_id, filename='vocab.txt')
+
+processor = AutoProcessor.from_pretrained(os.path.dirname(processor_path))
+model = AutoModel.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-inputs = processor(text=[text_prompt], return_tensors="pt")
-inputs = {key: tensor.to(device) for key, tensor in inputs.items()}
+inputs = processor(text=[text_prompt], return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-speech_tensors = model.generate(**inputs, do_sample=True)
-speech_array = speech_tensors.detach().cpu().numpy()
-speech_array = np.squeeze(speech_array)
+with torch.no_grad():
+    speech_values = model.generate(**inputs, do_sample=True)
 
-sampling_rate = getattr(model.generation_config, "sample_rate", None)
-if sampling_rate is None and hasattr(model.config, "sample_rate"):
-    sampling_rate = model.config.sample_rate
-if sampling_rate is None:
-    sampling_rate = 24000
+sampling_rate = model.generation_config.sample_rate
+output_audio = speech_values.detach().cpu().numpy().squeeze()
 
-RESULT = {"speech": speech_array, "sampling_rate": sampling_rate}
+RESULT = {"audio": output_audio, "sampling_rate": sampling_rate}

@@ -1,25 +1,31 @@
 {% set repo_id = repo_id | default("valhalla/m2m100_tiny_random") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("Hello, world!") %}
+{% set text_input = text_input | default('Hello world', true) %}
+{% set src_lang = src_lang | default('en', true) %}
+{% set tgt_lang = tgt_lang | default('fr', true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = "{{ text }}"
+text_input = {{ text_input | tojson }}
+src_lang = {{ src_lang | tojson }}
+tgt_lang = {{ tgt_lang | tojson }}
 
-import os
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, M2M100ForConditionalGeneration
 
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = M2M100ForConditionalGeneration.from_pretrained(repo_id).to(device)
+model.eval()
 
-if isinstance(text, str):
-    inputs = tokenizer(text, return_tensors="pt")
-else:
-    inputs = tokenizer(text, return_tensors="pt", padding=True)
-
+if hasattr(tokenizer, "src_lang"):
+    tokenizer.src_lang = src_lang
+inputs = tokenizer(text_input, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
+forced_bos_token_id = tokenizer.get_lang_id(tgt_lang) if hasattr(tokenizer, "get_lang_id") else None
+with torch.no_grad():
+    generated = model.generate(**inputs, forced_bos_token_id=forced_bos_token_id, max_new_tokens=32)
+output_text = tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
 
-generated_tokens = model.generate(**inputs)
-generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-
-RESULT = {"generated_text": generated_text}
+RESULT = {"output_text": output_text}

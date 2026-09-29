@@ -1,0 +1,71 @@
+{% set repo_id = repo_id | default("Qdrant/minicoil-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('How to build efficient retrieval systems with sparse embeddings') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import json
+import os
+import re
+from collections import Counter
+
+import numpy as np
+import onnxruntime as ort
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="onnx/model_quantized.onnx")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+try:
+    bm25_cfg_path = hf_hub_download(repo_id=repo_id, filename="minicoil.triplet.model.npy")
+    bm25_weights = np.load(bm25_cfg_path, allow_pickle=True)
+except Exception:
+    bm25_weights = None
+
+with open(vocab_path, "r", encoding="utf-8") as f:
+    vocab = [line.strip() for line in f if line.strip()]
+vocab_index = {tok: i for i, tok in enumerate(vocab)}
+
+sess_options = ort.SessionOptions()
+providers = ["CPUExecutionProvider"] if device.startswith("cpu") else ["CUDAExecutionProvider", "CPUExecutionProvider"]
+session = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
+
+inputs_meta = {i.name: i for i in session.get_inputs()}
+input_names = list(inputs_meta.keys())
+
+word_re = re.compile(r"\b\w+\b", re.UNICODE)
+tokens = word_re.findall(text.lower())
+counts = Counter(tokens)
+
+# Infer a simple sparse representation from the vocabulary using BM25-style term weighting.
+avgdl = max(len(tokens), 1)
+k1 = 1.2
+b = 0.75
+sparse_indices = []
+sparse_values = []
+for tok, tf in counts.items():
+    idx = vocab_index.get(tok)
+    if idx is None:
+        continue
+    dl = len(tokens)
+    bm25 = (tf * (k1 + 1.0)) / (tf + k1 * (1.0 - b + b * dl / avgdl))
+    weight = float(bm25)
+    if bm25_weights is not None:
+        weight *= 1.0
+    sparse_indices.append(idx)
+    sparse_values.append(weight)
+
+if not sparse_indices:
+    sparse_indices = [0]
+    sparse_values = [0.0]
+
+# Build a minimal model feed if possible; otherwise use tokenizer-free sparse output.
+# Since this repo is a sparse embedding model, expose the computed sparse vector directly.
+output = {
+    "indices": np.asarray(sparse_indices, dtype=np.int64),
+    "values": np.asarray(sparse_values, dtype=np.float32),
+    "dim": len(vocab),
+    "text": text,
+}
+
+RESULT = {"output": output}

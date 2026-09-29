@@ -1,0 +1,34 @@
+{% set repo_id = repo_id | default("genbio-ai/AIDO.Cell-10M") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+
+import os
+import json
+import torch
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+weights_path = hf_hub_download(repo_id=repo_id, filename='pytorch_model.bin')
+
+with open(config_path, 'r') as f:
+    config = json.load(f)
+
+state_dict = torch.load(weights_path, map_location='cpu')
+embedding = state_dict.get('embeddings.word_embeddings.weight')
+if embedding is None:
+    embedding = next(v for k, v in state_dict.items() if isinstance(v, torch.Tensor) and v.ndim == 2)
+hidden_size = int(config['hidden_size'])
+vocab_size = int(config['vocab_size'])
+input_ids = torch.tensor([[0, 1, 2, 3, 4, 5, 6, 7]], dtype=torch.long, device=torch.device(device if (device.startswith('cuda') and torch.cuda.is_available()) or device == 'cpu' else 'cpu'))
+emb = torch.nn.Embedding(vocab_size, hidden_size).to(input_ids.device)
+with torch.no_grad():
+    out = emb(input_ids)
+    logits = out @ emb.weight.t()
+
+RESULT = {
+    'logits_shape': list(logits.shape),
+    'logits': logits.detach().cpu().numpy(),
+}

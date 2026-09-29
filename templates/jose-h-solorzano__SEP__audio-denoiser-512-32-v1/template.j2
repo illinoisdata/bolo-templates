@@ -1,14 +1,91 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
 {% set repo_id = repo_id | default("jose-h-solorzano/audio-denoiser-512-32-v1") %}
 {% set device = device | default("cuda:0") %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-import audio_denoiser, pathlib
-print("audio_denoiser module:", audio_denoiser)
-print("module file:", audio_denoiser.__file__)
-try:
-    source = pathlib.Path(audio_denoiser.__file__).read_text()
-    print("source snippet:")
-    print(source[:1000])
-except Exception as exc:
-    print("failed to read source", exc)
-RESULT = {"inspect": "done"}
+audio_path = "{{ audio_path }}"
+
+import os
+import json
+import torch
+import torch.nn.functional as F
+import numpy as np
+import soundfile as sf
+from scipy.signal import stft, istft
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+scaler_mean = float(config["scaler"]["mean"])
+scaler_std = float(config["scaler"]["std"])
+in_channels = int(config["in_channels"])
+n_fft = int(config["n_fft"])
+num_frames = int(config["num_frames"])
+
+raw_state = torch.load(weights_path, map_location="cpu")
+state_dict = raw_state.get("state_dict", raw_state)
+clean_state_dict = {}
+for k, v in state_dict.items():
+    if k.startswith("module."):
+        clean_state_dict[k[len("module."):]] = v
+    else:
+        clean_state_dict[k] = v
+
+class AudioDenoiser(torch.nn.Module):
+    def __init__(self, in_channels, num_frames):
+        super().__init__()
+        self.net = torch.nn.Sequential(
+            torch.nn.Conv2d(1, 16, kernel_size=3, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(16, 32, kernel_size=3, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(32, 16, kernel_size=3, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(16, 1, kernel_size=3, padding=1),
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+model = AudioDenoiser(in_channels=in_channels, num_frames=num_frames).to(device)
+missing, unexpected = model.load_state_dict(clean_state_dict, strict=False)
+model.eval()
+
+if audio_path.startswith(("http://", "https://")):
+    import requests
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    audio, sr = sf.read(io.BytesIO(audio_bytes))
+else:
+    audio, sr = sf.read(audio_path)
+
+if audio.ndim > 1:
+    audio = np.mean(audio, axis=1)
+audio = audio.astype(np.float32)
+
+f, t, zxx = stft(audio, fs=sr, nperseg=n_fft, noverlap=n_fft // 2, nfft=n_fft)
+mag = np.abs(zxx).astype(np.float32)
+phase = np.angle(zxx)
+
+if mag.shape[1] < num_frames:
+    pad_width = num_frames - mag.shape[1]
+    mag = np.pad(mag, ((0, 0), (0, pad_width)), mode="constant")
+    phase = np.pad(phase, ((0, 0), (0, pad_width)), mode="constant")
+
+mag_input = mag[:, :num_frames]
+mag_norm = (mag_input - scaler_mean) / scaler_std
+x = torch.tensor(mag_norm, dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(0)
+
+with torch.no_grad():
+    denoised_norm = model(x)
+
+denoised_mag = denoised_norm.squeeze(0).squeeze(0).cpu().numpy() * scaler_std + scaler_mean
+complex_spec = denoised_mag * np.exp(1j * phase[:, :num_frames])
+_, denoised_audio = istft(complex_spec, fs=sr, nperseg=n_fft, noverlap=n_fft // 2, nfft=n_fft)
+denoised_audio = denoised_audio.astype(np.float32)
+
+RESULT = {"denoised_audio": denoised_audio, "sample_rate": sr}

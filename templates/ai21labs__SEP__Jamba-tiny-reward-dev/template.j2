@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("ai21labs/Jamba-tiny-reward-dev") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("A short review: the model should score this text for reward-model debugging.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+config_dir = "/".join(config_path.split("/")[:-1])
+tokenizer = AutoTokenizer.from_pretrained(
+    config_dir,
+    tokenizer_file=tokenizer_path,
+    tokenizer_config_file=tokenizer_config_path,
+    special_tokens_map_file=special_tokens_map_path,
+    use_fast=True,
+)
+model = AutoModelForSequenceClassification.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    trust_remote_code=False,
+)
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits.detach().float().cpu().tolist()
+probs = torch.softmax(outputs.logits.detach().float(), dim=-1).cpu().tolist()
+predicted_class = int(torch.argmax(outputs.logits, dim=-1).item())
+
+RESULT = {
+    "logits": logits,
+    "probabilities": probs,
+    "predicted_class": predicted_class,
+}

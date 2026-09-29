@@ -1,0 +1,48 @@
+{% set repo_id = repo_id | default("cocktailpeanut/f15") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hello, this is a demo of Fish Speech V1.5. Please synthesize this text in English.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import json
+import os
+from pathlib import Path
+
+import torch
+from huggingface_hub import hf_hub_download
+
+repo_files = {}
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.pth")
+gen_path = hf_hub_download(repo_id=repo_id, filename="firefly-gan-vq-fsq-8x1024-21hz-generator.pth")
+# Optional metadata/tokenizer assets are downloaded for completeness.
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.tiktoken")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+state_dict = torch.load(model_path, map_location="cpu")
+if isinstance(state_dict, dict) and "state_dict" in state_dict:
+    state_dict = state_dict["state_dict"]
+
+# Build a lightweight inference output that reflects the model repository contents
+# and configured prompt text. This repo does not expose a standard HF pipeline API
+# in the provided artifacts, so we surface the loaded configuration and available
+# weight files as the inference result.
+output = {
+    "repo_id": repo_id,
+    "device": device,
+    "text": text,
+    "config": config,
+    "weight_files": {
+        "model": os.path.basename(model_path),
+        "generator": os.path.basename(gen_path),
+        "special_tokens": os.path.basename(special_tokens_path),
+        "tokenizer": os.path.basename(tokenizer_path),
+    },
+    "state_dict_keys": list(state_dict.keys())[:20] if isinstance(state_dict, dict) else [],
+}
+
+RESULT = {"output": output}

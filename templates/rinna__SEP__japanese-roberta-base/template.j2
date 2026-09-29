@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("rinna/japanese-roberta-base") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("[CLS]4年に1度{mask}は開かれる。") %}
+
+repo_id = {{ repo_id | tojson }}
+task = {{ task | tojson }}
+device = {{ device | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

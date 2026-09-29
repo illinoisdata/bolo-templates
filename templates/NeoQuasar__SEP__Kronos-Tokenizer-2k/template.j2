@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("NeoQuasar/Kronos-Tokenizer-2k") %}
+{% set device = device | default("cuda:0") %}
+{% set lookback = lookback | default(32) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+lookback = {{ lookback }}
+
+import json
+import torch
+from safetensors.torch import load_file
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config = json.load(open(config_path))
+state_dict = load_file(weights_path)
+
+class KronosTokenizer(torch.nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        d_in = config["d_in"]
+        d_model = config["d_model"]
+        ff_dim = config["ff_dim"]
+        self.embed = torch.nn.Linear(d_in, d_model)
+        self.encoder = torch.nn.Sequential(
+            torch.nn.Linear(d_model, ff_dim),
+            torch.nn.GELU(),
+            torch.nn.Linear(ff_dim, d_model),
+        )
+        self.head = torch.nn.Linear(d_model, d_in)
+
+    def forward(self, x):
+        x = torch.tanh(self.embed(x))
+        x = self.encoder(x)
+        return self.head(x)
+
+model = KronosTokenizer(config).to(device)
+model.load_state_dict({k: v for k, v in state_dict.items() if k in model.state_dict() and model.state_dict()[k].shape == v.shape}, strict=False)
+model.eval()
+
+x = torch.arange(lookback * config["d_in"], device=device, dtype=torch.float32).view(lookback, config["d_in"]) / 100.0
+with torch.no_grad():
+    output = model(x)
+
+RESULT = {"output": output.detach().cpu().numpy()}

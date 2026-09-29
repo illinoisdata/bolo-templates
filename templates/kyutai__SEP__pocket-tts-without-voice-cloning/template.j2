@@ -1,0 +1,28 @@
+{% set repo_id = repo_id | default("kyutai/pocket-tts-without-voice-cloning") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hello world, this is a test of Pocket TTS.') %}
+{% set voice_prompt = voice_prompt | default('hf://kyutai/tts-voices/alba-mackenna/casual.wav') %}
+{% set language = language | default('english') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+voice_prompt = "{{ voice_prompt }}"
+language = "{{ language }}"
+
+import os
+from pathlib import Path
+import torch
+import requests
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+import safetensors.torch as st
+import tempfile
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="tts_b6369a24.safetensors")
+model_dir = Path(weights_path).parent
+
+state = st.load_file(weights_path)
+RESULT = {
+    "weights_keys": sorted(list(state.keys()))[:5],
+}

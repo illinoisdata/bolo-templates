@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("fxmarty/tiny-random-working-LongT5Model") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set model = model | default(repo_id) %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+
+task = "{{ task }}"
+model = "{{ model }}"
+device = "{{ device }}"
+input_prompt = "{{ input_prompt }}"
+
+from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
+
+hf_tokenizer = AutoTokenizer.from_pretrained(model)
+hf_model = AutoModelForSeq2SeqLM.from_pretrained(model)
+
+pipe = pipeline(task=task, model=hf_model, tokenizer=hf_tokenizer, device=device)
+RESULT = pipe(input_prompt)

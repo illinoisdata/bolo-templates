@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("Habana/distilbert-base-uncased") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The movie was surprisingly good and the acting was excellent.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import os
+import json
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import torch
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gaudi_config.json")
+config_dir = os.path.dirname(config_path)
+
+# Load a standard DistilBERT model for CPU/GPU inference; this repo only provides Gaudi config.
+tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
+model = AutoModelForSequenceClassification.from_pretrained("distilbert-base-uncased")
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits.detach().cpu().numpy()
+probabilities = torch.softmax(outputs.logits, dim=-1).detach().cpu().numpy().tolist()
+predicted_class_id = int(logits.argmax(axis=-1)[0])
+label = model.config.id2label.get(predicted_class_id, str(predicted_class_id))
+
+RESULT = {
+    "logits": logits,
+    "probabilities": probabilities,
+    "predicted_class_id": predicted_class_id,
+    "label": label,
+}

@@ -1,50 +1,47 @@
 {% set repo_id = repo_id | default("IlyaGusev/rut5_base_sum_gazeta") %}
 {% set device = device | default("cuda:0") %}
-{% set article_text = """
-Высота башни составляет 324 метра (1063 фута), примерно такая же высота, как у 81-этажного здания, и самое высокое сооружение в Париже. Его основание квадратно, размером 125 метров (410 футов) с любой стороны. Во время строительства Эйфелева башня превзошла монумент Вашингтона, став самым высоким искусственным сооружением в мире, и этот титул она удерживала в течение 41 года до завершения строительство здания Крайслер в Нью-Йорке в 1930 году. Это первое сооружение которое достигло высоты 300 метров. Из-за добавления вещательной антенны на вершине башни в 1957 году она сейчас выше здания Крайслер на 5,2 метра (17 футов). За исключением передатчиков, Эйфелева башня является второй самой высокой отдельно стоящей структурой во Франции после виадука Мийо.
-""" %}
-{% set max_source_length = max_source_length | default(600) %}
-{% set max_target_length = max_target_length | default(200) %}
-{% set num_beams = num_beams | default(5) %}
+{% set article_text = article_text | default('Высота башни составляет 324 метра (1063 фута), примерно такая же высота, как у 81-этажного здания, и самое высокое сооружение в Париже. Его основание квадратно, размером 125 метров (410 футов) с любой стороны. Во время строительства Эйфелева башня превзошла монумент Вашингтона, став самым высоким искусственным сооружением в мире, и этот титул она удерживала в течение 41 года до завершения строительство здания Крайслер в Нью-Йорке в 1930 году.') %}
+{% set max_source_tokens_count = max_source_tokens_count | default(600) %}
 {% set no_repeat_ngram_size = no_repeat_ngram_size | default(4) %}
+{% set num_beams = num_beams | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-article_text = """{{ article_text }}"""
-max_source_length = {{ max_source_length }}
-max_target_length = {{ max_target_length }}
-num_beams = {{ num_beams }}
+article_text = "{{ article_text }}"
+max_source_tokens_count = {{ max_source_tokens_count }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+num_beams = {{ num_beams }}
 
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+hf_hub_download(repo_id=repo_id, filename="spiece.model")
+
+model = T5ForConditionalGeneration.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-
-device_obj = torch.device(device)
-model = model.to(device_obj)
-
-# Pre-process input
-encoded_inputs = tokenizer(
-    article_text,
-    max_length=max_source_length,
+inputs = tokenizer(
+    [article_text],
+    max_length=max_source_tokens_count,
+    add_special_tokens=True,
     padding="max_length",
     truncation=True,
     return_tensors="pt",
-    add_special_tokens=True,
 )
-encoded_inputs = {key: value.to(device_obj) for key, value in encoded_inputs.items()}
+input_ids = inputs["input_ids"].to(device)
+attention_mask = inputs["attention_mask"].to(device)
 
-# Run inference
-generated_ids = model.generate(
-    **encoded_inputs,
-    max_length=max_target_length,
-    num_beams=num_beams,
+output_ids = model.generate(
+    input_ids=input_ids,
+    attention_mask=attention_mask,
     no_repeat_ngram_size=no_repeat_ngram_size,
+    num_beams=num_beams,
 )
-summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+summary = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-# Post-process & RESULT dict
 RESULT = {"summary": summary}

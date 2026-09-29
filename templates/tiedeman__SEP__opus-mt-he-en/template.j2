@@ -1,24 +1,36 @@
 {% set repo_id = repo_id | default("tiedeman/opus-mt-he-en") %}
 {% set device = device | default("cuda:0") %}
-{% set src_text = src_text | default("זה מבחן תרגום") %}
-{% set num_beams = num_beams | default(6) %}
-{% set max_length = max_length | default(512) %}
-
+{% set text = text | default('שלום עולם') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-src_text = "{{ src_text }}"
-num_beams = {{ num_beams }}
-max_length = {{ max_length }}
+text = "{{ text }}"
+max_new_tokens = {{ max_new_tokens }}
 
 import os
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+from transformers import MarianMTModel, MarianTokenizer
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+src_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+tgt_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-inputs = tokenizer(src_text, return_tensors="pt", padding=True).to(device)
+model = MarianMTModel.from_pretrained(repo_id)
+tokenizer = MarianTokenizer.from_pretrained(os.path.dirname(vocab_path))
+model.to(device)
+model.eval()
 
-generated_tokens = model.generate(**inputs, num_beams=num_beams, max_length=max_length)
-translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+inputs = tokenizer([text], return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-RESULT = {"translation_text": translation}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, num_beams=6, max_new_tokens=max_new_tokens)
+
+output_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"translation": output_text}

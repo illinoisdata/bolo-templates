@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("timm/gmixer_24_224.ra3_in1k") %}
+{% set task = task | default("image-classification") %}
+{% set model = model | default(repo_id) %}
+{% set device = device | default("cuda:0") %}
+{% set input_image_path = input_image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_image_path = {{ input_image_path | tojson }}
+
+from PIL import Image
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+input_image = Image.open(input_image_path).convert("RGB")
+RESULT = pipe(input_image)

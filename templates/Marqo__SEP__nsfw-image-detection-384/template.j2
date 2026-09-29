@@ -1,0 +1,44 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("Marqo/nsfw-image-detection-384") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import json
+from urllib.request import urlopen
+
+import torch
+import timm
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+model = timm.create_model(f"hf-hub:{repo_id}", pretrained=False, num_classes=cfg["num_classes"])
+state_dict = torch.load(model_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=True)
+model = model.to(device)
+model.eval()
+
+data_config = timm.data.resolve_model_data_config(model)
+transform = timm.data.create_transform(**data_config, is_training=False)
+input_tensor = transform(image).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    logits = model(input_tensor)
+    probs = logits.softmax(dim=-1).detach().cpu()
+
+class_names = cfg["label_names"]
+pred_idx = int(probs[0].argmax().item())
+RESULT = {"probabilities": probs[0].tolist(), "predicted_label": class_names[pred_idx]}

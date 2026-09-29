@@ -1,42 +1,23 @@
 {% set repo_id = repo_id | default("tuner007/pegasus_summarizer") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("My dog is cute, but he sometimes chews my shoes, which is frustrating.") %}
-{% set max_input_length = max_input_length | default(1024) %}
-{% set max_summary_length = max_summary_length | default(128) %}
-{% set num_beams = num_beams | default(5) %}
-{% set num_return_sequences = num_return_sequences | default(1) %}
-{% set temperature = temperature | default(1.5) %}
+{% set input_text = input_text | default("India wicket-keeper batsman Rishabh Pant has said someone from the crowd threw a ball on pacer Mohammed Siraj while he was fielding in the ongoing third Test against England on Wednesday. Pant revealed the incident made India skipper Virat Kohli upset.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-max_input_length = {{ max_input_length }}
-max_summary_length = {{ max_summary_length }}
-num_beams = {{ num_beams }}
-num_return_sequences = {{ num_return_sequences }}
-temperature = {{ temperature }}
+input_text = {{ input_text | tojson }}
 
-import os
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+auto_tokenizer = AutoTokenizer.from_pretrained(repo_id)
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
 
-# Preprocess input text
-tokens = tokenizer([input_text], truncation=True, padding="longest", max_length=max_input_length, return_tensors="pt").to(device)
+batch = auto_tokenizer([input_text], truncation=True, padding='longest', max_length=1024, return_tensors="pt").to(device)
+with torch.no_grad():
+    gen_out = model.generate(**batch, max_length=128, num_beams=5, num_return_sequences=1, temperature=1.5)
+output_text = auto_tokenizer.batch_decode(gen_out, skip_special_tokens=True)
 
-# Generate summary
-generated_ids = model.generate(
-    **tokens,
-    max_length=max_summary_length,
-    num_beams=num_beams,
-    num_return_sequences=num_return_sequences,
-    temperature=temperature,
-)
-
-# Decode and post-process summaries
-summaries = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-
-# Build the RESULT dict
-RESULT = {"summaries": summaries}
+RESULT = {"summary": output_text}

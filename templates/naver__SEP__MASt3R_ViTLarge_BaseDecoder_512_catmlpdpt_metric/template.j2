@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("naver/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric") %}
+{% set device = device | default("cuda:0") %}
+{% set image1 = image1 | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set image2 = image2 | default('/u/yunqili4/projects/ML-code-generation/data/image2.jpeg') %}
+{% set dust3r_size = dust3r_size | default(512) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image1 = "{{ image1 }}"
+image2 = "{{ image2 }}"
+dust3r_size = {{ dust3r_size }}
+
+import torch
+import requests
+from PIL import Image
+from io import BytesIO
+from pathlib import Path
+from huggingface_hub import hf_hub_download
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+
+if image1.startswith("http://") or image1.startswith("https://"):
+    img1 = Image.open(BytesIO(requests.get(image1, timeout=30).content)).convert("RGB")
+else:
+    img1 = Image.open(image1).convert("RGB")
+
+if image2.startswith("http://") or image2.startswith("https://"):
+    img2 = Image.open(BytesIO(requests.get(image2, timeout=30).content)).convert("RGB")
+else:
+    img2 = Image.open(image2).convert("RGB")
+
+RESULT = {
+    "model_path": model_path,
+    "config_path": config_path,
+    "image1_size": img1.size,
+    "image2_size": img2.size,
+}

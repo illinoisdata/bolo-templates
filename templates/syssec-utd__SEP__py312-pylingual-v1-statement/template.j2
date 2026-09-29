@@ -1,40 +1,46 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("syssec-utd/py312-pylingual-v1-statement") %}
-{% set prompt = prompt | default("summarize: The Transformers library allows developers to build powerful text generation models for natural language tasks.") %}
-{% set max_length = max_length | default(256) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default('def add(a, b):\n    return a + b\n') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text_input = {{ text_input | tojson }}
 
-from pathlib import Path
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(torch.device(device))
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename='tokenizer_config.json')
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename='special_tokens_map.json')
+vocab_path = hf_hub_download(repo_id=repo_id, filename='vocab.json')
+merges_path = hf_hub_download(repo_id=repo_id, filename='merges.txt')
+weights_path = hf_hub_download(repo_id=repo_id, filename='model.safetensors')
+generation_config_path = hf_hub_download(repo_id=repo_id, filename='generation_config.json')
+
+
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    use_fast=True,
+)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(prompt, return_tensors="pt")
-input_ids = inputs.input_ids.to(torch.device(device))
-attention_mask = inputs.attention_mask.to(torch.device(device)) if inputs.attention_mask is not None else None
+inputs = tokenizer(text_input, return_tensors='pt', truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-with torch.inference_mode():
-    generation_kwargs = {
-        "max_length": max_length,
-        "num_beams": num_beams,
-        "early_stopping": True,
-    }
-    outputs = model.generate(
-        input_ids=input_ids,
-        attention_mask=attention_mask,
-        **generation_kwargs,
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=128,
+        num_beams=4,
+        early_stopping=True,
+        no_repeat_ngram_size=3,
     )
 
-generated_texts = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-generated_text = generated_texts[0] if generated_texts else ""
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {"generated_text": generated_text}
+RESULT = {"output": output_text}

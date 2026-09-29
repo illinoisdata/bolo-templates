@@ -1,0 +1,23 @@
+{% set repo_id = repo_id | default("timm/rexnet_150.nav_in1k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+image_path = {{ image_path | tojson }}
+
+import os
+
+cuda_library_path = "/workspace/.pip/nvidia/cu13/lib"
+ld_library_path = os.environ.get("LD_LIBRARY_PATH", "")
+path_parts = [p for p in ld_library_path.split(os.pathsep) if p]
+if cuda_library_path not in path_parts:
+    path_parts.insert(0, cuda_library_path)
+    os.environ["LD_LIBRARY_PATH"] = os.pathsep.join(path_parts)
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = pipe(image_path)

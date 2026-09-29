@@ -1,34 +1,45 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("sshleifer/distilbart-xsum-12-3") %}
-{% set input_text = input_text | default("Scientists have shared a detailed report describing how climate change is altering migratory patterns of birds across the Northern Hemisphere, prompting conservationists to call for emergency action to protect key breeding habitats.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The Tower of London is a historic castle located on the north bank of the River Thames in central London. It was founded in 1066 as part of the Norman Conquest of England and has served as a royal palace, prison, armory, and treasury.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = """{{ input_text }}"""
-
-from pathlib import Path
+text = "{{ text }}"
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, BartForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-device_obj = torch.device(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device_obj)
-
-inputs = tokenizer(
-    input_text,
-    return_tensors="pt",
-    truncation=True,
-    padding=True,
+# Load tokenizer/model directly from the downloaded local files.
+tokenizer = AutoTokenizer.from_pretrained(
+    vocab_path.rsplit('/', 1)[0],
+    use_fast=False,
 )
-inputs = {name: tensor.to(device_obj) for name, tensor in inputs.items()}
-
-generated_tokens = model.generate(
-    **inputs,
-    max_length=128,
-    num_beams=4,
-    early_stopping=True,
+model = BartForConditionalGeneration.from_pretrained(
+    weights_path.rsplit('/', 1)[0],
+    torch_dtype=torch.float32,
 )
-summary = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0].strip()
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        num_beams=6,
+        max_length=62,
+        min_length=11,
+        no_repeat_ngram_size=3,
+        early_stopping=True,
+    )
+summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"summary": summary}

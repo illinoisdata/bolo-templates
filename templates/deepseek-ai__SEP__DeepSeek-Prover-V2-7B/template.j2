@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("deepseek-ai/DeepSeek-Prover-V2-7B") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Provide a detailed proof plan and Lean 4 formalization strategy for the theorem.') %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+
+import json
+import torch
+from transformers import AutoTokenizer, LlamaConfig, LlamaForCausalLM
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_index_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+with open(weights_index_path, "r") as f:
+    weight_map = json.load(f)["weight_map"]
+for fn in sorted(set(weight_map.values())):
+    hf_hub_download(repo_id=repo_id, filename=fn)
+model_dir = config_path.rsplit("/", 1)[0]
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+config = LlamaConfig(**cfg)
+model = LlamaForCausalLM.from_pretrained(model_dir, config=config, torch_dtype=torch.bfloat16, low_cpu_mem_usage=True)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+if tokenizer.pad_token_id is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+messages = [{"role": "user", "content": prompt}]
+chat_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+input_ids = tokenizer(chat_text, return_tensors="pt").input_ids.to(device)
+
+with torch.no_grad():
+    generated = model.generate(input_ids=input_ids, max_new_tokens=max_new_tokens, do_sample=False, pad_token_id=tokenizer.pad_token_id, eos_token_id=tokenizer.eos_token_id)
+
+output_text = tokenizer.decode(generated[0][input_ids.shape[-1]:], skip_special_tokens=True)
+RESULT = {"output": output_text}

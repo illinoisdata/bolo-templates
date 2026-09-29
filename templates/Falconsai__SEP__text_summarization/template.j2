@@ -1,48 +1,45 @@
 {% set repo_id = repo_id | default("Falconsai/text_summarization") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("Hugging Face: Revolutionizing Natural Language Processing Introduction In the rapidly evolving field of Natural Language Processing (NLP), Hugging Face has emerged as a prominent and innovative force. This article will explore the story and significance of Hugging Face, a company that has made remarkable contributions to NLP and AI as a whole. From its inception to its role in democratizing AI, Hugging Face has left an indelible mark on the industry.") %}
-{% set prefix = prefix | default("summarize: ") %}
-{% set early_stopping = early_stopping | default(true) %}
-{% set length_penalty = length_penalty | default(2.0) %}
+{% set article = article | default('Hugging Face: Revolutionizing Natural Language Processing Introduction In the rapidly evolving field of Natural Language Processing (NLP), Hugging Face has emerged as a prominent and innovative force. This article will explore the story and significance of Hugging Face, a company that has made remarkable contributions to NLP and AI as a whole. From its inception to its role in democratizing AI, Hugging Face has left an indelible mark on the industry.') %}
 {% set max_length = max_length | default(200) %}
 {% set min_length = min_length | default(30) %}
-{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
 {% set num_beams = num_beams | default(4) %}
-
+{% set do_sample = do_sample | default(false) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = {{ input_text|tojson }}
-prefix = {{ prefix|tojson }}
-early_stopping = {{ early_stopping }}
-length_penalty = {{ length_penalty }}
+article = "{{ article }}"
 max_length = {{ max_length }}
 min_length = {{ min_length }}
-no_repeat_ngram_size = {{ no_repeat_ngram_size }}
 num_beams = {{ num_beams }}
+do_sample = {{ do_sample }}
 
-import os
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.to(device)
+model.eval()
 
-# Pre-process input text with task prefix
-input_str = prefix + input_text
-inputs = tokenizer(input_str, return_tensors="pt").to(device)
+inputs = tokenizer("summarize: " + article, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Run inference
-summary_ids = model.generate(
-    **inputs,
-    early_stopping=early_stopping,
-    length_penalty=length_penalty,
-    max_length=max_length,
-    min_length=min_length,
-    no_repeat_ngram_size=no_repeat_ngram_size,
-    num_beams=num_beams,
-)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_length=max_length,
+        min_length=min_length,
+        num_beams=num_beams,
+        do_sample=do_sample,
+    )
+summary_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-# Post-process and build RESULT dict
-summary_list = tokenizer.batch_decode(summary_ids, skip_special_tokens=True)
-summary = summary_list[0]
-RESULT = {"summary_text": summary}
+RESULT = {"summary_text": summary_text}

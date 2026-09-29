@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("shaobocui/cesar-bert-large") %}
+{% set device = device | default("cuda:0") %}
+{% set s1 = s1 | default('Tom is very hungry now.') %}
+{% set s2 = s2 | default('He goes to McDonald for some food.') %}
+{% set model_name = model_name | default('CESAR') %}
+{% set model_path = model_path | default(repo_id) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+s1 = "{{ s1 }}"
+s2 = "{{ s2 }}"
+model_name = "{{ model_name }}"
+model_path = "{{ model_path }}"
+
+import os
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, BertConfig, BertForSequenceClassification
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+with open(config_path, "r") as f:
+    cfg_dict = json.load(f)
+cfg_dict.pop("model_type", None)
+cfg_dict.pop("architectures", None)
+config = BertConfig.from_dict(cfg_dict)
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_json_path), use_fast=True)
+model = BertForSequenceClassification(config)
+state_dict = torch.load(weights_path, map_location="cpu") if weights_path.endswith(".bin") else __import__("safetensors.torch").torch.load_file(weights_path)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(s1, s2, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    if hasattr(outputs, "logits"):
+        output_value = outputs.logits.detach().cpu().tolist()
+    elif isinstance(outputs, (tuple, list)):
+        output_value = outputs[0].detach().cpu().tolist() if torch.is_tensor(outputs[0]) else outputs[0]
+    else:
+        output_value = outputs
+
+RESULT = {"output": output_value}

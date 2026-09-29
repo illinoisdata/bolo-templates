@@ -1,0 +1,59 @@
+{% set repo_id = repo_id | default("deutsche-telekom/electra-base-de-squad2") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Wer leitet die Robert Bosch GmbH?') %}
+{% set context = context | default('Die Robert Bosch GmbH ist ein im Jahr 1886 von Robert Bosch gegründetes multinationales deutsches Unternehmen. Es ist tätig als Automobilzulieferer, Hersteller von Gebrauchsgütern und Industrie- und Gebäudetechnik und darüber hinaus in der automatisierten Verpackungstechnik, wo Bosch den führenden Platz einnimmt. Die Robert Bosch GmbH und ihre rund 460 Tochter- und Regionalgesellschaften in mehr als 60 Ländern bilden die Bosch-Gruppe. Der Sitz der Geschäftsführung befindet sich auf der Schillerhöhe in Gerlingen, der Firmensitz in Stuttgart. Seit dem 1. Juli 2012 ist Volkmar Denner Vorsitzender der Geschäftsführung. Im Jahr 2015 konnte Bosch die Spitzenposition zurückgewinnen. Die Automobilsparte war im Jahr 2018 für 61 % des Konzernumsatzes von Bosch verantwortlich. Das Unternehmen hatte im Jahr 2018 in Deutschland an 85 Standorten 139.400 Mitarbeiter.') %}
+{% set max_length = max_length | default(384) %}
+{% set doc_stride = doc_stride | default(128) %}
+{% set max_answer_len = max_answer_len | default(30) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+max_length = {{ max_length }}
+doc_stride = {{ doc_stride }}
+max_answer_len = {{ max_answer_len }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+model_dir = config_path.rsplit('/', 1)[0]
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = AutoModelForQuestionAnswering.from_pretrained(model_dir, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(
+    question,
+    context,
+    return_tensors="pt",
+    truncation="only_second",
+    max_length=max_length,
+    stride=doc_stride,
+    return_overflowing_tokens=False,
+    return_offsets_mapping=True,
+)
+offsets = inputs.pop("offset_mapping")[0].tolist()
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+start_logits = outputs.start_logits[0]
+end_logits = outputs.end_logits[0]
+start_idx = int(torch.argmax(start_logits).item())
+end_idx = int(torch.argmax(end_logits).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+if end_idx - start_idx + 1 > max_answer_len:
+    end_idx = min(start_idx + max_answer_len - 1, len(offsets) - 1)
+start_char, _ = offsets[start_idx]
+_, end_char = offsets[end_idx]
+answer = context[start_char:end_char]
+score = float((start_logits[start_idx] + end_logits[end_idx]).item())
+
+RESULT = {"answer": answer, "score": score, "start": int(start_char), "end": int(end_char)}

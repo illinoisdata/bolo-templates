@@ -1,40 +1,35 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("circulus/kobart-chat-mixed-v2") %}
-{% set user_prompt = user_prompt | default("안녕하세요! 오늘 어떤 대화를 나누고 싶으세요?") %}
-{% set max_new_tokens = max_new_tokens | default(128) %}
-{% set temperature = temperature | default(1.0) %}
-{% set do_sample = do_sample | default(false) %}
-{% set num_return_sequences = num_return_sequences | default(1) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('오늘 날씨 어때?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-user_prompt = "{{ user_prompt }}"
-max_new_tokens = {{ max_new_tokens }}
-temperature = {{ temperature }}
-do_sample = {{ "True" if do_sample else "False" }}
-num_return_sequences = {{ num_return_sequences }}
-
-from pathlib import Path
+text = {{ text | tojson }}
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+# Load tokenizer/model directly from downloaded files
+# tokenizer files are handled by AutoTokenizer via cache directory from the downloaded file paths
+import os
+model_dir = os.path.dirname(weights_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(user_prompt, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_tokens = model.generate(
-    **inputs,
-    max_new_tokens=max_new_tokens,
-    temperature=temperature,
-    do_sample=do_sample,
-    num_return_sequences=num_return_sequences,
-)
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=32, num_beams=4)
 
-generated_texts = tokenizer.batch_decode(
-    generated_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=True
-)
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {"generated_texts": generated_texts}
+RESULT = {"generated_text": output_text}

@@ -1,34 +1,47 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("linhphanff/semantic-base-vi") %}
-{% set sentences = [
-    "Học sinh cần được hướng dẫn kỹ năng học tập.",
-    "Thời tiết hôm nay thật đẹp và mát mẻ.",
-    "Công nghệ AI đang thay đổi thế giới từng ngày.",
-    "Người dân đổ xô đi mua sắm dịp cuối năm.",
-    "Giá xăng dầu giảm mạnh so với tháng trước.",
-    "Chương trình khuyến mãi hấp dẫn đang diễn ra tại các siêu thị.",
-    "Đội tuyển Việt Nam vô địch giải bóng đá Đông Nam Á.",
-    "Thủ tướng phát biểu tại hội nghị quốc tế về môi trường.",
-    "Nhiều tuyến đường ở thành phố Hồ Chí Minh bị ngập nặng sau cơn mưa lớn.",
-    "Sách là nguồn tri thức vô giá cho mỗi con người."
-] %}
+{% set device = device | default("cuda:0") %}
+{% set text_list = text_list | default([
+  'Học sinh cần được hướng dẫn kỹ năng học tập.',
+  'Thời tiết hôm nay thật đẹp và mát mẻ.',
+  'Công nghệ AI đang thay đổi thế giới từng ngày.',
+  'Người dân đổ xô đi mua sắm dịp cuối năm.',
+  'Giá xăng dầu giảm mạnh so với tháng trước.',
+  'Chương trình khuyến mãi hấp dẫn đang diễn ra tại các siêu thị.',
+  'Đội tuyển Việt Nam vô địch giải bóng đá Đông Nam Á.',
+  'Thủ tướng phát biểu tại hội nghị quốc tế về môi trường.',
+  'Nhiều tuyến đường ở thành phố Hồ Chí Minh bị ngập nặng sau cơn mưa lớn.',
+  'Sách là nguồn tri thức vô giá cho mỗi con người.'
+]) %}
+{% set max_length = max_length | default(128) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-sentences = {{ sentences | tojson }}
-
-import json
-from pathlib import Path
+text_list = {{ text_list }}
+max_length = {{ max_length }}
 
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel, RobertaTokenizer
+from pyvi.ViTokenizer import tokenize
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+model = AutoModel.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
-inputs = tokenizer(sentences, padding=True, truncation=True, return_tensors="pt")
+
+tokenizer = RobertaTokenizer(vocab_file=vocab_path, merges_file=vocab_path)
+
+sentences = [tokenize(sentence) for sentence in text_list]
+inputs = tokenizer(sentences, padding=True, truncation=True, max_length=max_length, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
+
 with torch.no_grad():
-    outputs = model(**inputs, output_hidden_states=True, return_dict=True)
-    embeddings = outputs.pooler_output
-embedding_list = embeddings.cpu().tolist()
-RESULT = {"embeddings": embedding_list}
+    embeddings = model(**inputs, output_hidden_states=True, return_dict=True).pooler_output
+
+RESULT = {"embeddings": embeddings.detach().cpu().numpy(), "sentences": sentences}

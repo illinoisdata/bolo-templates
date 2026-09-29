@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("phonemetransformers/GPT2-85M-BPE-TXT") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('The quick brown fox') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    local_files_only=False,
+    torch_dtype=torch.float32,
+)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=20,
+        do_sample=False,
+        pad_token_id=tokenizer.eos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": output_text}

@@ -1,60 +1,53 @@
 {% set repo_id = repo_id | default("microsoft/wavlm-base-plus-sv") %}
 {% set device = device | default("cuda:0") %}
-{% set audio_filepath = audio_filepath | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set ref_audio_path = ref_audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set threshold = threshold | default(0.86) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-audio_filepath = "{{ audio_filepath }}"
+audio_path = "{{ audio_path }}"
+ref_audio_path = "{{ ref_audio_path }}"
+threshold = {{ threshold }}
 
-from transformers import AutoFeatureExtractor, WavLMForXVector
-import torch
+import os
 import numpy as np
-import requests
-from io import BytesIO
-import torchaudio
+import torch
 import soundfile as sf
+from huggingface_hub import hf_hub_download
+from transformers import Wav2Vec2FeatureExtractor, WavLMForXVector
 
-# Load feature extractor and model
-feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
-model = WavLMForXVector.from_pretrained(repo_id)
-model.to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(os.path.dirname(preprocessor_path))
+model = WavLMForXVector.from_pretrained(os.path.dirname(weights_path))
+model = model.to(device)
 model.eval()
 
-# Load audio
-if audio_filepath.startswith("http"):
-    response = requests.get(audio_filepath)
-    audio_np, sr = sf.read(BytesIO(response.content))
-else:
-    audio_np, sr = sf.read(audio_filepath)
-audio = torch.tensor(audio_np)
+def load_audio(path):
+    if isinstance(path, str) and path.startswith(("http://", "https://")):
+        import requests
+        import io
+        audio_bytes = requests.get(path, timeout=30).content
+        wav, sr = sf.read(io.BytesIO(audio_bytes))
+    else:
+        wav, sr = sf.read(path)
+    if wav.ndim > 1:
+        wav = np.mean(wav, axis=1)
+    if sr != 16000:
+        import librosa
+        wav = librosa.resample(wav.astype(np.float32), orig_sr=sr, target_sr=16000)
+        sr = 16000
+    return wav.astype(np.float32), sr
 
-# Prepare audio tensor for resampling (channel-first)
-if audio.ndim > 1:
-    audio = audio.T
-else:
-    audio = audio.unsqueeze(0)
-
-# Ensure float32 for resampling
-audio = audio.to(torch.float32)
-
-# Resample if needed
-target_sr = feature_extractor.sampling_rate
-if sr != target_sr:
-    resampler = torchaudio.transforms.Resample(sr, target_sr)
-    audio = resampler(audio)
-    sr = target_sr
-
-# Convert to 1D numpy array
-audio = audio.squeeze(0).cpu().numpy()
-
-# Prepare inputs
-inputs = feature_extractor([audio], sampling_rate=sr, padding=True, return_tensors="pt")
+wav1, sr1 = load_audio(audio_path)
+wav2, sr2 = load_audio(ref_audio_path)
+inputs = feature_extractor([wav1, wav2], sampling_rate=16000, padding=True, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
-
-# Run inference
 with torch.no_grad():
     outputs = model(**inputs)
-    embeddings = outputs.embeddings
-    embeddings = torch.nn.functional.normalize(embeddings, dim=-1).cpu()
-
-# Post-process result
-RESULT = {"embeddings": embeddings}
+embeddings = torch.nn.functional.normalize(outputs.embeddings, dim=-1)
+cosine_sim = torch.nn.CosineSimilarity(dim=-1)
+similarity = cosine_sim(embeddings[0], embeddings[1]).item()
+RESULT = {"embeddings": embeddings.detach().cpu().numpy(), "similarity": similarity, "same_speaker": bool(similarity >= threshold)}

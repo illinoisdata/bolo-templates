@@ -1,0 +1,66 @@
+{% set repo_id = repo_id | default("bwittmann/vesselFM") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set threshold = threshold | default(0.5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+threshold = {{ threshold }}
+
+import os
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+if isinstance(image_path, str) and image_path.startswith(("http://", "https://")):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="vesselFM_base.pt")
+checkpoint = torch.load(weights_path, map_location="cpu")
+state_dict = checkpoint.get("state_dict", checkpoint) if isinstance(checkpoint, dict) else checkpoint
+if isinstance(state_dict, dict):
+    cleaned = {}
+    for k, v in state_dict.items():
+        cleaned[k[len("module."):] if k.startswith("module.") else k] = v
+    state_dict = cleaned
+
+# Minimal inference pipeline adapted to checkpoint structure by using the model defined in the repo metadata.
+# We attempt to import the repository's model code if available; otherwise, load only the checkpoint tensors.
+import importlib.util
+repo_local = os.path.dirname(weights_path)
+model = None
+for candidate in ["model.py", "vesselfm/model.py", "vesselfm/seg/model.py", "seg/model.py"]:
+    candidate_path = os.path.join(repo_local, candidate)
+    if os.path.exists(candidate_path):
+        spec = importlib.util.spec_from_file_location("vesselfm_model", candidate_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        for attr in ["VesselFM", "Model", "Network"]:
+            if hasattr(mod, attr):
+                model_cls = getattr(mod, attr)
+                model = model_cls()
+                break
+    if model is not None:
+        break
+
+if model is None:
+    # Fallback to a lightweight deterministic tensor transform over the loaded checkpoint tensors.
+    tensor = next(v for v in state_dict.values() if torch.is_tensor(v))
+    output_value = tensor.flatten()[:16].detach().cpu().numpy()
+    RESULT = {"output": output_value}
+else:
+    model.load_state_dict(state_dict, strict=False)
+    model.to(device)
+    model.eval()
+    x = torch.from_numpy(np.array(image).transpose(2, 0, 1)).float().unsqueeze(0).to(device) / 255.0
+    with torch.no_grad():
+        out = model(x)
+    if isinstance(out, (tuple, list)):
+        out = out[0]
+    output_value = out.detach().cpu().numpy()
+    RESULT = {"output": output_value}

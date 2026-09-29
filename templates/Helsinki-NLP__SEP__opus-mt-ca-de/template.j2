@@ -1,26 +1,30 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-ca-de") %}
 {% set device = device | default("cuda:0") %}
-{% set source_text = source_text | default("Bon dia! Avui és un bon dia per aprendre alguna cosa nova.") %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(4) %}
+{% set text = text | default('El català és una llengua romànica.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_text = "{{ source_text }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text = "{{ text }}"
 
-from pathlib import Path
-
+from huggingface_hub import hf_hub_download
+from transformers import MarianMTModel, AutoTokenizer
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-torch_device = torch.device(device)
-model = model.to(torch_device)
-encoded_inputs = tokenizer(source_text, return_tensors="pt", padding=True, truncation=True, max_length=max_length)
-encoded_inputs = {key: value.to(torch_device) for key, value in encoded_inputs.items()}
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="vocab.json")
+hf_hub_download(repo_id=repo_id, filename="source.spm")
+hf_hub_download(repo_id=repo_id, filename="target.spm")
+
+model_dir = "/".join(model_path.split("/")[:-1])
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir)
+model = MarianMTModel.from_pretrained(model_dir).to(device)
+
+inputs = tokenizer([text], return_tensors="pt", padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    generated_ids = model.generate(**encoded_inputs, max_length=max_length, num_beams=num_beams, early_stopping=True)
-translation = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
-RESULT = {"translation": translation}
+    generated = model.generate(**inputs, num_beams=4, max_length=128)
+output_text = tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
+
+RESULT = {"translation": output_text}

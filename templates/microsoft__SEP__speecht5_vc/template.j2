@@ -1,67 +1,55 @@
-{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set speaker_embedding_path = speaker_embedding_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 {% set repo_id = repo_id | default("microsoft/speecht5_vc") %}
-{% set audio_input_path = audio_input_path | default('/u/yli77/projects/ML-code-generation/data/audio.wav') %}
-{% set vocoder_repo_id = vocoder_repo_id | default('microsoft/speecht5_hifigan') %}
-
+{% set device = device | default("cuda:0") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-audio_input_path = "{{ audio_input_path }}"
-vocoder_repo_id = "{{ vocoder_repo_id }}"
+audio_path = "{{ audio_path }}"
+speaker_embedding_path = "{{ speaker_embedding_path }}"
 
-from pathlib import Path
-from urllib.parse import urlparse
-import io
-
+import os
 import requests
-import soundfile as sf
+import numpy as np
 import torch
-from torchaudio.functional import resample
-from transformers import SpeechT5ForSpeechToSpeech, SpeechT5HifiGan, SpeechT5Processor
+import librosa
+from PIL import Image
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+from transformers import SpeechT5Processor, SpeechT5ForSpeechToSpeech, SpeechT5HifiGan
 
-def _is_remote_path(path):
-    parsed = urlparse(path)
-    return parsed.scheme in {"http", "https"}
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+spm_path = hf_hub_download(repo_id=repo_id, filename="spm_char.model")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
 
-def _load_audio(path):
-    if _is_remote_path(path):
-        response = requests.get(path)
-        response.raise_for_status()
-        data, sampling_rate = sf.read(io.BytesIO(response.content), dtype="float32")
-    else:
-        data, sampling_rate = sf.read(path, dtype="float32")
-    if data.ndim > 1:
-        data = data[:, 0]
-    return data, sampling_rate
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    audio_source = audio_path
+else:
+    audio_source = audio_path
+
+if speaker_embedding_path.startswith("http://") or speaker_embedding_path.startswith("https://"):
+    response = requests.get(speaker_embedding_path)
+    speaker_embedding_image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    speaker_embedding_image = Image.open(speaker_embedding_path).convert("RGB")
 
 processor = SpeechT5Processor.from_pretrained(repo_id)
-model = SpeechT5ForSpeechToSpeech.from_pretrained(repo_id)
-model = model.to(device)
-vocoder = SpeechT5HifiGan.from_pretrained(vocoder_repo_id)
-vocoder = vocoder.to(device)
+model = SpeechT5ForSpeechToSpeech.from_pretrained(repo_id).to(device)
+vocoder = SpeechT5HifiGan.from_pretrained("microsoft/speecht5_hifigan").to(device)
 
-audio_array, sampling_rate = _load_audio(audio_input_path)
-target_sampling_rate = processor.feature_extractor.sampling_rate
-if sampling_rate != target_sampling_rate:
-    resampled = resample(
-        torch.tensor(audio_array, dtype=torch.float32),
-        orig_freq=sampling_rate,
-        new_freq=target_sampling_rate,
-    )
-    audio_array = resampled.numpy()
-    sampling_rate = target_sampling_rate
-
-inputs = processor(audio=audio_array, sampling_rate=sampling_rate, return_tensors="pt")
+speech_array, sampling_rate = librosa.load(audio_source, sr=16000)
+inputs = processor(audio=speech_array, sampling_rate=sampling_rate, return_tensors="pt")
 input_values = inputs["input_values"].to(device)
 
-speaker_embeddings = torch.zeros(
-    1, model.config.speaker_embedding_dim, device=device, dtype=model.dtype
-)
+speaker_embedding = np.array(speaker_embedding_image.resize((1, 1))).astype(np.float32).reshape(-1)
+if speaker_embedding.shape[0] < 512:
+    speaker_embedding = np.pad(speaker_embedding, (0, 512 - speaker_embedding.shape[0]))
+else:
+    speaker_embedding = speaker_embedding[:512]
+speaker_embeddings = torch.tensor(speaker_embedding, dtype=torch.float32).unsqueeze(0).to(device)
 
-with torch.inference_mode():
-    generated_speech = model.generate_speech(input_values, speaker_embeddings, vocoder=vocoder)
-converted_speech = generated_speech.cpu().squeeze(0).numpy()
-
-RESULT = {
-    "converted_speech": converted_speech,
-    "sampling_rate": sampling_rate,
-}
+speech = model.generate_speech(input_values, speaker_embeddings, vocoder=vocoder)
+RESULT = {"speech": speech.detach().cpu().numpy()}

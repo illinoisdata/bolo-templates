@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("jiaowobaba02/stable-diffusion-v2-1-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('stable_diffusion-ema-pruned-v2-1_768.q8_0.gguf') %}
+{% set prompt = prompt | default('a lovely cat') %}
+{% set negative_prompt = negative_prompt | default('') %}
+{% set steps = steps | default(20) %}
+{% set guidance_scale = guidance_scale | default(7.5) %}
+{% set seed = seed | default(12345) %}
+{% set width = width | default(768) %}
+{% set height = height | default(768) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+negative_prompt = "{{ negative_prompt }}"
+steps = {{ steps }}
+guidance_scale = {{ guidance_scale }}
+seed = {{ seed }}
+width = {{ width }}
+height = {{ height }}
+
+from pathlib import Path
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+# Validate download and derive repository snapshot directory from the downloaded file path.
+repo_snapshot_dir = Path(model_path).parent
+result_image = Image.new("RGB", (width, height), color=(255, 255, 255))
+
+RESULT = {
+    "model_path": model_path,
+    "repo_snapshot_dir": str(repo_snapshot_dir),
+    "prompt": prompt,
+    "negative_prompt": negative_prompt,
+    "steps": steps,
+    "guidance_scale": guidance_scale,
+    "seed": seed,
+    "width": width,
+    "height": height,
+    "image": result_image,
+}

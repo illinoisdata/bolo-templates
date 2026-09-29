@@ -1,0 +1,45 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("kaiko-ai/midnight") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import requests
+import torch
+from PIL import Image
+from transformers import AutoModel, AutoImageProcessor
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processor = AutoImageProcessor.from_pretrained("facebook/dinov2-giant")
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = processor(images=image, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+last_hidden_state = outputs.last_hidden_state
+cls_embedding = last_hidden_state[:, 0, :]
+patch_embeddings = last_hidden_state[:, 1:, :]
+classification_embedding = torch.cat([cls_embedding, patch_embeddings.mean(dim=1)], dim=-1)
+segmentation_embedding = patch_embeddings.permute(0, 2, 1)
+patch_grid = segmentation_embedding.shape[-1]
+side = int(patch_grid ** 0.5)
+segmentation_embedding = segmentation_embedding.reshape(segmentation_embedding.shape[0], segmentation_embedding.shape[1], side, side)
+
+RESULT = {
+    "classification_embedding": classification_embedding.detach().cpu(),
+    "segmentation_embedding": segmentation_embedding.detach().cpu(),
+}

@@ -1,0 +1,28 @@
+{% set repo_id = repo_id | default("NeelNanda/Attn_Only_4L512W_C4_Code") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('def add(a, b):\n    return a + b\n\n# Complete the function body:') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+
+import json
+import os
+import torch
+from huggingface_hub import hf_hub_download
+
+repo_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+repo_dir = os.path.dirname(repo_path)
+model_path = hf_hub_download(repo_id=repo_id, filename='model_init.pth')
+
+config = json.load(open(repo_path))
+state = torch.load(model_path, map_location='cpu')
+
+result = {
+    'config_keys': sorted(list(config.keys()))[:10],
+    'state_type': type(state).__name__,
+    'state_keys': sorted(list(state.keys()))[:10] if isinstance(state, dict) else None,
+    'prompt': prompt,
+    'repo_dir': repo_dir,
+}
+
+RESULT = {'output': result}

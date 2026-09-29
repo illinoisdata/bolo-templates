@@ -1,0 +1,80 @@
+{% set repo_id = repo_id | default("jinaai/jina-colbert-v2-64") %}
+{% set device = device | default("cuda:0") %}
+{% set query = query | default('What does ColBERT do?') %}
+{% set passages = passages | default(['ColBERT is a novel ranking model that adapts deep LMs for efficient retrieval.', 'Jina-ColBERT is a ColBERT-style model based on JinaBERT for long-context multilingual retrieval.']) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query = "{{ query }}"
+passages = {{ passages }}
+
+import os
+import json
+import torch
+from safetensors.torch import load_file
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+from transformers.models.roberta import RobertaConfig, RobertaModel
+
+if device.startswith("cuda") and not torch.cuda.is_available():
+    device = "cpu"
+
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+local_dir = os.path.dirname(config_file)
+with open(config_file, "r") as f:
+    cfg = json.load(f)
+
+config = RobertaConfig(
+    vocab_size=cfg.get("vocab_size", 50265),
+    hidden_size=cfg.get("hidden_size", 768),
+    num_hidden_layers=cfg.get("num_hidden_layers", 12),
+    num_attention_heads=cfg.get("num_attention_heads", 12),
+    intermediate_size=cfg.get("intermediate_size", 3072),
+    max_position_embeddings=cfg.get("max_position_embeddings", 514),
+    type_vocab_size=cfg.get("type_vocab_size", 1),
+    layer_norm_eps=cfg.get("layer_norm_eps", 1e-5),
+    hidden_dropout_prob=cfg.get("hidden_dropout_prob", 0.1),
+    attention_probs_dropout_prob=cfg.get("attention_probs_dropout_prob", 0.1),
+    pad_token_id=cfg.get("pad_token_id", 1),
+    bos_token_id=cfg.get("bos_token_id", 0),
+    eos_token_id=cfg.get("eos_token_id", 2),
+)
+
+model = RobertaModel(config)
+state_dict = load_file(model_file)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(local_dir, use_fast=True, local_files_only=True)
+
+def mean_pool(last_hidden_state, attention_mask):
+    mask = attention_mask.unsqueeze(-1).to(last_hidden_state.dtype)
+    summed = (last_hidden_state * mask).sum(dim=1)
+    counts = mask.sum(dim=1).clamp(min=1e-6)
+    return summed / counts
+
+query_inputs = tokenizer(query, return_tensors="pt", truncation=True, max_length=512)
+query_inputs = {k: v.to(device) for k, v in query_inputs.items()}
+passage_inputs = tokenizer(passages, return_tensors="pt", padding=True, truncation=True, max_length=512)
+passage_inputs = {k: v.to(device) for k, v in passage_inputs.items()}
+
+with torch.no_grad():
+    query_outputs = model(**query_inputs)
+    passage_outputs = model(**passage_inputs)
+    query_emb = torch.nn.functional.normalize(mean_pool(query_outputs.last_hidden_state, query_inputs["attention_mask"]), dim=-1)
+    passage_emb = torch.nn.functional.normalize(mean_pool(passage_outputs.last_hidden_state, passage_inputs["attention_mask"]), dim=-1)
+    scores = torch.matmul(passage_emb, query_emb.squeeze(0).unsqueeze(-1)).squeeze(-1)
+    ranking = torch.argsort(scores, descending=True)
+
+RESULT = {
+    "query_embedding": query_emb.detach().cpu(),
+    "passage_embeddings": passage_emb.detach().cpu(),
+    "scores": scores.detach().cpu().tolist(),
+    "ranking": ranking.detach().cpu().tolist(),
+}

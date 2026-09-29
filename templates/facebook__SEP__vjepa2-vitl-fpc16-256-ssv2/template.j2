@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("facebook/vjepa2-vitl-fpc16-256-ssv2") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("video-classification") %}
+{% set model = model | default(repo_id) %}
+{% set video_path = video_path | default("/u/yunqili4/projects/ML-code-generation/data/video.avi") %}
+{% set input_data = input_data | default(video_path) %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+video_path = {{ video_path | tojson }}
+input_data = {{ input_data | tojson }}
+
+import av
+import numpy as np
+
+from transformers import pipeline
+
+
+def _load_and_sample_video(path: str, num_frames: int):
+    container = av.open(path)
+    frames = [frame.to_ndarray(format="rgb24") for frame in container.decode(video=0)]
+    container.close()
+
+    if not frames:
+        raise ValueError(f"No video frames could be decoded from {path}")
+
+    if num_frames <= 0:
+        raise ValueError("`num_frames` must be a positive integer")
+
+    indices = np.linspace(0, len(frames) - 1, num=num_frames, dtype=int)
+    sampled_frames = [frames[idx] for idx in indices]
+    return np.stack(sampled_frames)
+
+
+pipe = pipeline(task=task, model=model, device=device)
+pipe.model.config.num_frames = pipe.model.config.frames_per_clip
+input_data = _load_and_sample_video(video_path, pipe.model.config.num_frames)
+RESULT = pipe(input_data)

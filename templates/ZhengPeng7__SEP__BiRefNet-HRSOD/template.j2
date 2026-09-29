@@ -1,0 +1,49 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("ZhengPeng7/BiRefNet-HRSOD") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import os
+import requests
+from io import BytesIO
+import torch
+import numpy as np
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from torchvision import transforms
+from transformers import AutoModelForImageSegmentation
+
+handler_path = hf_hub_download(repo_id=repo_id, filename="handler.py")
+repo_dir = os.path.dirname(handler_path)
+import sys
+sys.path.insert(0, repo_dir)
+import handler as h  # noqa: E402
+
+if image_path.startswith(("http://", "https://")):
+    image_ori = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image_ori = Image.open(image_path).convert("RGB")
+
+resolution = (1024, 1024)
+image_size = image_ori.size
+preprocessor = h.ImagePreprocessor(resolution)
+image = preprocessor.proc(image_ori)
+image = image.unsqueeze(0).to(device)
+
+model = AutoModelForImageSegmentation.from_pretrained(repo_id, trust_remote_code=True)
+model.to(device)
+model.eval()
+
+with torch.no_grad():
+    if device.startswith("cuda"):
+        model = model.half()
+        image = image.half()
+    outputs = model(image)
+
+pred = outputs[-1] if isinstance(outputs, (tuple, list)) else getattr(outputs, "logits", outputs)
+pred = torch.nn.functional.interpolate(pred, size=image_size[::-1], mode="bilinear", align_corners=False)
+mask = torch.sigmoid(pred)[0, 0]
+RESULT = {"mask": mask.detach().cpu().numpy()}

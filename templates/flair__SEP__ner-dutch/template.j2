@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("flair/ner-dutch") %}
+{% set device = device | default("cuda:0") %}
+{% set sentence = sentence | default('George Washington ging naar Washington') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sentence = "{{ sentence }}"
+
+import os
+import sys
+import subprocess
+from huggingface_hub import hf_hub_download
+
+# Ensure flair is available
+subprocess.run([sys.executable, "-m", "pip", "install", "-q", "flair"], check=True)
+
+from flair.data import Sentence
+from flair.models import SequenceTagger
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+tagger = SequenceTagger.load(weights_path)
+# Move to requested device if possible
+try:
+    tagger.to(device)
+except Exception:
+    pass
+
+sent = Sentence(sentence)
+tagger.predict(sent)
+
+entities = []
+for span in sent.get_spans("ner"):
+    entities.append({
+        "text": span.text,
+        "labels": [label.value for label in span.labels],
+        "score": span.score,
+        "start_position": span.start_position,
+        "end_position": span.end_position,
+    })
+
+RESULT = {"sentence": str(sent), "entities": entities}

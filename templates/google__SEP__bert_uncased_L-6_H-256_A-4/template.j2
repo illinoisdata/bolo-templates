@@ -1,49 +1,31 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("google/bert_uncased_L-6_H-256_A-4") %}
-{% set text_prompt = text_prompt | default("The capital of France is [MASK].") %}
-{% set top_k = top_k | default(5) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The quick brown fox jumps over the lazy dog.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_prompt = "{{ text_prompt }}"
-top_k = {{ top_k }}
+text = {{ text | tojson }}
 
-import json
-from pathlib import Path
-
+import os
 import torch
-from transformers import AutoModelForMaskedLM, AutoTokenizer
+from transformers import AutoTokenizer, BertModel
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForMaskedLM.from_pretrained(repo_id).to(torch_device)
+model_dir = os.path.dirname(weights_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = BertModel.from_pretrained(model_dir, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(text_prompt, return_tensors="pt")
-inputs = {k: v.to(torch_device) for k, v in inputs.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
     outputs = model(**inputs)
-logits = outputs.logits
 
-input_ids = inputs["input_ids"]
-mask_positions = (input_ids == tokenizer.mask_token_id).nonzero(as_tuple=False)
-
-predictions = []
-if mask_positions.numel() > 0:
-    mask_positions = mask_positions.cpu()
-    for mask_pos in mask_positions:
-        sequence_index = int(mask_pos[0].item())
-        token_index = int(mask_pos[1].item())
-        mask_logits = logits[sequence_index, token_index]
-        topk = torch.topk(mask_logits, top_k)
-        topk_indices = topk.indices.cpu().tolist()
-        topk_values = topk.values.cpu().tolist()
-        predicted_tokens = tokenizer.convert_ids_to_tokens(topk_indices)
-        predictions.append({
-            "sequence_index": sequence_index,
-            "token_index": token_index,
-            "predicted_tokens": predicted_tokens,
-            "scores": topk_values,
-        })
-
-RESULT = {"predictions": predictions}
+RESULT = {
+    "last_hidden_state": outputs.last_hidden_state,
+    "pooler_output": outputs.pooler_output,
+}

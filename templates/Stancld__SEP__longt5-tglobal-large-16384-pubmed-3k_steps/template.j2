@@ -1,30 +1,42 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Stancld/longt5-tglobal-large-16384-pubmed-3k_steps") %}
-{% set text_to_summarize = text_to_summarize | default("Anxiety affects quality of life in those living with Parkinson's disease more so than cognitive status, motor deficits, apathy, and depression.") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Summarize the following medical article in one concise paragraph.') %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_to_summarize = """{{ text_to_summarize }}"""
-from pathlib import Path
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+
+import torch
+from transformers import AutoTokenizer, LongT5ForConditionalGeneration
+
+# Download model files from Hub
+from huggingface_hub import hf_hub_download
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+# Pre-process input & load model
+if prompt.startswith("http://") or prompt.startswith("https://"):
+    import requests
+    article_text = requests.get(prompt, timeout=30).text
+else:
+    article_text = prompt
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = LongT5ForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-encoded_inputs = tokenizer(
-    text_to_summarize,
-    return_tensors="pt",
-    truncation=True,
-    max_length=4096,
-)
-inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+inputs = tokenizer(article_text, return_tensors="pt", truncation=True, max_length=4096)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(
-    **inputs,
-    max_length=512,
-    num_beams=4,
-    early_stopping=True,
-)
-decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-summary_text = decoded[0].strip()
+# Run inference
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {"summary": summary_text}
+# Post-process & build RESULT dict
+RESULT = {"summary": summary}

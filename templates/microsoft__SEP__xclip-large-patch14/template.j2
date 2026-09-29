@@ -1,0 +1,61 @@
+{% set repo_id = repo_id | default("microsoft/xclip-large-patch14") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("video-classification") %}
+{% set input_video = input_video | default("/u/yunqili4/projects/ML-code-generation/data/video.avi") %}
+{% set num_frames = num_frames | default(8) %}
+{% set text_prompt = text_prompt | default(["playing sports", "eating spaghetti", "cooking dinner"]) %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_video = {{ input_video | tojson }}
+num_frames = {{ num_frames | tojson }}
+text_prompt = {{ text_prompt | tojson }}
+
+from transformers import AutoTokenizer, pipeline
+from transformers.pipelines.video_classification import VideoClassificationPipeline
+
+# Override model check to support XCLIPModel in video-classification pipeline
+VideoClassificationPipeline.check_model_type = lambda *args, **kwargs: None
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+original_preprocess = pipe.preprocess
+
+def _preprocess_with_text(video, num_frames=None, frame_sampling_rate=1):
+    model_inputs = original_preprocess(video, num_frames=num_frames, frame_sampling_rate=frame_sampling_rate)
+    text_inputs = tokenizer(text_prompt, return_tensors="pt", padding=True, truncation=True).to(pipe.device)
+    model_inputs.update(text_inputs)
+    return model_inputs
+
+pipe.preprocess = _preprocess_with_text
+
+
+def _postprocess_with_similarity(model_outputs, top_k=5, function_to_apply="softmax"):
+    text_logits = model_outputs.logits_per_video
+    if text_logits is None:
+        return {}
+    labels = text_prompt if isinstance(text_prompt, list) else [text_prompt]
+    selected_logits = text_logits[0]
+    if function_to_apply == "sigmoid":
+        scores = selected_logits.sigmoid()
+    elif function_to_apply == "softmax":
+        scores = selected_logits.softmax(dim=-1)
+    else:
+        scores = selected_logits
+    available = min(top_k, len(labels))
+    top_scores, top_indices = scores.topk(available)
+    return {
+        "predictions": [
+            {"label": labels[idx], "score": float(score)}
+            for score, idx in zip(top_scores.tolist(), top_indices.tolist())
+        ],
+        "logits_per_video": text_logits.tolist(),
+    }
+
+pipe.postprocess = _postprocess_with_similarity
+
+input_data = input_video
+
+RESULT = pipe(input_data, num_frames=num_frames)

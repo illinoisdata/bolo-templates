@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("microsoft/table-transformer-structure-recognition-v1.1-all") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("object-detection") %}
+{% set input_data = input_data | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+{% set config_filename = config_filename | default("config.json") %}
+{% set preprocessor_filename = preprocessor_filename | default("preprocessor_config.json") %}
+{% set local_model_dir = local_model_dir | default("/workspace/table_transformer_model") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = {{ task | tojson }}
+input_data = {{ input_data | tojson }}
+config_filename = {{ config_filename | tojson }}
+preprocessor_filename = {{ preprocessor_filename | tojson }}
+local_model_dir = {{ local_model_dir | tojson }}
+
+import json
+import os
+import shutil
+from huggingface_hub import snapshot_download
+from transformers import pipeline
+
+hf_repo_dir = snapshot_download(repo_id=repo_id)
+if os.path.exists(local_model_dir):
+    shutil.rmtree(local_model_dir)
+shutil.copytree(hf_repo_dir, local_model_dir)
+
+config_path = os.path.join(local_model_dir, config_filename)
+with open(config_path, "r") as f:
+    config_dict = json.load(f)
+config_dict["dilation"] = False
+with open(config_path, "w") as f:
+    json.dump(config_dict, f)
+
+preprocessor_path = os.path.join(local_model_dir, preprocessor_filename)
+with open(preprocessor_path, "r") as f:
+    preprocessor_dict = json.load(f)
+preprocessor_dict["size"] = {"height": 800, "width": 800}
+with open(preprocessor_path, "w") as f:
+    json.dump(preprocessor_dict, f)
+
+pipe = pipeline(
+    task=task,
+    model=local_model_dir,
+    device=device,
+)
+
+inputs = input_data
+inference_output = pipe(inputs)
+
+RESULT = {"detections": inference_output}

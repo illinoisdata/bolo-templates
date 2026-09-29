@@ -1,48 +1,50 @@
-{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set sample_rate = sample_rate | default(16000) %}
 {% set repo_id = repo_id | default("m3hrdadfi/hubert-base-persian-speech-gender-recognition") %}
-{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
+{% set device = device | default("cuda:0") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
+sample_rate = {{ sample_rate }}
 
-import io
-import json
-from pathlib import Path
-
-import librosa
-import requests
+import os
+import numpy as np
 import torch
-from transformers import AutoFeatureExtractor, AutoModelForAudioClassification
+import torch.nn.functional as F
+import soundfile as sf
+from transformers import AutoConfig, AutoFeatureExtractor, HubertForSequenceClassification
+from huggingface_hub import hf_hub_download
 
-feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
-model = AutoModelForAudioClassification.from_pretrained(repo_id)
-torch_device = torch.device(device)
-model = model.to(torch_device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+config = AutoConfig.from_pretrained(config_path)
+feature_extractor = AutoFeatureExtractor.from_pretrained(os.path.dirname(preprocessor_path))
+
+device_obj = torch.device(device if (device.startswith('cuda') and torch.cuda.is_available()) or device == 'cpu' else 'cpu')
+model = HubertForSequenceClassification.from_pretrained(
+    os.path.dirname(weights_path),
+    config=config,
+).to(device_obj)
 model.eval()
-sampling_rate = feature_extractor.sampling_rate
 
-def load_audio(path: str, target_sampling_rate: int):
-    if path.startswith("http://") or path.startswith("https://"):
-        response = requests.get(path)
-        response.raise_for_status()
-        source = io.BytesIO(response.content)
-    else:
-        source = path
-    waveform, source_sampling_rate = librosa.load(source, sr=target_sampling_rate, mono=True)
-    return waveform, source_sampling_rate
+if audio_path.startswith('http://') or audio_path.startswith('https://'):
+    raise ValueError('audio_path must be a local file path for this evaluation')
 
-waveform, recorded_sampling_rate = load_audio(audio_path, sampling_rate)
-inputs = feature_extractor(waveform, sampling_rate=recorded_sampling_rate, return_tensors="pt", padding=True)
-inputs = {key: value.to(torch_device) for key, value in inputs.items()}
+audio, orig_sampling_rate = sf.read(audio_path, dtype='float32')
+if audio.ndim > 1:
+    audio = audio.mean(axis=1)
+if orig_sampling_rate != sample_rate:
+    import librosa
+    audio = librosa.resample(audio, orig_sr=orig_sampling_rate, target_sr=sample_rate)
+inputs = feature_extractor(audio, sampling_rate=sample_rate, return_tensors='pt', padding=True)
+inputs = {k: v.to(device_obj) for k, v in inputs.items()}
+
 with torch.no_grad():
-    outputs = model(**inputs)
-logits = outputs.logits
-probabilities = torch.softmax(logits, dim=-1)[0].cpu()
+    logits = model(**inputs).logits
+scores = F.softmax(logits, dim=-1)[0].detach().cpu().tolist()
+labels = [config.id2label[i] if i in config.id2label else config.id2label[str(i)] for i in range(len(scores))]
+output = [{"Label": label, "Score": f"{score * 100:.1f}%"} for label, score in zip(labels, scores)]
 
-label_map = model.config.id2label
-scores = []
-for index, score in enumerate(probabilities.tolist()):
-    label = label_map.get(index, label_map.get(str(index), str(index)))
-    scores.append({"label": label, "score": score})
-
-RESULT = {"gender_scores": scores}
+RESULT = {"output": output}

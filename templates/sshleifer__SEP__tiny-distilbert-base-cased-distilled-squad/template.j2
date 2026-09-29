@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("sshleifer/tiny-distilbert-base-cased-distilled-squad") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What is the name of the repository?') %}
+{% set context = context | default('The repository sshleifer/tiny-distilbert-base-cased-distilled-squad contains a tiny DistilBERT model fine-tuned for question answering.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+_ = config_file
+_ = tokenizer_file
+_ = special_tokens_file
+
+tokenizer = AutoTokenizer.from_pretrained(vocab_file.rsplit('/vocab.txt', 1)[0], use_fast=True)
+model = AutoModelForQuestionAnswering.from_pretrained(vocab_file.rsplit('/vocab.txt', 1)[0], torch_dtype=torch.float32)
+model.load_state_dict(torch.load(model_file, map_location='cpu'))
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors='pt', truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_idx = int(torch.argmax(outputs.start_logits, dim=-1).item())
+end_idx = int(torch.argmax(outputs.end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+answer = tokenizer.decode(inputs['input_ids'][0, start_idx:end_idx + 1], skip_special_tokens=True)
+
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx}

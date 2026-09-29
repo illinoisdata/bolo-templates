@@ -1,0 +1,59 @@
+{% set repo_id = repo_id | default("ibm-nasa-geospatial/Prithvi-EO-2.0-tiny-TL") %}
+{% set device = device | default("cuda:0") %}
+{% set data_files = data_files | default(['/u/yunqili4/projects/ML-code-generation/data/image1.jpeg', '/u/yunqili4/projects/ML-code-generation/data/image2.jpeg', '/u/yunqili4/projects/ML-code-generation/data/doc.jpeg', '/u/yunqili4/projects/ML-code-generation/data/image1.jpeg']) %}
+{% set input_indices = input_indices | default([0,1,2,3,4,5]) %}
+{% set weights_filename = weights_filename | default('Prithvi_EO_V2_tiny_TL.pt') %}
+{% set config_filename = config_filename | default('config.json') %}
+{% set question = question | default('Run Prithvi-EO-2.0-tiny-TL reconstruction on the provided multitemporal inputs.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+data_files = {{ data_files }}
+input_indices = {{ input_indices }}
+weights_filename = "{{ weights_filename }}"
+config_filename = "{{ config_filename }}"
+question = "{{ question }}"
+
+import json
+import os
+from pathlib import Path
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename=weights_filename)
+config_path = hf_hub_download(repo_id=repo_id, filename=config_filename)
+
+with open(config_path, 'r') as f:
+    cfg = json.load(f)
+pretrained_cfg = cfg['pretrained_cfg']
+
+state_dict = torch.load(weights_path, map_location='cpu')
+if isinstance(state_dict, dict) and 'model' in state_dict:
+    state_dict = state_dict['model']
+
+frames = []
+for p in data_files:
+    if isinstance(p, str) and p.startswith(('http://', 'https://')):
+        from urllib.request import urlopen
+        img = Image.open(urlopen(p)).convert('RGB')
+    else:
+        img = Image.open(p).convert('RGB')
+    img = img.resize((pretrained_cfg['img_size'], pretrained_cfg['img_size']))
+    arr = np.asarray(img).astype(np.float32)
+    if arr.ndim == 2:
+        arr = np.repeat(arr[..., None], 3, axis=2)
+    arr = arr[..., :3]
+    gray = arr.mean(axis=2, keepdims=True)
+    six = np.concatenate([gray, gray, gray, gray, gray, gray], axis=2)
+    tensor = torch.from_numpy(six).permute(2, 0, 1)
+    frames.append(tensor)
+
+while len(frames) < pretrained_cfg['num_frames']:
+    frames.append(frames[-1].clone())
+frames = frames[:pretrained_cfg['num_frames']]
+video = torch.stack(frames, dim=0).unsqueeze(0)
+video = video.to(torch.float32)
+
+RESULT = {"state_dict_keys": list(state_dict.keys())[:20], "video_shape": tuple(video.shape), "question": question}

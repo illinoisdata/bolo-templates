@@ -1,58 +1,23 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Babelscape/rebel-large") %}
-{% set text_input = text_input | default("Punta Cana is a resort town in the municipality of Higüey, in La Altagracia Province, the eastern most province of the Dominican Republic.") %}
-{% set max_length = max_length | default(256) %}
-{% set min_length = min_length | default(12) %}
-{% set num_beams = num_beams | default(3) %}
-{% set num_return_sequences = num_return_sequences | default(3) %}
-{% set length_penalty = length_penalty | default(0) %}
-{% set early_stopping = early_stopping | default(true) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Punta Cana is a resort town in the municipality of Higuey, in La Altagracia Province, the eastern most province of the Dominican Republic') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-max_length = {{ max_length }}
-min_length = {{ min_length }}
-num_beams = {{ num_beams }}
-num_return_sequences = {{ num_return_sequences }}
-length_penalty = {{ length_penalty }}
-early_stopping = {{ early_stopping }}
+text = "{{ text }}"
 
-import json
 from pathlib import Path
-
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
 
-encoded_input = tokenizer(
-    text_input,
-    max_length=max_length,
-    padding=True,
-    truncation=True,
-    return_tensors="pt",
-)
-encoded_input = {key: value.to(device) for key, value in encoded_input.items()}
-
-generated_tokens = model.generate(
-    **encoded_input,
-    max_length=max_length,
-    min_length=min_length,
-    length_penalty=length_penalty,
-    num_beams=num_beams,
-    num_return_sequences=num_return_sequences,
-    early_stopping=early_stopping,
-)
-
-decoded_sequences = tokenizer.batch_decode(generated_tokens, skip_special_tokens=False)
-
-def extract_triplets_from_text(text: str):
+def extract_triplets(generated_text):
     triplets = []
-    relation, subject, relation, object_ = "", "", "", ""
-    text = text.strip()
+    relation = ""
+    subject = ""
+    object_ = ""
     current = "x"
-    for token in text.replace("<s>", "").replace("<pad>", "").replace("</s>", "").split():
+    for token in generated_text.replace("<s>", "").replace("<pad>", "").replace("</s>", "").split():
         if token == "<triplet>":
             current = "t"
             if relation != "":
@@ -78,9 +43,37 @@ def extract_triplets_from_text(text: str):
         triplets.append({"head": subject.strip(), "type": relation.strip(), "tail": object_.strip()})
     return triplets
 
-extracted_triplets = [extract_triplets_from_text(sequence) for sequence in decoded_sequences]
 
-RESULT = {
-    "generated_sequences": decoded_sequences,
-    "extracted_triplets": extracted_triplets,
-}
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+_tokenizer_dir = str(Path(tokenizer_config_path).parent)
+_model_dir = str(Path(weights_path).parent)
+
+tokenizer = AutoTokenizer.from_pretrained(_tokenizer_dir, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(_model_dir, torch_dtype=torch.float32)
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(text, max_length=256, padding=True, truncation=True, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_tokens = model.generate(
+        input_ids=inputs["input_ids"],
+        attention_mask=inputs["attention_mask"],
+        max_length=256,
+        length_penalty=0.0,
+        num_beams=3,
+        num_return_sequences=3,
+    )
+
+decoded_preds = tokenizer.batch_decode(generated_tokens, skip_special_tokens=False)
+triplets = [extract_triplets(sentence) for sentence in decoded_preds]
+
+RESULT = {"decoded_predictions": decoded_preds, "triplets": triplets}

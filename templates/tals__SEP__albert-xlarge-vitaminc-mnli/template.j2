@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("tals/albert-xlarge-vitaminc-mnli") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+model = repo_id
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+inputs = input_prompt
+RESULT = pipe(inputs)
+RESULT = {"outputs": RESULT}

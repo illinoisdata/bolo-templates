@@ -1,25 +1,49 @@
-{% set repo_id = repo_id | default("jxm/gtr__nq__32__correct") %}
-{% set base_model = base_model | default("t5-base") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("This is a smple text with som errrors.") %}
-{% set max_new_tokens = max_new_tokens | default(32) %}
+{% set repo_id = repo_id | default("jxm/gtr__nq__32__correct") %}
+{% set query_text = query_text | default('What is the capital of France?') %}
+
 repo_id = "{{ repo_id }}"
-base_model = "{{ base_model }}"
 device = "{{ device }}"
-text = "{{ text }}"
-max_new_tokens = {{ max_new_tokens }}
+query_text = "{{ query_text }}"
 
-from transformers import AutoConfig, AutoTokenizer, AutoModelForSeq2SeqLM
+import os
+import json
 import torch
+from torch import nn
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, T5Config, T5EncoderModel
+from transformers.modeling_outputs import BaseModelOutput
 
-config = AutoConfig.from_pretrained(base_model)
-tokenizer = AutoTokenizer.from_pretrained(base_model)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, config=config).to(device)
+repo_files = [
+    "config.json",
+    "generation_config.json",
+    "pytorch_model.bin.index.json",
+    "pytorch_model-00001-of-00006.bin",
+    "pytorch_model-00002-of-00006.bin",
+    "pytorch_model-00003-of-00006.bin",
+    "pytorch_model-00004-of-00006.bin",
+    "pytorch_model-00005-of-00006.bin",
+    "pytorch_model-00006-of-00006.bin",
+]
+local_paths = {name: hf_hub_download(repo_id=repo_id, filename=name) for name in repo_files}
+model_dir = os.path.dirname(local_paths["config.json"])
+config_dict = json.load(open(local_paths["config.json"]))
+config_dict.pop("architectures", None)
+config_dict["model_type"] = "t5"
+config = T5Config.from_dict(config_dict)
+model = T5EncoderModel(config)
+state_dict = {}
+for idx in range(1, 7):
+    shard = torch.load(local_paths[f"pytorch_model-{idx:05d}-of-00006.bin"], map_location="cpu")
+    state_dict.update(shard)
+model.load_state_dict(state_dict, strict=False)
 
-inputs = tokenizer(text, return_tensors="pt")
+tokenizer = AutoTokenizer.from_pretrained("t5-base")
+model = model.to(device)
+model.eval()
+inputs = tokenizer(query_text, return_tensors="pt", truncation=True, max_length=32)
 inputs = {k: v.to(device) for k, v in inputs.items()}
-
-output_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
-corrected_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
-
-RESULT = {"corrected_text": corrected_text}
+with torch.no_grad():
+    output = model(**inputs)
+output_value = output.last_hidden_state.detach().cpu().numpy()
+RESULT = {"output": output_value}

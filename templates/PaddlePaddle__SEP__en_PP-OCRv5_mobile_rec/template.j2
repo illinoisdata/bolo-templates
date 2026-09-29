@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("PaddlePaddle/en_PP-OCRv5_mobile_rec") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text = text | default('PaddleOCR') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text = "{{ text }}"
+
+import os
+from pathlib import Path
+import numpy as np
+from PIL import Image
+import requests
+from huggingface_hub import hf_hub_download
+from paddleocr import TextRecognition
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="inference.pdiparams")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="inference.yml")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    img_input = image_path
+else:
+    img_input = image_path
+
+model = TextRecognition(model_name="en_PP-OCRv5_mobile_rec", device="cpu")
+output = model.predict(input=img_input, batch_size=1)
+
+texts = []
+for res in output:
+    if hasattr(res, 'res') and isinstance(res.res, dict) and 'rec_text' in res.res:
+        texts.append(res.res['rec_text'])
+    elif hasattr(res, 'rec_text'):
+        texts.append(res.rec_text)
+    else:
+        texts.append(str(res))
+
+RESULT = {"texts": texts}

@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("keremberke/yolov8n-hard-hat-detection") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set conf = conf | default(0.25) %}
+{% set iou = iou | default(0.45) %}
+{% set agnostic_nms = agnostic_nms | default(false) %}
+{% set max_det = max_det | default(1000) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+conf = {{ conf }}
+iou = {{ iou }}
+agnostic_nms = {{ agnostic_nms }}
+max_det = {{ max_det }}
+
+import requests
+from io import BytesIO
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from ultralytics import YOLO
+
+weights_path = hf_hub_download(repo_id=repo_id, filename='best.pt')
+model = YOLO(weights_path)
+model.overrides['conf'] = conf
+model.overrides['iou'] = iou
+model.overrides['agnostic_nms'] = agnostic_nms
+model.overrides['max_det'] = max_det
+
+if str(image_path).startswith(('http://', 'https://')):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+results = model.predict(image, device=device, verbose=False)
+result = results[0]
+render = Image.fromarray(result.plot()[:, :, ::-1])
+boxes = result.boxes
+boxes_xyxy = boxes.xyxy.detach().cpu().tolist() if boxes is not None else []
+classes = boxes.cls.detach().cpu().tolist() if boxes is not None else []
+scores = boxes.conf.detach().cpu().tolist() if boxes is not None else []
+RESULT = {"render": render, "boxes_xyxy": boxes_xyxy, "classes": classes, "scores": scores}

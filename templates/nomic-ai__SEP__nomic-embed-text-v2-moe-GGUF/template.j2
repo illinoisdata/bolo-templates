@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("nomic-ai/nomic-embed-text-v2-moe-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('nomic-embed-text-v2-moe.bf16.gguf') %}
+{% set query_text = query_text | default('search_query: tell me about embeddings') %}
+{% set document_text = document_text | default('search_document: embeddings are useful for retrieval') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+query_text = "{{ query_text }}"
+document_text = "{{ document_text }}"
+
+import os
+import numpy as np
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+n_ctx = 512
+n_threads = max(1, os.cpu_count() or 1)
+llm = Llama(
+    model_path=model_path,
+    n_ctx=n_ctx,
+    n_threads=n_threads,
+    embedding=True,
+    verbose=False,
+)
+
+def embed(text: str):
+    resp = llm.create_embedding(input=text)
+    return np.array(resp["data"][0]["embedding"], dtype=np.float32)
+
+query_embedding = embed(query_text)
+document_embedding = embed(document_text)
+
+RESULT = {
+    "query_embedding": query_embedding,
+    "document_embedding": document_embedding,
+}

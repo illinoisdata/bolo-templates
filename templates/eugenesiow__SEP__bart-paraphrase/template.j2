@@ -1,27 +1,39 @@
 {% set repo_id = repo_id | default("eugenesiow/bart-paraphrase") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("They were there to enjoy us and they were there to pray for us.") %}
-{% set max_length = max_length | default(60) %}
-{% set num_beams = num_beams | default(4) %}
+{% set input_sentence = input_sentence | default('They were there to enjoy us and they were there to pray for us.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = """{{ input_text }}"""
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+input_sentence = "{{ input_sentence }}"
 
-import os
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import BartForConditionalGeneration, BartTokenizer
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model_path = hf_hub_download(repo_id=repo_id, filename='model.safetensors')
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename='tokenizer.json')
+merges_path = hf_hub_download(repo_id=repo_id, filename='merges.txt')
+vocab_path = hf_hub_download(repo_id=repo_id, filename='vocab.json')
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename='special_tokens_map.json')
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename='tokenizer_config.json')
 
-encoded = tokenizer(input_text, return_tensors="pt")
-encoded = {key: value.to(device) for key, value in encoded.items()}
+model = BartForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32, device_map=None)
+model = model.to(device)
+model.eval()
+tokenizer = BartTokenizer.from_pretrained(repo_id)
 
+inputs = tokenizer(input_sentence, return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    generated_ids = model.generate(**encoded, max_length=max_length, num_beams=num_beams, early_stopping=True)
+    generated_ids = model.generate(
+        **inputs,
+        num_beams=4,
+        max_length=128,
+        min_length=12,
+        length_penalty=1.0,
+        no_repeat_ngram_size=3,
+        early_stopping=True,
+    )
+output_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
-paraphrases = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-
-RESULT = {"paraphrases": paraphrases}
+RESULT = {"generated_text": output_text}

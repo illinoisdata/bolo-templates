@@ -1,40 +1,45 @@
 {% set repo_id = repo_id | default("facebook/flava-full") %}
 {% set device = device | default("cuda:0") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set text = text | default("a photo of a cat") %}
+{% set question = question | default('What is happening in the image?') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
+question = "{{ question }}"
 image_path = "{{ image_path }}"
-text = "{{ text }}"
 
 import os
-from transformers import AutoProcessor, AutoModelForPreTraining
 import torch
 from PIL import Image
 import requests
 from io import BytesIO
-import numpy as np
+from huggingface_hub import hf_hub_download
+from transformers import FlavaProcessor, FlavaForPreTraining
 
-processor = AutoProcessor.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
-model.config.return_loss = False
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+processor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-# Load image
 if image_path.startswith(("http://", "https://")):
-    image = Image.open(BytesIO(requests.get(image_path).content)).convert("RGB")
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
 else:
     image = Image.open(image_path).convert("RGB")
 
-inputs = processor(text=text, images=image, return_tensors="pt")
-inputs = {k: v.to(device) for k, v in inputs.items()}
+processor = FlavaProcessor.from_pretrained(os.path.dirname(processor_path))
+model = FlavaForPreTraining.from_pretrained(os.path.dirname(weights_path))
+model.to(device)
+model.eval()
 
-# Inference
+inputs = processor(text=[question], images=[image], return_tensors="pt", padding=True, return_codebook_pixels=True)
+inputs = {k: v.to(device) if hasattr(v, "to") else v for k, v in inputs.items()}
+inputs["bool_masked_pos"] = torch.zeros((inputs["pixel_values"].shape[0], 196), dtype=torch.bool, device=device)
+
 with torch.no_grad():
     outputs = model(**inputs)
-    image_features = outputs.image_embeddings.cpu().numpy()
-    text_features = outputs.text_embeddings.cpu().numpy()
 
 RESULT = {
-    "image_features": image_features,
-    "text_features": text_features,
+    "loss": outputs.loss.detach().cpu().item() if outputs.loss is not None else None,
+    "output": outputs.to_tuple(),
 }

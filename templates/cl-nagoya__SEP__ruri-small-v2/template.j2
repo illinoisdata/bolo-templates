@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("cl-nagoya/ruri-small-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set query_text = query_text | default('クエリ: 瑠璃色はどんな色？') %}
+{% set passage_text = passage_text | default('文章: 瑠璃色（るりいろ）は、紫みを帯びた濃い青。名は、半貴石の瑠璃（ラピスラズリ、英: lapis lazuli）による。') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query_text = "{{ query_text }}"
+passage_text = "{{ passage_text }}"
+
+import os
+import torch
+from sentence_transformers import SentenceTransformer
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+# Download supporting files used by SentenceTransformer
+_ = hf_hub_download(repo_id=repo_id, filename="1_Pooling/config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="config_sentence_transformers.json")
+_ = hf_hub_download(repo_id=repo_id, filename="sentence_bert_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+model_dir = os.path.dirname(model_path)
+model = SentenceTransformer(model_dir, trust_remote_code=True, device=device)
+
+sentences = [query_text, passage_text]
+embeddings = model.encode(sentences, convert_to_tensor=True, device=device)
+similarity = torch.nn.functional.cosine_similarity(embeddings[0], embeddings[1], dim=0).item()
+
+RESULT = {"embeddings": embeddings, "similarity": similarity}

@@ -1,0 +1,48 @@
+{% set repo_id = repo_id | default("gagan3012/k2t-base") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text2text-generation") %}
+{% set model = model | default(repo_id) %}
+{% set input_prompt = input_prompt | default("keywords: curiosity, science, discovery; write an inspirational sentence.") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import AutoModelForSeq2SeqLM, pipeline
+from transformers.models.auto.modeling_auto import MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES
+from transformers.pipelines import PIPELINE_REGISTRY
+from transformers.pipelines.base import Pipeline
+from transformers.pipelines.text_generation import TextGenerationPipeline
+
+class Text2TextGenerationPipeline(TextGenerationPipeline):
+    def __init__(self, *args, **kwargs):
+        Pipeline.__init__(self, *args, **kwargs)
+        self.check_model_type(MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES)
+        if self.tokenizer is not None and self.tokenizer.padding_side == "right":
+            self.tokenizer.padding_side = "left"
+
+        if "prefix" not in self._preprocess_params:
+            prefix = self.prefix if self.prefix is not None else None
+            if prefix is None and self.model.__class__.__name__ in ["XLNetLMHeadModel", "TransfoXLLMHeadModel"]:
+                prefix = self.XL_PREFIX
+            if prefix is not None:
+                preprocess_params, forward_params, _ = self._sanitize_parameters(prefix=prefix, **self._forward_params)
+                self._preprocess_params = {**self._preprocess_params, **preprocess_params}
+                self._forward_params = {**self._forward_params, **forward_params}
+
+PIPELINE_REGISTRY.register_pipeline(
+    task=task,
+    pipeline_class=Text2TextGenerationPipeline,
+    pt_model=AutoModelForSeq2SeqLM,
+)
+
+pipe = pipeline(task=task, model=model, device=device)
+
+preprocessed_prompt = input_prompt.strip()
+
+RESULT = pipe(preprocessed_prompt)
+
+pipeline_output = RESULT
+RESULT = {"generated_result": pipeline_output}

@@ -1,0 +1,70 @@
+{% set repo_id = repo_id | default("UCSC-VLAA/openvision-vit-large-patch14-224") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text = text | default('a photo of a cat') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text = "{{ text }}"
+
+import json
+from io import BytesIO
+
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from open_clip import create_model_and_transforms, get_tokenizer
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+model_name = config.get("model_cfg", {}).get("vision_cfg", {}).get("name", "ViT-L-14")
+pretrained = None
+
+model, _, preprocess = create_model_and_transforms(
+    model_name=model_name,
+    pretrained=pretrained,
+    precision="fp32",
+    device=device,
+    jit=False,
+    force_quick_gelu=True,
+)
+state_dict = torch.load(weights_path, map_location="cpu")
+if isinstance(state_dict, dict) and "state_dict" in state_dict:
+    state_dict = state_dict["state_dict"]
+model_state = model.state_dict()
+filtered_state = {}
+for k, v in state_dict.items():
+    if k in model_state and tuple(v.shape) == tuple(model_state[k].shape):
+        filtered_state[k] = v
+model_state.update(filtered_state)
+model.load_state_dict(model_state, strict=False)
+model = model.to(device)
+model.eval()
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    import requests
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+image_input = preprocess(image).unsqueeze(0).to(device)
+
+tokenizer = get_tokenizer(model_name)
+text_tokens = tokenizer([text]).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_input)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    similarity = (image_features * text_features).sum(dim=-1)
+
+RESULT = {
+    "image_features": image_features.detach().cpu().numpy(),
+    "text_features": text_features.detach().cpu().numpy(),
+    "similarity": similarity.detach().cpu().numpy(),
+}

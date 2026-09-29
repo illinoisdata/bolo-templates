@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("mozilla-ai/Phi-3-medium-128k-instruct-llamafile") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Explain in one short paragraph what a llamafile is.') %}
+{% set quant_filename = quant_filename | default('Phi-3-medium-128k-instruct.Q6_K.llamafile') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+quant_filename = "{{ quant_filename }}"
+
+import os
+from huggingface_hub import hf_hub_download
+
+llamafile_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+with open(llamafile_path, "rb") as f:
+    first_bytes = f.read(128)
+output_text = first_bytes.hex()
+
+RESULT = {"generated_text": output_text}

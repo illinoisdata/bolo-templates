@@ -1,53 +1,48 @@
-{% set repo_id = repo_id | default("usyd-community/vitpose-plus-base") %}
+{% set image = image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+{% set person_threshold = person_threshold | default(0.3) %}
+{% set pose_threshold = pose_threshold | default(0.3) %}
 {% set device = device | default("cuda:0") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set dataset_index = dataset_index | default(0) %}
-{% set keypoint_threshold = keypoint_threshold | default(0.3) %}
-
+{% set repo_id = repo_id | default("usyd-community/vitpose-plus-base") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-image_path = "{{ image_path }}"
-dataset_index = {{ dataset_index }}
-keypoint_threshold = {{ keypoint_threshold }}
+image = "{{ image }}"
+person_threshold = {{ person_threshold }}
+pose_threshold = {{ pose_threshold }}
 
-import json
-from pathlib import Path
-
+import os
 import requests
 import torch
 from PIL import Image
 from transformers import AutoProcessor, VitPoseForPoseEstimation
+from huggingface_hub import hf_hub_download
 
-processor = AutoProcessor.from_pretrained(repo_id)
-model = VitPoseForPoseEstimation.from_pretrained(repo_id).to(device)
-id2label = {int(key): value for key, value in model.config.id2label.items()}
+import transformers.models.vitpose.image_processing_vitpose as vitpose_ip
+from scipy.linalg import inv as scipy_inv
+vitpose_ip.inv = scipy_inv
 
-if image_path.startswith(("http://", "https://")):
-    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+if image.startswith("http://") or image.startswith("https://"):
+    image_obj = Image.open(requests.get(image, stream=True).raw).convert("RGB")
 else:
-    image = Image.open(image_path).convert("RGB")
+    image_obj = Image.open(image).convert("RGB")
 
-full_box = [[0, 0, image.width, image.height]]
-boxes_per_image = [full_box]
-inputs = processor(image, boxes=boxes_per_image, return_tensors="pt").to(device)
-inputs["dataset_index"] = torch.tensor([dataset_index], device=device)
+processor = AutoProcessor.from_pretrained(os.path.dirname(processor_path))
+model = VitPoseForPoseEstimation.from_pretrained(os.path.dirname(weights_path), torch_dtype=torch.float32)
+model = model.to(device)
+model.eval()
+
+person_boxes = torch.tensor([[0.0, 0.0, float(image_obj.width), float(image_obj.height)]], device=device).cpu().numpy()
+inputs = processor(image_obj, boxes=[person_boxes], return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+inputs["dataset_index"] = torch.tensor([0], device=device)
 
 with torch.no_grad():
     outputs = model(**inputs)
 
-pose_results = processor.post_process_pose_estimation(
-    outputs, boxes=boxes_per_image, threshold=keypoint_threshold
-)
-pose_result = pose_results[0]
-pose_annotations = []
+pose_results = processor.post_process_pose_estimation(outputs, boxes=[person_boxes], threshold=pose_threshold)
+image_pose_result = pose_results[0]
 
-for person_pose in pose_result:
-    pose_annotations.append(
-        {
-            "keypoints": person_pose["keypoints"].cpu().tolist(),
-            "labels": [id2label[label.item()] for label in person_pose["labels"]],
-            "scores": person_pose["scores"].cpu().tolist(),
-        }
-    )
-
-RESULT = {"pose_annotations": pose_annotations}
+RESULT = {"poses": image_pose_result}

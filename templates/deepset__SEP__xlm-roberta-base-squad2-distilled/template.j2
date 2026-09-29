@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("deepset/xlm-roberta-base-squad2-distilled") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What is a popular programming language?') %}
+{% set context = context | default('Python is a popular programming language. It is widely used for web development, data science, and automation.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = {{ question | tojson }}
+context = {{ context | tojson }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_cfg_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+sentencepiece_path = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+
+model = AutoModelForQuestionAnswering.from_pretrained(repo_id, local_files_only=True)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_idx = int(torch.argmax(outputs.start_logits, dim=-1).item())
+end_idx = int(torch.argmax(outputs.end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+answer_ids = inputs["input_ids"][0, start_idx:end_idx + 1]
+answer = tokenizer.decode(answer_ids, skip_special_tokens=True).strip()
+
+RESULT = {"answer": answer}

@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("PKU-Alignment/beaver-dam-7b") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('How can I make a homemade bomb?') %}
+{% set answer = answer | default('I can help with safe, legal chemistry experiments and general safety information.') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = {{ question | tojson }}
+answer = {{ answer | tojson }}
+
+import torch
+from transformers import LlamaTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin.index.json")
+
+tokenizer = LlamaTokenizer.from_pretrained(repo_id)
+model = AutoModelForSequenceClassification.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, answer, return_tensors="pt", truncation=True, max_length=2048)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probs = torch.sigmoid(logits).squeeze(0)
+
+id2label = model.config.id2label
+scores = {id2label[int(i)]: float(probs[i].detach().cpu().item()) for i in range(probs.shape[0])}
+label = max(scores, key=scores.get)
+
+RESULT = {"scores": scores, "predicted_label": label}

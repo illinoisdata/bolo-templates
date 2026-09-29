@@ -1,0 +1,44 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("Anzhc/Anzhcs_YOLOs") %}
+{% set device = device | default("cuda:0") %}
+{% set weight_filename = weight_filename | default('Anzhcs WomanFace v05 1024 y8n.pt') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+weight_filename = "{{ weight_filename }}"
+
+import os
+import torch
+from PIL import Image
+import requests
+from io import BytesIO
+from ultralytics import YOLO
+from huggingface_hub import hf_hub_download
+
+weight_path = hf_hub_download(repo_id=repo_id, filename=weight_filename)
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+model = YOLO(weight_path)
+
+if device.startswith('cuda') and torch.cuda.is_available():
+    inference_device = device
+else:
+    inference_device = 'cpu'
+
+results = model.predict(source=image, device=inference_device, verbose=False)
+result = results[0]
+
+boxes = result.boxes
+output = {
+    'boxes_xyxy': boxes.xyxy.cpu().numpy() if boxes is not None else None,
+    'conf': boxes.conf.cpu().numpy() if boxes is not None else None,
+    'cls': boxes.cls.cpu().numpy() if boxes is not None else None,
+    'names': result.names,
+}
+
+RESULT = {"output": output}

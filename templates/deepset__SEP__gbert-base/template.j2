@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("deepset/gbert-base") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+from transformers import pipeline, BertTokenizer, AutoModelForMaskedLM, BertConfig
+
+config = BertConfig.from_pretrained(repo_id)
+tokenizer = BertTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id, config=config).to(device)
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+mask_token = tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

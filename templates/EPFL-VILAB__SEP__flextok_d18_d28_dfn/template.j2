@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("EPFL-VILAB/flextok_d18_d28_dfn") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set k_keep = k_keep | default(256) %}
+{% set timesteps = timesteps | default(20) %}
+{% set guidance_scale = guidance_scale | default(7.5) %}
+{% set perform_norm_guidance = perform_norm_guidance | default(True) %}
+{% set sample_posterior = sample_posterior | default(True) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+k_keep = {{ k_keep }}
+timesteps = {{ timesteps }}
+guidance_scale = {{ guidance_scale }}
+perform_norm_guidance = {{ perform_norm_guidance }}
+sample_posterior = {{ sample_posterior }}
+
+import torch
+from PIL import Image
+import torchvision.transforms as T
+from huggingface_hub import hf_hub_download
+from flextok.flextok_wrapper import FlexTokFromHub
+
+image = Image.open(image_path).convert("RGB") if not str(image_path).startswith(("http://", "https://")) else Image.open(__import__("io").BytesIO(__import__("requests").get(image_path).content)).convert("RGB")
+image = image.resize((256, 256))
+
+model = FlexTokFromHub.from_pretrained(repo_id).to(device).eval()
+
+img_t = T.ToTensor()(image).unsqueeze(0) * 2 - 1
+img_t = img_t.to(device)
+
+with torch.no_grad():
+    tokens_list = model.tokenize(img_t)
+    tokens_list = [t[:, :k_keep] for t in tokens_list]
+    reconst = model.detokenize(
+        tokens_list,
+        timesteps=timesteps,
+        guidance_scale=guidance_scale,
+        perform_norm_guidance=perform_norm_guidance,
+    )
+    output_image = ((reconst[0].detach().cpu() + 1) / 2).permute(1, 2, 0).numpy()
+
+RESULT = {"tokens": tokens_list[0].detach().cpu(), "reconstruction": output_image}

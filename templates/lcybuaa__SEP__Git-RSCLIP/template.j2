@@ -1,0 +1,42 @@
+{% set repo_id = repo_id | default("lcybuaa/Git-RSCLIP") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set candidate_labels = candidate_labels | default(['playing music', 'playing sports']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+candidate_labels = {{ candidate_labels }}
+
+import os
+import torch
+import requests
+from PIL import Image
+from transformers import AutoProcessor, AutoModel
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor = AutoProcessor.from_pretrained(repo_id)
+model = AutoModel.from_pretrained(repo_id, local_files_only=True)
+model.to(device)
+model.eval()
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = processor(text=candidate_labels, images=image, padding="max_length", return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits_per_image = outputs.logits_per_image
+    probs = torch.sigmoid(logits_per_image)
+    topk = torch.argsort(probs, descending=True, dim=-1)
+
+RESULT = {
+    "logits_per_image": logits_per_image.detach().cpu(),
+    "probs": probs.detach().cpu(),
+    "topk_indices": topk.detach().cpu(),
+}

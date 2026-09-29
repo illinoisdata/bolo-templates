@@ -1,0 +1,59 @@
+{% set repo_id = repo_id | default("UCSC-VLAA/ViT-L-16-HTxt-Recap-CLIP") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set labels = labels | default(['a diagram', 'a dog', 'a cat', 'a beignet']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+labels = {{ labels }}
+
+import json
+import torch
+import torch.nn.functional as F
+from PIL import Image
+from urllib.parse import urlparse
+from urllib.request import urlopen
+from huggingface_hub import hf_hub_download
+import open_clip
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+with open(config_path, 'r') as f:
+    config = json.load(f)
+
+model_cfg = config.get('model_cfg', config)
+model_name = model_cfg.get('model_name', 'ViT-L-16')
+pretrained_cfg = model_cfg.get('pretrained_cfg', {})
+
+model = open_clip.create_model(
+    model_name,
+    pretrained=weights_path,
+    device=device,
+    precision='fp32',
+    **{k: v for k, v in model_cfg.items() if k not in ('model_name', 'pretrained_cfg')},
+)
+model.eval()
+preprocess = open_clip.image_transform(
+    model.visual.image_size,
+    is_train=False,
+    mean=pretrained_cfg.get('mean', (0.48145466, 0.4578275, 0.40821073)),
+    std=pretrained_cfg.get('std', (0.26862954, 0.26130258, 0.27577711)),
+)
+tokenizer = open_clip.get_tokenizer(f"hf-hub:{repo_id}")
+
+if urlparse(image_path).scheme in ('http', 'https'):
+    image = Image.open(urlopen(image_path)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+image_input = preprocess(image).unsqueeze(0).to(device)
+text_input = tokenizer(labels, context_length=model.context_length).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_input)
+    text_features = model.encode_text(text_input)
+    image_features = F.normalize(image_features, dim=-1)
+    text_features = F.normalize(text_features, dim=-1)
+    text_probs = (100.0 * image_features @ text_features.T).softmax(dim=-1)
+
+RESULT = {"labels": labels, "probabilities": text_probs[0].detach().cpu().tolist()}

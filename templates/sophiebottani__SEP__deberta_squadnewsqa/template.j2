@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("sophiebottani/deberta_squadnewsqa") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What is the main topic of the text?') %}
+{% set context = context | default('The model is a fine-tuned version of DeBERTa trained on SQuAD v2 and NewsQA for question answering.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_file = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+spm_file = hf_hub_download(repo_id=repo_id, filename="spm.model")
+
+_ = config_file, tokenizer_file, tokenizer_config_file, special_tokens_file, added_tokens_file, spm_file
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForQuestionAnswering.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_idx = int(torch.argmax(outputs.start_logits, dim=-1).item())
+end_idx = int(torch.argmax(outputs.end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+
+input_ids = inputs["input_ids"][0]
+answer = tokenizer.decode(input_ids[start_idx:end_idx + 1], skip_special_tokens=True).strip()
+
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx}

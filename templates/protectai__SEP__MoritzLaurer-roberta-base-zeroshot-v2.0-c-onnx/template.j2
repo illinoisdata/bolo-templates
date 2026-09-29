@@ -1,0 +1,25 @@
+{% set repo_id = repo_id | default("protectai/MoritzLaurer-roberta-base-zeroshot-v2.0-c-onnx") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("zero-shot-classification") %}
+{% set input_prompt = input_prompt | default("I have a problem with my iphone that needs to be resolved asap!") %}
+{% set candidate_labels = candidate_labels | default(["urgent", "not urgent", "phone", "tablet", "computer"]) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_prompt = {{ input_prompt | tojson }}
+candidate_labels = {{ candidate_labels | tojson }}
+
+import onnxruntime as ort
+from optimum.onnxruntime import ORTModelForSequenceClassification
+from transformers import AutoTokenizer, pipeline
+
+available_providers = ort.get_available_providers()
+device_lower = device.lower() if isinstance(device, str) else ""
+cuda_requested = device_lower.startswith("cuda")
+execution_device = device if cuda_requested and "CUDAExecutionProvider" in available_providers else "cpu"
+
+ort_model = ORTModelForSequenceClassification.from_pretrained(repo_id)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+pipe = pipeline(task=task, model=ort_model, tokenizer=tokenizer, device=execution_device)
+RESULT = pipe(input_prompt, candidate_labels=candidate_labels)

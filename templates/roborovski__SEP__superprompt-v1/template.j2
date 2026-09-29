@@ -1,28 +1,36 @@
 {% set repo_id = repo_id | default("roborovski/superprompt-v1") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("Expand the following prompt to add more detail: A man in a suit walking down the street") %}
+{% set prompt = prompt | default('A storefront with \'Text to Image\' written on it.') %}
 {% set max_new_tokens = max_new_tokens | default(77) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
+prompt = "{{ prompt }}"
 max_new_tokens = {{ max_new_tokens }}
 
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-# Load model and tokenizer
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+prefix = "Expand the following prompt to add more detail: "
+input_text = prefix + prompt
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, local_files_only=True)
 model.to(device)
+model.eval()
 
-# Pre-process input
-inputs = tokenizer(input_text, return_tensors="pt").to(device)
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-# Run inference
-outputs = model.generate(**inputs, max_new_tokens=max_new_tokens)
-
-# Post-process output
-generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-# Build result dict
-RESULT = {"generated_text": generated_text}
+RESULT = {"output": output_text}

@@ -1,0 +1,46 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("ashishupadhyay/NSFW_DETECTION") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import os
+import torch
+from PIL import Image
+from transformers import AutoImageProcessor, AutoModelForImageClassification
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_file = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processor = AutoImageProcessor.from_pretrained(os.path.dirname(processor_file))
+model = AutoModelForImageClassification.from_pretrained(os.path.dirname(config_file), torch_dtype=torch.float32)
+model.load_state_dict(load_file(model_file), strict=True)
+model.to(device)
+model.eval()
+
+inputs = processor(images=image, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    probs = torch.softmax(outputs.logits, dim=-1)[0]
+    pred_idx = int(torch.argmax(probs).item())
+    pred_label = model.config.id2label[pred_idx]
+
+RESULT = {
+    "label": pred_label,
+    "score": float(probs[pred_idx].item()),
+    "logits": outputs.logits.detach().cpu().tolist(),
+}

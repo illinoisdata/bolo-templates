@@ -1,0 +1,109 @@
+{% set repo_id = repo_id | default("autogluon/tabpfn-mix-1.0-classifier") %}
+{% set device = device | default("cuda:0") %}
+{% set tabular_csv = tabular_csv | default('/workspace/tabular_input.csv') %}
+{% set label_column = label_column | default('class') %}
+{% set target_row = target_row | default(0) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+tabular_csv = "{{ tabular_csv }}"
+label_column = "{{ label_column }}"
+target_row = {{ target_row }}
+
+import os
+import json
+import numpy as np
+import pandas as pd
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+from sklearn.preprocessing import LabelEncoder
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+state_dict = load_file(weights_path)
+
+class TabPFNMixClassifier(torch.nn.Module):
+    def __init__(self, n_features, dim, n_layers, n_heads, n_classes, attn_dropout=0.0, y_as_float_embedding=True):
+        super().__init__()
+        self.n_features = n_features
+        self.dim = dim
+        self.n_classes = n_classes
+        self.feature_proj = torch.nn.Linear(n_features + 1, dim)
+        encoder_layer = torch.nn.TransformerEncoderLayer(d_model=dim, nhead=n_heads, dim_feedforward=dim * 4, dropout=attn_dropout, batch_first=True)
+        self.encoder = torch.nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
+        self.head = torch.nn.Linear(dim, n_classes)
+
+    def forward(self, x):
+        x = self.feature_proj(x)
+        x = x.unsqueeze(1)
+        x = self.encoder(x)
+        x = x[:, 0, :]
+        return self.head(x)
+
+model = TabPFNMixClassifier(
+    n_features=config["n_features"],
+    dim=config["dim"],
+    n_layers=config["n_layers"],
+    n_heads=config["n_heads"],
+    n_classes=config["n_classes"],
+    attn_dropout=config.get("attn_dropout", 0.0),
+    y_as_float_embedding=config.get("y_as_float_embedding", True),
+)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+if os.path.exists(tabular_csv):
+    df = pd.read_csv(tabular_csv)
+else:
+    df = pd.DataFrame({
+        "f0": [0.1, 0.2, 0.3],
+        "f1": [1.0, 0.0, -1.0],
+        "f2": [0.5, 0.4, 0.3],
+        "class": ["A", "B", "A"],
+    })
+
+if label_column in df.columns:
+    y = df[label_column]
+    X = df.drop(columns=[label_column])
+else:
+    X = df
+    y = pd.Series([0] * len(df))
+
+X = X.select_dtypes(include=[np.number]).copy()
+if X.shape[1] == 0:
+    X = pd.DataFrame({"f0": np.zeros(len(df), dtype=np.float32)})
+
+if X.shape[1] < config["n_features"]:
+    for i in range(X.shape[1], config["n_features"]):
+        X[f"pad_{i}"] = 0.0
+elif X.shape[1] > config["n_features"]:
+    X = X.iloc[:, :config["n_features"]]
+
+X = X.astype(np.float32)
+
+label_encoder = LabelEncoder()
+try:
+    y_encoded = label_encoder.fit_transform(y.astype(str))
+except Exception:
+    y_encoded = np.zeros(len(X), dtype=np.int64)
+
+sample_index = int(min(max(target_row, 0), len(X) - 1))
+row = X.iloc[[sample_index]].to_numpy(dtype=np.float32)
+row_with_target = np.concatenate([row, np.array([[float(y_encoded[sample_index])]], dtype=np.float32)], axis=1)
+input_tensor = torch.from_numpy(row_with_target).to(device)
+
+with torch.no_grad():
+    logits = model(input_tensor)
+    probs = torch.softmax(logits, dim=-1)
+    pred_idx = int(torch.argmax(probs, dim=-1).item())
+    pred_prob = float(probs[0, pred_idx].item())
+
+RESULT = {
+    "predicted_class_index": pred_idx,
+    "predicted_probability": pred_prob,
+    "probabilities": probs.squeeze(0).detach().cpu().numpy(),
+}

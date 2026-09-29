@@ -1,41 +1,51 @@
 {% set repo_id = repo_id | default("facebook/dpr-reader-single-nq-base") %}
 {% set device = device | default("cuda:0") %}
-{% set questions = questions | default(["What is love?"]) %}
-{% set titles = titles | default(["Haddaway"]) %}
-{% set texts = texts | default(["'What Is Love' is a song recorded by the artist Haddaway"]) %}
+{% set question = question | default("What is love ?") %}
+{% set title = title | default("Haddaway") %}
+{% set text = text | default("'What Is Love' is a song recorded by the artist Haddaway") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-questions = {{ questions }}
-titles = {{ titles }}
-texts = {{ texts }}
+question = {{ question | tojson }}
+title = {{ title | tojson }}
+text = {{ text | tojson }}
 
-import os
-import numpy as np
 import torch
-from transformers import DPRReaderTokenizer, DPRReader
+from huggingface_hub import hf_hub_download
+from transformers import DPRReader, DPRReaderTokenizer
 
-tokenizer = DPRReaderTokenizer.from_pretrained(repo_id)
-model = DPRReader.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+# Use the repository directory containing the downloaded tokenizer files
+repo_dir = tokenizer_path.rsplit("/", 1)[0]
+
+tokenizer = DPRReaderTokenizer.from_pretrained(repo_dir)
+model = DPRReader.from_pretrained(repo_dir)
+model = model.to(device)
 model.eval()
 
 encoded_inputs = tokenizer(
-    questions=questions,
-    titles=titles,
-    texts=texts,
+    questions=[question],
+    titles=[title],
+    texts=[text],
     return_tensors="pt",
+    padding=True,
+    truncation=True,
 )
-for k, v in encoded_inputs.items():
-    encoded_inputs[k] = v.to(device)
+encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
 
 with torch.no_grad():
     outputs = model(**encoded_inputs)
 
-start_logits = outputs.start_logits.detach().cpu().numpy()
-end_logits = outputs.end_logits.detach().cpu().numpy()
-relevance_logits = outputs.relevance_logits.detach().cpu().numpy()
+start_logits = outputs.start_logits
+end_logits = outputs.end_logits
+relevance_logits = outputs.relevance_logits
 
 RESULT = {
-    "start_logits": start_logits,
-    "end_logits": end_logits,
-    "relevance_logits": relevance_logits,
+    "start_logits": start_logits.detach().cpu().tolist(),
+    "end_logits": end_logits.detach().cpu().tolist(),
+    "relevance_logits": relevance_logits.detach().cpu().tolist(),
 }

@@ -1,42 +1,50 @@
+{% set image = image | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set trimap = trimap | default('/u/yunqili4/projects/ML-code-generation/data/image2.jpeg') %}
 {% set repo_id = repo_id | default("hustvl/vitmatte-small-distinctions-646") %}
 {% set device = device | default("cuda:0") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set trimap_path = trimap_path | default("/u/yli77/projects/ML-code-generation/data/image2.jpeg") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-image_path = "{{ image_path }}"
-trimap_path = "{{ trimap_path }}"
+image = "{{ image }}"
+trimap = "{{ trimap }}"
 
 import os
+import torch
 import requests
 from PIL import Image
-import torch
-import numpy as np
-from transformers import AutoImageProcessor, VitMatteForImageMatting
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+from transformers import VitMatteImageProcessor, VitMatteForImageMatting
 
-processor = AutoImageProcessor.from_pretrained(repo_id)
-model = VitMatteForImageMatting.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-def _load_pil_image(path: str) -> Image.Image:
-    if path.startswith("http://") or path.startswith("https://"):
-        return Image.open(requests.get(path, stream=True).raw)
-    return Image.open(path)
+processor = VitMatteImageProcessor.from_pretrained(os.path.dirname(preprocessor_path))
+model = VitMatteForImageMatting.from_pretrained(os.path.dirname(config_path), torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-image = _load_pil_image(image_path).convert("RGB")
-trimap_source = _load_pil_image(trimap_path).convert("L")
-trimap_source = trimap_source.resize(image.size, resample=Image.BILINEAR)
-trimap_array = np.array(trimap_source)
-trimap_mask = np.full_like(trimap_array, fill_value=128, dtype=np.uint8)
-trimap_mask[trimap_array > 200] = 255
-trimap_mask[trimap_array < 50] = 0
-trimap = Image.fromarray(trimap_mask, mode="L")
+if image.startswith("http://") or image.startswith("https://"):
+    image_obj = Image.open(BytesIO(requests.get(image, timeout=30).content)).convert("RGB")
+else:
+    image_obj = Image.open(image).convert("RGB")
 
-inputs = processor(image, trimaps=trimap, return_tensors="pt")
+if trimap.startswith("http://") or trimap.startswith("https://"):
+    trimap_obj = Image.open(BytesIO(requests.get(trimap, timeout=30).content)).convert("L")
+else:
+    trimap_obj = Image.open(trimap).convert("L")
+
+size = image_obj.size
+trimap_obj = trimap_obj.resize(size, Image.NEAREST)
+
+inputs = processor(images=image_obj, trimaps=trimap_obj, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
     outputs = model(**inputs)
 
-alphas = outputs.alphas.squeeze().cpu().numpy()
+output = outputs.alphas
+if isinstance(output, torch.Tensor):
+    output = output.detach().cpu().numpy()
 
-RESULT = {"alphas": alphas}
+RESULT = {"alpha_matte": output}

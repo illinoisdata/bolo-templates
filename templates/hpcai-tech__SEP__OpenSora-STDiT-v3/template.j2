@@ -1,8 +1,22 @@
 {% set repo_id = repo_id | default("hpcai-tech/OpenSora-STDiT-v3") %}
 {% set device = device | default("cuda:0") %}
+{% set repo_local_dir = repo_local_dir | default('/workspace/open_sora_stdit3_repo') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-import pkgutil
-import transformers
-modules = [m.name for m in pkgutil.iter_modules(transformers.models.__path__) if "stdit" in m.name.lower()]
-RESULT = {"modules": modules}
+
+import os
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+config = json.load(open(config_path))
+state_dict = load_file(weights_path, device="cpu")
+param_shapes = {k: list(v.shape) for k, v in state_dict.items()}
+param_sum = int(sum(v.numel() for v in state_dict.values()))
+first_key = next(iter(state_dict))
+first_tensor = state_dict[first_key].to(device)
+RESULT = {"config": config, "state_dict_summary": {"num_tensors": len(state_dict), "num_parameters": param_sum, "first_key": first_key, "first_tensor_shape": list(first_tensor.shape)}}

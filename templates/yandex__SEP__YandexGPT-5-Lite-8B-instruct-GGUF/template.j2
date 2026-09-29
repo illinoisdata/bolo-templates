@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("yandex/YandexGPT-5-Lite-8B-instruct-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('YandexGPT-5-Lite-8B-instruct-Q4_K_M.gguf') %}
+{% set prompt = prompt | default('Привет! Кратко объясни, что такое машинное обучение.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+import os
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+n_gpu_layers = -1 if str(device).startswith("cuda") else 0
+llm = Llama(
+    model_path=model_path,
+    n_gpu_layers=n_gpu_layers,
+    n_ctx=2048,
+    verbose=False,
+)
+
+messages = [
+    {"role": "user", "content": prompt},
+]
+
+response = llm.create_chat_completion(
+    messages=messages,
+    temperature=0.2,
+    top_p=0.9,
+    max_tokens=256,
+)
+
+output_text = response["choices"][0]["message"]["content"]
+
+RESULT = {"output_text": output_text}

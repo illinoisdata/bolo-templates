@@ -1,0 +1,24 @@
+{% set repo_id = repo_id | default("mlx-community/deepseek-r1-distill-qwen-1.5b") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Hello, explain the concept of reinforcement learning in one short paragraph.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(repo_id, trust_remote_code=True)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=64, do_sample=False)
+
+output = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output": output}

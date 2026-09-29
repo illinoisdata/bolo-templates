@@ -1,0 +1,55 @@
+{% set repo_id = repo_id | default("Systran/faster-whisper-medium") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set language = language | default('en') %}
+{% set task = task | default('transcribe') %}
+{% set beam_size = beam_size | default(5) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+language = "{{ language }}"
+task = "{{ task }}"
+beam_size = {{ beam_size }}
+
+import os
+import urllib.parse
+from pathlib import Path
+
+import torch
+from huggingface_hub import hf_hub_download
+from faster_whisper import WhisperModel
+
+model_bin = hf_hub_download(repo_id=repo_id, filename="model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocabulary.txt")
+
+if urllib.parse.urlparse(audio_path).scheme in ("http", "https"):
+    input_audio = audio_path
+else:
+    input_audio = audio_path
+
+compute_type = "float16" if str(device).startswith("cuda") else "int8"
+model = WhisperModel(
+    model_size_or_path=str(Path(model_bin).parent),
+    device="cuda" if str(device).startswith("cuda") else "cpu",
+    compute_type=compute_type,
+    download_root=str(Path(model_bin).parent),
+    local_files_only=True,
+)
+
+segments, info = model.transcribe(
+    input_audio,
+    language=language,
+    task=task,
+    beam_size=beam_size,
+)
+
+transcript = "".join(segment.text for segment in segments).strip()
+RESULT = {
+    "text": transcript,
+    "language": info.language,
+    "language_probability": info.language_probability,
+    "duration": info.duration,
+}

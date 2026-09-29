@@ -1,0 +1,29 @@
+{% set repo_id = repo_id | default("nvidia/GR00T-N1.5-3B") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Move the object to the target location.') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set proprioception = proprioception | default([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+image_path = "{{ image_path }}"
+proprioception = {{ proprioception }}
+
+import json
+import torch
+from PIL import Image
+from urllib.parse import urlparse
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+if urlparse(image_path).scheme in ("http", "https"):
+    from urllib.request import urlopen
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+RESULT = {"output": {"question": question, "image_size": image.size, "proprioception_len": len(proprioception), "config_action_dim": config.get("action_dim"), "device": device}}

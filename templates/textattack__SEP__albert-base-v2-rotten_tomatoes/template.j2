@@ -1,0 +1,14 @@
+{% set repo_id = repo_id | default("textattack/albert-base-v2-rotten_tomatoes") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set text_input = text_input | default("The film delivered an exciting and heartfelt story.") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+text_input = {{ text_input | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = pipe(text_input)

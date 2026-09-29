@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("PaddlePaddle/SLANet_plus") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set table_text = table_text | default('') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+table_text = "{{ table_text }}"
+
+import os
+import urllib.request
+from pathlib import Path
+
+from paddleocr import TableStructureRecognition
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    local_image_path = urllib.request.urlretrieve(image_path)[0]
+else:
+    local_image_path = image_path
+
+runtime_device = device if device.startswith(("cpu", "gpu", "xpu", "npu", "mlu", "gcu")) else "gpu" if device.startswith("cuda") else device
+if runtime_device.startswith("cuda"):
+    runtime_device = runtime_device.replace("cuda", "gpu", 1)
+
+model = TableStructureRecognition(model_name="SLANet_plus", device=runtime_device)
+output = model.predict(input=local_image_path, batch_size=1)
+
+results = []
+for res in output:
+    item = {}
+    if hasattr(res, "res"):
+        item["res"] = res.res
+    if hasattr(res, "html"):
+        item["html"] = res.html
+    if hasattr(res, "get"):
+        try:
+            item["data"] = res.get()
+        except Exception:
+            pass
+    if not item:
+        item = str(res)
+    results.append(item)
+
+RESULT = {"output": results}

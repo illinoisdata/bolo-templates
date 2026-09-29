@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("google/matcha-chartqa") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set question = question | default('Is the sum of all 4 places greater than Laos?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+question = "{{ question }}"
+
+import os
+import requests
+import torch
+from PIL import Image
+from transformers import Pix2StructProcessor, Pix2StructForConditionalGeneration
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_model_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processor = Pix2StructProcessor.from_pretrained(os.path.dirname(processor_config_path))
+model = Pix2StructForConditionalGeneration.from_pretrained(os.path.dirname(config_path))
+model = model.to(device)
+
+inputs = processor(images=image, text=question, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+predictions = model.generate(**inputs, max_new_tokens=32)
+output_text = processor.decode(predictions[0], skip_special_tokens=True)
+
+RESULT = {"output": output_text}

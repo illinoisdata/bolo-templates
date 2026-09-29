@@ -1,36 +1,39 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("bloomberg/KeyBART") %}
-{% set text_input = text_input | default("In this work, we explore how to learn task specific language models aimed towards learning rich representation of keyphrases from text documents. We experiment with different masking strategies for pre-training transformer language models in discriminative as well as generative settings.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('In this work, we explore how to learn task specific language models aimed towards learning rich representation of keyphrases from text documents.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = {{ text_input | tojson }}
+text = "{{ text }}"
 
 import torch
-from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-torch_device = torch.device(device)
-model.to(torch_device)
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_file = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-inputs = tokenizer(
-    text_input,
-    return_tensors="pt",
-    truncation=True,
-    max_length=1024,
-)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, local_files_only=True)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+model = model.to(device)
+model.eval()
 
-inputs = {name: tensor.to(torch_device) for name, tensor in inputs.items()}
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=1024)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
     generated_ids = model.generate(
         **inputs,
-        max_length=128,
         num_beams=4,
+        max_new_tokens=64,
+        no_repeat_ngram_size=3,
         early_stopping=True,
     )
 
-generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {"generated_keyphrases": generated_text}
+RESULT = {"generated_text": output_text}

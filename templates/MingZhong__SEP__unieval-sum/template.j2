@@ -1,34 +1,42 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("MingZhong/unieval-sum") %}
-{% set source_text = source_text | default("The quick brown fox jumps over the lazy dog.") %}
-{% set summary_text = summary_text | default("A quick fox jumps over a lazy dog.") %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The food was great and the service was excellent, but the wait time was a bit long.') %}
+{% set summary = summary | default('The restaurant had excellent food and service, though the wait was long.') %}
+{% set aspect = aspect | default('coherence') %}
+{% set max_new_tokens = max_new_tokens | default(16) %}
+{% set num_beams = num_beams | default(1) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_text = "{{ source_text }}"
-summary_text = "{{ summary_text }}"
-max_length = {{ max_length }}
+text = "{{ text }}"
+summary = "{{ summary }}"
+aspect = "{{ aspect }}"
+max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
-import os
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+spm_special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
 model.to(device)
+model.eval()
 
-# Pre-process input texts
-inputs = tokenizer(source_text, summary_text, return_tensors="pt", truncation=True)
-inputs = {k: v.to(device) for k, v in inputs.items()}
+prompt = f"Task: evaluate the {aspect} of the summary. Text: {text} Summary: {summary}"
+inputs = tokenizer(prompt, return_tensors="pt", truncation=True).to(device)
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+    )
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
 
-# Generate evaluation scores
-outputs = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
-
-# Decode generated tokens to text
-decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-evaluation = decoded[0]
-
-RESULT = {"evaluation": evaluation}
+RESULT = {"output": output_text}

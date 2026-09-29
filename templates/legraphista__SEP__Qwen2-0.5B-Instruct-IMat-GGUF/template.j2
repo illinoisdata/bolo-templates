@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("legraphista/Qwen2-0.5B-Instruct-IMat-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('Qwen2-0.5B-Instruct.Q4_K.gguf') %}
+{% set user_prompt = user_prompt | default('Write a short haiku about machine learning.') %}
+{% set max_new_tokens = max_new_tokens | default(48) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.95) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+user_prompt = "{{ user_prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+
+import os
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+llm = Llama(
+    model_path=model_path,
+    n_ctx=2048,
+    n_threads=max(1, (os.cpu_count() or 1) - 1),
+    n_gpu_layers=0 if device == "cpu" else -1,
+    verbose=False,
+)
+
+messages = [
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user", "content": user_prompt},
+]
+
+prompt = llm.create_chat_completion(messages=messages, max_tokens=1)["choices"][0]["message"]["content"]
+prompt = llm.tokenize(prompt.encode("utf-8"))
+output = llm(
+    llm.detokenize(prompt).decode("utf-8"),
+    max_tokens=max_new_tokens,
+    temperature=temperature,
+    top_p=top_p,
+    stop=["<|im_end|>"],
+)
+
+text = output["choices"][0]["text"]
+RESULT = {"generated_text": text}

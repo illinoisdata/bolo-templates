@@ -1,0 +1,73 @@
+{% set repo_id = repo_id | default("microsoft/xclip-large-patch14-16-frames") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("video-classification") %}
+{% set input_video = input_video | default("/u/yunqili4/projects/ML-code-generation/data/video.avi") %}
+{% set text_prompts = text_prompts | default(["a person playing sports", "a person cooking a meal"]) %}
+
+task = {{ task | tojson }}
+input_video = {{ input_video | tojson }}
+text_prompts = {{ text_prompts | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+
+import importlib.machinery
+import sys, types
+
+kernel_torchaudio = types.ModuleType('torchaudio')
+kernel_torchaudio.__spec__ = importlib.machinery.ModuleSpec('torchaudio', loader=None)
+sys.modules['torchaudio'] = kernel_torchaudio
+
+import torch
+from transformers import AutoTokenizer, pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+vision_config = getattr(pipe.model.config, "vision_config", None)
+if not hasattr(pipe.model.config, "num_frames") and vision_config is not None:
+    pipe.model.config.num_frames = vision_config.num_frames
+# adjust preprocessing to match model's expected image size
+if vision_config is not None:
+    image_size = vision_config.image_size
+    pipe.image_processor.size = {'shortest_edge': image_size}
+    pipe.image_processor.crop_size = {'height': image_size, 'width': image_size}
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+config_id2label = getattr(pipe.model.config, "id2label", {})
+try:
+    ordered_keys = sorted(config_id2label.keys(), key=lambda key: int(key) if str(key).isdigit() else key)
+except ValueError:
+    ordered_keys = list(config_id2label.keys())
+label_texts = [config_id2label[key] for key in ordered_keys] if ordered_keys else text_prompts
+text_inputs = tokenizer(label_texts, padding=True, return_tensors="pt", truncation=True)
+pipe_device = pipe.device if isinstance(pipe.device, torch.device) else torch.device(pipe.device)
+text_inputs = {k: v.to(pipe_device) for k, v in text_inputs.items()}
+original_preprocess = pipe.preprocess
+
+def preprocess_with_text(video, **kwargs):
+    model_inputs = original_preprocess(video, **kwargs)
+    model_inputs.update(text_inputs)
+    return model_inputs
+
+pipe.preprocess = preprocess_with_text
+original_postprocess = pipe.postprocess
+
+def postprocess_with_similarity(model_outputs, top_k=5, function_to_apply="softmax"):
+    logits = getattr(model_outputs, "logits", None)
+    if logits is None:
+        logits = model_outputs.logits_per_video
+    if top_k > logits.shape[-1]:
+        top_k = logits.shape[-1]
+
+    if function_to_apply == "softmax":
+        probs = logits[0].softmax(-1)
+    elif function_to_apply == "sigmoid":
+        probs = logits[0].sigmoid()
+    else:
+        probs = logits[0]
+
+    scores, ids = probs.topk(top_k)
+    scores = scores.tolist()
+    ids = ids.tolist()
+    return [{"score": score, "label": label_texts[label_id]} for score, label_id in zip(scores, ids)]
+
+pipe.postprocess = postprocess_with_similarity
+RESULT = pipe(input_video)

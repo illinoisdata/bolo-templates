@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("phiyodr/bert-large-finetuned-squad2") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What discipline did Winkelmann create?') %}
+{% set context = context | default('Johann Joachim Winckelmann was a German art historian and archaeologist. He was a pioneering Hellenist who first articulated the difference between Greek, Greco-Roman and Roman art. The prophet and founding hero of modern archaeology, Winckelmann was one of the founders of scientific archaeology and first applied the categories of style on a large, systematic basis to the history of art.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+# derive directories from downloaded paths when needed
+import os
+repo_files_dir = os.path.dirname(config_path)
+
+# load tokenizer and model from local files
+_tokenizer_kwargs = {}
+if os.path.exists(tokenizer_config_path):
+    _tokenizer_kwargs["tokenizer_file"] = None
+
+tokenizer = AutoTokenizer.from_pretrained(repo_files_dir, use_fast=False)
+model = AutoModelForQuestionAnswering.from_pretrained(repo_files_dir)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits
+end_logits = outputs.end_logits
+start_idx = int(torch.argmax(start_logits, dim=-1).item())
+end_idx = int(torch.argmax(end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+
+input_ids = inputs["input_ids"][0]
+answer_tokens = input_ids[start_idx:end_idx + 1]
+answer = tokenizer.decode(answer_tokens, skip_special_tokens=True)
+
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx}

@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("lmstudio-community/Phi-4-mini-instruct-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('Phi-4-mini-instruct-Q4_K_M.gguf') %}
+{% set prompt = prompt | default('Explain the concept of overfitting in machine learning in 2-3 sentences.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+llm = Llama(
+    model_path=model_path,
+    n_ctx=2048,
+    n_threads=max(1, os.cpu_count() or 1),
+    n_gpu_layers=-1 if str(device).startswith('cuda') else 0,
+    verbose=False,
+)
+
+result = llm(
+    prompt,
+    max_tokens=128,
+    temperature=0.2,
+    top_p=0.95,
+    stop=["</s>"]
+)
+
+output_text = result["choices"][0]["text"]
+
+RESULT = {"generated_text": output_text}

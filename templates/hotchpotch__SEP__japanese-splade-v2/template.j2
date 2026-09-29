@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("hotchpotch/japanese-splade-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set query = query | default("車の燃費を向上させる方法は？") %}
+{% set docs = docs | default([
+  "急発進や急ブレーキを避け、一定速度で走行することで燃費が良くなります。",
+  "車の運転時、急発進や急ブレーキをすると、燃費が悪くなります。",
+  "車を長持ちさせるには、消耗品を適切なタイミングで交換することが重要です。"
+]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query = {{ query | tojson }}
+docs = {{ docs | tojson }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoModelForMaskedLM, BertJapaneseTokenizer
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+download_dir = "/".join(config_path.split("/")[:-1])
+tokenizer = BertJapaneseTokenizer.from_pretrained(download_dir, use_fast=False)
+model = AutoModelForMaskedLM.from_pretrained(download_dir, torch_dtype=torch.float32).to(device)
+model.eval()
+
+def splade_max_pooling(logits, attention_mask):
+    relu_log = torch.log1p(torch.relu(logits))
+    weighted_log = relu_log * attention_mask.unsqueeze(-1)
+    max_val, _ = torch.max(weighted_log, dim=1)
+    return max_val
+
+sentences = [query] + docs
+tokens = tokenizer(sentences, return_tensors="pt", padding=True, truncation=True, max_length=512)
+tokens = {k: v.to(device) for k, v in tokens.items()}
+with torch.no_grad():
+    outputs = model(**tokens)
+embeddings = splade_max_pooling(outputs.logits, tokens["attention_mask"])
+similarity = torch.matmul(embeddings.unsqueeze(0), embeddings.T).squeeze(0)
+
+vocab = tokenizer.get_vocab()
+inv_vocab = {v: k for k, v in vocab.items()}
+topk = torch.topk(embeddings[0], k=min(20, embeddings.shape[-1]))
+token_values = {inv_vocab[int(idx)]: float(val) for val, idx in zip(topk.values, topk.indices)}
+
+RESULT = {
+    "similarity": similarity.detach().cpu().tolist(),
+    "token_values": token_values,
+}

@@ -1,0 +1,15 @@
+{% set repo_id = repo_id | default("mlx-community/DeepSeek-Coder-V2-Lite-Instruct-4bit-mlx") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Write a short Python function that checks whether a string is a palindrome, ignoring case and non-alphanumeric characters.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+from transformers import AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True)
+inputs = tokenizer(prompt, return_tensors="pt")
+input_ids = inputs["input_ids"][0].tolist()
+text = tokenizer.decode(input_ids, skip_special_tokens=True)
+
+RESULT = {"generated_text": text}

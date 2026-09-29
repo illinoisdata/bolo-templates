@@ -1,58 +1,39 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("openai/imagegpt-small") %}
-{% set batch_size = batch_size | default(8) %}
-{% set temperature = temperature | default(1.0) %}
-{% set top_k = top_k | default(40) %}
-{% set do_sample = do_sample | default(True) %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-batch_size = {{ batch_size }}
-temperature = {{ temperature }}
-top_k = {{ top_k }}
-do_sample = {{ do_sample }}
+image_path = "{{ image_path }}"
 
 import os
 import torch
-import numpy as np
 from PIL import Image
+from huggingface_hub import hf_hub_download
 from transformers import ImageGPTImageProcessor, ImageGPTForCausalImageModeling
 
-# Load processor and model
-processor = ImageGPTImageProcessor.from_pretrained(repo_id)
-model = ImageGPTForCausalImageModeling.from_pretrained(repo_id)
-model.to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+repo_dir = os.path.dirname(weights_path)
 
-# Preprocess input for unconditional image generation
-context = torch.full((batch_size, 1), model.config.vocab_size - 1)
-context = context.to(device)
-
-# Generate images
-output = model.generate(
-    input_ids=context,
-    max_length=model.config.n_positions + 1,
-    temperature=temperature,
-    do_sample=do_sample,
-    top_k=top_k,
-)
-
-# Post-process outputs
-clusters = processor.clusters
-if hasattr(clusters, "cpu"):
-    clusters = clusters.cpu().numpy()
-size = processor.size
-if hasattr(size, "height"):
-    height = size.height
-    width = size.width
-elif isinstance(size, dict):
-    height = size.get("height")
-    width = size.get("width")
+if image_path.startswith(("http://", "https://")):
+    from requests import get
+    from io import BytesIO
+    image = Image.open(BytesIO(get(image_path, timeout=30).content)).convert("RGB")
 else:
-    height = width = size
-samples = output[:, 1:].cpu().numpy()
-samples_img = [
-    np.reshape(np.rint(127.5 * (clusters[s] + 1.0)), (height, width, 3)).astype(np.uint8)
-    for s in samples
-]
-images = [Image.fromarray(img) for img in samples_img]
+    image = Image.open(image_path).convert("RGB")
 
-RESULT = {"images": images}
+processor = ImageGPTImageProcessor.from_pretrained(os.path.dirname(preprocessor_path))
+model = ImageGPTForCausalImageModeling.from_pretrained(repo_dir)
+model.load_state_dict(torch.load(weights_path, map_location="cpu"), strict=False)
+model.to(device)
+model.eval()
+
+inputs = processor(image, return_tensors="pt")
+input_ids = inputs["input_ids"].to(device)
+with torch.no_grad():
+    outputs = model(input_ids=input_ids)
+
+pred_ids = torch.argmax(outputs.logits, dim=-1)
+RESULT = {"predicted_token_ids": pred_ids.detach().cpu().tolist(), "logits_shape": list(outputs.logits.shape)}

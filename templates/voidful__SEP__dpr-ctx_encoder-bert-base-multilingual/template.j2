@@ -1,24 +1,38 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("voidful/dpr-ctx_encoder-bert-base-multilingual") %}
-{% set context_text = context_text | default("The Eiffel Tower is located in Paris, and it is a famous landmark in France.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Hello, is my dog cute ?") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-context_text = """{{ context_text }}"""
+text = "{{ text }}"
 
-import os
-import numpy as np
+from huggingface_hub import hf_hub_download
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import DPRContextEncoder, DPRContextEncoderTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+tokenizer = DPRContextEncoderTokenizer.from_pretrained(
+    tokenizer_path,
+    vocab_file=vocab_path,
+    tokenizer_file=tokenizer_path,
+    tokenizer_config_file=tokenizer_config_path,
+)
+model = DPRContextEncoder.from_pretrained(
+    None,
+    config=config_path,
+    state_dict=torch.load(weights_path, map_location=device),
+)
+model.to(device)
 model.eval()
 
-encoded_input = tokenizer(context_text, return_tensors="pt", truncation=True)
-encoded_input = {key: value.to(device) for key, value in encoded_input.items()}
-
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    outputs = model(**encoded_input)
+    outputs = model(**inputs)
 
-embeddings = outputs.pooler_output
-RESULT = {"embeddings": embeddings.detach().cpu()}
+embedding = outputs.pooler_output.detach().cpu().numpy()
+RESULT = {"embedding": embedding}

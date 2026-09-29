@@ -1,8 +1,45 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("huggingface/informer-tourism-monthly") %}
+{% set device = device | default("cuda:0") %}
+{% set context_length = context_length | default(60) %}
+{% set prediction_length = prediction_length | default(24) %}
+{% set input_series = input_series | default([1234.0, 1277.0, 1262.0, 1296.0, 1345.0, 1401.0, 1388.0, 1450.0, 1499.0, 1512.0, 1488.0, 1525.0, 1602.0, 1588.0, 1630.0, 1675.0, 1701.0, 1722.0, 1740.0, 1765.0, 1801.0, 1820.0, 1855.0, 1888.0, 1910.0, 1935.0, 1962.0, 1988.0, 2011.0, 2045.0, 2060.0, 2088.0, 2115.0, 2140.0, 2168.0, 2199.0, 2221.0, 2245.0, 2270.0, 2295.0, 2320.0, 2348.0, 2375.0, 2401.0, 2428.0, 2455.0, 2480.0, 2505.0, 2530.0, 2555.0, 2580.0, 2605.0, 2630.0, 2655.0, 2680.0, 2705.0, 2730.0, 2755.0, 2780.0, 2805.0]) %}
+{% set static_categorical_feature = static_categorical_feature | default([0]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-import inspect
+prediction_length = {{ prediction_length }}
+context_length = {{ context_length }}
+input_series = {{ input_series }}
+static_categorical_feature = {{ static_categorical_feature }}
+
+import torch
+from huggingface_hub import hf_hub_download
 from transformers import InformerForPrediction
-print(inspect.signature(InformerForPrediction.forward))
-print(inspect.getsource(InformerForPrediction))
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+model_dir = str(torch.PathLike(config_path).parent) if False else __import__('pathlib').Path(config_path).parent
+
+model = InformerForPrediction.from_pretrained(str(model_dir), local_files_only=True)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
+
+history = input_series[-context_length:]
+past_values = torch.tensor(history, dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(-1)
+past_time_features = torch.zeros((1, context_length, 2), dtype=torch.float32, device=device)
+future_time_features = torch.zeros((1, prediction_length, 2), dtype=torch.float32, device=device)
+past_observed_mask = torch.ones_like(past_values, dtype=torch.float32)
+static_categorical_features = torch.tensor(static_categorical_feature, dtype=torch.long, device=device).unsqueeze(0)
+
+with torch.no_grad():
+    outputs = model(
+        past_values=past_values,
+        past_time_features=past_time_features,
+        past_observed_mask=past_observed_mask,
+        future_time_features=future_time_features,
+        static_categorical_features=static_categorical_features,
+    )
+    pred = outputs.sequences
+
+RESULT = {"forecast": pred.detach().cpu().numpy()}

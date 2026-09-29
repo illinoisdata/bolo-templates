@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("pysentimiento/robertuito-irony") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Que irónico, ganar otra vez el premio a la puntualidad llegando dos horas tarde.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+model = AutoModelForSequenceClassification.from_pretrained(
+    repo_id,
+    config=config_path,
+    state_dict=torch.load(weights_path, map_location="cpu"),
+)
+
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    tokenizer_file=tokenizer_json_path,
+    tokenizer_config_file=tokenizer_config_path,
+    special_tokens_map_file=special_tokens_map_path,
+)
+
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=130)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    probs = torch.softmax(outputs.logits, dim=-1)[0]
+    pred_id = int(torch.argmax(probs).item())
+    pred_label = model.config.id2label[pred_id]
+    confidence = float(probs[pred_id].item())
+
+RESULT = {
+    "text": text,
+    "label": pred_label,
+    "confidence": confidence,
+    "scores": {model.config.id2label[i]: float(probs[i].item()) for i in range(probs.shape[-1])},
+}

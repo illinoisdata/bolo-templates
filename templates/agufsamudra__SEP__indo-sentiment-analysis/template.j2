@@ -1,0 +1,48 @@
+{% set repo_id = repo_id | default("agufsamudra/indo-sentiment-analysis") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Saya sangat puas dengan pelayanan ini!') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+from transformers import BertTokenizer, BertForSequenceClassification, BertConfig
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+config = BertConfig.from_json_file(config_path)
+label_map = config.id2label or {0: "Negative", 1: "Positive"}
+state_dict = load_file(weights_path)
+model = BertForSequenceClassification(config)
+model.load_state_dict(state_dict)
+
+tokenizer = BertTokenizer.from_pretrained(
+    repo_id,
+    vocab_file=vocab_path,
+    local_files_only=True,
+)
+
+model.to(device)
+model.eval()
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=128)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+pred_id = int(torch.argmax(logits, dim=-1).item())
+probs = torch.softmax(logits, dim=-1).squeeze(0).detach().cpu().tolist()
+label = label_map.get(pred_id, label_map.get(str(pred_id), str(pred_id)))
+
+RESULT = {
+    "text": text,
+    "label": label,
+    "pred_id": pred_id,
+    "probabilities": probs,
+}

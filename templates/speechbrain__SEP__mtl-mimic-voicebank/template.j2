@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("speechbrain/mtl-mimic-voicebank") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set sample_rate = sample_rate | default(16000) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+sample_rate = {{ sample_rate }}
+
+from pathlib import Path
+import torch
+import torchaudio
+from speechbrain.inference.enhancement import WaveformEnhancement
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="enhance_model.ckpt")
+perceptual_path = hf_hub_download(repo_id=repo_id, filename="perceptual.ckpt")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+hparams_path = hf_hub_download(repo_id=repo_id, filename="hyperparams.yaml")
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    raise ValueError("URL audio inputs are not supported in this environment")
+input_audio_path = audio_path
+
+enhance_model = WaveformEnhancement.from_hparams(
+    source=repo_id,
+    savedir=str(Path(weights_path).parent / "sb_enhance_cache"),
+    hparams_file=hparams_path,
+    run_opts={"device": device},
+)
+
+enhanced = enhance_model.enhance_file(input_audio_path)
+if isinstance(enhanced, tuple):
+    enhanced = enhanced[0]
+if enhanced.dim() == 1:
+    enhanced_waveform = enhanced.unsqueeze(0)
+else:
+    enhanced_waveform = enhanced
+
+RESULT = {"enhanced_audio": enhanced_waveform.detach().cpu()}

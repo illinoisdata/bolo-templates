@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("timm/tf_mobilenetv3_large_100.in1k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+image_path = {{ image_path | tojson }}
+
+from PIL import Image
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+input_image = Image.open(image_path).convert("RGB")
+
+RESULT = pipe(input_image)

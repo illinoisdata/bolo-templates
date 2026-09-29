@@ -1,66 +1,53 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("setu4993/LaBSE") %}
-{% set english_sentences = english_sentences | default(["dog", "Puppies are nice.", "I enjoy taking long walks along the beach with my dog."]) %}
-{% set italian_sentences = italian_sentences | default(["cane", "I cuccioli sono carini.", "Mi piace fare lunghe passeggiate lungo la spiaggia con il mio cane."]) %}
-{% set japanese_sentences = japanese_sentences | default(["犬", "子犬はいいです", "私は犬と一緒にビーチを散歩するのが好きです"]) %}
+{% set device = device | default("cuda:0") %}
+{% set sentence1 = sentence1 | default("dog") %}
+{% set sentence2 = sentence2 | default("Puppies are nice.") %}
+{% set max_length = max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-english_sentences = {{ english_sentences | tojson }}
-italian_sentences = {{ italian_sentences | tojson }}
-japanese_sentences = {{ japanese_sentences | tojson }}
+sentence1 = "{{ sentence1 }}"
+sentence2 = "{{ sentence2 }}"
+max_length = {{ max_length }}
 
-import os
-
-import numpy as np
 import torch
 import torch.nn.functional as F
-from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+from transformers import BertModel, BertTokenizerFast, BertConfig
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id)
-model.to(device)
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+config = BertConfig.from_json_file(config_file)
+model = BertModel(config)
+state_dict = load_file(weights_file); state_dict.pop("embeddings.position_ids", None); model.load_state_dict(state_dict)
+model = model.to(device)
 model.eval()
 
-def tokenize_batch(texts):
-    tokenized = tokenizer(texts, return_tensors="pt", padding=True, truncation=True)
-    return {key: tensor.to(device) for key, tensor in tokenized.items()}
+tokenizer = BertTokenizerFast.from_pretrained(
+    pretrained_model_name_or_path=repo_id,
+    vocab_file=vocab_file,
+    tokenizer_file=tokenizer_file,
+    tokenizer_config_file=tokenizer_config_file,
+    special_tokens_map_file=special_tokens_map_file,
+    local_files_only=True,
+)
 
-english_inputs = tokenize_batch(english_sentences)
-italian_inputs = tokenize_batch(italian_sentences)
-japanese_inputs = tokenize_batch(japanese_sentences)
+inputs = tokenizer([sentence1, sentence2], return_tensors="pt", padding=True, truncation=True, max_length=max_length)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    english_outputs = model(**english_inputs)
-    italian_outputs = model(**italian_inputs)
-    japanese_outputs = model(**japanese_inputs)
-
-english_embeddings = english_outputs.pooler_output
-italian_embeddings = italian_outputs.pooler_output
-japanese_embeddings = japanese_outputs.pooler_output
-
-english_norm = F.normalize(english_embeddings, p=2, dim=1)
-italian_norm = F.normalize(italian_embeddings, p=2, dim=1)
-japanese_norm = F.normalize(japanese_embeddings, p=2, dim=1)
-
-def similarity(a, b):
-    return torch.matmul(a, b.transpose(0, 1))
-
-english_italian_similarity = similarity(english_norm, italian_norm)
-english_japanese_similarity = similarity(english_norm, japanese_norm)
-italian_japanese_similarity = similarity(italian_norm, japanese_norm)
-
-english_embeddings_np = english_embeddings.detach().cpu().numpy()
-italian_embeddings_np = italian_embeddings.detach().cpu().numpy()
-japanese_embeddings_np = japanese_embeddings.detach().cpu().numpy()
-english_italian_similarity_np = english_italian_similarity.cpu().numpy()
-english_japanese_similarity_np = english_japanese_similarity.cpu().numpy()
-italian_japanese_similarity_np = italian_japanese_similarity.cpu().numpy()
+    outputs = model(**inputs)
+    embeddings = outputs.pooler_output
+    normalized = F.normalize(embeddings, p=2, dim=1)
+    similarity = torch.matmul(normalized[0:1], normalized[1:2].transpose(0, 1)).squeeze().item()
 
 RESULT = {
-    "english_embeddings": english_embeddings_np,
-    "italian_embeddings": italian_embeddings_np,
-    "japanese_embeddings": japanese_embeddings_np,
-    "english_italian_similarity": english_italian_similarity_np,
-    "english_japanese_similarity": english_japanese_similarity_np,
-    "italian_japanese_similarity": italian_japanese_similarity_np,
+    "sentence1_embedding": embeddings[0].detach().cpu(),
+    "sentence2_embedding": embeddings[1].detach().cpu(),
+    "cosine_similarity": similarity,
 }

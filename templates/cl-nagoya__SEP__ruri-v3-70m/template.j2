@@ -1,0 +1,35 @@
+{% set text1 = text1 | default('川べりでサーフボードを持った人たちがいます') %}
+{% set text2 = text2 | default('サーファーたちが川べりに立っています') %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("cl-nagoya/ruri-v3-70m") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text1 = "{{ text1 }}"
+text2 = "{{ text2 }}"
+
+import os
+import torch
+import torch.nn.functional as F
+from sentence_transformers import SentenceTransformer
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_model_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.model")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+ssb_config_path = hf_hub_download(repo_id=repo_id, filename="sentence_bert_config.json")
+pooling_config_path = hf_hub_download(repo_id=repo_id, filename="1_Pooling/config.json")
+
+model_dir = os.path.dirname(model_path)
+model = SentenceTransformer(model_dir, device=device)
+
+sentences = [text1, text2]
+embeddings = model.encode(sentences, convert_to_tensor=True)
+similarity = F.cosine_similarity(embeddings[0].unsqueeze(0), embeddings[1].unsqueeze(0)).item()
+
+RESULT = {
+    "embeddings": embeddings,
+    "similarity": similarity,
+}

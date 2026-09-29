@@ -1,35 +1,43 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("ai-forever/RuM2M100-418M") %}
-{% set text_input = text_input | default("прийдя в МГТУ я был удивлен никого необноружив там…") %}
-{% set src_lang = src_lang | default("ru") %}
-{% set tgt_lang = tgt_lang | default("ru") %}
+{% set device = device | default("cuda:0") %}
+{% set sentence = sentence | default('прийдя в МГТУ я был удивлен никого необноружив там…') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-src_lang = "{{ src_lang }}"
-tgt_lang = "{{ tgt_lang }}"
+sentence = "{{ sentence }}"
 
-from pathlib import Path
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import M2M100ForConditionalGeneration, M2M100Tokenizer
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id, src_lang=src_lang, tgt_lang=tgt_lang)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+spm_path = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
 
-tokenizer.src_lang = src_lang
-tokenizer.tgt_lang = tgt_lang
-
-# Pre-process input
-inputs = tokenizer(text_input, return_tensors="pt")
-inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
-
-# Run inference
-generated_tokens = model.generate(
-    **inputs,
-    forced_bos_token_id=tokenizer.get_lang_id(tgt_lang),
+model = M2M100ForConditionalGeneration.from_pretrained(repo_id, local_files_only=True)
+tokenizer = M2M100Tokenizer.from_pretrained(
+    repo_id,
+    src_lang="ru",
+    tgt_lang="ru",
+    local_files_only=True,
 )
 
-# Post-process output
-corrected_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-corrected_text = corrected_texts[0]
+inputs = tokenizer(sentence, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+model = model.to(device)
+model.eval()
 
-RESULT = {"corrected_text": corrected_text}
+with torch.no_grad():
+    generated_tokens = model.generate(
+        **inputs,
+        forced_bos_token_id=tokenizer.get_lang_id("ru"),
+        max_length=200,
+        num_beams=5,
+    )
+
+output = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"output": output}

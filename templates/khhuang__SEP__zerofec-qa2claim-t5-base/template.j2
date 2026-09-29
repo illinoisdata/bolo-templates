@@ -2,34 +2,39 @@
 {% set device = device | default("cuda:0") %}
 {% set question = question | default("What is Night of the Living Dead?") %}
 {% set answer = answer | default("a 1968 american independent horror film") %}
-{% set max_length = max_length | default(64) %}
-{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 question = "{{ question }}"
 answer = "{{ answer }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
 
-from pathlib import Path
-
+from huggingface_hub import hf_hub_download
+import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_file = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+
+text = f"{answer} \n {question}"
+
+tokenizer = AutoTokenizer.from_pretrained(
+    tokenizer_file.rsplit('/', 1)[0],
+    use_fast=True,
+)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    model_file.rsplit('/', 1)[0],
+    torch_dtype=torch.float32,
+)
+model = model.to(device)
 model.eval()
 
-formatted_input = f"{answer}\n{question}"
-encoded_inputs = tokenizer(formatted_input, return_tensors="pt")
-input_ids = encoded_inputs.input_ids.to(device)
-attention_mask = encoded_inputs.attention_mask.to(device)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_length=32, num_beams=4)
+output = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
-generated_ids = model.generate(
-    input_ids=input_ids,
-    attention_mask=attention_mask,
-    max_length=max_length,
-    num_beams=num_beams,
-)
-generated_claims = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-generated_claim = generated_claims[0]
-RESULT = {"generated_claim": generated_claim}
+RESULT = {"output": output}

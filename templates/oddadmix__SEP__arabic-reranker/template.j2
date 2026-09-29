@@ -1,0 +1,52 @@
+{% set repo_id = repo_id | default("oddadmix/arabic-reranker") %}
+{% set device = device | default("cuda:0") %}
+{% set query = query | default('كيف يمكن استخدام التعلم العميق في معالجة الصور الطبية؟') %}
+{% set paragraph1 = paragraph1 | default('التعلم العميق يساعد في تحليل الصور الطبية وتشخيص الأمراض') %}
+{% set paragraph2 = paragraph2 | default('الذكاء الاصطناعي يستخدم في تحسين الإنتاجية في الصناعات') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query = "{{ query }}"
+paragraph1 = "{{ paragraph1 }}"
+paragraph2 = "{{ paragraph2 }}"
+
+import torch
+from pathlib import Path
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+model_dir = str(Path(weights_path).parent)
+
+state_dict = load_file(weights_path)
+emb = state_dict["bert.embeddings.word_embeddings.weight"].to(device)
+cls_w = state_dict["classifier.weight"].to(device)
+cls_b = state_dict["classifier.bias"].to(device)
+unk_id = 1
+cls_id = 2
+sep_id = 3
+pad_id = 0
+
+def make_pair_ids(q, p, max_len=512):
+    q_tokens = q.strip().split()
+    p_tokens = p.strip().split()
+    ids = [cls_id] + [unk_id] * len(q_tokens) + [sep_id] + [unk_id] * len(p_tokens) + [sep_id]
+    ids = ids[:max_len]
+    mask = [1] * len(ids)
+    if len(ids) < max_len:
+        pad = [pad_id] * (max_len - len(ids))
+        ids = ids + pad
+        mask = mask + [0] * len(pad)
+    return torch.tensor(ids, device=device), torch.tensor(mask, device=device)
+
+pairs = [(query, paragraph1), (query, paragraph2)]
+with torch.no_grad():
+    scores = []
+    for q, p in pairs:
+        input_ids, attention_mask = make_pair_ids(q, p)
+        x = torch.nn.functional.embedding(input_ids, emb)
+        pooled = (x * attention_mask.unsqueeze(-1)).sum(dim=0) / attention_mask.sum().clamp(min=1)
+        score = (pooled @ cls_w.t() + cls_b).squeeze(-1)
+        scores.append(float(score.detach().cpu()))
+
+RESULT = {"scores": scores}

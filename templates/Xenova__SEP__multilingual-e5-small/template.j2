@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("Xenova/multilingual-e5-small") %}
+{% set device = device | default("cuda:0") %}
+{% set query = query | default('query: A multilingual sentence embedding model.') %}
+{% set passages = passages | default(['passage: This is a sentence.', 'passage: Another example sentence.']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query = "{{ query }}"
+passages = {{ passages }}
+
+import numpy as np
+import torch
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="onnx/model.onnx")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+# Load tokenizer and model metadata files from the repo.
+tokenizer = AutoTokenizer.from_pretrained(
+    tokenizer_path.rsplit("/", 1)[0],
+    use_fast=True,
+    local_files_only=True,
+)
+
+# The repo provides ONNX weights for Transformers.js; for Python inference, use the original model id.
+model = AutoModel.from_pretrained("intfloat/multilingual-e5-small")
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer([query] + passages, padding=True, truncation=True, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    token_embeddings = outputs.last_hidden_state
+    attention_mask = inputs["attention_mask"].unsqueeze(-1).expand(token_embeddings.size()).float()
+    sentence_embeddings = (token_embeddings * attention_mask).sum(dim=1) / torch.clamp(attention_mask.sum(dim=1), min=1e-9)
+    sentence_embeddings = torch.nn.functional.normalize(sentence_embeddings, p=2, dim=1)
+    query_embedding = sentence_embeddings[0].detach().cpu().numpy()
+    passage_embeddings = sentence_embeddings[1:].detach().cpu().numpy()
+    scores = np.matmul(passage_embeddings, query_embedding)
+
+RESULT = {"query_embedding": query_embedding, "passage_embeddings": passage_embeddings, "scores": scores}

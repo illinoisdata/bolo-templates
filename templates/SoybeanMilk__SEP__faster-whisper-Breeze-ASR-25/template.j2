@@ -1,0 +1,58 @@
+{% set repo_id = repo_id | default("SoybeanMilk/faster-whisper-Breeze-ASR-25") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set language = language | default('en') %}
+{% set beam_size = beam_size | default(5) %}
+{% set best_of = best_of | default(5) %}
+{% set temperature = temperature | default(0.0) %}
+{% set word_timestamps = word_timestamps | default(False) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+language = "{{ language }}"
+beam_size = {{ beam_size }}
+best_of = {{ best_of }}
+temperature = {{ temperature }}
+word_timestamps = {{ word_timestamps }}
+
+from pathlib import Path
+from urllib.parse import urlparse
+
+import requests
+from faster_whisper import WhisperModel
+from huggingface_hub import hf_hub_download
+
+model_bin = hf_hub_download(repo_id=repo_id, filename="model.bin")
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+hf_hub_download(repo_id=repo_id, filename="vocabulary.json")
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    audio_local = Path("/tmp") / Path(urlparse(audio_path).path).name
+    if not audio_local.exists():
+        audio_local.write_bytes(requests.get(audio_path, timeout=30).content)
+    audio_input = str(audio_local)
+else:
+    audio_input = audio_path
+
+model_dir = str(Path(model_bin).parent)
+model = WhisperModel(model_dir, device="cpu", compute_type="int8")
+
+segments, info = model.transcribe(
+    audio_input,
+    language=language,
+    beam_size=beam_size,
+    best_of=best_of,
+    temperature=temperature,
+    word_timestamps=word_timestamps,
+)
+
+transcript = "".join(segment.text for segment in segments).strip()
+
+RESULT = {
+    "text": transcript,
+    "language": info.language,
+    "language_probability": info.language_probability,
+}

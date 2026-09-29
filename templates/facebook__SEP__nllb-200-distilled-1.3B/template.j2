@@ -1,28 +1,39 @@
 {% set repo_id = repo_id | default("facebook/nllb-200-distilled-1.3B") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default('Hello, world!') %}
+{% set src_text = src_text | default('Hello, how are you?') %}
 {% set src_lang = src_lang | default('eng_Latn') %}
 {% set tgt_lang = tgt_lang | default('fra_Latn') %}
-repo_id = '{{ repo_id }}'
-device = '{{ device }}'
-input_text = '{{ input_text }}'
-src_lang = '{{ src_lang }}'
-tgt_lang = '{{ tgt_lang }}'
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set num_beams = num_beams | default(4) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+src_text = {{ src_text | tojson }}
+src_lang = {{ src_lang | tojson }}
+tgt_lang = {{ tgt_lang | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import torch
-import os
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-tokenizer.src_lang = src_lang
-tokenizer.tgt_lang = tgt_lang
-inputs = tokenizer(input_text, return_tensors='pt')
+inputs = tokenizer(src_text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
-forced_bos_token_id = tokenizer.convert_tokens_to_ids(f'<{tgt_lang}>')
-generated_tokens = model.generate(**inputs, forced_bos_token_id=forced_bos_token_id)
+tokenizer.src_lang = src_lang
+output_ids = model.generate(
+    **inputs,
+    forced_bos_token_id=tokenizer.convert_tokens_to_ids(tgt_lang),
+    num_beams=num_beams,
+    max_new_tokens=max_new_tokens,
+)
+translated_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
 
-translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
-
-RESULT = {'translation': translation}
+RESULT = {"translation_text": translated_text}

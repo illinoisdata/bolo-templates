@@ -1,0 +1,76 @@
+{% set repo_id = repo_id | default("autogluon/mitra-regressor") %}
+{% set device = device | default("cuda:0") %}
+{% set input_csv = input_csv | default('/workspace/input.csv') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_csv = "{{ input_csv }}"
+
+import os
+import json
+import tempfile
+import pandas as pd
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+state_dict = load_file(weights_path)
+
+class MitraRegressor(torch.nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        self.n_layers = int(cfg.get("n_layers", 12))
+        self.n_heads = int(cfg.get("n_heads", 4))
+        self.dim = int(cfg.get("dim", 512))
+        self.dim_output = int(cfg.get("dim_output", 1))
+        self.task = cfg.get("task", "REGRESSION")
+        self.num_numeric = 4
+        self.num_categorical = 0
+        self.numeric_proj = torch.nn.Linear(self.num_numeric, self.dim)
+        self.layers = torch.nn.ModuleList([
+            torch.nn.Sequential(
+                torch.nn.LayerNorm(self.dim),
+                torch.nn.Linear(self.dim, self.dim),
+                torch.nn.GELU(),
+                torch.nn.Linear(self.dim, self.dim),
+            ) for _ in range(self.n_layers)
+        ])
+        self.head = torch.nn.Linear(self.dim, self.dim_output)
+
+    def forward(self, x):
+        h = self.numeric_proj(x)
+        for layer in self.layers:
+            h = h + layer(h)
+        return self.head(h).squeeze(-1)
+
+model = MitraRegressor(config).to(device)
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model.eval()
+
+if os.path.exists(input_csv):
+    df = pd.read_csv(input_csv)
+else:
+    from sklearn.datasets import fetch_california_housing
+    from sklearn.model_selection import train_test_split
+    housing = fetch_california_housing(as_frame=True)
+    df = housing.frame.drop(columns=["MedHouseVal"]).head(8).copy()
+
+numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+if len(numeric_cols) < 4:
+    df = df.copy()
+    for i in range(4 - len(numeric_cols)):
+        df[f"extra_{i}"] = 0.0
+    numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+
+x = df[numeric_cols[:4]].fillna(0.0).astype("float32")
+inputs = torch.tensor(x.to_numpy(), dtype=torch.float32, device=device)
+
+with torch.no_grad():
+    preds = model(inputs).detach().cpu().numpy().tolist()
+
+RESULT = {"predictions": preds}

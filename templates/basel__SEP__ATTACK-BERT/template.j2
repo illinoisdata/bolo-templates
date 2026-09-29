@@ -1,39 +1,24 @@
 {% set repo_id = repo_id | default("basel/ATTACK-BERT") %}
 {% set device = device | default("cuda:0") %}
-{% set sentences = sentences | default(["Attacker takes a screenshot", "Attacker captures the screen"]) %}
+{% set sentence1 = sentence1 | default('Attacker takes a screenshot') %}
+{% set sentence2 = sentence2 | default('Attacker captures the screen') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-sentences = {{ sentences | tojson }}
+sentence1 = "{{ sentence1 }}"
+sentence2 = "{{ sentence2 }}"
 
 import os
-import json
-
 import torch
-from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 
-torch_device = torch.device(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+module0_path = hf_hub_download(repo_id=repo_id, filename="modules.json") if False else None
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(torch_device)
-model.eval()
+model = SentenceTransformer(repo_id, device=device)
+embeddings = model.encode([sentence1, sentence2], convert_to_numpy=True)
+similarity = cosine_similarity([embeddings[0]], [embeddings[1]])
 
-encoded_inputs = tokenizer(
-    sentences,
-    padding=True,
-    truncation=True,
-    return_tensors="pt",
-)
-encoded_inputs = {key: tensor.to(torch_device) for key, tensor in encoded_inputs.items()}
-with torch.no_grad():
-    model_outputs = model(**encoded_inputs)
-
-hidden_states = model_outputs.last_hidden_state
-attention_mask = encoded_inputs["attention_mask"]
-mask = attention_mask.unsqueeze(-1)
-masked_hidden = hidden_states * mask
-summed_hidden = masked_hidden.sum(dim=1)
-mask_sums = mask.sum(dim=1).clamp(min=1e-9)
-sentence_embeddings = summed_hidden / mask_sums
-embeddings = sentence_embeddings.cpu().tolist()
-
-RESULT = {"embeddings": embeddings}
+RESULT = {"embeddings": embeddings, "similarity": similarity}

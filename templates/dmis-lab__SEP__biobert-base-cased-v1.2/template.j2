@@ -1,0 +1,27 @@
+{% set repo_id = repo_id | default("dmis-lab/biobert-base-cased-v1.2") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+
+repo_id = "{{ repo_id }}"
+device = {{ device | tojson }}
+task = "{{ task }}"
+masked_prompt = "{{ masked_prompt }}"
+model = repo_id
+
+import torch
+from transformers import pipeline
+
+
+def _resolve_device(device_value):
+    if isinstance(device_value, str) and device_value.startswith("cuda"):
+        if not torch.cuda.is_available() or torch.cuda.device_count() == 0:
+            return "cpu"
+    return device_value
+
+effective_device = _resolve_device(device)
+
+pipe = pipeline(task=task, model=model, device=effective_device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

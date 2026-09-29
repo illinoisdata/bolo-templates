@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("Xenova/e5-small-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set text1 = text1 | default('query: What is the capital of France?', true) %}
+{% set text2 = text2 | default('passage: Paris is the capital and most populous city of France.', true) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text1 = "{{ text1 }}"
+text2 = "{{ text2 }}"
+
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from tokenizers import Tokenizer
+from transformers import BertConfig, BertModel
+
+onnx_path = hf_hub_download(repo_id=repo_id, filename="onnx/model.onnx")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+config = BertConfig.from_json_file(config_path)
+model = BertModel(config)
+model.eval().to(device)
+
+# Load tokenizer directly from the tokenizer.json file.
+tok = Tokenizer.from_file(tokenizer_json_path)
+
+def encode_pair(a, b):
+    return tok.encode(a, b)
+
+encodings = [encode_pair(text1, None), encode_pair(text2, None)]
+max_len = max(len(e.ids) for e in encodings)
+input_ids = []
+attention_mask = []
+for e in encodings:
+    ids = e.ids + [0] * (max_len - len(e.ids))
+    mask = [1] * len(e.ids) + [0] * (max_len - len(e.ids))
+    input_ids.append(ids)
+    attention_mask.append(mask)
+
+input_ids = torch.tensor(input_ids, device=device, dtype=torch.long)
+attention_mask = torch.tensor(attention_mask, device=device, dtype=torch.long)
+
+with torch.no_grad():
+    outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+    last_hidden_state = outputs.last_hidden_state
+    mask = attention_mask.unsqueeze(-1).type_as(last_hidden_state)
+    sentence_embeddings = (last_hidden_state * mask).sum(dim=1) / mask.sum(dim=1).clamp(min=1e-9)
+    sentence_embeddings = torch.nn.functional.normalize(sentence_embeddings, p=2, dim=1)
+
+embedding = sentence_embeddings.detach().cpu().numpy()
+RESULT = {"embedding": embedding}

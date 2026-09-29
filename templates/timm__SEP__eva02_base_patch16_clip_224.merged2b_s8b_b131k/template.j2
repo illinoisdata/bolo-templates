@@ -1,0 +1,48 @@
+{% set repo_id = repo_id | default("timm/eva02_base_patch16_clip_224.merged2b_s8b_b131k") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text_prompt = text_prompt | default('a photo of a cat') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text_prompt = "{{ text_prompt }}"
+
+import requests
+import torch
+from PIL import Image
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+from open_clip import create_model_from_pretrained, get_tokenizer
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+model, preprocess = create_model_from_pretrained(
+    model_name="EVA02-B-16",
+    pretrained=weights_path,
+    device=device,
+)
+model.eval()
+
+image_input = preprocess(image).unsqueeze(0).to(device)
+tokenizer = get_tokenizer("EVA02-B-16")
+text_tokens = tokenizer([text_prompt]).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_input)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logit_scale = model.logit_scale.exp()
+    logits_per_image = logit_scale * image_features @ text_features.T
+    probs = logits_per_image.softmax(dim=-1)
+
+RESULT = {
+    "text_prompt": text_prompt,
+    "probability": probs.squeeze(0).tolist(),
+}

@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("katuni4ka/tiny-random-llama-4-8E") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-text-to-text") %}
+{% set input_image = input_image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+{% set input_prompt = input_prompt | default("Describe this image") %}
+
+repo_id = "{{ repo_id }}"
+task = "{{ task }}"
+device = "{{ device }}"
+input_image = "{{ input_image }}"
+input_prompt = "{{ input_prompt }}"
+
+from huggingface_hub import snapshot_download
+import json
+import os
+from transformers import pipeline
+
+# Download the repo locally so we can modify the config before loading the model
+local_repo = snapshot_download(repo_id=repo_id)
+config_path = os.path.join(local_repo, "config.json")
+config_dict = json.load(open(config_path))
+config_dict["text_config"]["attn_temperature_tuning"] = bool(
+    config_dict["text_config"].get("attn_temperature_tuning", 0)
+)
+with open(config_path, "w") as f:
+    json.dump(config_dict, f)
+
+pipe = pipeline(task=task, model=local_repo, device=device)
+
+processor = pipe.processor if pipe.processor is not None else pipe.tokenizer
+
+template = getattr(processor, "chat_template", None)
+if template is None and hasattr(processor, "tokenizer"):
+    template = getattr(processor.tokenizer, "chat_template", None)
+
+has_chat_template = template is not None
+
+if has_chat_template:
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image", "image": input_image},
+                {"type": "text", "text": input_prompt},
+            ],
+        },
+    ]
+    RESULT = pipe(text=messages)
+else:
+    RESULT = pipe(input_image, text=input_prompt)

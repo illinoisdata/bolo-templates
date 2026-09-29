@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("Xenova/e5-base-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set query = query | default('query: The Eiffel Tower is located in') %}
+{% set passage = passage | default('passage: The Eiffel Tower is located in Paris.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query = "{{ query }}"
+passage = "{{ passage }}"
+
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModel, BertConfig, BertModel
+
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+config = BertConfig.from_json_file(config_path)
+model = BertModel(config).to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+
+inputs = tokenizer([query, passage], padding=True, truncation=True, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    last_hidden = outputs.last_hidden_state
+    attention_mask = inputs["attention_mask"].unsqueeze(-1)
+    masked = last_hidden * attention_mask
+    pooled = masked.sum(dim=1) / attention_mask.sum(dim=1).clamp(min=1)
+    embeddings = torch.nn.functional.normalize(pooled, p=2, dim=1)
+    similarity = torch.matmul(embeddings[0:1], embeddings[1:2].T).item()
+
+RESULT = {"embeddings": embeddings.cpu().numpy(), "similarity": similarity}

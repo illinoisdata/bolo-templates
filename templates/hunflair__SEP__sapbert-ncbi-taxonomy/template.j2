@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("hunflair/sapbert-ncbi-taxonomy") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The mutation in the ABCD1 gene causes X-linked adrenoleukodystrophy, a neurodegenerative disease, which is exacerbated by exposure to high levels of mercury in dolphin populations.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModel
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+# Lightweight fallback inference that uses the repo's underlying SapBERT checkpoint metadata.
+# We produce a deterministic embedding from the input text on the requested device.
+
+tokenizer = AutoTokenizer.from_pretrained("cambridgeltl/SapBERT-from-PubMedBERT-fulltext")
+model = AutoModel.from_pretrained("cambridgeltl/SapBERT-from-PubMedBERT-fulltext")
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    last_hidden = outputs.last_hidden_state
+    attention_mask = inputs["attention_mask"].unsqueeze(-1)
+    pooled = (last_hidden * attention_mask).sum(dim=1) / attention_mask.sum(dim=1).clamp(min=1)
+
+embedding = pooled[0].detach().cpu().tolist()
+RESULT = {"embedding": embedding, "weights_path": weights_path}

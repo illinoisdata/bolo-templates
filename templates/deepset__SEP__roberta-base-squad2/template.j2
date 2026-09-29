@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("deepset/roberta-base-squad2") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Why is model conversion important?') %}
+{% set context = context | default('The option to convert models between FARM and transformers gives freedom to the user and lets people easily switch between frameworks.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+import torch
+
+from huggingface_hub import hf_hub_download
+
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+model = AutoModelForQuestionAnswering.from_pretrained(repo_id, local_files_only=True).to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+
+inputs = tokenizer(question, context, return_tensors='pt', truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits
+end_logits = outputs.end_logits
+start_idx = int(torch.argmax(start_logits, dim=-1).item())
+end_idx = int(torch.argmax(end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+answer_ids = inputs['input_ids'][0, start_idx:end_idx + 1]
+answer = tokenizer.decode(answer_ids, skip_special_tokens=True).strip()
+RESULT = {"answer": answer, "start_logits": start_logits.detach().cpu().tolist(), "end_logits": end_logits.detach().cpu().tolist()}

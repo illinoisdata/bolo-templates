@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("Trendyol/Trendyol-LLM-7b-chat-dpo-v1.0") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") -%}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") -%}
+{% set max_new_tokens = max_new_tokens | default(256) -%}
+{% set do_sample = do_sample | default(True) -%}
+{% set temperature = temperature | default(0.7) -%}
+{% set top_p = top_p | default(0.9) -%}
+{% set top_k = top_k | default(50) -%}
+{% set repetition_penalty = repetition_penalty | default(1.1) -%}
+{% set return_full_text = return_full_text | default(True) -%}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens | tojson }}
+do_sample = {{ do_sample }}
+temperature = {{ temperature | tojson }}
+top_p = {{ top_p | tojson }}
+top_k = {{ top_k | tojson }}
+repetition_penalty = {{ repetition_penalty | tojson }}
+return_full_text = {{ return_full_text }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+prompt = input_prompt
+inference_kwargs = {
+    "max_new_tokens": max_new_tokens,
+    "do_sample": do_sample,
+    "temperature": temperature,
+    "top_p": top_p,
+    "top_k": top_k,
+    "repetition_penalty": repetition_penalty,
+    "return_full_text": return_full_text,
+}
+
+RESULT = pipe(prompt, **inference_kwargs)
+RESULT = {"outputs": RESULT}

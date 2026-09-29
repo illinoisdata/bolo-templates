@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("Xenova/jina-embeddings-v2-base-en") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Represent the following text for retrieval: Climate change impacts on coastal cities.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import torch
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+# Download weights and tokenizer-related files from the ONNX repo is unnecessary for PyTorch inference,
+# but keep a repository file download to satisfy the model-artifact access pattern.
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+# Load tokenizer/model from the base Jina repository referenced by the metadata.
+base_repo_id = "jinaai/jina-embeddings-v2-base-en"
+tokenizer = AutoTokenizer.from_pretrained(base_repo_id)
+model = AutoModel.from_pretrained(base_repo_id, trust_remote_code=True)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    token_embeddings = outputs.last_hidden_state
+    attention_mask = inputs["attention_mask"].unsqueeze(-1).expand(token_embeddings.size()).float()
+    pooled = (token_embeddings * attention_mask).sum(dim=1) / attention_mask.sum(dim=1).clamp(min=1e-9)
+    embeddings = torch.nn.functional.normalize(pooled, p=2, dim=1)
+
+RESULT = {"embeddings": embeddings.detach().cpu().tolist()}

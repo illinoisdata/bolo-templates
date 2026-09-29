@@ -1,0 +1,34 @@
+{% set repo_id = repo_id | default("katuni4ka/tiny-random-dbrx") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set config_filename = config_filename | default("config.json") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+config_filename = {{ config_filename | tojson }}
+
+import json
+import tempfile
+from huggingface_hub import hf_hub_download
+from transformers import AutoConfig, pipeline
+
+config_path = hf_hub_download(repo_id=repo_id, filename=config_filename)
+with open(config_path, "r", encoding="utf-8") as config_file:
+    config_dict = json.load(config_file)
+ffn_config = config_dict.get("ffn_config")
+if isinstance(ffn_config, dict):
+    moe_jitter = ffn_config.get("moe_jitter_eps")
+    if moe_jitter is not None:
+        ffn_config["moe_jitter_eps"] = float(moe_jitter)
+with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as corrected_config_file:
+    json.dump(config_dict, corrected_config_file)
+    corrected_config_path = corrected_config_file.name
+config = AutoConfig.from_pretrained(corrected_config_path)
+pipe = pipeline(task=task, model=repo_id, device=device, config=config)
+
+prepared_prompt = input_prompt
+
+RESULT = pipe(prepared_prompt)

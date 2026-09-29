@@ -1,0 +1,38 @@
+{% set text = text | default('It took me quite a long time to develop a voice, and now that I have it I am not going to be silent.') %}
+{% set language = language | default('en') %}
+{% set speaker_wav = speaker_wav | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set repo_id = repo_id | default("coqui/XTTS-v2") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+language = "{{ language }}"
+speaker_wav = "{{ speaker_wav }}"
+
+import os
+import json
+import tempfile
+from pathlib import Path
+from urllib.parse import urlparse
+
+import torch
+import requests
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+_ = hf_hub_download(repo_id=repo_id, filename='vocab.json')
+_ = hf_hub_download(repo_id=repo_id, filename='speakers_xtts.pth')
+_ = hf_hub_download(repo_id=repo_id, filename='dvae.pth')
+_ = hf_hub_download(repo_id=repo_id, filename='mel_stats.pth')
+
+if speaker_wav.startswith('http://') or speaker_wav.startswith('https://'):
+    response = requests.get(speaker_wav, timeout=30)
+    response.raise_for_status()
+    tmp_dir = Path(tempfile.mkdtemp())
+    parsed = urlparse(speaker_wav)
+    speaker_wav = str(tmp_dir / Path(parsed.path).name)
+    with open(speaker_wav, 'wb') as f:
+        f.write(response.content)
+
+RESULT = {"note": "XTTS-v2 requires the coqui TTS package, which is unavailable in this environment."}

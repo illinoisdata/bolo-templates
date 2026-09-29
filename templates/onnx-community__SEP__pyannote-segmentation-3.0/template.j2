@@ -1,0 +1,82 @@
+{% set repo_id = repo_id | default("onnx-community/pyannote-segmentation-3.0") %}
+{% set device = device | default("cuda:0") %}
+{% set audio = audio | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set chunk_duration = chunk_duration | default(3.0) %}
+{% set num_frames = num_frames | default(64) %}
+{% set threshold = threshold | default(0.5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio = "{{ audio }}"
+chunk_duration = {{ chunk_duration }}
+num_frames = {{ num_frames }}
+threshold = {{ threshold }}
+
+import json
+from pathlib import Path
+import urllib.request
+import tempfile
+
+import numpy as np
+import onnxruntime as ort
+import librosa
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="onnx/model.onnx")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+with open(preprocessor_path, "r") as f:
+    preprocessor_config = json.load(f)
+
+sample_rate = int(preprocessor_config.get("sampling_rate", 16000))
+labels = [config["id2label"][str(i)] for i in range(len(config["id2label"]))]
+
+if audio.startswith(("http://", "https://")):
+    tmp_audio = tempfile.NamedTemporaryFile(suffix=Path(audio).suffix, delete=False)
+    tmp_audio.close()
+    urllib.request.urlretrieve(audio, tmp_audio.name)
+    audio_path = tmp_audio.name
+else:
+    audio_path = audio
+
+waveform, _ = librosa.load(audio_path, sr=sample_rate, mono=True)
+chunk_samples = int(chunk_duration * sample_rate)
+if waveform.shape[0] < chunk_samples:
+    waveform = np.pad(waveform, (0, chunk_samples - waveform.shape[0]))
+else:
+    waveform = waveform[:chunk_samples]
+
+# Model expects 3D input: [batch, channels, num_samples]
+inputs = waveform.astype(np.float32)[None, None, :]
+
+providers = ["CPUExecutionProvider"]
+if device.startswith("cuda"):
+    providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+session_options = ort.SessionOptions()
+session_options.intra_op_num_threads = 1
+session_options.inter_op_num_threads = 1
+session = ort.InferenceSession(model_path, sess_options=session_options, providers=providers)
+
+input_name = session.get_inputs()[0].name
+outputs = session.run(None, {input_name: inputs})
+logits = np.asarray(outputs[0])
+
+if logits.ndim == 3 and logits.shape[1] == len(labels):
+    logits = np.transpose(logits, (0, 2, 1))
+probs = 1.0 / (1.0 + np.exp(-logits))
+frame_scores = probs[0]
+
+selected = []
+if frame_scores.ndim == 2:
+    mean_scores = frame_scores.mean(axis=0)
+    for label, score in zip(labels, mean_scores):
+        if float(score) >= threshold:
+            selected.append({"label": label, "score": float(score)})
+else:
+    for label, score in zip(labels, frame_scores.tolist()):
+        if float(score) >= threshold:
+            selected.append({"label": label, "score": float(score)})
+
+RESULT = {"labels": labels, "frame_scores": frame_scores, "selected": selected}

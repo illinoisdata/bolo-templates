@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("sayeed99/segformer-b3-fashion") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-segmentation") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+task = {{ task | tojson }}
+image_path = {{ image_path | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+model = repo_id
+
+from PIL import Image
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+
+image = Image.open(image_path)
+
+RESULT = pipe(image)

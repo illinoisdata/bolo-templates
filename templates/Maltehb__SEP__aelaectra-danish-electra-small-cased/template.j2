@@ -1,27 +1,30 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Maltehb/aelaectra-danish-electra-small-cased") %}
-{% set text = text | default("Dette er en prøve sætning.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Dette er en testtekst til Ælæctra.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
-import os
-import numpy as np
 import torch
-from transformers import AutoTokenizer, AutoModelForPreTraining
+from transformers import AutoTokenizer, ElectraForPreTraining
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-# Pre-process input
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+model = ElectraForPreTraining.from_pretrained(repo_id, local_files_only=True)
+model.to(device)
+model.eval()
+
 inputs = tokenizer(text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
 
-# Run inference
-outputs = model(**inputs)
-logits = outputs["logits"] if isinstance(outputs, dict) else outputs.logits
-logits = logits.detach().cpu().numpy()
-
-# Post-process & build RESULT dict
-RESULT = {"logits": logits}
+logits = outputs.logits
+probabilities = torch.sigmoid(logits)
+RESULT = {"logits": logits.detach().cpu().tolist(), "probabilities": probabilities.detach().cpu().tolist()}

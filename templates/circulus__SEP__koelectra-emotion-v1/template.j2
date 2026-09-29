@@ -1,54 +1,33 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("circulus/koelectra-emotion-v1") %}
-{% set text_input = text_input | default("오늘 기분이 좋습니다. 날씨도 화창해요.") %}
-{% set probability_threshold = probability_threshold | default(0.5) %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-text_input = {{ text_input | tojson }}
-probability_threshold = {{ probability_threshold }}
-
-import json
-import os
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('오늘 하루가 너무 좋고 행복해요!') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
 
 import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = AutoModelForSequenceClassification.from_pretrained(repo_id)
-model.to(torch_device)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(
-    text_input,
-    return_tensors="pt",
-    truncation=True,
-    padding=True,
-)
-encoded_inputs = {key: value.to(torch_device) for key, value in encoded_inputs.items()}
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
-logits = outputs.logits
-probabilities = torch.sigmoid(logits)
+    logits = model(**inputs).logits
+    probs = torch.sigmoid(logits).squeeze(0)
 
-probability_values = probabilities.squeeze(0).tolist()
-raw_id2label = model.config.id2label
-id2label = {int(key): value for key, value in raw_id2label.items()}
-
-label_probabilities = [
-    {"label": id2label.get(index, str(index)), "probability": prob}
-    for index, prob in enumerate(probability_values)
-]
-
-predicted_labels = [
-    entry["label"]
-    for entry in label_probabilities
-    if entry["probability"] >= probability_threshold
-]
-
-RESULT = {
-    "label_probabilities": label_probabilities,
-    "predicted_labels": predicted_labels,
-}
+id2label = model.config.id2label
+labels = [id2label[str(i)] if str(i) in id2label else id2label[i] for i in range(len(probs))]
+output = {label: float(prob) for label, prob in zip(labels, probs.tolist())}
+RESULT = {"output": output}

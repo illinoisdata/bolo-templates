@@ -1,25 +1,36 @@
 {% set repo_id = repo_id | default("ai-forever/sage-fredt5-distilled-95m") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default('И не чсно прохожим в этот день непогожйи почему я веселый такйо') %}
-{% set length_multiplier = length_multiplier | default(1.5) %}
+{% set input_text = input_text | default("И не чсно прохожим в этот день непогожйи почему я веселый такйо") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-length_multiplier = {{ length_multiplier }}
 
-import os
+from huggingface_hub import hf_hub_download
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    tokenizer_file=None,
+    use_fast=False,
+)
 model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
 model.to(device)
+model.eval()
 
-inputs = tokenizer(input_text, max_length=None, padding="longest", truncation=False, return_tensors="pt")
-inputs = inputs.to(device)
+inputs = tokenizer(input_text, return_tensors="pt", truncation=False, padding=False)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+max_new_tokens = max(8, int(inputs["input_ids"].shape[1] * 1.5))
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+output_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
 
-outputs = model.generate(**inputs, max_length=int(inputs["input_ids"].size(1) * length_multiplier))
-
-generated_texts = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-
-RESULT = {"generated_texts": generated_texts}
+RESULT = {"output_text": output_text}

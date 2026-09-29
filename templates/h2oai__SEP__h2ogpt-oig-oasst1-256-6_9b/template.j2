@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("h2oai/h2ogpt-oig-oasst1-256-6_9b") %}
+{% set device = device | default("cuda:0") %}
+{%- set task = task | default("text-generation") -%}
+{%- set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") -%}
+{%- set max_new_tokens = max_new_tokens | default(128) -%}
+{%- set temperature = temperature | default(0.9) -%}
+{%- set top_p = top_p | default(0.95) -%}
+
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens | tojson }}
+temperature = {{ temperature | tojson }}
+top_p = {{ top_p | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+
+parts = device.split(":")
+if device.startswith("cuda") and len(parts) > 1 and parts[-1].isdigit():
+    pipeline_device = int(parts[-1])
+elif device.startswith("cuda"):
+    pipeline_device = 0
+else:
+    pipeline_device = -1
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, padding_side="left")
+model = AutoModelForCausalLM.from_pretrained(repo_id, torch_dtype=torch.float16, device_map="auto")
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=pipeline_device)
+
+RESULT = pipe(
+    input_prompt,
+    max_new_tokens=max_new_tokens,
+    temperature=temperature,
+    top_p=top_p,
+)

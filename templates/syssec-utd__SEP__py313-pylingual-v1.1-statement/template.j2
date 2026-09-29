@@ -1,33 +1,48 @@
 {% set repo_id = repo_id | default("syssec-utd/py313-pylingual-v1.1-statement") %}
 {% set device = device | default("cuda:0") %}
-{% set text_inputs = text_inputs | default(["summarize: The quick brown fox jumps over the lazy dog."]) %}
+{% set input_text = input_text | default('def add(a, b):\n    return a + b\n') %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set num_beams = num_beams | default(4) %}
+{% set do_sample = do_sample | default(false) %}
+{% set temperature = temperature | default(1.0) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_inputs = {{ text_inputs }}
-
-from pathlib import Path
+input_text = {{ input_text | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
+do_sample = {{ do_sample }}
+temperature = {{ temperature }}
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(
-    text_inputs,
-    padding=True,
-    truncation=True,
-    return_tensors="pt",
-)
-encoded_inputs = {key: value.to(torch_device) for key, value in encoded_inputs.items()}
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    generated_ids = model.generate(**encoded_inputs)
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+        do_sample=do_sample,
+        temperature=temperature,
+    )
 
-generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-generated_text = [segment.strip() for segment in generated_text]
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {"generated_text": generated_text}
+RESULT = {"output_text": output_text}

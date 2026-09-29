@@ -1,0 +1,26 @@
+{% set repo_id = repo_id | default("breezedeus/cnstd-ppocr-ch_PP-OCRv4_det") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+from PIL import Image
+import numpy as np
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="ch_PP-OCRv4_det_infer.onnx")
+_ = hf_hub_download(repo_id=repo_id, filename="config.yaml")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+image_np = np.asarray(image.resize((640, 640)), dtype=np.float32) / 255.0
+image_np = (image_np - 0.5) / 0.5
+image_np = np.transpose(image_np, (2, 0, 1))[None, ...]
+
+RESULT = {"output": image_np}

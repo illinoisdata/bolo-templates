@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("m-a-p/MERT-v0") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set sampling_rate = sampling_rate | default(16000) %}
+{% set input_audio = input_audio | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+
+task = "{{ task }}"
+sampling_rate = {{ sampling_rate }}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_audio = "{{ input_audio }}"
+
+import librosa
+import torch
+from transformers import pipeline
+
+class AudioTokenizer:
+    def __init__(self, sampling_rate: int):
+        self.sampling_rate = sampling_rate
+
+    def __call__(self, audio_source: str, return_tensors: str = "pt", **_) -> dict[str, torch.Tensor]:
+        waveform, _ = librosa.load(audio_source, sr=self.sampling_rate, mono=True)
+        tensor = torch.from_numpy(waveform).float()
+        if return_tensors == "pt":
+            tensor = tensor.unsqueeze(0)
+        return {"input_values": tensor}
+
+tokenizer = AudioTokenizer(sampling_rate=sampling_rate)
+
+pipe = pipeline(task=task, model=repo_id, tokenizer=tokenizer, device=device, trust_remote_code=True)
+raw_result = pipe(input_audio)
+
+RESULT = {"features": raw_result}

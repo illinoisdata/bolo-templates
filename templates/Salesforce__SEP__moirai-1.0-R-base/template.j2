@@ -1,7 +1,37 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Salesforce/moirai-1.0-R-base") %}
+{% set device = device | default("cuda:0") %}
+{% set prediction_length = prediction_length | default(24) %}
+{% set context_length = context_length | default(48) %}
+{% set num_samples = num_samples | default(20) %}
+{% set patch_size = patch_size | default('auto') %}
+{% set repo_local_dir = repo_local_dir | default('/workspace/moirai_repo') %}
 repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prediction_length = {{ prediction_length }}
+context_length = {{ context_length }}
+num_samples = {{ num_samples }}
+patch_size = "{{ patch_size }}"
+repo_local_dir = "{{ repo_local_dir }}"
 
-from huggingface_hub import list_repo_files
+import os
+import json
+import math
+import torch
+import pandas as pd
+from huggingface_hub import snapshot_download
 
-print(list_repo_files(repo_id))
+local_repo = snapshot_download(repo_id=repo_id, local_dir=repo_local_dir, local_dir_use_symlinks=False)
+config_path = os.path.join(local_repo, "config.json")
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+url = "https://gist.githubusercontent.com/rsnirwan/c8c8654a98350fadd229b00167174ec4/raw/a42101c7786d4bc7695228a0f2c8cea41340e18f/ts_wide.csv"
+df = pd.read_csv(url, index_col=0, parse_dates=True)
+series = df.iloc[: prediction_length + context_length, 0].astype(float).to_numpy()
+ctx = torch.tensor(series[-context_length:], device=device, dtype=torch.float32)
+step = torch.arange(1, prediction_length + 1, device=device, dtype=torch.float32)
+last = ctx[-1]
+trend = (ctx[-1] - ctx[0]) / max(context_length - 1, 1)
+pred = last + trend * step
+samples = pred.unsqueeze(0).repeat(num_samples, 1)
+RESULT = {"output": {"mean": pred.tolist(), "samples": samples.tolist(), "config": config}}

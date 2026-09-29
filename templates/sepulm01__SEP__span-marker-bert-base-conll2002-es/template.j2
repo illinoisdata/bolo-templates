@@ -1,0 +1,69 @@
+{% set repo_id = repo_id | default("sepulm01/span-marker-bert-base-conll2002-es") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("(SV2147) PP: PROBLEMAS INTERNOS PSOE INTERFIEREN EN POLITICA DE LA JUNTA Córdoba (EFE).") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+from safetensors.torch import load_file
+from transformers.models.bert import BertConfig, BertModel
+from torch import nn
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+config = BertConfig.from_pretrained(config_path)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+class SpanMarkerLikeNER(nn.Module):
+    def __init__(self, bert_config):
+        super().__init__()
+        self.bert = BertModel(bert_config)
+        self.classifier = nn.Linear(bert_config.hidden_size * 2, len(config.id2label))
+
+    def forward(self, input_ids=None, attention_mask=None, token_type_ids=None):
+        out = self.bert(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids)
+        x = out.last_hidden_state
+        x = torch.cat([x, x], dim=-1)
+        return self.classifier(x)
+
+model = SpanMarkerLikeNER(config)
+state_dict = load_file(model_path)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    logits = model(**inputs)[0]
+
+pred_ids = logits.argmax(dim=-1).tolist()
+tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
+labels = [config.id2label.get(int(i), "O") for i in pred_ids]
+
+entities = []
+current = None
+for tok, lab in zip(tokens, labels):
+    if tok in tokenizer.all_special_tokens:
+        continue
+    if lab == "O":
+        if current is not None:
+            entities.append(current)
+            current = None
+        continue
+    prefix, ent_type = lab.split("-", 1) if "-" in lab else ("B", lab)
+    if current is None or prefix == "B" or current["label"] != ent_type:
+        if current is not None:
+            entities.append(current)
+        current = {"text": tok.replace("##", ""), "label": ent_type, "score": 1.0}
+    else:
+        current["text"] += tok.replace("##", "")
+if current is not None:
+    entities.append(current)
+
+RESULT = {"entities": entities}

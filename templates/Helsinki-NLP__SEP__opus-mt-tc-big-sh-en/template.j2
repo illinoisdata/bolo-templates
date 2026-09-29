@@ -1,37 +1,30 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-sh-en") %}
+{% set device = device | default("cuda:0") %}
 {% set src_text = src_text | default(["Ispostavilo se da je istina.", "Ovaj vikend imamo besplatne pozive."]) %}
-{% set max_new_tokens = max_new_tokens | default(128) %}
-{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 src_text = {{ src_text }}
-max_new_tokens = {{ max_new_tokens }}
-num_beams = {{ num_beams }}
 
+import os
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import MarianMTModel, MarianTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-tokenized_inputs = tokenizer(
-    src_text,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-    max_length=512,
-)
-tokenized_inputs = {key: value.to(device) for key, value in tokenized_inputs.items()}
+tokenizer = MarianTokenizer.from_pretrained(os.path.dirname(source_spm_path))
+model = MarianMTModel.from_pretrained(os.path.dirname(model_path)).to(device)
+model.eval()
 
+inputs = tokenizer(src_text, return_tensors="pt", padding=True, truncation=True).to(device)
 with torch.no_grad():
-    generated_tokens = model.generate(
-        **tokenized_inputs,
-        max_new_tokens=max_new_tokens,
-        num_beams=num_beams,
-        early_stopping=True,
-    )
-
+    generated_tokens = model.generate(**inputs, num_beams=4)
 translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+
 RESULT = {"translations": translations}

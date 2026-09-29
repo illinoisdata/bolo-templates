@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("unsloth/Llama-3.2-3B-bnb-4bit") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = {"outputs": pipe(input_prompt, max_new_tokens=max_new_tokens)}

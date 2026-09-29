@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("csuhan/Tar-1.5B") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set prompt = prompt | default('Describe the image in detail.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from transformers import AutoProcessor, AutoModelForCausalLM
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+_ = hf_hub_download(repo_id=repo_id, filename='config.json')
+_ = hf_hub_download(repo_id=repo_id, filename='model.safetensors.index.json')
+
+processor = AutoProcessor.from_pretrained(repo_id, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    trust_remote_code=True,
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+)
+model.to(device)
+model.eval()
+
+text = prompt
+inputs = processor(text=text, images=image, return_tensors='pt')
+inputs = {k: v.to(device) if torch.is_tensor(v) else v for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=128, do_sample=False)
+
+output_text = processor.decode(generated_ids[0], skip_special_tokens=True)
+RESULT = {'text': output_text}

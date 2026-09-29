@@ -1,0 +1,51 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set repo_id = repo_id | default("lengyue233/content-vec-best") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+import json
+import torch
+import torch.nn as nn
+import numpy as np
+from transformers import HubertConfig, HubertModel
+from huggingface_hub import hf_hub_download
+import soundfile as sf
+
+
+class HubertModelWithFinalProj(HubertModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.final_proj = nn.Linear(config.hidden_size, config.classifier_proj_size)
+
+
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+config = HubertConfig.from_json_file(config_file)
+model = HubertModelWithFinalProj(config)
+state_dict = torch.load(model_file, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
+model.eval()
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    waveform, sr = sf.read(BytesIO(audio_bytes))
+else:
+    waveform, sr = sf.read(audio_path)
+
+if waveform.ndim > 1:
+    waveform = waveform.mean(axis=1)
+if waveform.dtype != np.float32:
+    waveform = waveform.astype(np.float32)
+waveform = torch.tensor(waveform, dtype=torch.float32).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    outputs = model(waveform)
+
+RESULT = {"last_hidden_state": outputs["last_hidden_state"].detach().cpu().numpy()}

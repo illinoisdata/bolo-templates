@@ -1,0 +1,66 @@
+{% set repo_id = repo_id | default("ZhengPeng7/BiRefNet_HR-matting") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set image_size = image_size | default(2048) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+image_size = {{ image_size }}
+
+import os
+import sys
+import importlib.util
+import torch
+import requests
+from io import BytesIO
+from PIL import Image
+from torchvision import transforms
+from huggingface_hub import hf_hub_download
+
+birefnet_py = hf_hub_download(repo_id=repo_id, filename="birefnet.py")
+config_py = hf_hub_download(repo_id=repo_id, filename="BiRefNet_config.py")
+weights_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+from safetensors.torch import load_file
+repo_dir = os.path.dirname(birefnet_py)
+sys.path.insert(0, repo_dir)
+
+spec_cfg = importlib.util.spec_from_file_location("BiRefNet_config", config_py)
+BiRefNet_config = importlib.util.module_from_spec(spec_cfg)
+spec_cfg.loader.exec_module(BiRefNet_config)
+sys.modules["BiRefNet_config"] = BiRefNet_config
+
+spec = importlib.util.spec_from_file_location("birefnet", birefnet_py, submodule_search_locations=[repo_dir])
+birefnet = importlib.util.module_from_spec(spec)
+sys.modules["birefnet"] = birefnet
+spec.loader.exec_module(birefnet)
+BiRefNet = birefnet.BiRefNet
+
+if isinstance(image_path, str) and image_path.startswith(("http://", "https://")):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model = BiRefNet(bb_pretrained=False)
+state_dict = load_file(weights_file, device="cpu")
+model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
+model.eval()
+
+transform_image = transforms.Compose([
+    transforms.Resize((image_size, image_size)),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+])
+
+input_image = transform_image(image).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    output = model(input_image)
+    preds = output[-1].sigmoid().cpu() if isinstance(output, (list, tuple)) else output.sigmoid().cpu()
+
+pred = preds[0].squeeze()
+mask = transforms.ToPILImage()(pred).resize(image.size)
+rgba_image = image.copy()
+rgba_image.putalpha(mask)
+
+RESULT = {"image": rgba_image, "mask": mask, "prediction": pred}

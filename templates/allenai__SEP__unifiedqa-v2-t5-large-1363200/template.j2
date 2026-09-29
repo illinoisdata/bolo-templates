@@ -1,33 +1,51 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("allenai/unifiedqa-v2-t5-large-1363200") %}
-{% set text_prompt = text_prompt | default("Answer the following question: What is the capital of France?") %}
-{% set max_length = max_length | default(200) %}
-{% set num_beams = num_beams | default(5) %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What is the capital of France?') %}
+{% set context = context | default('') %}
+{% set max_new_tokens = max_new_tokens | default(16) %}
+{% set num_beams = num_beams | default(4) %}
+{% set do_sample = do_sample | default(false) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_prompt = "{{ text_prompt }}"
-max_length = {{ max_length }}
+question = "{{ question }}"
+context = "{{ context }}"
+max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
+do_sample = {{ do_sample }}
 
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_file = hf_hub_download(repo_id=repo_id, filename="spiece.model")
 
-encoded_inputs = tokenizer(text_prompt, return_tensors="pt")
-encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+model_dir = model_file.rsplit('/', 1)[0]
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-generation_kwargs = {
-    "max_length": max_length,
-    "num_beams": num_beams,
-}
+if context:
+    input_text = f"question: {question} context: {context}"
+else:
+    input_text = f"question: {question}"
 
-generated_tokens = model.generate(**encoded_inputs, **generation_kwargs)
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_answer = tokenizer.decode(
-    generated_tokens[0], skip_special_tokens=True, clean_up_tokenization_spaces=True
-)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+        do_sample=do_sample,
+    )
 
-RESULT = {"generated_answer": generated_answer}
+answer = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"answer": answer}

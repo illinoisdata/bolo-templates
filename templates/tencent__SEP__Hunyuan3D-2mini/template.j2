@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("tencent/Hunyuan3D-2mini") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set num_inference_steps = num_inference_steps | default(30) %}
+{% set octree_resolution = octree_resolution | default(380) %}
+{% set num_chunks = num_chunks | default(20000) %}
+{% set seed = seed | default(12345) %}
+{% set subfolder = subfolder | default('hunyuan3d-dit-v2-mini') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+num_inference_steps = {{ num_inference_steps }}
+octree_resolution = {{ octree_resolution }}
+num_chunks = {{ num_chunks }}
+seed = {{ seed }}
+subfolder = "{{ subfolder }}"
+
+import os
+from pathlib import Path
+import torch
+from PIL import Image
+import requests
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+from hy3dgen.shapegen import Hunyuan3DDiTFlowMatchingPipeline
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model_file = hf_hub_download(repo_id=repo_id, filename=f"{subfolder}/model.fp16.safetensors")
+model_dir = str(Path(model_file).parent)
+
+pipeline = Hunyuan3DDiTFlowMatchingPipeline.from_pretrained(
+    repo_id,
+    subfolder=subfolder,
+    use_safetensors=True,
+    device=device,
+)
+
+mesh = pipeline(
+    image=image,
+    num_inference_steps=num_inference_steps,
+    octree_resolution=octree_resolution,
+    num_chunks=num_chunks,
+    generator=torch.manual_seed(seed),
+    output_type='trimesh'
+)[0]
+
+RESULT = {"mesh": mesh}

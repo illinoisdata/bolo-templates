@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("salmanshahid/vad") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+import os
+import soundfile as sf
+import torch
+import requests
+from pathlib import Path
+from huggingface_hub import hf_hub_download
+from pyannote.audio import Pipeline
+
+if audio_path.startswith('http://') or audio_path.startswith('https://'):
+    local_audio_path = Path('/tmp') / 'vad_input_audio.wav'
+    r = requests.get(audio_path, timeout=30)
+    r.raise_for_status()
+    local_audio_path.write_bytes(r.content)
+    audio_file = str(local_audio_path)
+else:
+    audio_file = audio_path
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config.yaml')
+_ = Path(config_path).parent
+
+waveform, sample_rate = sf.read(audio_file, always_2d=True)
+waveform = torch.tensor(waveform.T, dtype=torch.float32)
+audio_input = {"waveform": waveform, "sample_rate": sample_rate}
+
+pipeline = Pipeline.from_pretrained(repo_id)
+pipeline.to(torch.device(device))
+
+vad_output = pipeline(audio_input)
+
+speech_segments = []
+for segment in vad_output.get_timeline().support():
+    speech_segments.append({'start': float(segment.start), 'end': float(segment.end)})
+
+RESULT = {"speech_segments": speech_segments}

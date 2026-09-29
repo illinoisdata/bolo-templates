@@ -1,0 +1,56 @@
+{% set repo_id = repo_id | default("timm/resnet50_clip.yfcc15m") %}
+{% set device = device | default("cuda:0") %}
+{% set image1 = image1 | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text = text | default('a photo of a cat') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image1 = "{{ image1 }}"
+text = "{{ text }}"
+
+import json
+from PIL import Image
+import torch
+import timm
+from safetensors.torch import load_file
+from huggingface_hub import hf_hub_download
+from timm.data import resolve_data_config, create_transform
+
+model_path = hf_hub_download(repo_id=repo_id, filename='model.safetensors')
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+
+with open(config_path, 'r') as f:
+    cfg = json.load(f)
+
+if image1.startswith('http://') or image1.startswith('https://'):
+    import requests
+    img = Image.open(requests.get(image1, stream=True).raw).convert('RGB')
+else:
+    img = Image.open(image1).convert('RGB')
+
+model = timm.create_model(repo_id.split('/')[-1], pretrained=False, num_classes=cfg.get('num_classes', 1024))
+state_dict = load_file(model_path)
+model.load_state_dict(state_dict)
+model.eval().to(device)
+
+pretrained_cfg = cfg.get('pretrained_cfg', {})
+data_config = resolve_data_config({
+    'input_size': pretrained_cfg.get('input_size', (3, 224, 224)),
+    'interpolation': pretrained_cfg.get('interpolation', 'bicubic'),
+    'mean': pretrained_cfg.get('mean', (0.48145466, 0.4578275, 0.40821073)),
+    'std': pretrained_cfg.get('std', (0.26862954, 0.26130258, 0.27577711)),
+    'crop_pct': pretrained_cfg.get('crop_pct', 0.9),
+}, model=model)
+transform = create_transform(**data_config, is_training=False)
+input_tensor = transform(img).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    logits = model(input_tensor)
+    probs = torch.softmax(logits, dim=-1)
+    top_probs, top_indices = torch.topk(probs, k=5, dim=-1)
+
+RESULT = {
+    'logits': logits.detach().cpu(),
+    'probs': probs.detach().cpu(),
+    'top_probs': top_probs.detach().cpu(),
+    'top_indices': top_indices.detach().cpu(),
+}

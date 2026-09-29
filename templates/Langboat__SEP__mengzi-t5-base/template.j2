@@ -1,28 +1,39 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Langboat/mengzi-t5-base") %}
-{% set text_input = text_input | default("翻译以下中文：今天的天气晴朗，想让模型用更优美的语言表达。") %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('今天天气怎么样？') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text = "{{ text }}"
 
-from pathlib import Path
+import torch
+from transformers import T5Tokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+weights_path = hf_hub_download(repo_id=repo_id, filename='model.safetensors')
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename='spiece.model')
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+# Load tokenizer and model on the specified device
+tokenizer = T5Tokenizer(vocab_file=tokenizer_path)
+model = T5ForConditionalGeneration.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+model.eval()
 
-encoded_inputs = tokenizer(text_input, return_tensors="pt")
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+inputs = tokenizer(text, return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_tokens = model.generate(**encoded_inputs, max_length=max_length, num_beams=num_beams)
-generated_tokens = generated_tokens.to("cpu")
-decoded_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-generated_text = decoded_texts[0] if decoded_texts else ""
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=32,
+        num_beams=4,
+        do_sample=False,
+    )
 
-RESULT = {"generated_text": generated_text}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

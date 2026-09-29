@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("Qwen/Qwen3-8B-FP8") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set model_kwargs = model_kwargs | default({"quantization_config": None}) %}
+
+repo_id = "{{ repo_id }}"
+task = "{{ task }}"
+device = "{{ device }}"
+input_prompt = "{{ input_prompt }}"
+model_kwargs = {{ model_kwargs | tojson | replace('null', 'None') }}
+model = repo_id
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device, model_kwargs=model_kwargs)
+RESULT = pipe(input_prompt)

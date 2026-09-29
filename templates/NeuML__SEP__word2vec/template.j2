@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("NeuML/word2vec") %}
+{% set device = device | default("cuda:0") %}
+{% set words = words | default(['word', 'vector', 'king', 'queen']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+words = {{ words }}
+
+import json
+import os
+
+import numpy as np
+from huggingface_hub import hf_hub_download
+from staticvectors import StaticVectors
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+
+model = StaticVectors(weights_path)
+embeddings = model.embeddings(words)
+
+RESULT = {"embeddings": embeddings, "shape": embeddings.shape, "words": words}

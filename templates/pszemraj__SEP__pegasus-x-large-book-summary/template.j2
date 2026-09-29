@@ -1,47 +1,61 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("pszemraj/pegasus-x-large-book-summary") %}
-{% set input_text = input_text | default("Modern long-form summarization models condense extensive documents into concise overviews while respecting the core arguments and narrative flow.") %}
-{% set max_length = max_length | default(512) %}
-{% set min_length = min_length | default(8) %}
-{% set num_beams = num_beams | default(2) %}
-{% set length_penalty = length_penalty | default(0.8) %}
-{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
-{% set early_stopping = early_stopping | default(true) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Transformer-based models have shown to be very useful for many NLP tasks. However, a major limitation of transformers-based models is its O(n^2) time and memory complexity. BigBird is one of such recent models to address this issue by using block sparse attention and can handle long sequences more efficiently. The goal of this post is to give the reader an in-depth understanding of big bird implementation and ease one’s life in using BigBird with Transformers.', true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = """{{ input_text }}"""
-max_length = {{ max_length }}
-min_length = {{ min_length }}
-num_beams = {{ num_beams }}
-length_penalty = {{ length_penalty }}
-no_repeat_ngram_size = {{ no_repeat_ngram_size }}
-early_stopping = {{ early_stopping }}
-
-from pathlib import Path
+text = "{{ text }}"
+max_length = {{ max_length | default(48, true) }}
+min_length = {{ min_length | default(2, true) }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size | default(3, true) }}
+encoder_no_repeat_ngram_size = {{ encoder_no_repeat_ngram_size | default(3, true) }}
+early_stopping = {{ early_stopping | default(true, true) }}
+length_penalty = {{ length_penalty | default(0.1, true) }}
+num_beams = {{ num_beams | default(2, true) }}
 
 import torch
+from huggingface_hub import hf_hub_download
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-torch_device = torch.device(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
-encoded_inputs = tokenizer(
-    input_text,
-    return_tensors="pt",
-    truncation=True,
-    padding="longest",
-    max_length=max_length,
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+_tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    use_fast=True,
+    tokenizer_file=tokenizer_json_path,
+    tokenizer_config_path=tokenizer_config_path,
+    special_tokens_map_file=special_tokens_map_path,
 )
-encoded_inputs = {name: tensor.to(torch_device) for name, tensor in encoded_inputs.items()}
-generated_ids = model.generate(
-    **encoded_inputs,
-    max_length=max_length,
-    min_length=min_length,
-    num_beams=num_beams,
-    length_penalty=length_penalty,
-    no_repeat_ngram_size=no_repeat_ngram_size,
-    early_stopping=early_stopping,
+
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+    low_cpu_mem_usage=True,
+    use_safetensors=True,
+    device_map=None,
 )
-summary_candidates = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-summary_output = summary_candidates[0] if len(summary_candidates) == 1 else summary_candidates
-RESULT = {"summary": summary_output}
+model.to(device)
+model.eval()
+
+inputs = _tokenizer(text, return_tensors="pt", truncation=True, max_length=16384)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_length=max_length,
+        min_length=min_length,
+        no_repeat_ngram_size=no_repeat_ngram_size,
+        encoder_no_repeat_ngram_size=encoder_no_repeat_ngram_size,
+        early_stopping=early_stopping,
+        length_penalty=length_penalty,
+        num_beams=num_beams,
+    )
+
+summary = _tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"summary": summary}

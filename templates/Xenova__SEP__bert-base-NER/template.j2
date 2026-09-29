@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("Xenova/bert-base-NER") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hugging Face Inc. is a company based in New York City. Its founder is Clement Delangue.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import os
+import numpy as np
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoConfig, pipeline, BertForTokenClassification
+import torch
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+repo_dir = os.path.dirname(config_path)
+
+config = AutoConfig.from_pretrained(repo_dir)
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, use_fast=True)
+model = BertForTokenClassification(config)
+model.to(device)
+model.eval()
+
+ner = pipeline(
+    task="token-classification",
+    model=model,
+    tokenizer=tokenizer,
+    aggregation_strategy="simple",
+    device=0 if str(device).startswith("cuda") else -1,
+)
+
+output = ner(text)
+
+RESULT = {"output": output}

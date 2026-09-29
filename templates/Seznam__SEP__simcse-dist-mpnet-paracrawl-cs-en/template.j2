@@ -1,40 +1,30 @@
 {% set repo_id = repo_id | default("Seznam/simcse-dist-mpnet-paracrawl-cs-en") %}
 {% set device = device | default("cuda:0") %}
-{% set sentence_a = sentence_a | default("Dnes je výborné počasí na procházku po parku.") %}
-{% set sentence_b = sentence_b | default("Večer si oblíbím dobrý film a uvařím si čaj.") %}
-{% set max_length = max_length | default(512) %}
+{% set text1 = text1 | default('Dnes je výborné počasí na procházku po parku.') %}
+{% set text2 = text2 | default('Večer si oblíbím dobrý film a uvařím si čaj.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-sentence_a = "{{ sentence_a }}"
-sentence_b = "{{ sentence_b }}"
-max_length = {{ max_length }}
-
-from pathlib import Path
+text1 = {{ text1 | tojson }}
+text2 = {{ text2 | tojson }}
 
 import torch
 from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
+model = AutoModel.from_pretrained(repo_id, torch_dtype=torch.float32).to(device)
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(torch_device)
-model.eval()
 
-text_inputs = [sentence_a, sentence_b]
-encoded_input = tokenizer(
-    text_inputs,
-    padding=True,
-    truncation=True,
-    max_length=max_length,
-    return_tensors="pt",
-)
-encoded_input = {key: value.to(torch_device) for key, value in encoded_input.items()}
-
+inputs = tokenizer([text1, text2], max_length=512, padding=True, truncation=True, return_tensors='pt').to(device)
 with torch.no_grad():
-    outputs = model(**encoded_input)
+    outputs = model(**inputs)
+    embeddings = outputs.last_hidden_state[:, 0]
+    similarity = torch.nn.functional.cosine_similarity(embeddings[0], embeddings[1], dim=0)
 
-embeddings = outputs.last_hidden_state[:, 0]
-similarity = torch.nn.functional.cosine_similarity(embeddings[0], embeddings[1], dim=0)
-similarity_score = similarity.item()
-
-RESULT = {"similarity_score": similarity_score}
+RESULT = {"similarity": similarity.item(), "embeddings": embeddings.detach().cpu().numpy()}

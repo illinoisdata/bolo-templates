@@ -1,0 +1,39 @@
+{% set task = task | default("text-generation") %}
+{% set repo_id = repo_id | default("aisquared/chopt-1_3b") %}
+{% set device = device | default("cuda:0") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set special_tokens = special_tokens | default(["### Instruction:", "### Response:\n", "### End"]) %}
+
+# Task and model configuration
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+special_tokens = {{ special_tokens | tojson }}
+
+# Imports
+from transformers import AutoTokenizer, pipeline
+from instruct_pipeline import InstructionTextGenerationPipeline
+
+# Load tokenizer and assign custom pipeline
+tokenizer = AutoTokenizer.from_pretrained(repo_id, padding_side="left")
+existing_special_tokens = getattr(tokenizer, "additional_special_tokens", None)
+if existing_special_tokens is None:
+    tokenizer.additional_special_tokens = special_tokens.copy()
+else:
+    merged_special_tokens = list(existing_special_tokens)
+    for token in special_tokens:
+        if token not in merged_special_tokens:
+            merged_special_tokens.append(token)
+    tokenizer.additional_special_tokens = merged_special_tokens
+
+pipe = pipeline(
+    task=task,
+    model=repo_id,
+    tokenizer=tokenizer,
+    device=device,
+    pipeline_class=InstructionTextGenerationPipeline,
+)
+
+# Run inference
+RESULT = pipe(input_prompt)

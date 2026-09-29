@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("Yiwen-ntu/MeshAnything") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+
+from huggingface_hub import hf_hub_download
+
+weight_path = hf_hub_download(repo_id=repo_id, filename='MeshAnything_350m.pth')
+
+with open(weight_path, 'rb') as f:
+    head = f.read(32)
+
+RESULT = {
+    'weight_path': weight_path,
+    'file_head_bytes': list(head),
+}

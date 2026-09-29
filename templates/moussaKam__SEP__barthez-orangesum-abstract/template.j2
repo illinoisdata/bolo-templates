@@ -1,0 +1,59 @@
+{% set repo_id = repo_id | default("moussaKam/barthez-orangesum-abstract") %}
+{% set device = device | default("cuda:0") %}
+{% set max_length = max_length | default(100) %}
+{% set min_length = min_length | default(10) %}
+{% set num_beams = num_beams | default(4) %}
+{% set text = text | default('Citant les préoccupations de ses clients dénonçant des cas de censure après la suppression du compte de Trump, un fournisseur d\'accès Internet de l\'État de l\'Idaho a décidé de bloquer Facebook et Twitter. La mesure ne concernera cependant que les clients mécontents de la politique de ces réseaux sociaux.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_length = {{ max_length }}
+min_length = {{ min_length }}
+num_beams = {{ num_beams }}
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from tokenizers import Tokenizer
+from transformers import MBartForConditionalGeneration, MBartConfig
+
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+sentencepiece_path = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+
+with open(config_path, "r") as f:
+    config_dict = json.load(f)
+config = MBartConfig.from_dict(config_dict)
+
+model = MBartForConditionalGeneration(config)
+state_dict = torch.load(model_path, map_location="cpu")
+model.load_state_dict(state_dict)
+model = model.to(device)
+model.eval()
+
+with open(tokenizer_path, "r", encoding="utf-8") as f:
+    tokenizer_json = json.load(f)
+# fallback: build tokenizer from json if available
+try:
+    tokenizer = Tokenizer.from_file(tokenizer_path)
+except Exception:
+    vocab = tokenizer_json.get("model", {}).get("vocab", [])
+    tokenizer = Tokenizer(Unigram(vocab, unk_id=3, byte_fallback=False))
+enc = tokenizer.encode(text)
+input_ids = torch.tensor([enc.ids], device=device)
+attention_mask = torch.tensor([[1] * len(enc.ids)], device=device)
+inputs = {"input_ids": input_ids, "attention_mask": attention_mask}
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_length=max_length,
+        min_length=min_length,
+        num_beams=num_beams,
+        early_stopping=True,
+    )
+summary = tokenizer.decode(generated_ids[0].tolist())
+
+RESULT = {"summary": summary}

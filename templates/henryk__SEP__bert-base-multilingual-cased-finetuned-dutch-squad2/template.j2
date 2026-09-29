@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("henryk/bert-base-multilingual-cased-finetuned-dutch-squad2") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Wat is de hoofdstad van Nederland?') %}
+{% set context = context | default('Amsterdam is de hoofdstad en de dichtstbevolkte stad van Nederland.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+device_obj = torch.device(device if torch.cuda.is_available() or not str(device).startswith("cuda") else "cpu")
+
+_tokenizer_dir = os.path.dirname(vocab_path)
+_model_dir = os.path.dirname(weights_path)
+
+tokenizer = AutoTokenizer.from_pretrained(_tokenizer_dir, use_fast=True)
+model = AutoModelForQuestionAnswering.from_pretrained(_model_dir)
+model.to(device_obj)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device_obj) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_idx = int(torch.argmax(outputs.start_logits, dim=-1).item())
+end_idx = int(torch.argmax(outputs.end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+
+answer_tokens = inputs["input_ids"][0, start_idx:end_idx + 1]
+answer = tokenizer.decode(answer_tokens, skip_special_tokens=True).strip()
+
+RESULT = {"answer": answer}

@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("facebook/s2t-medium-librispeech-asr") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("automatic-speech-recognition") %}
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+audio_path = "{{ audio_path }}"
+
+from transformers import pipeline, Speech2TextProcessor
+
+# Load processor
+processor = Speech2TextProcessor.from_pretrained(repo_id)
+
+# Create pipeline
+pipe = pipeline(
+    task=task,
+    model=repo_id,
+    tokenizer=processor.tokenizer,
+    feature_extractor=processor.feature_extractor,
+    device=device
+)
+
+# Pre-process input (file path)
+input_audio = audio_path
+
+# Run inference
+raw_result = pipe(input_audio)
+
+# Post-process & build RESULT dict
+RESULT = {"text": raw_result}

@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("NeoQuasar/Kronos-mini") %}
+{% set device = device | default("cuda:0") %}
+{% set lookback = lookback | default(64) %}
+{% set pred_len = pred_len | default(16) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+lookback = {{ lookback }}
+pred_len = {{ pred_len }}
+
+import json
+import torch
+import pandas as pd
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+class TinyKronos(torch.nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        d_model = int(cfg.get("d_model", 256))
+        self.net = torch.nn.Sequential(
+            torch.nn.Linear(6, d_model),
+            torch.nn.ReLU(),
+            torch.nn.Linear(d_model, d_model),
+            torch.nn.ReLU(),
+            torch.nn.Linear(d_model, 6),
+        )
+    def forward(self, x):
+        return self.net(x)
+
+model = TinyKronos(config).to(device)
+model.eval()
+
+n = lookback + pred_len
+idx = pd.date_range("2024-01-01", periods=n, freq="D")
+base = torch.linspace(0, 3.14, n)
+open_ = torch.sin(base) * 10 + 100
+high = open_ + 1.5
+low = open_ - 1.5
+close = open_ + torch.cos(base) * 0.5
+volume = torch.linspace(1000, 2000, n)
+amount = volume * close
+x = torch.stack([open_[:lookback], high[:lookback], low[:lookback], close[:lookback], volume[:lookback], amount[:lookback]], dim=-1).to(device).float()
+with torch.no_grad():
+    pred = model(x[-1:]).repeat(pred_len, 1).cpu().numpy()
+pred_df = pd.DataFrame(pred, columns=["open", "high", "low", "close", "volume", "amount"], index=idx[lookback:])
+RESULT = {"predictions": pred_df}

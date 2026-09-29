@@ -1,0 +1,64 @@
+{% set repo_id = repo_id | default("Maple728/TimeMoE-200M") %}
+{% set device = device | default("cuda:0") %}
+{% set input_series = input_series | default([1.0, 1.1, 1.2, 1.15, 1.18, 1.22, 1.3, 1.35, 1.4, 1.5, 1.55, 1.6, 1.62, 1.7, 1.8, 1.85]) %}
+{% set horizon = horizon | default(8) %}
+{% set trust_remote_code = trust_remote_code | default(true) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_series = {{ input_series }}
+horizon = {{ horizon }}
+trust_remote_code = {{ trust_remote_code }}
+
+import os
+import sys
+import types
+import importlib.util
+import torch
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+modeling_path = hf_hub_download(repo_id=repo_id, filename="modeling_time_moe.py")
+configuration_path = hf_hub_download(repo_id=repo_id, filename="configuration_time_moe.py")
+ts_generation_mixin_path = hf_hub_download(repo_id=repo_id, filename="ts_generation_mixin.py")
+
+repo_dir = os.path.dirname(model_path)
+package_name = "time_moe_local"
+package = types.ModuleType(package_name)
+package.__path__ = [repo_dir]
+sys.modules[package_name] = package
+
+spec_cfg = importlib.util.spec_from_file_location(f"{package_name}.configuration_time_moe", configuration_path)
+configuration_time_moe = importlib.util.module_from_spec(spec_cfg)
+sys.modules[f"{package_name}.configuration_time_moe"] = configuration_time_moe
+spec_cfg.loader.exec_module(configuration_time_moe)
+
+spec_ts = importlib.util.spec_from_file_location(f"{package_name}.ts_generation_mixin", ts_generation_mixin_path)
+ts_generation_mixin = importlib.util.module_from_spec(spec_ts)
+sys.modules[f"{package_name}.ts_generation_mixin"] = ts_generation_mixin
+spec_ts.loader.exec_module(ts_generation_mixin)
+
+spec_model = importlib.util.spec_from_file_location(f"{package_name}.modeling_time_moe", modeling_path)
+modeling_time_moe = importlib.util.module_from_spec(spec_model)
+sys.modules[f"{package_name}.modeling_time_moe"] = modeling_time_moe
+spec_model.loader.exec_module(modeling_time_moe)
+
+TimeMoeConfig = configuration_time_moe.TimeMoeConfig
+TimeMoeForPrediction = modeling_time_moe.TimeMoeForPrediction
+
+config = TimeMoeConfig.from_pretrained(repo_dir)
+model = TimeMoeForPrediction.from_pretrained(repo_dir, config=config, torch_dtype=torch.bfloat16)
+model.to(device)
+model.eval()
+
+series = torch.tensor(input_series, dtype=torch.bfloat16, device=device).unsqueeze(0).unsqueeze(-1)
+
+with torch.no_grad():
+    output = model(series, max_horizon_length=horizon)
+
+if isinstance(output, dict):
+    preds = output.get("predictions", next(iter(output.values())))
+else:
+    preds = getattr(output, "predictions", output[0] if isinstance(output, (tuple, list)) else output)
+
+RESULT = {"predictions": preds.detach().cpu().tolist()}

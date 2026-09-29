@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("apple/DFN2B-CLIP-ViT-L-14") %}
+{% set device = device | default("cuda:0") %}
+{% set labels = labels | default(['a dog', 'a cat', 'a donut', 'a beignet']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+labels = {{ labels }}
+image_path = "/u/yunqili4/projects/ML-code-generation/data/image1.jpeg"
+
+import torch
+import torch.nn.functional as F
+from PIL import Image
+from open_clip import create_model_from_pretrained, get_tokenizer
+from huggingface_hub import hf_hub_download
+
+_ = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+if str(image_path).startswith(("http://", "https://")):
+    from urllib.request import urlopen
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model, preprocess = create_model_from_pretrained(f"hf-hub:{repo_id}")
+model = model.to(device)
+model.eval()
+tokenizer = get_tokenizer('ViT-L-14')
+
+image = preprocess(image).unsqueeze(0).to(device)
+text = tokenizer(labels, context_length=model.context_length).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image)
+    text_features = model.encode_text(text)
+    image_features = F.normalize(image_features, dim=-1)
+    text_features = F.normalize(text_features, dim=-1)
+    logits = image_features @ text_features.T * model.logit_scale.exp()
+    if getattr(model, 'logit_bias', None) is not None:
+        logits = logits + model.logit_bias
+    text_probs = torch.sigmoid(logits)
+    output = list(zip(labels, [round(p.item(), 3) for p in text_probs[0].detach().cpu()]))
+
+RESULT = {"output": output}

@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("dandelin/vilt-b32-finetuned-vqa") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default("What is the animal doing?") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+image_path = "{{ image_path }}"
+
+import torch
+from PIL import Image
+import requests
+from io import BytesIO
+from transformers import ViltProcessor, ViltForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+processor = ViltProcessor.from_pretrained(repo_id)
+model = ViltForQuestionAnswering.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+if str(image_path).startswith(("http://", "https://")):
+    image = Image.open(BytesIO(requests.get(image_path, stream=True).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+encoding = processor(image, question, return_tensors="pt")
+encoding = {k: v.to(device) for k, v in encoding.items()}
+with torch.no_grad():
+    outputs = model(**encoding)
+logits = outputs.logits
+pred_idx = int(logits.argmax(-1).item())
+answer = model.config.id2label[pred_idx]
+RESULT = {"answer": answer, "logits": logits.detach().cpu().numpy()}

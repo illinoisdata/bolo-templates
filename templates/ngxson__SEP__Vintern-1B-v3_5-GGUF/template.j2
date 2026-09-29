@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("ngxson/Vintern-1B-v3_5-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('Vintern-1B-v3_5-Q8_0.gguf') %}
+{% set mmproj_filename = mmproj_filename | default('mmproj-Vintern-1B-v3_5-Q8_0.gguf') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set prompt = prompt | default('Describe the image in detail.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+mmproj_filename = "{{ mmproj_filename }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+
+from huggingface_hub import hf_hub_download
+from PIL import Image
+import os
+import subprocess
+import shutil
+import tempfile
+
+# Download model files from Hub
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+mmproj_path = hf_hub_download(repo_id=repo_id, filename=mmproj_filename)
+
+# Load image input
+if isinstance(image_path, str) and image_path.startswith(("http://", "https://")):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+llama_cli = shutil.which("llama-cli")
+if llama_cli is not None:
+    cmd = [
+        llama_cli,
+        "-m", model_path,
+        "--mmproj", mmproj_path,
+        "--image", image_path,
+        "--chat-template", "vicuna",
+        "-p", prompt,
+        "-n", "128",
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    output_text = proc.stdout.strip() if proc.stdout.strip() else proc.stderr.strip()
+else:
+    output_text = f"llama-cli not available; downloaded {os.path.basename(model_path)} and {os.path.basename(mmproj_path)}"
+
+RESULT = {"output_text": output_text, "image": image}

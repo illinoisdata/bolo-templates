@@ -1,0 +1,15 @@
+{% set repo_id = repo_id | default("unsloth/gemma-2-9b-bnb-4bit") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+repo_id = {{ repo_id | tojson }}
+task = {{ task | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+RESULT = {"output": pipe(input_prompt)}

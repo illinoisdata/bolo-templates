@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("LiheYoung/depth_anything_vitl14") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("depth-estimation") %}
+{% set config = config | default("Intel/dpt-large") %}
+{% set image_processor = image_processor | default("Intel/dpt-large") %}
+{% set input_image = input_image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+task = {{ task | tojson }}
+config = {{ config | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+image_processor = {{ image_processor | tojson }}
+input_image = {{ input_image | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, config=config, image_processor=image_processor, device=device)
+RESULT = pipe(input_image)

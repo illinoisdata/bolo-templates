@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("LanguageBind/MoE-LLaVA-Phi2-2.7B-4e") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set model = model | default(repo_id) %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+
+repo_id = "{{ repo_id }}"
+task = "{{ task }}"
+device = "{{ device }}"
+model = "{{ model }}"
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, PhiConfig, PhiForCausalLM, pipeline
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_path, "r", encoding="utf-8") as fp:
+    raw_config = json.load(fp)
+clean_config = {k: v for k, v in raw_config.items() if k != "auto_map"}
+config = PhiConfig(**clean_config)
+config.model_type = raw_config.get("model_type", config.model_type)
+config.auto_map = {}
+config.name_or_path = repo_id
+
+tokenizer = AutoTokenizer.from_pretrained(model)
+model_obj = PhiForCausalLM.from_pretrained(model, config=config)
+model_obj.to(device)
+pipe = pipeline(
+    task=task,
+    model=model_obj,
+    tokenizer=tokenizer,
+    device=device,
+)
+
+RESULT = pipe(input_prompt, max_new_tokens=max_new_tokens)

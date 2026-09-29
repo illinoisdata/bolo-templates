@@ -1,0 +1,23 @@
+{% set repo_id = repo_id | default("moussaKam/barthez") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Barthez est le meilleur {mask} du monde.") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+import json
+from huggingface_hub import hf_hub_download
+from transformers import BarthezTokenizer, pipeline
+
+tokenizer_file = hf_hub_download(repo_id, "tokenizer.json")
+with open(tokenizer_file, "r", encoding="utf-8") as tokenizer_handle:
+    vocab_dict = json.load(tokenizer_handle)["model"]["vocab"]
+sorted_vocab = sorted(vocab_dict.items(), key=lambda entry: entry[1])
+tokenizer = BarthezTokenizer(vocab=[(token, 0.0) for token, _ in sorted_vocab])
+pipe = pipeline(task=task, model=repo_id, tokenizer=tokenizer, device=device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

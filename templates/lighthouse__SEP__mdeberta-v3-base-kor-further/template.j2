@@ -1,25 +1,43 @@
 {% set repo_id = repo_id | default("lighthouse/mdeberta-v3-base-kor-further") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("한국어 테스트 문장입니다.") %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-text = {{ text | tojson }}
-
-import json
-from pathlib import Path
+{% set text = text | default('한국어 문장을 입력받아 문장 임베딩을 생성합니다.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
 
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer, AutoModel, DebertaV2Tokenizer
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spm_path = hf_hub_download(repo_id=repo_id, filename="spm.model")
 
-inputs = tokenizer(text, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+_ = (weights_path, config_path, tokenizer_config_path, special_tokens_map_path)
 
-with torch.inference_mode():
+tokenizer = DebertaV2Tokenizer(vocab_file=spm_path)
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=False)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
     outputs = model(**inputs)
+    last_hidden_state = outputs.last_hidden_state
+    attention_mask = inputs.get("attention_mask")
+    if attention_mask is None:
+        sentence_embedding = last_hidden_state[:, 0, :]
+    else:
+        mask = attention_mask.unsqueeze(-1).type_as(last_hidden_state)
+        summed = (last_hidden_state * mask).sum(dim=1)
+        counts = mask.sum(dim=1).clamp(min=1e-9)
+        sentence_embedding = summed / counts
 
-last_hidden_state = outputs.last_hidden_state.detach().cpu().tolist()
-
-RESULT = {"last_hidden_state": last_hidden_state}
+RESULT = {
+    "last_hidden_state": last_hidden_state.detach().cpu(),
+    "sentence_embedding": sentence_embedding.detach().cpu(),
+}

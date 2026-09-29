@@ -1,12 +1,69 @@
 {% set repo_id = repo_id | default("eugenesiow/edsr-base") %}
 {% set device = device | default("cuda:0") %}
+{% set scale = scale | default(2) %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
+scale = {{ scale }}
+image_path = "{{ image_path }}"
 
 import os
-import transformers
+import urllib.request
+from PIL import Image
+import torch
+from torchvision.transforms.functional import to_tensor, to_pil_image
 
-models_dir = os.path.join(os.path.dirname(transformers.__file__), "models")
-models = sorted(os.listdir(models_dir)) if os.path.isdir(models_dir) else []
+class ResidualBlock(torch.nn.Module):
+    def __init__(self, n_feats, res_scale=1.0):
+        super().__init__()
+        self.body = torch.nn.Sequential(
+            torch.nn.Conv2d(n_feats, n_feats, 3, padding=1),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.Conv2d(n_feats, n_feats, 3, padding=1),
+        )
+        self.res_scale = res_scale
+    def forward(self, x):
+        return x + self.body(x) * self.res_scale
 
-RESULT = {"models": models}
+class EDSR(torch.nn.Module):
+    def __init__(self, scale=2, n_resblocks=16, n_feats=64, res_scale=1.0, n_colors=3):
+        super().__init__()
+        self.head = torch.nn.Conv2d(n_colors, n_feats, 3, padding=1)
+        self.body = torch.nn.Sequential(*[ResidualBlock(n_feats, res_scale) for _ in range(n_resblocks)], torch.nn.Conv2d(n_feats, n_feats, 3, padding=1))
+        self.up = torch.nn.Sequential(
+            torch.nn.Conv2d(n_feats, n_feats * scale * scale, 3, padding=1),
+            torch.nn.PixelShuffle(scale),
+            torch.nn.Conv2d(n_feats, n_colors, 3, padding=1),
+        )
+    def forward(self, x):
+        x = self.head(x)
+        res = self.body(x) + x
+        return self.up(res)
+
+weights_file = f"/tmp/pytorch_model_{scale}x.pt"
+if not os.path.exists(weights_file):
+    url = f"https://huggingface.co/{repo_id}/resolve/main/pytorch_model_{scale}x.pt"
+    urllib.request.urlretrieve(url, weights_file)
+state_dict = torch.load(weights_file, map_location="cpu")
+state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
+state_dict = {k.replace("head.0.", "head."): v for k, v in state_dict.items()}
+state_dict = {k.replace("tail.0.0.", "up.0."): v for k, v in state_dict.items()}
+state_dict = {k.replace("tail.1.", "up.2."): v for k, v in state_dict.items()}
+state_dict = {k.replace("sub_mean.", ""): v for k, v in state_dict.items()}
+state_dict = {k.replace("add_mean.", ""): v for k, v in state_dict.items()}
+model = EDSR(scale=scale, n_resblocks=16, n_feats=64, res_scale=1.0, n_colors=3)
+model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
+model.eval()
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(urllib.request.urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+input_tensor = to_tensor(image).unsqueeze(0).to(device)
+with torch.no_grad():
+    pred = model(input_tensor).clamp(0, 1)
+
+output_image = to_pil_image(pred.squeeze(0).cpu())
+RESULT = {"output_image": output_image}

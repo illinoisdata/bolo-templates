@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("cmarkea/distilcamembert-base-sentiment") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set model = model | default(repo_id) %}
+{% set tokenizer = tokenizer | default("camembert-base") %}
+{% set input_prompt = input_prompt | default("J'aime me promener en forêt même si ça me donne mal aux pieds.") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+tokenizer = {{ tokenizer | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+device = {{ device | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt)

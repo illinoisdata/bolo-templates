@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("llm-book/bert-base-japanese-v3-jsts") %}
+{% set task = task | default("text-classification") %}
+{% set model = model | default(repo_id) %}
+{% set device = device | default("cuda:0") %}
+{% set function_to_apply = function_to_apply | default("none") %}
+{% set text = text | default("川べりでサーフボードを持った人たちがいます") %}
+{% set text_pair = text_pair | default("サーファーたちが川べりに立っています") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+function_to_apply = {{ function_to_apply | tojson }}
+text = {{ text | tojson }}
+text_pair = {{ text_pair | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device, function_to_apply=function_to_apply)
+input_data = {"text": text, "text_pair": text_pair}
+RESULT = pipe(input_data)

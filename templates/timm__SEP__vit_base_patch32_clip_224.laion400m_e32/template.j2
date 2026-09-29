@@ -1,0 +1,57 @@
+{% set repo_id = repo_id | default("timm/vit_base_patch32_clip_224.laion400m_e32") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import json
+from PIL import Image
+from huggingface_hub import hf_hub_download
+import torch
+from timm import create_model
+from timm.data import create_transform
+
+weights_path = hf_hub_download(repo_id=repo_id, filename='pytorch_model.bin')
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+
+with open(config_path, 'r') as f:
+    cfg = json.load(f)
+
+model = create_model(
+    'vit_base_patch32_clip_224.laion400m_e32',
+    pretrained=False,
+    num_classes=cfg.get('num_classes', 512),
+)
+state_dict = torch.load(weights_path, map_location='cpu')
+if isinstance(state_dict, dict) and 'model' in state_dict:
+    state_dict = state_dict['model']
+model.load_state_dict(state_dict, strict=True)
+model.eval().to(device)
+
+if str(image_path).startswith(('http://', 'https://')):
+    from urllib.request import urlopen
+    img = Image.open(urlopen(image_path)).convert('RGB')
+else:
+    img = Image.open(image_path).convert('RGB')
+
+transform = create_transform(
+    input_size=tuple(cfg['pretrained_cfg']['input_size'][1:]),
+    interpolation=cfg['pretrained_cfg']['interpolation'],
+    mean=cfg['pretrained_cfg']['mean'],
+    std=cfg['pretrained_cfg']['std'],
+    crop_pct=cfg['pretrained_cfg']['crop_pct'],
+)
+image_tensor = transform(img).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    output = model(image_tensor)
+    probs = torch.nn.functional.softmax(output, dim=-1)
+    top_prob, top_idx = probs.max(dim=-1)
+
+RESULT = {
+    'logits': output[0].detach().cpu(),
+    'probabilities': probs[0].detach().cpu(),
+    'top_probability': float(top_prob.item()),
+    'top_index': int(top_idx.item()),
+}

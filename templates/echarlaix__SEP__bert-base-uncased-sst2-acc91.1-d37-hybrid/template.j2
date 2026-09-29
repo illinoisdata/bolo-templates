@@ -1,0 +1,14 @@
+{% set repo_id = repo_id | default("echarlaix/bert-base-uncased-sst2-acc91.1-d37-hybrid") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device, model_kwargs={"ignore_mismatched_sizes": True})
+RESULT = pipe(input_prompt)

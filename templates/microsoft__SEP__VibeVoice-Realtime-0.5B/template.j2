@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("microsoft/VibeVoice-Realtime-0.5B") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Hello, this is a short realtime TTS demo generated from text.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+
+import json
+from huggingface_hub import hf_hub_download
+
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+preproc_file = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+with open(config_file, 'r') as f:
+    config = json.load(f)
+
+RESULT = {"config": config, "weights_file": weights_file, "preprocessor_file": preproc_file}

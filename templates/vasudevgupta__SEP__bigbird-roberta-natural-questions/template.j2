@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("vasudevgupta/bigbird-roberta-natural-questions") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default("Who added BigBird to HuggingFace Transformers?") %}
+{% set context = context | default("BigBird Pegasus just landed! Thanks to Vasudev Gupta, BigBird Pegasus from Google AI is merged into HuggingFace Transformers. Check it out today!!!") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import torch
+from transformers import AutoTokenizer, BigBirdForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+
+_tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    use_fast=False,
+)
+model = BigBirdForQuestionAnswering.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = _tokenizer(question, context, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_idx = int(torch.argmax(outputs.start_logits, dim=-1).item())
+end_idx = int(torch.argmax(outputs.end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+answer_ids = inputs["input_ids"][0, start_idx : end_idx + 1]
+answer = _tokenizer.decode(answer_ids, skip_special_tokens=True).strip()
+
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx}

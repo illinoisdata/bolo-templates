@@ -1,0 +1,24 @@
+{% set repo_id = repo_id | default("stabilityai/sdxl-turbo-ryzen-ai") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('a cinematic photo of a futuristic city at sunset, ultra detailed') %}
+{% set num_inference_steps = num_inference_steps | default(1) %}
+{% set guidance_scale = guidance_scale | default(0.0) %}
+{% set seed = seed | default(42) %}
+{% set height = height | default(512) %}
+{% set width = width | default(512) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+num_inference_steps = {{ num_inference_steps }}
+guidance_scale = {{ guidance_scale }}
+seed = {{ seed }}
+height = {{ height }}
+width = {{ width }}
+
+import os
+from huggingface_hub import hf_hub_download
+
+# Download at least one repo file to validate access; model execution is not supported by generic diffusers here.
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+_ = os.path.exists(config_path)
+RESULT = {"config_path": config_path, "repo_id": repo_id}

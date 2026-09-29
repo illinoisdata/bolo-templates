@@ -1,0 +1,14 @@
+{% set repo_id = repo_id | default("r-f/wav2vec-english-speech-emotion-recognition") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("audio-classification") %}
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+audio_path = "{{ audio_path }}"
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = pipe(audio_path)

@@ -1,0 +1,61 @@
+{% set repo_id = repo_id | default("guillaumekln/faster-whisper-large-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+{% set language = language | default("en") %}
+{% set task = task | default("transcribe") %}
+{% set beam_size = beam_size | default(1) %}
+{% set best_of = best_of | default(1) %}
+{% set temperature = temperature | default(0.0) %}
+{% set compute_type = compute_type | default("default") %}
+{% set vad_filter = vad_filter | default(false) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+language = "{{ language }}"
+task = "{{ task }}"
+beam_size = {{ beam_size }}
+best_of = {{ best_of }}
+temperature = {{ temperature }}
+compute_type = "{{ compute_type }}"
+vad_filter = {{ vad_filter }}
+
+import os
+import io
+import requests
+import numpy as np
+import soundfile as sf
+from faster_whisper import WhisperModel
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.bin")
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+hf_hub_download(repo_id=repo_id, filename="vocabulary.txt")
+
+if audio_path.startswith(("http://", "https://")):
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    audio, sampling_rate = sf.read(io.BytesIO(audio_bytes))
+else:
+    audio, sampling_rate = sf.read(audio_path)
+
+if audio.ndim > 1:
+    audio = np.mean(audio, axis=1)
+
+model = WhisperModel(os.path.dirname(model_path), device="cpu", compute_type=compute_type)
+segments, info = model.transcribe(
+    audio,
+    language=language,
+    task=task,
+    beam_size=beam_size,
+    best_of=best_of,
+    temperature=temperature,
+    vad_filter=vad_filter,
+)
+
+transcript = "".join(segment.text for segment in segments).strip()
+RESULT = {
+    "text": transcript,
+    "language": info.language,
+    "language_probability": info.language_probability,
+    "duration": info.duration,
+}

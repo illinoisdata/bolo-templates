@@ -1,40 +1,44 @@
 {% set repo_id = repo_id | default("GanymedeNil/text2vec-large-chinese") %}
 {% set device = device | default("cuda:0") %}
-{% set reference_sentence = reference_sentence | default("今天天气很好，阳光明媚。") %}
-{% set comparison_sentence = comparison_sentence | default("今天空气清新，适合户外散步。") %}
+{% set text1 = text1 | default('今天天气很好') %}
+{% set text2 = text2 | default('今天天气不错') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-reference_sentence = "{{ reference_sentence }}"
-comparison_sentence = "{{ comparison_sentence }}"
+text1 = "{{ text1 }}"
+text2 = "{{ text2 }}"
 
+import os
 import torch
-from transformers import AutoModel, AutoTokenizer
+import torch.nn.functional as F
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModel
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
-model = AutoModel.from_pretrained(repo_id)
-model = model.to(device)
+model_files = [
+    "config.json",
+    "special_tokens_map.json",
+    "tokenizer.json",
+    "tokenizer_config.json",
+    "vocab.txt",
+    "model.safetensors",
+]
+local_files = {name: hf_hub_download(repo_id=repo_id, filename=name) for name in model_files}
+model_dir = os.path.dirname(local_files["config.json"])
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
+model = AutoModel.from_pretrained(model_dir, local_files_only=True)
+model.to(device)
 model.eval()
-encoded_inputs = tokenizer(
-    [reference_sentence, comparison_sentence],
-    padding=True,
-    truncation=True,
-    return_tensors="pt",
-)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+
+inputs = tokenizer([text1, text2], padding=True, truncation=True, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    model_outputs = model(**encoded_inputs)
-    hidden_states = model_outputs.last_hidden_state
-    attention_mask = encoded_inputs["attention_mask"].unsqueeze(-1).type_as(hidden_states)
-    pooled_states = (hidden_states * attention_mask).sum(dim=1)
-    mask_sum = attention_mask.sum(dim=1).clamp(min=1e-9)
-    sentence_embeddings = pooled_states / mask_sum
-    similarity_tensor = torch.nn.functional.cosine_similarity(sentence_embeddings[0], sentence_embeddings[1], dim=0)
-sentence_embeddings = sentence_embeddings.cpu()
-sentence_embeddings_list = sentence_embeddings.tolist()
-cosine_similarity = similarity_tensor.item()
+    outputs = model(**inputs)
+    last_hidden = outputs.last_hidden_state
+    attention_mask = inputs["attention_mask"].unsqueeze(-1).type_as(last_hidden)
+    summed = (last_hidden * attention_mask).sum(dim=1)
+    counts = attention_mask.sum(dim=1).clamp(min=1e-9)
+    embeddings = F.normalize(summed / counts, p=2, dim=1)
+    similarity = float(F.cosine_similarity(embeddings[0], embeddings[1], dim=0).item())
 
-RESULT = {
-    "sentence_embeddings": sentence_embeddings_list,
-    "cosine_similarity": cosine_similarity,
-}
+RESULT = {"similarity": similarity, "embeddings": embeddings.detach().cpu().tolist()}

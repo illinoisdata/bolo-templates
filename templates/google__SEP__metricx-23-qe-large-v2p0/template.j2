@@ -1,58 +1,34 @@
 {% set repo_id = repo_id | default("google/metricx-23-qe-large-v2p0") %}
-{% set tokenizer_repo = tokenizer_repo | default("google/mt5-large") %}
 {% set device = device | default("cuda:0") %}
-{% set source_text = source_text | default("The cat is on the mat.") %}
-{% set hypothesis_text = hypothesis_text | default("Die Katze liegt auf der Matte.") %}
-{% set max_input_length = max_input_length | default(1024) %}
-{% set max_new_tokens = max_new_tokens | default(10) %}
+{% set source_text = source_text | default('This is a source sentence.') %}
+{% set hypothesis_text = hypothesis_text | default('This is a hypothesis translation.') %}
 repo_id = "{{ repo_id }}"
-tokenizer_repo = "{{ tokenizer_repo }}"
 device = "{{ device }}"
 source_text = "{{ source_text }}"
 hypothesis_text = "{{ hypothesis_text }}"
-max_input_length = {{ max_input_length }}
-max_new_tokens = {{ max_new_tokens }}
 
 import torch
-from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 
-tokenizer = AutoTokenizer.from_pretrained(tokenizer_repo, use_fast=False)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+tokenizer = AutoTokenizer.from_pretrained("google/mt5-xl", use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
 model.eval()
 
-# Pre-process inputs
-
-inputs = tokenizer(
-    text=source_text,
-    text_pair=hypothesis_text,
-    truncation=True,
-    max_length=max_input_length,
-    return_tensors="pt",
-)
+text = f"source: {source_text} hypothesis: {hypothesis_text}"
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=1024)
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Run inference
-
 with torch.no_grad():
-    generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+    output_ids = model.generate(**inputs, max_new_tokens=4)
+    decoded = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
 
-# Post-process generated sentinel tokens to numeric score
-tokens = tokenizer.convert_ids_to_tokens(generated_ids[0])
-digit_map = {f"<extra_id_{i}>": str(i) for i in range(10)}
-digit_map["<extra_id_10>"] = "."
-digits = []
-for tok in tokens:
-    normalized = tok.lstrip("▁")
-    if normalized in digit_map:
-        digits.append(digit_map[normalized])
-    elif digits:
-        break
-score_str = "".join(digits)
-prediction = float(score_str)
-
-# Build result dict
-RESULT = {"prediction": prediction}
+RESULT = {"output": decoded}

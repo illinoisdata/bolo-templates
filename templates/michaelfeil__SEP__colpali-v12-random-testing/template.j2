@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("michaelfeil/colpali-v12-random-testing") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+{% set query_text = query_text | default('What is shown in this document?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+query_text = "{{ query_text }}"
+
+import os
+import torch
+import requests
+from PIL import Image
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+from transformers import ColPaliForRetrieval, SiglipImageProcessor
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+preproc_file = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+processor = SiglipImageProcessor.from_pretrained(os.path.dirname(preproc_file))
+model = ColPaliForRetrieval.from_pretrained(os.path.dirname(model_file), torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+if str(image_path).startswith(("http://", "https://")):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+with torch.no_grad():
+    image_inputs = processor(images=image, return_tensors="pt")
+    image_inputs = {k: v.to(device) for k, v in image_inputs.items()}
+    image_out = model.vlm.get_image_features(**image_inputs)
+    image_embeds = image_out.last_hidden_state if hasattr(image_out, "last_hidden_state") else image_out[0]
+
+RESULT = {"output": image_embeds.detach().cpu().tolist()}

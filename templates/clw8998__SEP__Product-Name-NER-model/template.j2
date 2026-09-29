@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("clw8998/Product-Name-NER-model") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Apple iPhone 15 Pro Max 256GB 深藍色') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, BertConfig, BertForTokenClassification, pipeline
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+config = BertConfig.from_json_file(config_path)
+config.num_labels = getattr(config, "num_labels", 2)
+config.id2label = {0: "O", 1: "ENT"}
+config.label2id = {v: k for k, v in config.id2label.items()}
+
+model = BertForTokenClassification.from_pretrained(
+    os.path.dirname(model_path),
+    config=config,
+    local_files_only=True,
+)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_json_path), local_files_only=True, use_fast=True)
+
+ner_pipe = pipeline(
+    task="token-classification",
+    model=model,
+    tokenizer=tokenizer,
+    aggregation_strategy="simple",
+    device=0 if str(device).startswith("cuda") else -1,
+)
+
+output = ner_pipe(text)
+RESULT = {"output": output}

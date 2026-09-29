@@ -1,33 +1,49 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("hyunwoongko/ctrlsum-cnndm") %}
-{% set article = article | default("The article describes the latest advancements in the tech industry.") %}
-{% set max_length = max_length | default(128) %}
-{% set min_length = min_length | default(12) %}
+{% set device = device | default("cuda:0") %}
+{% set max_length = max_length | default(142) %}
+{% set min_length = min_length | default(56) %}
 {% set num_beams = num_beams | default(4) %}
+{% set article = article | default('The stock market rallied sharply today as investors reacted positively to easing inflation data and stronger-than-expected earnings from major technology companies. Analysts said the rebound was driven by hopes that the Federal Reserve may slow the pace of interest rate hikes, while traders also pointed to improving consumer confidence and resilient corporate spending. Shares of several large-cap firms led the gains, helping major indexes recover some of last week\'s losses.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-article = "{{ article }}"
 max_length = {{ max_length }}
 min_length = {{ min_length }}
 num_beams = {{ num_beams }}
+article = """{{ article }}"""
 
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+_merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+_special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
 
-inputs = tokenizer(article, return_tensors="pt", truncation=True)
-inputs = {key: value.to(device) for key, value in inputs.items()}
+model_dir = os.path.dirname(weights_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
+model.to(device)
+model.eval()
 
-generated_ids = model.generate(
-    **inputs,
-    max_length=max_length,
-    min_length=min_length,
-    num_beams=num_beams,
-    early_stopping=True,
-)
+inputs = tokenizer(article, return_tensors="pt", truncation=True, max_length=1024)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-summary = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_length=max_length,
+        min_length=min_length,
+        num_beams=num_beams,
+        no_repeat_ngram_size=3,
+        early_stopping=True,
+    )
+
+summary = tokenizer.decode(output_ids[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
 
 RESULT = {"summary": summary}

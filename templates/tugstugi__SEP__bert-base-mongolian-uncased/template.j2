@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("tugstugi/bert-base-mongolian-uncased") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Миний {mask} хоол идэх нь тун чухал.") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+from transformers import AutoTokenizer, AutoModelForMaskedLM, pipeline
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+
+mask_token = tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+output = pipe(text)
+
+RESULT = {"predictions": output}

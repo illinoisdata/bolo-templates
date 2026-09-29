@@ -1,49 +1,44 @@
 {% set repo_id = repo_id | default("google/byt5-small") %}
 {% set device = device | default("cuda:0") %}
-{% set input_texts = input_texts | default(["Life is like a box of chocolates."]) %}
-{% set max_length = max_length | default(64) %}
-{% set num_return_sequences = num_return_sequences | default(1) %}
-{% set do_sample = do_sample | default(false) %}
-{% set temperature = temperature | default(1.0) %}
-
+{% set text = text | default('Life is like a box of chocolates.') %}
+{% set text2 = text2 | default('Today is Monday.') %}
+{% set target_text = target_text | default('La vie est comme une boîte de chocolat.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_texts = {{ input_texts }}
-max_length = {{ max_length }}
-num_return_sequences = {{ num_return_sequences }}
-do_sample = {{ do_sample }}
-temperature = {{ temperature }}
+text = "{{ text }}"
+text2 = "{{ text2 }}"
+target_text = "{{ target_text }}"
 
-import json
 import os
-
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+model_dir = os.path.dirname(weights_path)
+tokenizer_dir = os.path.dirname(tokenizer_config_path)
+
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir, use_fast=False)
+model = T5ForConditionalGeneration.from_pretrained(model_dir)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(
-    input_texts,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-)
-encoded_inputs = {key: tensor.to(device) for key, tensor in encoded_inputs.items()}
+model_inputs = tokenizer([text, text2], padding="longest", return_tensors="pt")
+labels = tokenizer([target_text, target_text], padding="longest", return_tensors="pt").input_ids
+model_inputs = {k: v.to(device) for k, v in model_inputs.items()}
+labels = labels.to(device)
 
 with torch.no_grad():
-    generated_tokens = model.generate(
-        **encoded_inputs,
-        max_length=max_length,
-        num_return_sequences=num_return_sequences,
-        do_sample=do_sample,
-        temperature=temperature,
-    )
+    outputs = model(**model_inputs, labels=labels)
+    generated = model.generate(**model_inputs, max_new_tokens=32)
 
-generated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-
-RESULT = {"generated_text": generated_texts}
+RESULT = {
+    "loss": outputs.loss.detach().cpu().item(),
+    "generated_text": tokenizer.batch_decode(generated, skip_special_tokens=True),
+}

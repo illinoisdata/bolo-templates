@@ -1,0 +1,65 @@
+{% set repo_id = repo_id | default("bibabobbb/kronons-token-btc-special") %}
+{% set device = device | default("cuda:0") %}
+{% set input_tensor = input_tensor | default([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_tensor = {{ input_tensor }}
+
+import json
+from safetensors.torch import load_file
+import torch
+import torch.nn as nn
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+class KrononsTokenModel(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        d_in = config["d_in"]
+        d_model = config["d_model"]
+        ff_dim = config["ff_dim"]
+        n_enc_layers = config["n_enc_layers"]
+        n_dec_layers = config["n_dec_layers"]
+        n_heads = config["n_heads"]
+        enc_layer = nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=n_heads,
+            dim_feedforward=ff_dim,
+            dropout=0.0,
+            batch_first=True,
+            activation="gelu",
+        )
+        dec_layer = nn.TransformerDecoderLayer(
+            d_model=d_model,
+            nhead=n_heads,
+            dim_feedforward=ff_dim,
+            dropout=0.0,
+            batch_first=True,
+            activation="gelu",
+        )
+        self.in_proj = nn.Linear(d_in, d_model)
+        self.encoder = nn.TransformerEncoder(enc_layer, num_layers=n_enc_layers)
+        self.decoder = nn.TransformerDecoder(dec_layer, num_layers=n_dec_layers)
+        self.out_proj = nn.Linear(d_model, d_in)
+
+    def forward(self, x):
+        h = self.in_proj(x)
+        h = self.encoder(h)
+        h = self.decoder(h, h)
+        return self.out_proj(h)
+
+model = KrononsTokenModel(config).to(device)
+state_dict = load_file(model_path, device=device)
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model.eval()
+
+x = torch.tensor(input_tensor, dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(0)
+with torch.no_grad():
+    y = model(x)
+
+RESULT = {"output": y.squeeze(0).squeeze(0).detach().cpu().tolist()}

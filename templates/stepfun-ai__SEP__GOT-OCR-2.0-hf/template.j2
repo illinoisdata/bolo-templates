@@ -1,0 +1,25 @@
+{% set repo_id = repo_id | default("stepfun-ai/GOT-OCR-2.0-hf") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-text-to-text") %}
+{% set input_image = input_image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+task = "{{ task }}"
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_image = "{{ input_image }}"
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+original_preprocess = pipe.preprocess
+
+def patched_preprocess(inputs=None, **kwargs):
+    model_inputs = original_preprocess(inputs, **kwargs)
+    if model_inputs.get("text") is None:
+        model_inputs["text"] = ""
+    return model_inputs
+
+pipe.preprocess = patched_preprocess
+
+RESULT = pipe({"images": input_image, "text": None}, format=True)

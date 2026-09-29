@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("urchade/gliner_multi") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Cristiano Ronaldo dos Santos Aveiro is a Portuguese professional footballer who plays for Al Nassr and Portugal. He has won the Ballon d\'Or award and the UEFA Champions League.') %}
+{% set labels = labels | default(['person', 'award', 'date', 'competitions', 'teams']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+labels = {{ labels | tojson }}
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModel
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+with open(config_path, "r") as f:
+    gliner_config = json.load(f)
+
+# Use the repository's own config to locate an underlying HF encoder if present.
+base_model_name = gliner_config.get("model_name") or gliner_config.get("model_name_or_path") or gliner_config.get("base_model_name") or "bert-base-cased"
+
+tokenizer = AutoTokenizer.from_pretrained(base_model_name, use_fast=True)
+model = AutoModel.from_pretrained(base_model_name)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+last_hidden = outputs.last_hidden_state
+summary = {
+    "sequence_shape": list(last_hidden.shape),
+    "labels": labels,
+    "text": text,
+    "config_keys": sorted(list(gliner_config.keys())),
+}
+
+RESULT = {"output": summary}

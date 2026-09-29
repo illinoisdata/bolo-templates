@@ -1,25 +1,28 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("akreal/tiny-random-xlnet") %}
-{% set prompt = prompt | default("Hello, huggingface") %}
-{% set max_new_tokens = max_new_tokens | default(20) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hello from XLNet') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
-max_new_tokens = {{ max_new_tokens }}
-
-import pathlib
+text = "{{ text }}"
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForCausalLM.from_pretrained(repo_id).to(device)
-inputs = tokenizer(prompt, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+model = AutoModelForSequenceClassification.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+    low_cpu_mem_usage=True,
+    ignore_mismatched_sizes=True,
+)
+model.to(device)
+model.eval()
 
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+    outputs = model(**inputs)
 
-generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
-
-RESULT = {"generated_text": generated_text}
+logits = outputs.logits.detach().cpu().tolist()
+RESULT = {"logits": logits}

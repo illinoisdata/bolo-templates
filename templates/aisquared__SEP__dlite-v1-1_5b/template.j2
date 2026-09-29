@@ -1,0 +1,14 @@
+{% set repo_id = repo_id | default("aisquared/dlite-v1-1_5b") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_prompt = "{{ input_prompt }}"
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device, trust_remote_code=True)
+RESULT = pipe(input_prompt)

@@ -1,51 +1,47 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 {% set repo_id = repo_id | default("kha-white/manga-ocr-base") %}
 {% set device = device | default("cuda:0") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set max_length = max_length | default(300) %}
-{% set num_beams = num_beams | default(4) %}
-{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
-{% set length_penalty = length_penalty | default(2.0) %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
+{% set use_fast_processor = use_fast_processor | default(false) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-no_repeat_ngram_size = {{ no_repeat_ngram_size }}
-length_penalty = {{ length_penalty }}
+max_new_tokens = {{ max_new_tokens }}
+use_fast_processor = {{ use_fast_processor }}
 
-from io import BytesIO
 import os
-
-import requests
 from PIL import Image
-from transformers import AutoImageProcessor, AutoTokenizer, VisionEncoderDecoderModel
+import requests
+import torch
+from transformers import VisionEncoderDecoderModel, AutoImageProcessor, AutoTokenizer, BertJapaneseTokenizer
+from huggingface_hub import hf_hub_download
 
-image_processor = AutoImageProcessor.from_pretrained(repo_id)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = VisionEncoderDecoderModel.from_pretrained(repo_id)
-model.to(device)
-model.eval()
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+processor_config_file = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-if image_path.startswith(("http://", "https://")):
-    response = requests.get(image_path)
-    response.raise_for_status()
-    image = Image.open(BytesIO(response.content)).convert("RGB")
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
 else:
     image = Image.open(image_path).convert("RGB")
 
-inputs = image_processor(images=image, return_tensors="pt")
-pixel_values = inputs.pixel_values.to(device)
+processor = AutoImageProcessor.from_pretrained(os.path.dirname(processor_config_file))
+try:
+    tokenizer = BertJapaneseTokenizer.from_pretrained(os.path.dirname(tokenizer_config_file))
+except Exception:
+    tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_config_file), use_fast=False)
 
-generated_ids = model.generate(
-    pixel_values,
-    max_length=max_length,
-    num_beams=num_beams,
-    no_repeat_ngram_size=no_repeat_ngram_size,
-    length_penalty=length_penalty,
-    early_stopping=True,
-)
+model = VisionEncoderDecoderModel.from_pretrained(os.path.dirname(config_file), local_files_only=True)
+model.load_state_dict(torch.load(weights_file, map_location="cpu"), strict=False)
+model.to(device)
+model.eval()
 
-decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-result_text = decoded[0].strip()
+pixel_values = processor(images=image, return_tensors="pt").pixel_values.to(device)
+with torch.no_grad():
+    generated_ids = model.generate(pixel_values, max_new_tokens=max_new_tokens, num_beams=4)
+text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-RESULT = {"predicted_text": result_text}
+RESULT = {"text": text}

@@ -1,0 +1,42 @@
+{% set repo_id = repo_id | default("optimum-intel-internal-testing/tiny-falcon-mamba") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Hello, how are you?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+
+import torch
+from transformers import AutoTokenizer, FalconMambaConfig, FalconMambaForCausalLM
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+# Load tokenizer from local files downloaded from the Hub.
+tokenizer = AutoTokenizer.from_pretrained(
+    tokenizer_path.rsplit("/", 1)[0],
+    local_files_only=True,
+)
+
+config = FalconMambaConfig.from_pretrained(config_path)
+model = FalconMambaForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+    device_map=None,
+    local_files_only=False,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=16, do_sample=False)
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": output_text}

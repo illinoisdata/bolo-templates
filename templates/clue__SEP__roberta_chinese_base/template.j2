@@ -1,28 +1,33 @@
-{% set repo_id = repo_id | default("clue/roberta_chinese_base") %}
+{% set text = text | default('今天天气很好，我们去公园散步。') %}
+{% set max_length = max_length | default(32) %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("这是一个用于测试的中文句子。") %}
+{% set repo_id = repo_id | default("clue/roberta_chinese_base") %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+text = "{{ text }}"
+max_length = {{ max_length }}
 
 import torch
-from pathlib import Path
-from transformers import AutoModel, AutoTokenizer
+from transformers import BertTokenizer, BertModel
+from huggingface_hub import hf_hub_download
 
-target_device = torch.device(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(target_device)
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-encoded_inputs = tokenizer(text_input, return_tensors="pt", padding=True, truncation=True)
-encoded_inputs = {k: v.to(target_device) for k, v in encoded_inputs.items()}
+tokenizer = BertTokenizer(vocab_file=vocab_file)
+model = BertModel.from_pretrained(weights_file, config=config_file)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", max_length=max_length, truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
+    outputs = model(**inputs)
 
 last_hidden_state = outputs.last_hidden_state.detach().cpu()
 pooler_output = outputs.pooler_output.detach().cpu() if outputs.pooler_output is not None else None
 
-RESULT = {
-    "last_hidden_state": last_hidden_state,
-    "pooler_output": pooler_output,
-}
+RESULT = {"last_hidden_state": last_hidden_state, "pooler_output": pooler_output}

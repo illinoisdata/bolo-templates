@@ -1,0 +1,15 @@
+{% set repo_id = repo_id | default("Jean-Baptiste/camembert-ner") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("token-classification") %}
+{% set input_text = input_text | default("Je m'appelle jean-baptiste et je vis à montréal.") %}
+
+# Entrypoint variables populated by Jinja
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+input_text = {{ input_text | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device, aggregation_strategy="simple")
+RESULT = pipe(input_text)

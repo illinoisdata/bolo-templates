@@ -1,0 +1,17 @@
+{% set text = text | default('Hello world, this is a test of Pocket TTS.') %}
+{% set voice_name = voice_name | default('alba') %}
+{% set repo_id = repo_id | default("kyutai/pocket-tts") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+voice_name = {{ voice_name | tojson }}
+
+from pocket_tts import TTSModel
+from pocket_tts.models.tts_model import get_predefined_voice
+
+model = TTSModel.load_model(language="english")
+voice_path = get_predefined_voice("english", voice_name)
+voice_state = model.get_state_for_audio_prompt(voice_path)
+audio = model.generate_audio(voice_state, text)
+RESULT = {"audio": audio.detach().cpu().numpy(), "sample_rate": int(model.sample_rate)}

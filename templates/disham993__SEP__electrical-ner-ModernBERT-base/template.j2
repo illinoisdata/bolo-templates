@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("disham993/electrical-ner-ModernBERT-base") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("The Xilinx Vivado development suite was used to program the Artix-7 FPGA. The transformer used a Texas Instruments TPS5430 regulator, an STM32 microcontroller, and an IEC 61000 standard compliant filter.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import json
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_cfg_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+
+model_dir = os.path.dirname(model_path)
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = AutoModelForTokenClassification.from_pretrained(model_dir)
+model.to(device)
+model.eval()
+
+ner_pipeline = pipeline(
+    task="token-classification",
+    model=model,
+    tokenizer=tokenizer,
+    aggregation_strategy="simple",
+    device=0 if str(device).startswith("cuda") else -1,
+)
+
+outputs = ner_pipeline(text)
+RESULT = {"output": outputs}

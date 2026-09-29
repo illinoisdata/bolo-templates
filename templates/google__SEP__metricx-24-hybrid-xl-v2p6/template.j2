@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("google/metricx-24-hybrid-xl-v2p6") %}
+{% set device = device | default("cuda:0") %}
+{% set source_text = source_text | default('The source sentence to evaluate.') %}
+{% set translation_text = translation_text | default('The translated sentence to evaluate.') %}
+{% set reference_text = reference_text | default('The reference translation to compare against.') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = "{{ source_text }}"
+translation_text = "{{ translation_text }}"
+reference_text = "{{ reference_text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoConfig, MT5ForConditionalGeneration
+from huggingface_hub import snapshot_download
+
+local_dir = snapshot_download(repo_id=repo_id)
+config = AutoConfig.from_pretrained(local_dir)
+model = MT5ForConditionalGeneration.from_pretrained(local_dir, config=config, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(local_dir)
+input_text = f"source: {source_text} </s> translation: {translation_text} </s> reference: {reference_text}"
+inputs = tokenizer(input_text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model.generate(input_ids=inputs["input_ids"], attention_mask=inputs.get("attention_mask"), max_new_tokens=1, do_sample=False)
+    score = outputs.float().mean().item()
+
+RESULT = {"score": score}

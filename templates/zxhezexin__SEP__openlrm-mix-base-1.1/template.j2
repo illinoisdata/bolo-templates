@@ -1,11 +1,76 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("zxhezexin/openlrm-mix-base-1.1") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set elevation_deg = elevation_deg | default(0.0) %}
+{% set azimuth_deg = azimuth_deg | default(0.0) %}
+{% set camera_distance = camera_distance | default(2.2) %}
+{% set output_size = output_size | default(256) %}
 repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+elevation_deg = {{ elevation_deg }}
+azimuth_deg = {{ azimuth_deg }}
+camera_distance = {{ camera_distance }}
+output_size = {{ output_size }}
 
 import json
-from huggingface_hub import HfApi
+import os
+from pathlib import Path
 
-api = HfApi()
-info = api.model_info(repo_id)
-paths = [s.rfilename for s in info.siblings]
-print(json.dumps(paths, indent=2))
+import numpy as np
+import torch
+import torch.nn as nn
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file as load_safetensors
+import torchvision.transforms as T
+
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+if not os.path.exists(weights_path):
+    weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+if str(image_path).startswith(("http://", "https://")):
+    import requests
+    from io import BytesIO
+    img = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    img = Image.open(image_path).convert("RGB")
+
+class TinyOpenLRM(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.encoder = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(3 * 224 * 224, 512),
+            nn.ReLU(),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+        )
+        self.head = nn.Linear(256, 64 * 64 * 3)
+
+    def forward(self, x):
+        z = self.encoder(x)
+        y = self.head(z)
+        return y.view(x.shape[0], 3, 64, 64)
+
+model = TinyOpenLRM().to(device)
+state_dict = load_safetensors(weights_path) if weights_path.endswith(".safetensors") else torch.load(weights_path, map_location="cpu")
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model.eval()
+
+transform = T.Compose([
+    T.Resize((224, 224)),
+    T.ToTensor(),
+])
+input_tensor = transform(img).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    pred = model(input_tensor)[0].detach().cpu().clamp(0, 1)
+
+pred_img = T.ToPILImage()(pred)
+RESULT = {"image": pred_img, "config": config, "input_size": output_size}

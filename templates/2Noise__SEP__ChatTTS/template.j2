@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("2Noise/ChatTTS") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('So we found being competitive and collaborative was a huge way of staying motivated towards our goals, so one person to call when you fall off, one person who gets you back on then one person to actually do the activity with.') %}
+{% set compile = compile | default(false) %}
+{% set temperature = temperature | default(0.3) %}
+{% set top_P = top_P | default(0.7) %}
+{% set top_K = top_K | default(20) %}
+{% set prompt = prompt | default('') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+compile = {{ compile }}
+temperature = {{ temperature }}
+top_P = {{ top_P }}
+top_K = {{ top_K }}
+prompt = "{{ prompt }}"
+
+import os
+import torch
+import numpy as np
+from huggingface_hub import hf_hub_download
+import ChatTTS
+
+torch.set_float32_matmul_precision('high')
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config/path.yaml')
+config_dir = os.path.dirname(config_path)
+
+chat = ChatTTS.Chat()
+chat.download_models(source='huggingface')
+chat.load(source='local', compile=compile, custom_path=config_dir, device=torch.device(device))
+
+texts = [text]
+params_infer_code = ChatTTS.Chat.InferCodeParams(spk_emb=None, temperature=temperature, top_P=top_P, top_K=top_K)
+params_refine_text = ChatTTS.Chat.RefineTextParams(prompt=prompt)
+
+wavs = chat.infer(texts, params_refine_text=params_refine_text, params_infer_code=params_infer_code)
+output_audio = wavs[0]
+if isinstance(output_audio, torch.Tensor):
+    output_audio = output_audio.detach().cpu().numpy()
+output_audio = np.asarray(output_audio)
+
+RESULT = {"audio": output_audio, "sample_rate": 24000}

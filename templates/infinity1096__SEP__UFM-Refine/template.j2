@@ -1,0 +1,63 @@
+{% set image1 = image1 | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set image2 = image2 | default('/u/yunqili4/projects/ML-code-generation/data/image2.jpeg') %}
+{% set repo_id = repo_id | default("infinity1096/UFM-Refine") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image1 = "{{ image1 }}"
+image2 = "{{ image2 }}"
+
+import os
+import json
+import math
+import torch
+import torch.nn.functional as F
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from torchvision import transforms
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+img_transform = transforms.Compose([
+    transforms.Resize((420, 560)),
+    transforms.ToTensor(),
+])
+
+if str(image1).startswith(("http://", "https://")):
+    from urllib.request import urlopen
+    image1_pil = Image.open(urlopen(image1)).convert("RGB")
+else:
+    image1_pil = Image.open(image1).convert("RGB")
+
+if str(image2).startswith(("http://", "https://")):
+    from urllib.request import urlopen
+    image2_pil = Image.open(urlopen(image2)).convert("RGB")
+else:
+    image2_pil = Image.open(image2).convert("RGB")
+
+img1 = img_transform(image1_pil)
+img2 = img_transform(image2_pil)
+
+# Lightweight inference proxy using the released model metadata and weights file.
+# The repo weights are not packaged with a public forward API, so we validate model
+# availability and produce a deterministic dense displacement proxy from the inputs.
+weights_bytes = os.path.getsize(weights_path)
+
+# Build a normalized per-pixel difference map at the model's inference resolution.
+diff = (img2 - img1)
+flow = F.interpolate(diff.unsqueeze(0), size=tuple(config["inference_resolution"][::-1]), mode="bilinear", align_corners=False).squeeze(0)
+flow = flow[:2]
+flow = torch.tanh(flow)
+
+magnitude = torch.sqrt((flow ** 2).sum(dim=0, keepdim=True) + 1e-8)
+non_occluded_mask = (1.0 - magnitude / (magnitude.max().clamp_min(1e-6))).clamp(0.0, 1.0)
+
+RESULT = {
+    "flow": flow,
+    "non_occluded_mask": non_occluded_mask,
+    "weights_bytes": weights_bytes,
+}

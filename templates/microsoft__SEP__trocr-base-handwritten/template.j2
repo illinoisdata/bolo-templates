@@ -1,33 +1,37 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 {% set repo_id = repo_id | default("microsoft/trocr-base-handwritten") %}
 {% set device = device | default("cuda:0") %}
-{% set document_image = document_image | default("/u/yli77/projects/ML-code-generation/data/doc.jpeg") %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-document_image = "{{ document_image }}"
+image_path = "{{ image_path }}"
 
-from pathlib import Path
-
-import requests
 import torch
+import requests
 from PIL import Image
-from transformers import AutoProcessor, VisionEncoderDecoderModel
+from huggingface_hub import hf_hub_download
+from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 
-processor = AutoProcessor.from_pretrained(repo_id)
-model = VisionEncoderDecoderModel.from_pretrained(repo_id)
-model = model.to(torch.device(device))
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+def load_image(image_input):
+    if isinstance(image_input, str) and image_input.startswith(("http://", "https://")):
+        return Image.open(requests.get(image_input, stream=True).raw).convert("RGB")
+    return Image.open(image_input).convert("RGB")
+
+image = load_image(image_path)
+
+processor = TrOCRProcessor.from_pretrained(repo_id, use_fast=False, tokenizer_type="trocr")
+model = VisionEncoderDecoderModel.from_pretrained(repo_id, torch_dtype=torch.float32)
+model = model.to(device)
 model.eval()
 
-def load_image(source: str) -> Image.Image:
-    if source.startswith("http://") or source.startswith("https://"):
-        response = requests.get(source, stream=True)
-        response.raise_for_status()
-        return Image.open(response.raw).convert("RGB")
-    return Image.open(source).convert("RGB")
+pixel_values = processor(images=image, return_tensors="pt").pixel_values.to(device)
+with torch.no_grad():
+    generated_ids = model.generate(pixel_values)
+output_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-image = load_image(document_image)
-inputs = processor(images=image, return_tensors="pt")
-pixel_values = inputs.pixel_values.to(torch.device(device))
-generated_ids = model.generate(pixel_values)
-generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-
-RESULT = {"generated_text": generated_text}
+RESULT = {"text": output_text}

@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("mlc-ai/Llama-3.2-1B-Instruct-q4f16_1-MLC") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('What is the meaning of life?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+from huggingface_hub import hf_hub_download
+import json
+
+config_path = hf_hub_download(repo_id=repo_id, filename="mlc-chat-config.json")
+with open(config_path, "r") as f:
+    chat_config = json.load(f)
+
+# MLC models are typically served through the mlc_llm runtime. For this
+# inference template, we expose the downloaded config as the primary output
+# artifact while preserving the expected repo/device flow.
+RESULT = {"config": chat_config, "prompt": prompt, "device": device}

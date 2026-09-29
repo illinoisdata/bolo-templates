@@ -1,32 +1,40 @@
 {% set repo_id = repo_id | default("deepset/sentence_bert") %}
 {% set device = device | default("cuda:0") %}
-{% set sentences = sentences | default(["This is an example sentence for embedding.", "Here is another sentence to embed."]) %}
+{% set text_a = text_a | default('The quick brown fox jumps over the lazy dog.') %}
+{% set text_b = text_b | default('A fast dark-colored fox leaps above a sleepy canine.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-sentences = {{ sentences }}
+text_a = "{{ text_a }}"
+text_b = "{{ text_b }}"
 
-import os
-from pathlib import Path
-import numpy as np
 import torch
-from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
+from transformers import BertTokenizer, BertConfig, BertModel
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+config = BertConfig.from_json_file(config_path)
+tokenizer = BertTokenizer(vocab_file=vocab_path)
+model = BertModel(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+state_dict = {k: v for k, v in state_dict.items() if not k.startswith("classifier.")}
+model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
 model.eval()
 
-encoded = tokenizer(sentences, padding=True, truncation=True, return_tensors="pt")
-encoded = {k: v.to(device) for k, v in encoded.items()}
+inputs = tokenizer([text_a, text_b], return_tensors="pt", padding=True, truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**encoded)
+    outputs = model(**inputs)
 
 last_hidden = outputs.last_hidden_state
-attention_mask = encoded["attention_mask"]
-mask = attention_mask.unsqueeze(-1)
-sum_embeddings = (last_hidden * mask).sum(1)
-lengths = mask.sum(1)
-embeddings = sum_embeddings / lengths
-embeddings = embeddings.cpu().numpy()
+mask = inputs["attention_mask"].unsqueeze(-1).type_as(last_hidden)
+summed = (last_hidden * mask).sum(dim=1)
+counts = mask.sum(dim=1).clamp(min=1e-9)
+embeddings = summed / counts
+cosine = torch.nn.functional.cosine_similarity(embeddings[0:1], embeddings[1:2]).item()
 
-RESULT = {"embeddings": embeddings}
+RESULT = {"sentence_embedding_a": embeddings[0].detach().cpu().tolist(), "sentence_embedding_b": embeddings[1].detach().cpu().tolist(), "cosine_similarity": cosine}

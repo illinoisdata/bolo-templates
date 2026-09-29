@@ -1,24 +1,38 @@
 {% set repo_id = repo_id | default("QizhiPei/biot5-base") %}
 {% set device = device | default("cuda:0") %}
-{% set prompt = prompt | default("What is the function of hemoglobin?") %}
-{% set max_length = max_length | default(50) %}
-{% set num_beams = num_beams | default(4) %}
+{% set text_input = text_input | default('Translate this protein-related sentence into a concise biomedical paraphrase: The enzyme inhibits bacterial growth by targeting cell wall synthesis.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text_input = "{{ text_input }}"
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 import torch
+from transformers import AutoTokenizer, T5ForConditionalGeneration
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
 
-inputs = tokenizer(prompt, return_tensors="pt").to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, model_max_length=512)
+model = T5ForConditionalGeneration.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-generated_ids = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+inputs = tokenizer(text_input, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=64,
+        do_sample=False,
+        num_beams=1,
+    )
 
-RESULT = {"generated_text": generated_text}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": output_text}

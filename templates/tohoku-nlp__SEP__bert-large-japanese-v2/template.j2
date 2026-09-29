@@ -1,43 +1,42 @@
 {% set repo_id = repo_id | default("tohoku-nlp/bert-large-japanese-v2") %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("東北大学で[MASK]の研究をしています。") %}
+{% set text = text | default('東北大学で[MASK]の研究をしています。') %}
 {% set top_k = top_k | default(5) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+text = "{{ text }}"
 top_k = {{ top_k }}
 
-import json
-from pathlib import Path
-
 import torch
-from transformers import AutoTokenizer, AutoModelForMaskedLM
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoConfig, AutoModelForMaskedLM
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+config = AutoConfig.from_pretrained(config_path)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False, vocab_file=vocab_path)
+model = AutoModelForMaskedLM.from_config(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+state_dict = {k: v for k, v in state_dict.items() if not k.startswith("cls.seq_relationship") and k != "bert.pooler.dense.weight" and k != "bert.pooler.dense.bias" and k != "bert.embeddings.position_ids"}
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
 model.eval()
 
-encoded = tokenizer(text_input, return_tensors="pt")
-inputs = {key: val.to(device) for key, val in encoded.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+mask_token_id = tokenizer.mask_token_id
+mask_positions = (inputs["input_ids"][0] == mask_token_id).nonzero(as_tuple=False).flatten()
 with torch.no_grad():
     outputs = model(**inputs)
-logits = outputs.logits
+    logits = outputs.logits
+    mask_logits = logits[0, mask_positions[0]]
+    probs = torch.softmax(mask_logits, dim=-1)
+    topk = torch.topk(probs, k=top_k)
+    token_ids = topk.indices.tolist()
+    tokens = tokenizer.convert_ids_to_tokens(token_ids)
+    scores = topk.values.tolist()
 
-mask_token_id = tokenizer.mask_token_id
-mask_positions = (inputs["input_ids"] == mask_token_id).nonzero(as_tuple=False)
-
-mask_predictions = []
-for batch_index, sequence_index in mask_positions.tolist():
-    mask_logits = logits[batch_index, sequence_index]
-    mask_probs = torch.softmax(mask_logits, dim=-1)
-    topk_values, topk_indices = torch.topk(mask_probs, k=top_k, dim=-1)
-    tokens = tokenizer.convert_ids_to_tokens(topk_indices.tolist())
-    mask_predictions.append(
-        {
-            "mask_index": int(sequence_index),
-            "tokens": tokens,
-            "scores": topk_values.tolist(),
-        }
-    )
-
-RESULT = {"mask_predictions": mask_predictions}
+RESULT = {"tokens": tokens, "scores": scores}

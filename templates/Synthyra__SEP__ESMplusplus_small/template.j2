@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("Synthyra/ESMplusplus_small") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+{% set model = model | default(repo_id) %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device, trust_remote_code=True)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

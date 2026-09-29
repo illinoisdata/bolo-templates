@@ -1,0 +1,54 @@
+{% set repo_id = repo_id | default("Xenova/whisper-small") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set task = task | default('transcribe') %}
+{% set language = language | default('en') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+task = "{{ task }}"
+language = "{{ language }}"
+
+import numpy as np
+from pathlib import Path
+from urllib.parse import urlparse
+from huggingface_hub import hf_hub_download
+from transformers import AutoProcessor, WhisperForConditionalGeneration
+from scipy.io import wavfile
+from scipy.signal import resample_poly
+
+_ = hf_hub_download(repo_id=repo_id, filename="onnx/encoder_model.onnx")
+_ = hf_hub_download(repo_id=repo_id, filename="onnx/decoder_model.onnx")
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    import requests
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    local_audio_path = Path("/tmp") / Path(urlparse(audio_path).path).name
+    local_audio_path.write_bytes(audio_bytes)
+    audio_path = str(local_audio_path)
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-small").to(device)
+model.eval()
+
+sampling_rate, audio_array = wavfile.read(audio_path)
+if audio_array.ndim > 1:
+    audio_array = np.mean(audio_array, axis=1)
+if audio_array.dtype != np.float32:
+    if np.issubdtype(audio_array.dtype, np.integer):
+        audio_array = audio_array.astype(np.float32) / np.iinfo(audio_array.dtype).max
+    else:
+        audio_array = audio_array.astype(np.float32)
+if sampling_rate != 16000:
+    g = np.gcd(sampling_rate, 16000)
+    audio_array = resample_poly(audio_array, 16000 // g, sampling_rate // g).astype(np.float32)
+    sampling_rate = 16000
+
+inputs = processor(audio_array, sampling_rate=sampling_rate, return_tensors="pt")
+input_features = inputs.input_features.to(device)
+forced_decoder_ids = processor.get_decoder_prompt_ids(language=language, task=task)
+
+generated_ids = model.generate(input_features=input_features, forced_decoder_ids=forced_decoder_ids)
+transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"text": transcription}

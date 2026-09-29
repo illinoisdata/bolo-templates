@@ -1,0 +1,72 @@
+{% set repo_id = repo_id | default("stanfordnlp/stanza-fr") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Le chat noir mange une souris.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import json
+import os
+
+import torch
+from huggingface_hub import hf_hub_download
+import stanza
+
+model_files = [
+    "models/tokenize/gsd.pt",
+    "models/mwt/combined.pt",
+    "models/pos/gsd_nocharlm.pt",
+    "models/lemma/gsd_nocharlm.pt",
+    "models/depparse/gsd_nocharlm.pt",
+]
+local_paths = [hf_hub_download(repo_id=repo_id, filename=fn) for fn in model_files]
+model_dir = os.path.dirname(os.path.dirname(os.path.dirname(local_paths[0])))
+
+stanza.download(
+    lang="fr",
+    model_dir=model_dir,
+    processors="tokenize,mwt,pos,lemma,depparse",
+    package={
+        "tokenize": "gsd",
+        "mwt": "combined",
+        "pos": "gsd_nocharlm",
+        "lemma": "gsd_nocharlm",
+        "depparse": "gsd_nocharlm",
+    },
+    verbose=False,
+)
+
+pipeline = stanza.Pipeline(
+    lang="fr",
+    dir=model_dir,
+    processors="tokenize,mwt,pos,lemma,depparse",
+    package={
+        "tokenize": "gsd",
+        "mwt": "combined",
+        "pos": "gsd_nocharlm",
+        "lemma": "gsd_nocharlm",
+        "depparse": "gsd_nocharlm",
+    },
+    tokenize_pretokenized=False,
+    use_gpu=device.startswith("cuda"),
+    verbose=False,
+)
+
+doc = pipeline(text)
+output = []
+for sent in doc.sentences:
+    sent_out = []
+    for w in sent.words:
+        sent_out.append({
+            "id": w.id,
+            "text": w.text,
+            "lemma": w.lemma,
+            "upos": w.upos,
+            "xpos": w.xpos,
+            "feats": w.feats,
+            "head": w.head,
+            "deprel": w.deprel,
+        })
+    output.append(sent_out)
+
+RESULT = {"sentences": output}

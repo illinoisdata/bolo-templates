@@ -1,0 +1,68 @@
+{% set repo_id = repo_id | default("bibabobbb/kronons-token-eth-recent-1m") %}
+{% set device = device | default("cuda:0") %}
+{% set seq_len = seq_len | default(8) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+seq_len = {{ seq_len }}
+
+import json
+from huggingface_hub import hf_hub_download
+import torch
+from safetensors.torch import load_file
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+state_dict = load_file(model_path, device="cpu")
+
+class KrononsTokenModel(torch.nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        d_in = cfg["d_in"]
+        d_model = cfg["d_model"]
+        self.input_proj = torch.nn.Linear(d_in, d_model)
+        enc_layer = torch.nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=cfg["n_heads"],
+            dim_feedforward=cfg["ff_dim"],
+            dropout=cfg["ffn_dropout_p"],
+            batch_first=True,
+            activation="gelu",
+            norm_first=True,
+        )
+        dec_layer = torch.nn.TransformerDecoderLayer(
+            d_model=d_model,
+            nhead=cfg["n_heads"],
+            dim_feedforward=cfg["ff_dim"],
+            dropout=cfg["ffn_dropout_p"],
+            batch_first=True,
+            activation="gelu",
+            norm_first=True,
+        )
+        self.encoder = torch.nn.TransformerEncoder(enc_layer, num_layers=cfg["n_enc_layers"])
+        self.decoder = torch.nn.TransformerDecoder(dec_layer, num_layers=cfg["n_dec_layers"])
+        self.output_proj = torch.nn.Linear(d_model, d_in)
+
+    def forward(self, x):
+        h = self.input_proj(x)
+        h = self.encoder(h)
+        y = self.decoder(h, h)
+        return self.output_proj(y)
+
+model = KrononsTokenModel(config)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+x = torch.arange(seq_len * config["d_in"], dtype=torch.float32).reshape(1, seq_len, config["d_in"])
+x = x.to(device)
+
+with torch.no_grad():
+    logits = model(x)
+    output = logits.detach().cpu().numpy()
+
+RESULT = {"output": output}

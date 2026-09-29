@@ -1,29 +1,22 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("facebook/mms-tts-ara") %}
-{% set text_input = text_input | default("مرحبا بالعالم، هذا نموذج لتوليد الكلام من النص.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('مرحبا، هذا اختبار لتحويل النص إلى كلام باللغة العربية.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+text = "{{ text }}"
 
 import torch
-from pathlib import Path
-from scipy.io import wavfile
-from transformers import AutoTokenizer, VitsModel
+from transformers import VitsModel, AutoTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = VitsModel.from_pretrained(repo_id)
-model = model.to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-inputs = tokenizer(text_input, return_tensors="pt")
-inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    inference_output = model(**inputs)
+    waveform = model(**inputs).waveform
 
-waveform = inference_output.waveform
-waveform = waveform.detach().to("cpu").squeeze(0)
-waveform = waveform.numpy()
-
-sampling_rate = int(model.config.sampling_rate)
-
-RESULT = {"waveform": waveform}
+RESULT = {"waveform": waveform.cpu().numpy(), "sampling_rate": model.config.sampling_rate}

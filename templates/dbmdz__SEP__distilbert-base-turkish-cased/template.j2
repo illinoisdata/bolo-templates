@@ -1,28 +1,32 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("dbmdz/distilbert-base-turkish-cased") %}
-{% set text_input = text_input | default("Merhaba dunya, bu bir test cumlesidir.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Merhaba, bu bir test cümlesidir.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+text = "{{ text }}"
 
-import json
 import os
-
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+repo_dir = os.path.dirname(weights_path)
+
+_tokenizer = AutoTokenizer.from_pretrained(repo_dir, local_files_only=True)
+model = AutoModel.from_pretrained(repo_dir, local_files_only=True)
 model.to(device)
 model.eval()
 
-encoded = tokenizer(text_input, return_tensors="pt")
-encoded = {key: value.to(device) for key, value in encoded.items()}
-
+inputs = _tokenizer(text, return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    outputs = model(**encoded)
-sequence_output = outputs.last_hidden_state
-pooled_embedding = sequence_output.mean(dim=1).squeeze(0)
-embedding = pooled_embedding.cpu().tolist()
+    outputs = model(**inputs)
 
-RESULT = {"embedding": embedding}
+RESULT = {
+    'last_hidden_state': outputs.last_hidden_state.detach().cpu().numpy(),
+    'pooler_output': getattr(outputs, 'pooler_output', None),
+}

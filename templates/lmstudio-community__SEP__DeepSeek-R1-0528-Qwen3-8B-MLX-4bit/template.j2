@@ -1,0 +1,42 @@
+{% set repo_id = repo_id | default("lmstudio-community/DeepSeek-R1-0528-Qwen3-8B-MLX-4bit") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Write a short, helpful greeting.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float16,
+    low_cpu_mem_usage=True,
+    trust_remote_code=True,
+    device_map={"": device},
+    quantization_config=None,
+    ignore_mismatched_sizes=True,
+)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.inference_mode():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=16,
+        do_sample=False,
+        pad_token_id=tokenizer.eos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+text = tokenizer.decode(generated[0], skip_special_tokens=True)
+RESULT = {"text": text}

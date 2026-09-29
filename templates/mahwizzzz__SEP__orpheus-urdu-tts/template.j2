@@ -1,0 +1,66 @@
+{% set text = text | default('السلام علیکم، یہ اورفیوس اردو ٹیکسٹ ٹو اسپیچ ماڈل کا ایک مختصر آزمائشی نمونہ ہے۔') %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set repo_id = repo_id | default("mahwizzzz/orpheus-urdu-tts") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_new_tokens = {{ max_new_tokens }}
+
+import json
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoConfig
+from transformers.models.llama.modeling_llama import LlamaForCausalLM
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+index_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+
+with open(index_path, "r") as f:
+    index = json.load(f)
+weight_files = sorted(set(index["weight_map"].values()))
+local_weight_files = [hf_hub_download(repo_id=repo_id, filename=fname) for fname in weight_files]
+model_dir = os.path.dirname(local_weight_files[0])
+
+if device.startswith("cuda") and torch.cuda.is_available():
+    torch_device = torch.device(device)
+    dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+else:
+    torch_device = torch.device("cpu")
+    dtype = torch.float32
+
+config = AutoConfig.from_pretrained(model_dir)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = LlamaForCausalLM.from_pretrained(
+    model_dir,
+    config=config,
+    torch_dtype=dtype,
+    low_cpu_mem_usage=True,
+    local_files_only=True,
+)
+model.to(torch_device)
+model.eval()
+
+prompt = f"<|begin_of_text|><|user|>\n{text}\n<|assistant|>\n"
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(torch_device) for k, v in inputs.items()}
+
+with torch.inference_mode():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=False,
+        temperature=0.0,
+        pad_token_id=tokenizer.pad_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+output_ids = generated[0, inputs["input_ids"].shape[1]:]
+output_text = tokenizer.decode(output_ids, skip_special_tokens=True)
+
+RESULT = {"generated_text": output_text}

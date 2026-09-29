@@ -1,0 +1,53 @@
+{% set repo_id = repo_id | default("zli12321/roberta-large-qa-evaluator") %}
+{% set device = device | default("cuda:0") %}
+{% set text_a = text_a | default('The cat sat on the mat.') %}
+{% set text_b = text_b | default('A cat is sitting on a mat.') %}
+{% set max_length = max_length | default(128) %}
+{% set top_k = top_k | default(5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_a = "{{ text_a }}"
+text_b = "{{ text_b }}"
+max_length = {{ max_length }}
+top_k = {{ top_k }}
+
+import json
+import os
+import re
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+
+# Derive tokenizer directory from downloaded file paths
+model_dir = os.path.dirname(config_path)
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = AutoModelForSequenceClassification.from_pretrained(model_dir)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text_a, text_b, return_tensors="pt", truncation=True, max_length=max_length, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probs = torch.softmax(logits, dim=-1)
+
+scores = probs[0].detach().cpu().tolist()
+topk = min(top_k, len(scores))
+ranked = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)[:topk]
+labels = model.config.id2label if getattr(model.config, "id2label", None) else {i: f"LABEL_{i}" for i in range(len(scores))}
+
+RESULT = {
+    "logits": logits[0].detach().cpu().tolist(),
+    "probabilities": scores,
+    "top_k": [{"label": labels.get(i, f"LABEL_{i}"), "score": s} for i, s in ranked],
+}

@@ -1,0 +1,47 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set refine_foreground = refine_foreground | default(false) %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("PramaLLC/BEN2") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+refine_foreground = {{ refine_foreground }}
+
+import os
+import io
+import requests
+from PIL import Image
+import torch
+from huggingface_hub import hf_hub_download
+
+import sys
+import subprocess
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="BEN2_Base.pth")
+code_path = hf_hub_download(repo_id=repo_id, filename="BEN2.py")
+repo_dir = os.path.dirname(code_path)
+if repo_dir not in sys.path:
+    sys.path.insert(0, repo_dir)
+import importlib.util
+_spec = importlib.util.spec_from_file_location("BEN2", code_path)
+_ben2 = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_ben2)
+BEN_Base = _ben2.BEN_Base
+
+import importlib.util
+import glob
+
+model = BEN_Base()
+state_dict = torch.load(weights_path, map_location=device)
+if isinstance(state_dict, dict) and "state_dict" in state_dict:
+    state_dict = state_dict["state_dict"]
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model.to(device).eval()
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(io.BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+foreground = model.inference(image, refine_foreground=refine_foreground)
+RESULT = {"foreground": foreground}

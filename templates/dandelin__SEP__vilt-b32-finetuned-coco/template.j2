@@ -1,37 +1,40 @@
 {% set repo_id = repo_id | default("dandelin/vilt-b32-finetuned-coco") %}
 {% set device = device | default("cuda:0") %}
-{% set image = image | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set texts = texts | default(["An image of two cats chilling on a couch", "A football player scoring a goal"]) %}
+{% set text1 = text1 | default('An image of two cats chilling on a couch') %}
+{% set text2 = text2 | default('A football player scoring a goal') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-image = "{{ image }}"
-texts = {{ texts }}
+text1 = "{{ text1 }}"
+text2 = "{{ text2 }}"
+image_path = "{{ image_path }}"
 
-from transformers import ViltProcessor, ViltForImageAndTextRetrieval
 import os
 import requests
 from PIL import Image
+import torch
+from transformers import ViltProcessor, ViltForImageAndTextRetrieval
+from huggingface_hub import hf_hub_download
 
-# Load processor and model
-processor = ViltProcessor.from_pretrained(repo_id)
-model = ViltForImageAndTextRetrieval.from_pretrained(repo_id)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+processor = ViltProcessor.from_pretrained(os.path.dirname(preprocessor_config_path))
+model = ViltForImageAndTextRetrieval.from_pretrained(os.path.dirname(config_path))
 model.to(device)
+model.eval()
 
-# Pre-process input: load image from local path or URL
-if image.startswith("http://") or image.startswith("https://"):
-    img = Image.open(requests.get(image, stream=True).raw)
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
 else:
-    img = Image.open(image)
+    image = Image.open(image_path).convert("RGB")
 
-# Run inference and post-process outputs
 scores = {}
-for text in texts:
-    encoding = processor(img, text, return_tensors="pt")
-    # move tensors to device
-    encoding = {k: v.to(device) for k, v in encoding.items()}
-    outputs = model(**encoding)
-    # extract matching score as a float
-    scores[text] = outputs.logits.flatten()[0].item()
+with torch.no_grad():
+    for text in [text1, text2]:
+        encoding = processor(image, text, return_tensors="pt")
+        encoding = {k: v.to(device) for k, v in encoding.items()}
+        outputs = model(**encoding)
+        scores[text] = outputs.logits[0, :].item()
 
-# Build RESULT dict
 RESULT = {"scores": scores}

@@ -1,40 +1,31 @@
 {% set repo_id = repo_id | default("allenai/scibert_scivocab_cased") %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("Trained on scientific literature, SciBERT excels at domain-specific tasks.") %}
-{% set output_path = output_path | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/allenai__SEP__scibert_scivocab_cased") %}
+{% set text = text | default('Scientific text mining is essential for biomedical discovery.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = """{{ text_input }}"""
-output_path = "{{ output_path }}"
+text = "{{ text }}"
 
-from pathlib import Path
-
-import numpy as np
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-device = torch.device(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
 model.eval()
 
-encoded = tokenizer(
-    text_input,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-    max_length=512,
-)
-inputs = {name: tensor.to(device) for name, tensor in encoded.items()}
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
     outputs = model(**inputs)
 
-last_hidden_state = outputs.last_hidden_state.cpu().numpy()
-pooler_output = (
-    outputs.pooler_output.cpu().numpy() if outputs.pooler_output is not None else None
-)
+last_hidden_state = outputs.last_hidden_state
+pooler_output = outputs.pooler_output
 
 RESULT = {
     "last_hidden_state": last_hidden_state,

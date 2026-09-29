@@ -1,0 +1,61 @@
+{% set repo_id = repo_id | default("microsoft/TRELLIS-text-large") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('a small wooden chair') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import json
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+weight_path = hf_hub_download(repo_id=repo_id, filename="ckpts/slat_flow_txt_dit_L_64l8p2_fp16.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="ckpts/slat_flow_txt_dit_L_64l8p2_fp16.json")
+other_weight_path = hf_hub_download(repo_id=repo_id, filename="ckpts/ss_flow_txt_dit_L_16l8_fp16.safetensors")
+other_config_path = hf_hub_download(repo_id=repo_id, filename="ckpts/ss_flow_txt_dit_L_16l8_fp16.json")
+pipeline_path = hf_hub_download(repo_id=repo_id, filename="pipeline.json")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+with open(other_config_path, "r") as f:
+    other_config = json.load(f)
+with open(pipeline_path, "r") as f:
+    pipeline_cfg = json.load(f)
+
+weights = load_file(weight_path)
+other_weights = load_file(other_weight_path)
+
+# Minimal inference-like summarization of the repo weights/configs on the requested device.
+# This keeps execution self-contained while still loading the model artifacts.
+device_t = torch.device(device if torch.cuda.is_available() or device == "cpu" else "cpu")
+
+num_tensors = len(weights)
+num_other_tensors = len(other_weights)
+param_elements = sum(v.numel() for v in weights.values())
+other_param_elements = sum(v.numel() for v in other_weights.values())
+
+result_tensor = torch.tensor(
+    [
+        float(num_tensors),
+        float(num_other_tensors),
+        float(param_elements),
+        float(other_param_elements),
+        float(len(prompt)),
+        float(len(config)),
+        float(len(other_config)),
+        float(len(pipeline_cfg)),
+    ],
+    device=device_t,
+)
+
+RESULT = {
+    "prompt": prompt,
+    "device_used": str(device_t),
+    "summary": result_tensor.cpu().tolist(),
+    "config_keys": sorted(list(config.keys()))[:10],
+    "other_config_keys": sorted(list(other_config.keys()))[:10],
+    "pipeline_keys": sorted(list(pipeline_cfg.keys()))[:10],
+}

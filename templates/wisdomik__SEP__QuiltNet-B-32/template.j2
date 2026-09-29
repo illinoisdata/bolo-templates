@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("wisdomik/QuiltNet-B-32") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set candidate_labels = candidate_labels | default(['adipose tissue', 'debris tissue', 'lymphocytes tissue', 'mucus tissue', 'smooth muscle tissue', 'normal colon mucosa tissue', 'cancer-associated stroma tissue', 'colorectal adenocarcinoma epithelium tissue']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+candidate_labels = {{ candidate_labels }}
+
+import os
+import torch
+import requests
+import numpy as np
+from PIL import Image
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+from transformers import CLIPModel, CLIPProcessor
+
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_file = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+def load_image(path_or_url):
+    if path_or_url.startswith("http://") or path_or_url.startswith("https://"):
+        return Image.open(BytesIO(requests.get(path_or_url, timeout=30).content)).convert("RGB")
+    return Image.open(path_or_url).convert("RGB")
+
+processor = CLIPProcessor.from_pretrained(os.path.dirname(preprocessor_file))
+model = CLIPModel.from_pretrained(os.path.dirname(config_file), local_files_only=True)
+state_dict = torch.load(model_file, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+image = load_image(image_path)
+inputs = processor(text=candidate_labels, images=image, return_tensors="pt", padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits_per_image = outputs.logits_per_image
+    probs = logits_per_image.softmax(dim=1)[0]
+
+scores = probs.detach().cpu().tolist()
+result = sorted(zip(candidate_labels, scores), key=lambda x: x[1], reverse=True)
+
+RESULT = {"labels": [x[0] for x in result], "scores": [float(x[1]) for x in result]}

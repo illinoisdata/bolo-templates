@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("zhihan1996/DNA_bert_6") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") -%}
+{% set masked_prompt = masked_prompt | default("ATG{mask}CGTAGC") -%}
+
+task = {{ task | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+
+from transformers import pipeline
+
+
+def _pipeline_device_arg(device_value):
+    if isinstance(device_value, str):
+        normalized = device_value.lower()
+        if normalized.startswith("cuda"):
+            parts = normalized.split(":")
+            if len(parts) > 1 and parts[1].isdigit():
+                return int(parts[1])
+            return 0
+        if normalized.startswith("cpu"):
+            return -1
+    if isinstance(device_value, int):
+        return device_value
+    return -1
+
+pipeline_device = _pipeline_device_arg(device)
+pipe = pipeline(task=task, model=repo_id, device=pipeline_device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

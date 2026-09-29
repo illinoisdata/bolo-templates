@@ -1,0 +1,30 @@
+{% set repo_id = repo_id | default("alakxender/mms-tts-div-finetuned-md-f03") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-to-audio") %}
+{% set input_text = input_text | default("މޫސުން ވަރަށް ގޯސްވެ، ފުވައްމުލަކުން ފެށިގެން އައްޑުއަށް އޮރެންޖް އެލާޓް ނެރެފި") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+input_text = {{ input_text | tojson }}
+
+from transformers import BatchEncoding, pipeline
+
+# Allow the text-to-audio pipeline to accept the `dtype` keyword when moving inputs
+_original_batch_encoding_to = BatchEncoding.to
+
+def _batch_encoding_to(self, device=None, *, non_blocking=False, dtype=None):
+    if dtype is None or device is not None:
+        return _original_batch_encoding_to(self, device, non_blocking=non_blocking)
+    return self
+
+BatchEncoding.to = _batch_encoding_to
+
+# Load tokenizer/processor & model
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+# Pre-process input
+text_inputs = input_text
+
+# Run inference
+RESULT = pipe(text_inputs)

@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("OpenVINO/Llama-3.1-8B-Instruct-FastDraft-150M-int8-ov") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('What is OpenVINO?') %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
+{% set num_assistant_tokens = num_assistant_tokens | default(3) %}
+{% set cache_size = cache_size | default(2) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+num_assistant_tokens = {{ num_assistant_tokens }}
+cache_size = {{ cache_size }}
+
+from pathlib import Path
+import huggingface_hub as hf_hub
+import openvino_genai
+
+model_dir = Path(hf_hub.snapshot_download(repo_id=repo_id))
+main_model_path = str(model_dir)
+draft_model_path = str(model_dir)
+
+config = openvino_genai.GenerationConfig()
+config.num_assistant_tokens = num_assistant_tokens
+config.max_new_tokens = max_new_tokens
+
+scheduler_config = openvino_genai.SchedulerConfig()
+scheduler_config.cache_size = cache_size
+
+device_name = device
+if device_name.startswith("cuda"):
+    device_name = "CPU"
+
+draft_model = openvino_genai.draft_model(draft_model_path, device_name)
+pipe = openvino_genai.LLMPipeline(main_model_path, device_name, scheduler_config=scheduler_config, draft_model=draft_model)
+output_text = pipe.generate(prompt, config)
+
+RESULT = {"output_text": output_text}

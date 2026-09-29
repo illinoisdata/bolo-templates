@@ -1,0 +1,25 @@
+{% set repo_id = repo_id | default("mlc-ai/Qwen2.5-0.5B-Instruct-q4f16_1-MLC") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('What is the meaning of life?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+_ = hf_hub_download(repo_id=repo_id, filename="mlc-chat-config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+_ = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+for i in range(8):
+    _ = hf_hub_download(repo_id=repo_id, filename=f"params_shard_{i}.bin")
+
+model_name = "Qwen/Qwen2.5-0.5B-Instruct"
+tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True).to(device)
+inputs = tokenizer(prompt, return_tensors="pt").to(device)
+out = model.generate(**inputs, max_new_tokens=32, do_sample=False)
+output_text = tokenizer.decode(out[0], skip_special_tokens=True)
+RESULT = {"text": output_text}

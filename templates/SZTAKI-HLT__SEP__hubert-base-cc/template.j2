@@ -1,29 +1,37 @@
 {% set repo_id = repo_id | default("SZTAKI-HLT/hubert-base-cc") %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("Ez egy példamondat a modellhez.") %}
+{% set text = text | default('A magyar nyelvű modell tesztelése.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+text = "{{ text }}"
 
+import os
 import torch
-from pathlib import Path
-from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModel
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+# Load tokenizer/model
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_path), use_fast=False)
+model = AutoModel.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(
-    text_input,
-    return_tensors="pt",
-    padding="max_length",
-    truncation=True,
-    max_length=512,
-)
-encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
+    outputs = model(**inputs)
 
-last_hidden_state = outputs.last_hidden_state.cpu()
-RESULT = {"last_hidden_state": last_hidden_state}
+last_hidden_state = outputs.last_hidden_state
+pooled_output = outputs.pooler_output
+
+RESULT = {
+    "last_hidden_state": last_hidden_state,
+    "pooled_output": pooled_output,
+}

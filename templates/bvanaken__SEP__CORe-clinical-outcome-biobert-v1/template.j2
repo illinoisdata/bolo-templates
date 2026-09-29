@@ -1,29 +1,32 @@
 {% set repo_id = repo_id | default("bvanaken/CORe-clinical-outcome-biobert-v1") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("Patient is a 67-year-old male with chest pain and shortness of breath.") %}
+{% set text = text | default('The patient was admitted with chest pain and shortness of breath. What is the likely clinical context?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
-import os
 import torch
 from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-# Preprocess input text
-inputs = tokenizer(text, return_tensors="pt")
+tokenizer = AutoTokenizer.from_pretrained(repo_id, vocab_file=vocab_path)
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Run inference
-outputs = model(**inputs)
+with torch.no_grad():
+    outputs = model(**inputs)
 
-# Post-process outputs
-# last_hidden_state: [batch_size, sequence_length, hidden_size]
-# pooler_output: [batch_size, hidden_size]
+last_hidden_state = outputs.last_hidden_state
+pooler_output = outputs.pooler_output if hasattr(outputs, 'pooler_output') else None
 RESULT = {
-    "last_hidden_state": outputs.last_hidden_state.cpu(),
-    "pooler_output": outputs.pooler_output.cpu(),
+    "last_hidden_state": last_hidden_state,
+    "pooler_output": pooler_output,
 }

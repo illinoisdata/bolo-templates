@@ -1,7 +1,0 @@
-{% set device = device | default("cuda:0") %}
-{% set repo_id = repo_id | default("myshell-ai/MeloTTS-English") %}
-repo_id = "{{ repo_id }}"
-
-from huggingface_hub import list_repo_files
-
-print(list_repo_files(repo_id))

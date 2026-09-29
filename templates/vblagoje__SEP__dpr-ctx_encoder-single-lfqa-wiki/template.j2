@@ -1,28 +1,29 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("vblagoje/dpr-ctx_encoder-single-lfqa-wiki") %}
-{% set query = query | default("Where an aircraft passes through a cloud, it can disperse the cloud in its path...") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Where an aircraft passes through a cloud, it can disperse the cloud in its path...') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-query = """{{ query }}"""
+text = "{{ text }}"
 
-import os
-from pathlib import Path
-
-import numpy as np
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import DPRContextEncoder, DPRContextEncoderTokenizer
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+tokenizer = DPRContextEncoderTokenizer.from_pretrained(repo_id, local_files_only=True)
+model = DPRContextEncoder.from_pretrained(repo_id, local_files_only=True, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-encoded = tokenizer(query, return_tensors="pt", truncation=True, max_length=512)
-encoded = {key: value.to(device) for key, value in encoded.items()}
-
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    outputs = model(**encoded)
+    outputs = model(**inputs)
+embedding = outputs.pooler_output.detach().cpu().numpy()
 
-embeddings = outputs.pooler_output
-embedding_list = embeddings.cpu().tolist()
-
-RESULT = {"query_embedding": embedding_list}
+RESULT = {"embedding": embedding}

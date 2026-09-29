@@ -1,0 +1,57 @@
+{% set repo_id = repo_id | default("Maple728/TimeMoE-50M") %}
+{% set device = device | default("cuda:0") %}
+{% set context_length = context_length | default(96) %}
+{% set prediction_length = prediction_length | default(32) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+context_length = {{ context_length }}
+prediction_length = {{ prediction_length }}
+
+import os
+import sys
+import json
+import types
+import torch
+import numpy as np
+from huggingface_hub import hf_hub_download
+
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+configuration_time_moe_file = hf_hub_download(repo_id=repo_id, filename="configuration_time_moe.py")
+modeling_time_moe_file = hf_hub_download(repo_id=repo_id, filename="modeling_time_moe.py")
+ts_generation_mixin_file = hf_hub_download(repo_id=repo_id, filename="ts_generation_mixin.py")
+
+package_name = "time_moe_remote"
+package = types.ModuleType(package_name)
+package.__path__ = [os.path.dirname(configuration_time_moe_file)]
+sys.modules[package_name] = package
+
+import importlib.util
+for module_name, file_path in [
+    (f"{package_name}.configuration_time_moe", configuration_time_moe_file),
+    (f"{package_name}.ts_generation_mixin", ts_generation_mixin_file),
+    (f"{package_name}.modeling_time_moe", modeling_time_moe_file),
+]:
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+
+from time_moe_remote.configuration_time_moe import TimeMoeConfig
+from time_moe_remote.modeling_time_moe import TimeMoeForPrediction
+
+config = TimeMoeConfig.from_pretrained(os.path.dirname(config_file), local_files_only=True)
+model = TimeMoeForPrediction.from_pretrained(os.path.dirname(config_file), local_files_only=True, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+series = torch.linspace(0, 2 * np.pi, steps=context_length, device=device)
+input_series = torch.sin(series).unsqueeze(0).unsqueeze(-1).to(torch.float32)
+
+with torch.no_grad():
+    output = model(input_series)
+
+if isinstance(output, tuple):
+    output = output[0]
+forecast = output.detach().cpu().numpy() if isinstance(output, torch.Tensor) else np.array(output)
+RESULT = {"forecast": forecast}

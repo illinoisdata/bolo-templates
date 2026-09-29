@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("1-800-BAD-CODE/punctuation_fullstop_truecase_english") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("hello user this is an example input this text should be split into several sentences including a final interrogative did it work") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import os
+from huggingface_hub import hf_hub_download
+from punctuators.models import PunctCapSegModelONNX
+
+_onnx_path = hf_hub_download(repo_id=repo_id, filename="punct_cap_seg_en.onnx")
+_spe_path = hf_hub_download(repo_id=repo_id, filename="spe_32k_lc_en.model")
+
+model = PunctCapSegModelONNX.from_pretrained("pcs_en")
+output = model.infer([text])[0]
+
+RESULT = {"output": output}

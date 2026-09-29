@@ -1,0 +1,52 @@
+{% set repo_id = repo_id | default("Synthyra/ESMplusplus_large") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("MSTNPKPQRKTK{mask}NT") %}
+{% set local_repo_dir = local_repo_dir | default("/workspace/Synthyra_ESMplusplus_large_repo") %}
+
+task = {{ task | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+local_repo_dir = {{ local_repo_dir | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+model = repo_id
+
+from pathlib import Path
+import importlib
+import sys
+import types
+
+from huggingface_hub import snapshot_download
+from transformers import AutoTokenizer, pipeline
+
+local_model_dir = Path(local_repo_dir)
+if not (local_model_dir / "config.json").exists():
+    snapshot_download(
+        repo_id=repo_id,
+        repo_type="model",
+        local_dir=str(local_model_dir),
+        local_dir_use_symlinks=False,
+    )
+
+sys.path.insert(0, str(local_model_dir))
+package_name = local_model_dir.name
+if package_name not in sys.modules:
+    package = types.ModuleType(package_name)
+    package.__path__ = [str(local_model_dir)]
+    sys.modules[package_name] = package
+
+modeling_module = importlib.import_module(f"{package_name}.modeling_fastplms")
+ESMplusplusForMaskedLM = modeling_module.ESMplusplusForMaskedLM
+
+model = ESMplusplusForMaskedLM.from_pretrained(str(local_model_dir))
+tokenizer = AutoTokenizer.from_pretrained(str(local_model_dir))
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=tokenizer,
+    device=device,
+)
+mask_token = tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

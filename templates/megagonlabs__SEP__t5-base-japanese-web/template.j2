@@ -1,26 +1,38 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("megagonlabs/t5-base-japanese-web") %}
-{% set prompt = prompt | default("これはテスト文章です。要約してください。") %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('日本の首都はどこですか？') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text = "{{ text }}"
 
-import os
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, T5Tokenizer
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
 
-inputs = tokenizer(prompt, return_tensors="pt").to(device)
+
+tokenizer = T5Tokenizer(vocab_file=spiece_path)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+    output_ids = model.generate(
+        **inputs,
+        max_new_tokens=32,
+        num_beams=4,
+        do_sample=False,
+    )
 
-decoded_output = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-RESULT = {"generated_text": decoded_output}
+RESULT = {"output_text": output_text}

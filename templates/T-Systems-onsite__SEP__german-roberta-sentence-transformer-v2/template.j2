@@ -1,0 +1,13 @@
+{% set repo_id = repo_id | default("T-Systems-onsite/german-roberta-sentence-transformer-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set input_prompt = input_prompt | default("Ich liebe das Modell von T-Systems-onsite für Satz-Embeddings und möchte seine Repräsentationen testen.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = pipe(input_prompt)

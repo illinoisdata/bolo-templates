@@ -1,33 +1,72 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("shtoshni/spanbert_coreference_base") %}
-{% set text = text | default("The quick brown fox jumps over the lazy dog.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Barack Obama was born in Hawaii. He was elected president in 2008. The two men met in Paris.') %}
+{% set max_spans = max_spans | default(32) %}
+{% set top_k = top_k | default(10) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
+max_spans = {{ max_spans }}
+top_k = {{ top_k }}
 
 import json
-import os
 import torch
+from transformers import AutoTokenizer, BertConfig, BertForPreTraining
+from huggingface_hub import hf_hub_download
 
-from transformers import BertModel, BertTokenizerFast
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 
-tokenizer = BertTokenizerFast.from_pretrained(repo_id)
-model = BertModel.from_pretrained(repo_id).to(device)
+with open(config_path, "r") as f:
+    config_dict = json.load(f)
+config = BertConfig(**config_dict)
+
+try:
+    tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+except Exception:
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased", use_fast=True)
+
+model = BertForPreTraining(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(text, return_tensors="pt", truncation=True)
-inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
+input_ids = inputs["input_ids"].to(device)
+attention_mask = inputs["attention_mask"].to(device)
+seq_len = int(attention_mask.sum().item())
+start_token = 1
+end_token = max(start_token, seq_len - 1)
+span_candidates = []
+for i in range(start_token, min(end_token, start_token + 20)):
+    for j in range(i, min(end_token, i + 5)):
+        span_candidates.append((i, j))
+        if len(span_candidates) >= max_spans:
+            break
+    if len(span_candidates) >= max_spans:
+        break
 
+scores = []
 with torch.no_grad():
-    outputs = model(**inputs)
+    for s, e in span_candidates:
+        masked = input_ids.clone()
+        masked[:, s:e+1] = tokenizer.mask_token_id
+        outputs = model(masked, attention_mask=attention_mask)
+        prediction_scores = outputs.prediction_logits
+        log_probs = torch.log_softmax(prediction_scores[:, s:e+1, :], dim=-1)
+        target = input_ids[:, s:e+1].unsqueeze(-1)
+        token_logp = torch.gather(log_probs, -1, target).squeeze(-1)
+        score = float((-token_logp.mean()).item())
+        scores.append(score)
 
-pooled_output = outputs.pooler_output
-if pooled_output is not None:
-    pooled_output = pooled_output[0].cpu().tolist()
+ranked = sorted(zip(span_candidates, scores), key=lambda x: x[1])[:top_k]
+entities = []
+for (s, e), score in ranked:
+    entities.append({
+        "span": [int(s), int(e)],
+        "text": tokenizer.decode(input_ids[0, s:e+1], skip_special_tokens=True).strip(),
+        "score": float(score),
+    })
 
-first_token_hidden_state = outputs.last_hidden_state[0, 0].cpu().tolist()
-
-RESULT = {
-    "pooled_output": pooled_output,
-    "first_token_hidden_state": first_token_hidden_state,
-}
+RESULT = {"entities": entities, "num_candidates": len(span_candidates)}

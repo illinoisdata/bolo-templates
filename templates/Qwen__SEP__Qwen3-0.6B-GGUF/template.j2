@@ -1,0 +1,36 @@
+{% set repo_id = repo_id | default("Qwen/Qwen3-0.6B-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('Qwen3-0.6B-Q8_0.gguf') %}
+{% set prompt = prompt | default('Explain in one short paragraph what the Qwen3 model is and mention one practical use case.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+llm = Llama(
+    model_path=model_path,
+    n_ctx=1024,
+    n_threads=4,
+    n_batch=256,
+    n_gpu_layers=0,
+    verbose=False,
+)
+
+result = llm(
+    prompt,
+    max_tokens=128,
+    temperature=0.7,
+    top_p=0.8,
+    top_k=20,
+    repeat_penalty=1.1,
+    stop=["</s>"]
+)
+
+output_text = result["choices"][0]["text"].strip()
+
+RESULT = {"text": output_text}

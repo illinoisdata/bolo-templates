@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("mlx-community/DeepSeek-R1-Distill-Qwen-1.5B-4bit") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('hello') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import os
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+model_dir = os.path.dirname(model_path)
+with open(config_path, 'r') as f:
+    config = json.load(f)
+config.pop('quantization', None)
+config.pop('quantization_config', None)
+with open(os.path.join(model_dir, 'config.json'), 'w') as f:
+    json.dump(config, f)
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
+model = AutoModelForCausalLM.from_pretrained(
+    model_dir,
+    local_files_only=True,
+    ignore_mismatched_sizes=True,
+    torch_dtype=torch.float16 if device.startswith('cuda') else torch.float32,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated = model.generate(**inputs, max_new_tokens=32, do_sample=False)
+output = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+RESULT = {"output": output}

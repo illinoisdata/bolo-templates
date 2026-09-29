@@ -1,48 +1,56 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
 {% set repo_id = repo_id | default("hubertsiuzdak/snac_44khz") %}
 {% set device = device | default("cuda:0") %}
-{% set audio_path = audio_path | default('/u/yli77/projects/ML-code-generation/data/audio.wav') %}
+{% set target_sr = target_sr | default(44100) %}
+{% set max_seconds = max_seconds | default(1.0) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
+target_sr = {{ target_sr }}
+max_seconds = {{ max_seconds }}
 
+import os
 import io
-from pathlib import Path
-
-import numpy as np
+import torch
+import torch.nn.functional as F
 import requests
 import soundfile as sf
-import torch
-import torchaudio.functional as F
+import librosa
+from huggingface_hub import hf_hub_download
 from snac import SNAC
 
-model = SNAC.from_pretrained(repo_id).eval().to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 
-target_sample_rate = 44100
-
-if audio_path.lower().startswith(("http://", "https://")):
-    response = requests.get(audio_path, stream=True)
+if audio_path.startswith(("http://", "https://")):
+    response = requests.get(audio_path, timeout=30)
     response.raise_for_status()
-    audio_buffer = io.BytesIO(response.content)
-    audio_array, sample_rate = sf.read(audio_buffer, dtype="float32")
+    audio, sr = sf.read(io.BytesIO(response.content), dtype="float32")
 else:
-    audio_array, sample_rate = sf.read(audio_path, dtype="float32")
+    audio, sr = sf.read(audio_path, dtype="float32")
 
-if audio_array.ndim > 1:
-    audio_array = audio_array.mean(axis=1)
+if audio.ndim > 1:
+    audio = audio.mean(axis=1)
 
-audio_array = np.ascontiguousarray(audio_array, dtype=np.float32)
-audio_tensor = torch.from_numpy(audio_array)
+if sr != target_sr:
+    audio = librosa.resample(audio, orig_sr=sr, target_sr=target_sr)
+    sr = target_sr
 
-if sample_rate != target_sample_rate:
-    audio_tensor = F.resample(audio_tensor.unsqueeze(0), sample_rate, target_sample_rate).squeeze(0)
-    sample_rate = target_sample_rate
+max_len = int(max_seconds * sr)
+if audio.shape[0] > max_len:
+    audio = audio[:max_len]
 
-audio_tensor = audio_tensor.unsqueeze(0).unsqueeze(0).to(device)
+waveform = torch.tensor(audio, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+if waveform.shape[-1] < max_len:
+    waveform = F.pad(waveform, (0, max_len - waveform.shape[-1]))
+
+torch_device = torch.device(device if (device.startswith("cuda") and torch.cuda.is_available()) else "cpu")
+model = SNAC.from_pretrained(repo_id).to(torch_device).eval()
 
 with torch.inference_mode():
-    reconstructed_audio, codes = model(audio_tensor)
+    waveform = waveform.to(torch_device)
+    reconstructed, codes = model(waveform)
 
-reconstructed_audio = reconstructed_audio.detach().cpu()
-codes = [code.detach().cpu() for code in codes]
-
-RESULT = {"reconstructed_audio": reconstructed_audio, "codes": codes}
+output_audio = reconstructed.squeeze(0).squeeze(0).detach().cpu()
+code_shapes = [tuple(c.shape) for c in codes]
+RESULT = {"audio": output_audio, "code_shapes": code_shapes, "sample_rate": sr}

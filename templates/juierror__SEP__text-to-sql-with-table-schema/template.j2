@@ -1,34 +1,35 @@
 {% set repo_id = repo_id | default("juierror/text-to-sql-with-table-schema") %}
 {% set device = device | default("cuda:0") %}
-{% set question = question | default("get people name with age equal 25") %}
-{% set table_columns = table_columns | default(["id", "name", "age"]) %}
+{% set question = question | default('get people name with age equal 25') %}
+{% set table = table | default(['id', 'name', 'age']) %}
+{% set max_length = max_length | default(700) %}
+{% set num_beams = num_beams | default(10) %}
+{% set top_k = top_k | default(10) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-question = "{{ question }}"
-table_columns = {{ table_columns }}
+question = {{ question | tojson }}
+table = {{ table | tojson }}
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+top_k = {{ top_k }}
 
-from pathlib import Path
+from huggingface_hub import hf_hub_download
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
 
-table_prefix = "table:"
-question_prefix = "question:"
-joined_table = ",".join(table_columns)
-input_text = f"{question_prefix} {question} {table_prefix} {joined_table}"
-encoded_inputs = tokenizer(input_text, max_length=700, truncation=True, return_tensors="pt")
-input_ids = encoded_inputs.input_ids.to(device)
-attention_mask = encoded_inputs.attention_mask.to(device)
+inputs = f"question: {question} table: {','.join(table)}"
+input_ids = tokenizer(inputs, max_length=max_length, truncation=True, return_tensors="pt").input_ids.to(device)
+model = model.to(device)
+model.eval()
 
-generated_tokens = model.generate(
-    input_ids=input_ids,
-    attention_mask=attention_mask,
-    num_beams=10,
-    top_k=10,
-    max_length=700,
-)
+with torch.no_grad():
+    outputs = model.generate(input_ids=input_ids, num_beams=num_beams, top_k=top_k, max_length=max_length)
+    result = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-sql = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
-
-RESULT = {"sql": sql}
+RESULT = {"output": result}

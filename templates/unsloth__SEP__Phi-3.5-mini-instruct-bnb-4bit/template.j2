@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("unsloth/Phi-3.5-mini-instruct-bnb-4bit") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") -%}
+{% set input_prompt = input_prompt | default("The following is a short conversation between a human and an assistant. Human: \"Explain how to solve 2x + 3 = 7 algebraically.\"") -%}
+{% set generation_kwargs = generation_kwargs | default({"max_new_tokens": 256, "return_full_text": False, "temperature": 0.0, "do_sample": False}) -%}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+generation_kwargs = {{ generation_kwargs }}
+model = repo_id
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(input_prompt, **generation_kwargs)

@@ -1,0 +1,52 @@
+{% set repo_id = repo_id | default("RedHatAI/Llama-3.1-8B-Instruct-NVFP4") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Write a short assistant-style response explaining what FP4 quantization is.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import json
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_index_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+_ = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+with open(config_path, 'r') as f:
+    _config = json.load(f)
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+if tokenizer.pad_token_id is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+messages = [
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user", "content": prompt},
+]
+inputs = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt")
+inputs = inputs.to(device)
+
+with torch.no_grad():
+    generated = model.generate(
+        input_ids=inputs,
+        max_new_tokens=64,
+        do_sample=False,
+        pad_token_id=tokenizer.eos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+output_text = tokenizer.decode(generated[0][inputs.shape[-1]:], skip_special_tokens=True)
+RESULT = {"generated_text": output_text}

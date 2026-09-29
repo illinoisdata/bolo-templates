@@ -1,0 +1,34 @@
+{% set repo_id = repo_id | default("taobao-mnn/deepseek-llm-7b-chat-MNN") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Hello! Give a brief introduction to DeepSeek-LLM-7B-Chat.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+
+import json
+import os
+
+from huggingface_hub import hf_hub_download
+
+repo_root = os.path.dirname(hf_hub_download(repo_id=repo_id, filename='config.json'))
+config_path = os.path.join(repo_root, 'config.json')
+llm_config_path = os.path.join(repo_root, 'llm_config.json')
+tokenizer_path = os.path.join(repo_root, 'tokenizer.txt')
+model_path = os.path.join(repo_root, 'llm.mnn')
+weight_path = os.path.join(repo_root, 'llm.mnn.weight')
+
+config = json.load(open(config_path, 'r'))
+
+RESULT = {
+    'config': config,
+    'repo_root': repo_root,
+    'model_files': {
+        'config': config_path,
+        'llm_config': llm_config_path,
+        'tokenizer': tokenizer_path,
+        'model': model_path,
+        'weight': weight_path,
+    },
+    'prompt': prompt,
+    'device': device,
+}

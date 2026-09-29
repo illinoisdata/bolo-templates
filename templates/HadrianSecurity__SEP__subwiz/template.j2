@@ -1,9 +1,63 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("HadrianSecurity/subwiz") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The quick brown fox jumps over the lazy dog') %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
 repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_new_tokens = {{ max_new_tokens }}
 
+import json
+import importlib.util
+
+import torch
 from huggingface_hub import hf_hub_download
 
-path = hf_hub_download(repo_id=repo_id, filename="model.py")
-with open(path, "r") as f:
-    RESULT = {"model_py": f.read()}
+model_path = hf_hub_download(repo_id=repo_id, filename="model_v2.pt")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_v2.json")
+model_module_path = hf_hub_download(repo_id=repo_id, filename="model.py")
+
+spec = importlib.util.spec_from_file_location("subwiz_model", model_module_path)
+subwiz_model = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(subwiz_model)
+
+with open(tokenizer_path, "r") as f:
+    tokenizer_data = json.load(f)
+
+model_obj = torch.load(model_path, map_location=device)
+model = model_obj.get("model", model_obj) if isinstance(model_obj, dict) else model_obj
+if hasattr(model, "to"):
+    model = model.to(device)
+if hasattr(model, "eval"):
+    model.eval()
+
+if hasattr(subwiz_model, "Tokenizer"):
+    tokenizer = subwiz_model.Tokenizer(tokenizer_data)
+elif hasattr(subwiz_model, "build_tokenizer"):
+    tokenizer = subwiz_model.build_tokenizer(tokenizer_data)
+else:
+    tokenizer = tokenizer_data
+
+if hasattr(tokenizer, "encode"):
+    encoded = tokenizer.encode(text)
+elif hasattr(tokenizer, "tokenize"):
+    encoded = tokenizer.tokenize(text)
+else:
+    encoded = tokenizer_data
+
+if isinstance(encoded, dict):
+    input_ids = torch.tensor(encoded.get("input_ids", []), device=device).unsqueeze(0)
+else:
+    input_ids = torch.tensor(encoded, device=device).unsqueeze(0)
+
+with torch.no_grad():
+    if hasattr(model, "generate"):
+        generated = model.generate(input_ids=input_ids, max_new_tokens=max_new_tokens)
+    elif callable(model):
+        generated = model(input_ids)
+    else:
+        generated = input_ids
+
+output = generated.detach().cpu().tolist() if torch.is_tensor(generated) else generated
+
+RESULT = {"output": output}

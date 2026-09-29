@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("lmstudio-community/gemma-3-12B-it-qat-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('gemma-3-12B-it-QAT-Q4_0.gguf') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set prompt = prompt | default('Describe the image in detail.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+
+import os
+from urllib.parse import urlparse
+import requests
+from PIL import Image
+import torch
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+weight_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+mmproj_path = hf_hub_download(repo_id=repo_id, filename='mmproj-model-f16.gguf')
+
+if urlparse(image_path).scheme in ('http', 'https'):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+llm = Llama(
+    model_path=weight_path,
+    mmproj_path=mmproj_path,
+    n_ctx=4096,
+    n_gpu_layers=-1 if device.startswith('cuda') else 0,
+    verbose=False,
+)
+
+output = llm.create_chat_completion(
+    messages=[
+        {"role": "user", "content": [
+            {"type": "image", "image": image},
+            {"type": "text", "text": prompt},
+        ]}
+    ],
+    max_tokens=128,
+)
+output_text = output["choices"][0]["message"]["content"]
+
+RESULT = {"output_text": output_text}

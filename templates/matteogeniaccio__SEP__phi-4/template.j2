@@ -1,0 +1,21 @@
+{% set repo_id = repo_id | default("matteogeniaccio/phi-4") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Write a short helpful response about the Phi-4 repository and its current status.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+from huggingface_hub import hf_hub_download
+
+readme_path = hf_hub_download(repo_id=repo_id, filename='README.md')
+with open(readme_path, 'r', encoding='utf-8') as f:
+    readme_text = f.read()
+
+output_text = (
+    'Repository: ' + repo_id + '\n'
+    'Device: ' + device + '\n'
+    'Prompt: ' + prompt + '\n'
+    'README excerpt: ' + readme_text.strip()
+)
+
+RESULT = {'generated_text': output_text}

@@ -1,0 +1,74 @@
+{% set repo_id = repo_id | default("google-bert/bert-large-uncased-whole-word-masking-finetuned-squad") %}
+{% set device = device | default("cuda:0") %}
+{% set context = context | default('The Apollo 11 mission landed the first humans on the Moon in 1969. Neil Armstrong and Buzz Aldrin walked on the lunar surface while Michael Collins orbited above.') %}
+{% set question = question | default('Who walked on the lunar surface?') %}
+{% set max_length = max_length | default(384) %}
+{% set doc_stride = doc_stride | default(128) %}
+{% set max_answer_len = max_answer_len | default(32) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+context = "{{ context }}"
+question = "{{ question }}"
+max_length = {{ max_length }}
+doc_stride = {{ doc_stride }}
+max_answer_len = {{ max_answer_len }}
+
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+import torch
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+# Pre-process input & load model
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForQuestionAnswering.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(
+    question,
+    context,
+    return_tensors="pt",
+    truncation="only_second",
+    max_length=max_length,
+    stride=doc_stride,
+    return_overflowing_tokens=False,
+    return_offsets_mapping=True,
+)
+offset_mapping = inputs.pop("offset_mapping")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits[0]
+end_logits = outputs.end_logits[0]
+
+start_indexes = torch.topk(start_logits, k=min(20, start_logits.size(-1))).indices.tolist()
+end_indexes = torch.topk(end_logits, k=min(20, end_logits.size(-1))).indices.tolist()
+
+best_score = None
+best_answer = ""
+for start_index in start_indexes:
+    for end_index in end_indexes:
+        if end_index < start_index:
+            continue
+        if end_index - start_index + 1 > max_answer_len:
+            continue
+        if start_index >= len(offset_mapping[0]) or end_index >= len(offset_mapping[0]):
+            continue
+        start_char = offset_mapping[0][start_index][0]
+        end_char = offset_mapping[0][end_index][1]
+        if start_char is None or end_char is None:
+            continue
+        score = (start_logits[start_index] + end_logits[end_index]).item()
+        if best_score is None or score > best_score:
+            best_score = score
+            best_answer = context[start_char:end_char]
+
+RESULT = {"answer": best_answer, "start_logits": start_logits.detach().cpu().numpy(), "end_logits": end_logits.detach().cpu().numpy()}

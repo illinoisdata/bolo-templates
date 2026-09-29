@@ -1,0 +1,111 @@
+{% set repo_id = repo_id | default("LongSafari/hyenadna-tiny-1k-seqlen-hf") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set model_repo_id = model_repo_id | default(repo_id) %}
+{% set input_prompt = input_prompt | default("ACGTACGTACGT") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set temperature = temperature | default(0.8) %}
+{% set top_k = top_k | default(30) %}
+{% set top_p = top_p | default(0.95) %}
+
+task = {{ task | tojson }}
+model_repo_id = {{ model_repo_id | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+device = {{ device | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_k = {{ top_k }}
+top_p = {{ top_p }}
+
+import sys
+import types
+import importlib.util
+from pathlib import Path
+
+import torch
+from transformers import pipeline
+from transformers.generation import GenerationConfig
+from transformers.generation.utils import GenerateDecoderOnlyOutput
+from transformers.pipelines.text_generation import TextGenerationPipeline
+from huggingface_hub import snapshot_download
+
+TextGenerationPipeline.assistant_model = None
+TextGenerationPipeline.assistant_tokenizer = None
+TextGenerationPipeline.prefix = None
+
+repo_path = Path(snapshot_download(repo_id=model_repo_id))
+package_name = "_hyenadna_package"
+hyena_package = types.ModuleType(package_name)
+hyena_package.__path__ = [str(repo_path)]
+sys.modules[package_name] = hyena_package
+
+
+def load_repo_module(module_name: str):
+    module_path = repo_path / f"{module_name}.py"
+    spec = importlib.util.spec_from_file_location(f"{package_name}.{module_name}", module_path)
+    module = importlib.util.module_from_spec(spec)
+    module.__package__ = package_name
+    loader = spec.loader
+    if loader is None:
+        raise ImportError(f"Could not load {module_name} from {module_path}")
+    loader.exec_module(module)
+    sys.modules[spec.name] = module
+    setattr(hyena_package, module_name, module)
+    return module
+
+
+configuration_module = load_repo_module("configuration_hyena")
+tokenization_module = load_repo_module("tokenization_hyena")
+modeling_module = load_repo_module("modeling_hyena")
+
+
+HyenaConfig = configuration_module.HyenaConfig
+config = HyenaConfig.from_pretrained(str(repo_path))
+
+HyenaDNATokenizer = tokenization_module.HyenaDNATokenizer
+tokenizer = HyenaDNATokenizer(model_max_length=config.max_seq_len)
+
+HyenaDNAForCausalLM = modeling_module.HyenaDNAForCausalLM
+model = HyenaDNAForCausalLM.from_pretrained(str(repo_path), config=config)
+model.__class__.can_generate = lambda self, *args, **kwargs: True
+model.generation_config = GenerationConfig()
+
+def _hyena_simple_generate(self, input_ids=None, max_new_tokens=None, eos_token_id=None, **kwargs):
+    if input_ids is None:
+        raise ValueError("`input_ids` must be provided to generate")
+    max_new_tokens = (
+        max_new_tokens
+        if max_new_tokens is not None
+        else getattr(self.generation_config, "max_new_tokens", 0)
+    )
+    generated = input_ids
+    for _ in range(max_new_tokens):
+        with torch.no_grad():
+            outputs = self(
+                input_ids=generated,
+                return_dict=True,
+            )
+            logits = outputs.logits
+        next_token = torch.argmax(logits[:, -1, :], dim=-1, keepdim=True)
+        generated = torch.cat([generated, next_token], dim=-1)
+        if eos_token_id is not None and torch.any(next_token == eos_token_id):
+            break
+    return GenerateDecoderOnlyOutput(sequences=generated)
+
+model.generate = types.MethodType(_hyena_simple_generate, model)
+
+torch_device = torch.device(device)
+model = model.to(torch_device)
+if torch_device.type == "cuda":
+    pipeline_device = torch_device.index if torch_device.index is not None else 0
+else:
+    pipeline_device = -1
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=pipeline_device)
+RESULT = pipe(
+    input_prompt,
+    max_new_tokens=max_new_tokens,
+    temperature=temperature,
+    top_k=top_k,
+    top_p=top_p,
+)

@@ -1,0 +1,47 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+{% set repo_id = repo_id | default("Felix92/onnxtr-db-mobilenet-v3-large") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import json
+import numpy as np
+from PIL import Image
+import onnxruntime as ort
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.onnx")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+with open(config_path, 'r') as f:
+    config = json.load(f)
+
+mean = np.array(config["mean"], dtype=np.float32)
+std = np.array(config["std"], dtype=np.float32)
+input_shape = config["input_shape"]
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+orig_w, orig_h = image.size
+scale = min(input_shape[1] / orig_h, input_shape[2] / orig_w)
+new_w = int(round(orig_w * scale))
+new_h = int(round(orig_h * scale))
+resized = image.resize((new_w, new_h), Image.BILINEAR)
+canvas = Image.new('RGB', (input_shape[2], input_shape[1]), (0, 0, 0))
+canvas.paste(resized, (0, 0))
+img = np.asarray(canvas).astype(np.float32) / 255.0
+img = (img - mean) / std
+img = np.transpose(img, (2, 0, 1))[None, ...]
+
+session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"], sess_options=ort.SessionOptions())
+input_name = session.get_inputs()[0].name
+outputs = session.run(None, {input_name: img})
+
+RESULT = {"output": outputs[0]}

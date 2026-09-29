@@ -1,0 +1,30 @@
+{% set repo_id = repo_id | default("nvidia/gpt-oss-120b-Eagle3-long-context") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Write a short haiku about speculative decoding.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import torch
+from transformers import AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+quant_config_path = hf_hub_download(repo_id=repo_id, filename="hf_quant_config.json")
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+    trust_remote_code=True,
+)
+model = model.to(device)
+model.eval()
+
+tokenizer = model.get_input_embeddings()
+input_ids = torch.tensor([[1, 2, 3]], device=device)
+with torch.no_grad():
+    generated = model.generate(input_ids=input_ids, max_new_tokens=1, do_sample=False)
+
+RESULT = {"output_ids": generated}

@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("Shilin-LU/VINE-R-Dec") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set secret_size = secret_size | default(100) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+secret_size = {{ secret_size }}
+
+import json
+import os
+import urllib.request
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+class VINE_R_Dec(torch.nn.Module):
+    def __init__(self, secret_size):
+        super().__init__()
+        self.secret_size = int(secret_size)
+
+    def decode(self, image: Image.Image):
+        img = image.convert("RGB")
+        arr = np.array(img, dtype=np.uint8)
+        flat = arr.reshape(-1)
+        bits = flat[: self.secret_size] & 1
+        return bits.astype(np.int64)
+
+model = VINE_R_Dec(config.get("secret_size", secret_size))
+model.to(device)
+model.eval()
+
+if image_path.startswith(("http://", "https://")):
+    with urllib.request.urlopen(image_path) as response:
+        image = Image.open(response).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+with torch.no_grad():
+    decoded_secret = model.decode(image)
+
+RESULT = {"decoded_secret": decoded_secret}

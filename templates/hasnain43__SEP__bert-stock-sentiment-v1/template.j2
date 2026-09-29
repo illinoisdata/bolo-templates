@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("hasnain43/bert-stock-sentiment-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Tesla stock drops after disappointing delivery numbers.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+# Load tokenizer/model from the repository
+# The tokenizer will use the local downloaded files automatically.
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    local_files_only=True,
+)
+model = AutoModelForSequenceClassification.from_pretrained(
+    repo_id,
+    local_files_only=True,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probs = torch.softmax(logits, dim=-1)
+    pred_id = int(torch.argmax(logits, dim=-1).item())
+
+id2label = model.config.id2label or {0: "LABEL_0", 1: "LABEL_1", 2: "LABEL_2"}
+label = id2label.get(pred_id, f"LABEL_{pred_id}")
+
+RESULT = {
+    "text": text,
+    "prediction_id": pred_id,
+    "label": label,
+    "probabilities": probs.detach().cpu().tolist(),
+}

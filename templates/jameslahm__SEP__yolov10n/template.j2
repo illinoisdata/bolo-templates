@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("jameslahm/yolov10n") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set conf = conf | default(0.25) %}
+{% set iou = iou | default(0.45) %}
+{% set max_det = max_det | default(100) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+conf = {{ conf }}
+iou = {{ iou }}
+max_det = {{ max_det }}
+
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from ultralytics import YOLO
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    source = image_path
+else:
+    source = Image.open(image_path).convert("RGB")
+
+model = YOLO(repo_id)
+results = model.predict(source=source, conf=conf, iou=iou, max_det=max_det, device=device, verbose=False)
+result0 = results[0]
+boxes = result0.boxes
+
+if boxes is not None and boxes.xyxy is not None and len(boxes) > 0:
+    class_ids = boxes.cls.detach().cpu().numpy().astype(int)
+    output = {
+        "boxes_xyxy": boxes.xyxy.detach().cpu().numpy(),
+        "scores": boxes.conf.detach().cpu().numpy(),
+        "class_ids": class_ids,
+        "class_names": [result0.names[int(i)] for i in class_ids],
+    }
+else:
+    output = {
+        "boxes_xyxy": None,
+        "scores": None,
+        "class_ids": None,
+        "class_names": None,
+    }
+
+RESULT = {"output": output}

@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("nlp-waseda/roberta-base-japanese-with-auto-jumanpp") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("早稲田大学で自然言語処理を{mask}する。") %}
+{% set model = model | default(repo_id) %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+model = {{ model | tojson }}
+
+from transformers import AutoTokenizer, pipeline
+
+# Use basic word tokenizer to avoid requiring Juman++ binary
+tokenizer = AutoTokenizer.from_pretrained(model, word_tokenizer_type="basic")
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

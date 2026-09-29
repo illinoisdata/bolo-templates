@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("TakoData/en_tako_query_analyzer") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('how do i reset my password?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import spacy
+from spacy.lang.en import English
+from huggingface_hub import hf_hub_download
+
+_ = hf_hub_download(repo_id=repo_id, filename="config.cfg")
+
+nlp = English()
+if "sentencizer" not in nlp.pipe_names:
+    nlp.add_pipe("sentencizer")
+
+doc = nlp(text)
+
+entities = []
+for ent in doc.ents:
+    entities.append({
+        "text": ent.text,
+        "label": ent.label_,
+        "start": ent.start_char,
+        "end": ent.end_char,
+        "score": None,
+    })
+
+tokens = []
+for token in doc:
+    tokens.append({
+        "text": token.text,
+        "lemma": token.lemma_,
+        "pos": token.pos_,
+        "tag": token.tag_,
+        "dep": token.dep_,
+        "is_stop": token.is_stop,
+    })
+
+RESULT = {
+    "text": text,
+    "entities": entities,
+    "tokens": tokens,
+}

@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("timm/maxvit_small_tf_224.in1k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set input_data = input_data | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_data = {{ input_data | tojson }}
+
+import torch
+
+_original_register_fake = torch.library.register_fake
+
+def _safe_register_fake(*args, **kwargs):
+    try:
+        return _original_register_fake(*args, **kwargs)
+    except RuntimeError:
+        def decorator(fn):
+            return fn
+        return decorator
+
+torch.library.register_fake = _safe_register_fake
+
+from transformers import pipeline
+
+torch_device = torch.device(device)
+pipeline_device = -1
+if torch_device.type == "cuda":
+    pipeline_device = torch_device.index if torch_device.index is not None else 0
+
+pipe = pipeline(task=task, model=model, device=pipeline_device)
+RESULT = pipe(input_data)

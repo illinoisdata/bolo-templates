@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("DoeyLLM/OneLLM-Doey-V1-Llama-3.2-3B-Q4_K_M-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('The meaning to life and the universe is') %}
+{% set quant_filename = quant_filename | default('onellm-doey-v1-llama-3.2-3b-q4_k_m.gguf') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+quant_filename = "{{ quant_filename }}"
+
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+llm = Llama(model_path=model_path, n_ctx=2048, n_threads=4, n_gpu_layers=-1, verbose=False)
+output = llm(prompt, max_tokens=64, stop=["</s>"])
+text = output["choices"][0]["text"]
+
+RESULT = {"text": text}

@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("unsloth/gemma-7b-it-bnb-4bit") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+# 1. Set variables
+# 2. Python assignments
+task = "{{ task }}"
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_prompt = "{{ input_prompt }}"
+
+# 3. Imports
+from transformers import pipeline
+
+# 4. Load pipeline
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+# 5 & 6. Run inference & capture output
+RESULT = pipe(input_prompt)

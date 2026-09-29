@@ -1,0 +1,24 @@
+{% set repo_id = repo_id | default("mrm8488/t5-base-finetuned-imdb-sentiment") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('I dislike a lot that film') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_length=2)
+
+output = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+RESULT = {"output": output}

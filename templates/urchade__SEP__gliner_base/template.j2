@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("urchade/gliner_base") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Cristiano Ronaldo dos Santos Aveiro (Portuguese pronunciation: [kɾiʃˈtjɐnu ʁɔˈnaldu]; born 5 February 1985) is a Portuguese professional footballer who plays as a forward for and captains both Saudi Pro League club Al Nassr and the Portugal national team. Widely regarded as one of the greatest players of all time, Ronaldo has won five Ballon d\'Or awards, a record three UEFA Men\'s Player of the Year Awards, and four European Golden Shoes, the most by a European player.') %}
+{% set labels = labels | default(['person', 'award', 'date', 'competitions', 'teams']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+labels = {{ labels }}
+
+import os
+os.environ["TRANSFORMERS_NO_TORCH_AUDIO"] = "1"
+from gliner import GLiNER
+
+model = GLiNER.from_pretrained(repo_id, map_location=device)
+entities = model.predict_entities(text, labels)
+
+RESULT = {"entities": entities}

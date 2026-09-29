@@ -1,0 +1,34 @@
+{% set repo_id = repo_id | default("PaddlePaddle/korean_PP-OCRv5_mobile_rec") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+from io import BytesIO
+
+import numpy as np
+from huggingface_hub import hf_hub_download
+from PIL import Image
+from paddleocr import TextRecognition
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="inference.pdiparams")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="inference.yml")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    import requests
+    image_bytes = requests.get(image_path, timeout=30).content
+    img = Image.open(BytesIO(image_bytes)).convert("RGB")
+else:
+    img = Image.open(image_path).convert("RGB")
+
+img_np = np.array(img)
+inference_device = "cpu" if device.startswith("cuda") else device
+model = TextRecognition(model_name="korean_PP-OCRv5_mobile_rec", device=inference_device)
+result = model.predict(input=img_np, batch_size=1)
+texts = []
+for res in result:
+    texts.append(getattr(res, "text", getattr(res, "res", str(res))))
+
+RESULT = {"texts": texts}

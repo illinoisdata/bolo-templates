@@ -1,0 +1,53 @@
+{% set repo_id = repo_id | default("ibm-research/CTI-BERT") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The attacker exploited a vulnerability in the authentication service.') %}
+{% set mask_token = mask_token | default('[MASK]') %}
+{% set top_k = top_k | default(5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+mask_token = "{{ mask_token }}"
+top_k = {{ top_k }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+from pathlib import Path
+model_dir = str(Path(weights_path).parent)
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True, use_fast=True)
+model = AutoModelForMaskedLM.from_pretrained(model_dir, local_files_only=True)
+model.to(device)
+model.eval()
+
+if mask_token not in text:
+    text = text + " " + mask_token
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+mask_token_id = tokenizer.mask_token_id
+mask_positions = (inputs["input_ids"] == mask_token_id).nonzero(as_tuple=False)
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+
+pred_tokens = []
+for pos in mask_positions:
+    batch_idx, token_idx = pos.tolist()
+    scores = logits[batch_idx, token_idx]
+    top_ids = torch.topk(scores, k=top_k).indices.tolist()
+    pred_tokens.append(tokenizer.convert_ids_to_tokens(top_ids))
+
+RESULT = {
+    "masked_text": text,
+    "mask_predictions": pred_tokens,
+}

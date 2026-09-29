@@ -1,0 +1,25 @@
+{% set repo_id = repo_id | default("Qwen/Qwen1.5-14B-Chat-AWQ") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set temperature = temperature | default(0.7) %}
+
+task = "{{ task }}"
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+processed_input = input_prompt
+inference_outputs = pipe(
+    processed_input,
+    max_new_tokens=max_new_tokens,
+    temperature=temperature,
+)
+generated_text = inference_outputs[0]["generated_text"]
+RESULT = {"generated_text": generated_text}

@@ -1,46 +1,43 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Einmalumdiewelt/T5-Base_GNAD") %}
-{% set text_input = text_input | default("Die internationalen Klimaverhandlungen erstrecken sich über viele Staaten und treffen auf unterschiedliche Interessen.") %}
-{% set summary_prefix = summary_prefix | default("summarize: ") %}
-{% set min_length = min_length | default(30) %}
-{% set max_length = max_length | default(200) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default('summarize: Der Film war spannend und gut gespielt, aber die Handlung war vorhersehbar und zu lang.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = """{{ text_input }}"""
-summary_prefix = "{{ summary_prefix }}"
-min_length = {{ min_length }}
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text_input = "{{ text_input }}"
 
-from pathlib import Path
+import os
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_model_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+# tokenizer files are downloaded to ensure all required assets are present
+_ = (config_path, tokenizer_config_path, special_tokens_map_path, tokenizer_json_path, spiece_model_path)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
 model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-inference_device = torch.device(device)
-model = model.to(inference_device)
+inputs = tokenizer(text_input, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-prefixed_input = f"{summary_prefix}{text_input}"
-inputs = tokenizer(prefixed_input, return_tensors="pt", truncation=True)
-inputs = {k: v.to(inference_device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_length=200,
+        num_beams=4,
+        early_stopping=True,
+        length_penalty=2.0,
+        no_repeat_ngram_size=3,
+    )
 
-generated_tokens = model.generate(
-    **inputs,
-    max_length=max_length,
-    min_length=min_length,
-    num_beams=num_beams,
-    early_stopping=True,
-    no_repeat_ngram_size=3,
-)
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-decoded = tokenizer.batch_decode(
-    generated_tokens,
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-)
-summary = decoded[0].strip()
-
-RESULT = {"summary": summary}
+RESULT = {"generated_text": output_text}

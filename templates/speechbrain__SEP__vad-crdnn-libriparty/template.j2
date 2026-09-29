@@ -1,0 +1,31 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set repo_id = repo_id | default("speechbrain/vad-crdnn-libriparty") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+from pathlib import Path
+import requests
+import torchaudio
+from speechbrain.inference.VAD import VAD
+
+if audio_path.startswith('http://') or audio_path.startswith('https://'):
+    local_audio_path = Path('audio_input.wav')
+    local_audio_path.write_bytes(requests.get(audio_path, timeout=30).content)
+    audio_path = str(local_audio_path)
+
+waveform, sample_rate = torchaudio.load(audio_path)
+if waveform.shape[0] > 1:
+    waveform = waveform.mean(dim=0, keepdim=True)
+if sample_rate != 16000:
+    waveform = torchaudio.functional.resample(waveform, sample_rate, 16000)
+    sample_rate = 16000
+processed_audio_path = Path('processed_audio.wav')
+torchaudio.save(str(processed_audio_path), waveform, sample_rate)
+
+savedir = Path('/workspace/pretrained_models') / repo_id.replace('/', '_')
+vad = VAD.from_hparams(source=repo_id, savedir=str(savedir), run_opts={"device": device})
+boundaries = vad.get_speech_segments(str(processed_audio_path))
+RESULT = {"boundaries": boundaries}

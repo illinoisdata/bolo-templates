@@ -1,41 +1,51 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("naver-clova-ix/donut-base") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/doc.jpeg") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+{% set task_prompt = task_prompt | default('<s>') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
+task_prompt = "{{ task_prompt }}"
+max_new_tokens = {{ max_new_tokens }}
 
-import io
 import os
-from pathlib import Path
-
+from urllib.parse import urlparse
 import requests
 import torch
 from PIL import Image
 from transformers import AutoProcessor, VisionEncoderDecoderModel
+from huggingface_hub import hf_hub_download
 
-processor = AutoProcessor.from_pretrained(repo_id)
-model = VisionEncoderDecoderModel.from_pretrained(repo_id).to(device)
-model.eval()
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_config_file = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+added_tokens_file = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+tokenizer_json_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+sentencepiece_file = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
 
-if image_path.startswith("http://") or image_path.startswith("https://"):
-    response = requests.get(image_path)
-    response.raise_for_status()
-    image = Image.open(io.BytesIO(response.content)).convert("RGB")
+if urlparse(image_path).scheme in ("http", "https"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
 else:
     image = Image.open(image_path).convert("RGB")
 
-inputs = processor(image, return_tensors="pt")
-inputs = {k: v.to(device) for k, v in inputs.items()}
+processor = AutoProcessor.from_pretrained(os.path.dirname(processor_config_file))
+model = VisionEncoderDecoderModel.from_pretrained(os.path.dirname(model_file))
+model.to(device)
+model.eval()
 
-generated_ids = None
+pixel_values = processor(image, return_tensors="pt").pixel_values.to(device)
+decoder_input_ids = processor.tokenizer(task_prompt, add_special_tokens=False, return_tensors="pt").input_ids.to(device)
+
 with torch.no_grad():
     generated_ids = model.generate(
-        **inputs,
-        decoder_start_token_id=processor.tokenizer.cls_token_id,
-        eos_token_id=processor.tokenizer.sep_token_id,
-        max_length=1024,
+        pixel_values,
+        decoder_input_ids=decoder_input_ids,
+        max_new_tokens=max_new_tokens,
     )
 
-generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
-RESULT = {"generated_text": generated_text}
+output_text = processor.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"output_text": output_text}

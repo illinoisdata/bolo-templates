@@ -1,51 +1,54 @@
 {% set repo_id = repo_id | default("davidkim205/iris-7b") %}
 {% set device = device | default("cuda:0") %}
-{% set direction = direction | default("ko2en") %}
-{% set text = text | default("아이리스는 딥러닝을 기반으로 한 한-영어 문장 번역을 위한 모델이다.") %}
-{% set max_new_tokens = max_new_tokens | default(2048) %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
 {% set temperature = temperature | default(1.0) %}
 {% set num_beams = num_beams | default(5) %}
+{% set text = text | default('다음 문장을 한글로 번역하세요. Iris is a model for Korean-English sentence translation based on deep learning.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-direction = "{{ direction }}"
-text = "{{ text }}"
 max_new_tokens = {{ max_new_tokens }}
 temperature = {{ temperature }}
 num_beams = {{ num_beams }}
+text = "{{ text }}"
 
-import os
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
 
-# Load model and tokenizer
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForCausalLM.from_pretrained(repo_id, torch_dtype=torch.bfloat16)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+weights_index_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+    low_cpu_mem_usage=True,
+)
 model.to(device)
 model.eval()
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
 
-# Prepare prompt based on translation direction
-if direction == "ko2en":
-    prompt = f"[INST] 다음 문장을 영어로 번역하세요.{text} [/INST]"
-elif direction == "en2ko":
-    prompt = f"[INST] 다음 문장을 한글로 번역하세요.{text} [/INST]"
-else:
-    raise ValueError(f"Unsupported direction: {direction}")
+def translate_ko2en(input_text):
+    prompt = f"[INST] 다음 문장을 영어로 번역하세요.{input_text} [/INST]"
+    encoding = tokenizer(
+        prompt,
+        return_tensors="pt",
+        return_token_type_ids=False,
+    )
+    encoding = {k: v.to(device) for k, v in encoding.items()}
+    with torch.no_grad():
+        gen_tokens = model.generate(
+            **encoding,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+            num_beams=num_beams,
+        )
+    prompt_end_size = encoding["input_ids"].shape[1]
+    return tokenizer.decode(gen_tokens[0, prompt_end_size:], skip_special_tokens=True)
 
-inputs = tokenizer(prompt, return_tensors="pt", return_token_type_ids=False)
-inputs = {k: v.to(device) for k, v in inputs.items()}
+output = translate_ko2en(text)
 
-# Inference
-gen_tokens = model.generate(
-    **inputs,
-    max_new_tokens=max_new_tokens,
-    temperature=temperature,
-    num_beams=num_beams,
-)
-
-# Post-process
-prompt_length = inputs["input_ids"].shape[1]
-output_tokens = gen_tokens[0, prompt_length:]
-result = tokenizer.decode(output_tokens)
-
-# Build RESULT
-RESULT = {"translation": result}
+RESULT = {"output": output}

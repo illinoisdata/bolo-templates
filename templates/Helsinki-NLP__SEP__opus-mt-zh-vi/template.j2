@@ -1,41 +1,32 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-zh-vi") %}
-{% set input_text = input_text | default("中国的首都是哪里？") %}
-{% set num_beams = num_beams | default(6) %}
-{% set max_length = max_length | default(128) %}
-{% set output_path = output_path | default("/u/yli77/work_link/yli77/templates/milestone1/transformers/others/_mini-swe/Helsinki-NLP__SEP__opus-mt-zh-vi/output") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('今天天气很好。') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-num_beams = {{ num_beams }}
-max_length = {{ max_length }}
-output_path = "{{ output_path }}"
-
-from pathlib import Path
+text = "{{ text }}"
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import MarianMTModel, MarianTokenizer, MarianConfig
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+config = MarianConfig.from_json_file(config_path)
+model = MarianMTModel(config)
+state_dict = torch.load(weights_path, map_location=device)
+model.load_state_dict(state_dict, strict=False)
 model = model.to(device)
+model.eval()
 
-tokenized_input = tokenizer(
-    input_text,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-    max_length=max_length,
-)
-tokenized_input = {key: value.to(device) for key, value in tokenized_input.items()}
+tokenizer = MarianTokenizer(vocab=vocab_path, source_spm=source_spm_path, target_spm=target_spm_path)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    output_ids = model.generate(**inputs, num_beams=6, max_length=128)
+output_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
 
-with torch.inference_mode():
-    generated_tokens = model.generate(
-        **tokenized_input,
-        num_beams=num_beams,
-        max_length=max_length,
-    )
-
-translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
-
-RESULT = {"translation": translation}
+RESULT = {"translation": output_text}

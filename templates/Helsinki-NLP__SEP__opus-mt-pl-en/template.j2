@@ -1,18 +1,32 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-pl-en") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("Ala ma kota.") %}
+{% set text = text | default('Cześć, jak się masz?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
+text = {{ text | tojson }}
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+# Use the downloaded files directly via repo id; hf_hub_download ensures availability.
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-encoded = tokenizer(input_text, return_tensors="pt").to(device)
-generated_tokens = model.generate(**encoded)
-decoded = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs)
+output_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-RESULT = {"translation": decoded}
+RESULT = {"translation": output_text}

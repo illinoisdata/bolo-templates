@@ -1,0 +1,30 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set repo_id = repo_id | default("speechbrain/lang-id-commonlanguage_ecapa") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+from urllib.parse import urlparse
+import torch
+import torchaudio
+from speechbrain.inference.classifiers import EncoderClassifier
+from huggingface_hub import hf_hub_download
+
+if urlparse(audio_path).scheme in ("http", "https"):
+    waveform, sample_rate = torchaudio.load(audio_path)
+else:
+    waveform, sample_rate = torchaudio.load(audio_path)
+
+_ = hf_hub_download(repo_id=repo_id, filename="hyperparams.yaml")
+_ = hf_hub_download(repo_id=repo_id, filename="classifier.ckpt")
+_ = hf_hub_download(repo_id=repo_id, filename="embedding_model.ckpt")
+_ = hf_hub_download(repo_id=repo_id, filename="label_encoder.txt")
+
+classifier = EncoderClassifier.from_hparams(
+    source=repo_id,
+    run_opts={"device": device},
+)
+
+out_prob, score, index, text_lab = classifier.classify_batch(waveform.to(device), torch.tensor([waveform.shape[1]], device=device))
+RESULT = {"label": text_lab[0], "score": float(score[0].item()) if hasattr(score[0], 'item') else float(score[0])}

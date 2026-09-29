@@ -1,25 +1,41 @@
 {% set repo_id = repo_id | default("ai-forever/FRED-T5-large") %}
 {% set device = device | default("cuda:0") %}
-{% set prompt = prompt | default("Привет! Расскажи короткий позитивный рассказ.") %}
-{% set max_length = max_length | default(128) %}
+{% set prompt = prompt | default('<LM>Принялся Кутузов рассказывать свою историю как он сюда попал. Началось') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = """{{ prompt }}"""
-max_length = {{ max_length }}
+prompt = "{{ prompt }}"
 
-from pathlib import Path
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_file = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+merges_file = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+repo_dir = "/".join(config_file.split("/")[:-1])
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, eos_token="</s>")
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_dir, torch_dtype=torch.float32, use_safetensors=False)
 model.to(device)
 model.eval()
 
 inputs = tokenizer(prompt, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+input_ids = inputs["input_ids"].to(device)
+attention_mask = inputs["attention_mask"].to(device)
 
-generated_ids = model.generate(**inputs, max_length=max_length)
-generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+with torch.no_grad():
+    output_ids = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        eos_token_id=tokenizer.eos_token_id,
+        early_stopping=True,
+        max_length=64,
+    )
 
-RESULT = {"generated_text": generated_text}
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=False)
+
+RESULT = {"output_text": output_text}

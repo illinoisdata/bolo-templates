@@ -1,0 +1,15 @@
+{% set repo_id = repo_id | default("timm/deit3_small_patch16_384.fb_in22k_ft_in1k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set input_image = input_image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+model = repo_id
+input_image = {{ input_image | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(input_image)

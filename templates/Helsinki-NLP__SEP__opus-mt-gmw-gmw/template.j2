@@ -1,31 +1,34 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-gmw-gmw") %}
-{% set source_text = source_text | default("Hello, how are you today?") %}
-{% set target_lang = target_lang | default("nld") %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hello world!') %}
+{% set source_lang = source_lang | default('eng') %}
+{% set target_lang = target_lang | default('deu') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_text = "{{ source_text }}"
+text = "{{ text }}"
+source_lang = "{{ source_lang }}"
 target_lang = "{{ target_lang }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
 
-from pathlib import Path
-
+import os
 import torch
 from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
+from huggingface_hub import hf_hub_download
 
-tokenizer = MarianTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+base_dir = os.path.dirname(model_path)
+tokenizer = MarianTokenizer(vocab=vocab_path, source_spm=source_spm_path, target_spm=target_spm_path)
+model = AutoModelForSeq2SeqLM.from_pretrained(base_dir, local_files_only=True)
+model.to(device)
 model.eval()
 
-formatted_text = f">>{target_lang}<< {source_text}".strip()
-inputs = tokenizer(formatted_text, return_tensors="pt", padding=True, truncation=True).to(device)
-
-with torch.no_grad():
-    generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
-
-translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+inputs = tokenizer([f">>{target_lang}<< {text}"], return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+generated_ids = model.generate(**inputs, num_beams=4)
+translation = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 RESULT = {"translation": translation}

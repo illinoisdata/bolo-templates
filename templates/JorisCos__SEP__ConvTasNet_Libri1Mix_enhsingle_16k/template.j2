@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("JorisCos/ConvTasNet_Libri1Mix_enhsingle_16k") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set sample_rate = sample_rate | default(16000) %}
+{% set segment_samples = segment_samples | default(32000) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+sample_rate = {{ sample_rate }}
+segment_samples = {{ segment_samples }}
+
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from asteroid.models import ConvTasNet
+import soundfile as sf
+import librosa
+
+weight_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+state_dict = torch.load(weight_path, map_location="cpu")
+model = ConvTasNet(n_src=1, sample_rate=sample_rate)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    waveform, file_sr = sf.read(BytesIO(requests.get(audio_path, timeout=30).content), dtype="float32")
+else:
+    waveform, file_sr = sf.read(audio_path, dtype="float32")
+
+if waveform.ndim > 1:
+    waveform = np.mean(waveform, axis=1)
+waveform = waveform.astype(np.float32)
+
+if file_sr != sample_rate:
+    waveform = librosa.resample(waveform, orig_sr=file_sr, target_sr=sample_rate)
+
+if len(waveform) < segment_samples:
+    waveform = np.pad(waveform, (0, segment_samples - len(waveform)))
+else:
+    waveform = waveform[:segment_samples]
+
+mix = torch.from_numpy(waveform[None, None, :]).to(device)
+with torch.no_grad():
+    estimate = model(mix)
+
+output = estimate.detach().cpu().numpy()
+RESULT = {"separated_audio": output}

@@ -1,34 +1,41 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("facebook/mbart-large-50-many-to-many-mmt") %}
-{% set text_input = text_input | default("The UN secretary-general says there is no military solution in Syria.") %}
-{% set src_lang = src_lang | default("en_XX") %}
+{% set device = device | default("cuda:0") %}
+{% set source_text = source_text | default("संयुक्त राष्ट्र के प्रमुख का कहना है कि सीरिया में कोई सैन्य समाधान नहीं है") %}
+{% set source_lang = source_lang | default("hi_IN") %}
 {% set target_lang = target_lang | default("fr_XX") %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-text_input = {{ text_input | tojson }}
-src_lang = {{ src_lang | tojson }}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = {{ source_text | tojson }}
+source_lang = {{ source_lang | tojson }}
 target_lang = {{ target_lang | tojson }}
+max_new_tokens = {{ max_new_tokens }}
 
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import MBartForConditionalGeneration, MBart50TokenizerFast
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model.to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+tokenizer = MBart50TokenizerFast(vocab_file=tokenizer_path, tokenizer_file=None)
+model = MBartForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
+model = model.to(device)
 model.eval()
 
-tokenizer.src_lang = src_lang
-encoded_inputs = tokenizer(text_input, return_tensors="pt")
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
-
+tokenizer.src_lang = source_lang
+encoded = tokenizer(source_text, return_tensors="pt")
+encoded = {k: v.to(device) for k, v in encoded.items()}
 forced_bos_token_id = tokenizer.lang_code_to_id[target_lang]
-generated_tokens = model.generate(
-    **encoded_inputs,
-    forced_bos_token_id=forced_bos_token_id,
-)
+with torch.inference_mode():
+    generated_tokens = model.generate(
+        **encoded,
+        forced_bos_token_id=forced_bos_token_id,
+        max_new_tokens=max_new_tokens,
+    )
+output_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
-decoded_sentences = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-translation = decoded_sentences[0] if decoded_sentences else ""
-
-RESULT = {"translation": translation}
+RESULT = {"translation": output_text}

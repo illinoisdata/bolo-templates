@@ -1,32 +1,26 @@
 {% set repo_id = repo_id | default("facebook/mms-tts-cat") %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("Catalan text-to-speech synthesis with expressive intonation.") %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-text_input = {{ text_input | tojson }}
+{% set text = text | default('Bon dia, aquesta és una prova de síntesi de veu en català.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
 
-from pathlib import Path
-
-import numpy as np
 import torch
-from scipy.io import wavfile
+from huggingface_hub import hf_hub_download
 from transformers import AutoTokenizer, VitsModel
 
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+device = "cpu"
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = VitsModel.from_pretrained(repo_id)
-model = model.to(device)
+model = VitsModel.from_pretrained(repo_id).to(device)
 model.eval()
 
-tokenized_input = tokenizer(text_input, return_tensors="pt")
-tokenized_input = {k: v.to(device) for k, v in tokenized_input.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    waveform_tensor = model(**tokenized_input).waveform
+    waveform = model(**inputs).waveform
 
-waveform = waveform_tensor.squeeze(0).cpu().numpy()
-sampling_rate = model.config.sampling_rate
-
-RESULT = {
-    "waveform": waveform,
-    "sampling_rate": sampling_rate,
-}
+RESULT = {"waveform": waveform.detach().cpu(), "sampling_rate": model.config.sampling_rate}

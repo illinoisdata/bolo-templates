@@ -1,0 +1,28 @@
+{% set repo_id = repo_id | default("keremberke/yolov8m-pokemon-classification") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set conf = conf | default(0.25) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+conf = {{ conf }}
+
+import os
+from PIL import Image
+import requests
+from ultralytics import YOLO
+
+model_path = "best.pt"
+if not os.path.exists(model_path):
+    from huggingface_hub import hf_hub_download
+    model_path = hf_hub_download(repo_id=repo_id, filename="best.pt")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model = YOLO(model_path)
+results = model.predict(source=image, conf=conf, device=device)
+probs = results[0].probs.data.tolist()
+RESULT = {"probs": probs}

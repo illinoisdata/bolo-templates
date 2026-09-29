@@ -1,28 +1,34 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("flexudy/t5-base-multi-sentence-doctor") %}
-{% set input_text = input_text | default("repair_sentence: m a medical doct context: {That is my job I a}{or I save lives} </s>") %}
-{% set max_length = max_length | default(32) %}
-{% set num_beams = num_beams | default(1) %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('repair_sentence: m a medical doct context: {That is my job I a}{or I save lives} </s>') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
 
 from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+model_dir = Path(weights_path).parent
 
-inputs = tokenizer(input_text, return_tensors="pt")
-for key, value in inputs.items():
-    inputs[key] = value.to(torch_device)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
+model.to(device)
+model.eval()
 
-generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
-corrected_sentence = tokenizer.decode(generated_tokens[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
+encoded = tokenizer(input_text, return_tensors="pt")
+encoded = {k: v.to(device) for k, v in encoded.items()}
 
-RESULT = {"corrected_sentence": corrected_sentence}
+with torch.no_grad():
+    generated_ids = model.generate(**encoded, max_length=32, num_beams=1)
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
+
+RESULT = {"output_text": output_text}

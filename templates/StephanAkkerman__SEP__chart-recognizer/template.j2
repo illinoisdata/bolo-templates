@@ -1,0 +1,50 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("StephanAkkerman/chart-recognizer") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import json
+from urllib.parse import urlparse
+from urllib.request import urlopen
+
+import torch
+import timm
+from PIL import Image
+from timm.data import resolve_data_config, create_transform
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+labels = cfg["label_names"]
+model = timm.create_model(f"hf-hub:{repo_id}", pretrained=False, num_classes=len(labels))
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict)
+model.eval()
+model.to(device)
+
+pretrained_cfg = cfg.get("pretrained_cfg", {})
+transform = create_transform(**resolve_data_config(pretrained_cfg, model=model))
+
+if urlparse(image_path).scheme in ("http", "https"):
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+x = transform(image).unsqueeze(0).to(device)
+with torch.no_grad():
+    logits = model(x)
+    if isinstance(logits, (tuple, list)):
+        logits = logits[0]
+    probs = torch.softmax(logits[0], dim=0)
+
+output = {label: float(prob) for label, prob in zip(labels, probs)}
+
+RESULT = {"output": output}

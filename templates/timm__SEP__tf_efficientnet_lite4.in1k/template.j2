@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("timm/tf_efficientnet_lite4.in1k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set input_data = input_data | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+input_data = {{ input_data | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+prepared_input = input_data
+raw_output = pipe(prepared_input)
+RESULT = {"predictions": raw_output}

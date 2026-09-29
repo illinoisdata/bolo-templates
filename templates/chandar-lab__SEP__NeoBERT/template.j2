@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("chandar-lab/NeoBERT") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+
+model = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_prompt = "{{ input_prompt }}"
+
+import sys
+import types
+
+import torch.nn.functional as F
+from torch import nn
+from transformers import pipeline
+
+
+class SwiGLU(nn.Module):
+    def __init__(
+        self,
+        in_features,
+        hidden_features,
+        out_features=None,
+        bias=True,
+        *,
+        _pack_weights=True,
+    ):
+        super().__init__()
+        out_features = out_features or in_features
+        hidden_features = hidden_features or in_features
+        self.linear_gate = nn.Linear(in_features, hidden_features, bias=bias)
+        self.linear_value = nn.Linear(in_features, hidden_features, bias=bias)
+        self.linear_out = nn.Linear(hidden_features, out_features, bias=bias)
+
+    def forward(self, x):
+        gate = F.silu(self.linear_gate(x))
+        return self.linear_out(gate * self.linear_value(x))
+
+
+_xformers_ops = types.ModuleType("xformers.ops")
+_xformers_ops.SwiGLU = SwiGLU
+_xformers_pkg = types.ModuleType("xformers")
+_xformers_pkg.ops = _xformers_ops
+sys.modules["xformers.ops"] = _xformers_ops
+sys.modules["xformers"] = _xformers_pkg
+
+
+pipe = pipeline(task=task, model=model, device=device, trust_remote_code=True)
+RESULT = pipe(input_prompt)

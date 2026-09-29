@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("speechbrain/sepformer-wsj02mix") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set sample_rate = sample_rate | default(8000) %}
+{% set savedir = savedir | default('pretrained_models/sepformer-wsj02mix') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+sample_rate = {{ sample_rate }}
+savedir = "{{ savedir }}"
+
+import os
+import soundfile as sf
+import torch
+from speechbrain.inference.separation import SepformerSeparation
+
+
+def load_audio(path_or_url):
+    if str(path_or_url).startswith(("http://", "https://")):
+        from urllib.request import urlopen
+        import io
+        with urlopen(path_or_url) as f:
+            data = f.read()
+        waveform, sr = sf.read(io.BytesIO(data), dtype="float32", always_2d=True)
+    else:
+        waveform, sr = sf.read(path_or_url, dtype="float32", always_2d=True)
+    waveform = torch.from_numpy(waveform.T)
+    return waveform, sr
+
+
+waveform, sr = load_audio(audio_path)
+if sr != sample_rate:
+    import torchaudio
+    waveform = torchaudio.functional.resample(waveform, sr, sample_rate)
+if waveform.size(0) > 1:
+    waveform = waveform[:1]
+
+os.makedirs(savedir, exist_ok=True)
+model = SepformerSeparation.from_hparams(
+    source=repo_id,
+    savedir=savedir,
+    run_opts={"device": device},
+)
+
+est_sources = model.separate_batch(waveform)
+output = est_sources.detach().cpu()
+RESULT = {"sources": output}

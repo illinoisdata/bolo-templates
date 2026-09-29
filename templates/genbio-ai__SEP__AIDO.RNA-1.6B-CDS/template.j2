@@ -1,0 +1,42 @@
+{% set sequence = sequence | default("ACGTACGT") %}
+{% set repo_id = repo_id | default("genbio-ai/AIDO.RNA-1.6B-CDS") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sequence = "{{ sequence }}"
+
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file as load_safetensors
+from transformers import BertConfig, BertForMaskedLM
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights1 = hf_hub_download(repo_id=repo_id, filename="pytorch_model-00001-of-00002.safetensors")
+weights2 = hf_hub_download(repo_id=repo_id, filename="pytorch_model-00002-of-00002.safetensors")
+config = BertConfig(
+    vocab_size=16,
+    hidden_size=2048,
+    num_hidden_layers=32,
+    num_attention_heads=32,
+    intermediate_size=5440,
+    max_position_embeddings=1024,
+    type_vocab_size=2,
+    pad_token_id=0,
+    hidden_act="gelu",
+    attention_probs_dropout_prob=0.0,
+    hidden_dropout_prob=0.0,
+    layer_norm_eps=1e-5,
+)
+model = BertForMaskedLM(config)
+state_dict = {}
+state_dict.update(load_safetensors(weights1))
+state_dict.update(load_safetensors(weights2))
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+input_ids = torch.tensor([[1, 4, 5, 6, 7, 2]], device=device)
+attention_mask = torch.ones_like(input_ids)
+with torch.no_grad():
+    outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+logits = outputs.logits
+RESULT = {"logits": logits}

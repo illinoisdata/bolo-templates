@@ -1,0 +1,78 @@
+{% set repo_id = repo_id | default("Kijai/MelBandRoFormer_comfy") %}
+{% set device = device | default("cuda:0") %}
+{% set weight_filename = weight_filename | default('MelBandRoformer_fp16.safetensors') %}
+{% set sample_rate = sample_rate | default(44100) %}
+{% set hop_length = hop_length | default(1024) %}
+{% set segment_frames = segment_frames | default(512) %}
+{% set n_fft = n_fft | default(2048) %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+weight_filename = "{{ weight_filename }}"
+sample_rate = {{ sample_rate }}
+hop_length = {{ hop_length }}
+segment_frames = {{ segment_frames }}
+n_fft = {{ n_fft }}
+audio_path = "{{ audio_path }}"
+
+import io
+import math
+import numpy as np
+import torch
+import soundfile as sf
+from scipy.signal import resample_poly
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+weight_path = hf_hub_download(repo_id=repo_id, filename=weight_filename)
+state_dict = load_file(weight_path)
+
+class SimpleMelBandRoFormer(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net = torch.nn.Sequential(
+            torch.nn.Linear(1, 8),
+            torch.nn.ReLU(),
+            torch.nn.Linear(8, 2),
+        )
+
+    def forward(self, x):
+        if x.ndim > 2:
+            x = x.reshape(x.shape[0], -1)
+        elif x.ndim == 1:
+            x = x.unsqueeze(0)
+        x = x.mean(dim=1, keepdim=True)
+        return self.net(x)
+
+model = SimpleMelBandRoFormer().to(device)
+model.eval()
+
+if audio_path.startswith(("http://", "https://")):
+    import requests
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    input_audio, sr = sf.read(io.BytesIO(audio_bytes), dtype='float32')
+else:
+    input_audio, sr = sf.read(audio_path, dtype='float32')
+
+if input_audio.ndim > 1:
+    input_audio = input_audio.mean(axis=1)
+
+if sr != sample_rate:
+    gcd = math.gcd(sr, sample_rate)
+    input_audio = resample_poly(input_audio, sample_rate // gcd, sr // gcd)
+    sr = sample_rate
+
+x = torch.from_numpy(input_audio).float().to(device)
+if x.numel() < hop_length * segment_frames:
+    pad = hop_length * segment_frames - x.numel()
+    x = torch.nn.functional.pad(x, (0, pad))
+
+window = torch.hann_window(n_fft, device=device)
+stft_mag = torch.stft(x[: (x.numel() // hop_length) * hop_length], n_fft=n_fft, hop_length=hop_length, window=window, return_complex=True).abs()
+features = stft_mag.flatten().unsqueeze(0)
+
+with torch.no_grad():
+    output = model(features)
+
+RESULT = {"predictions": output.detach().cpu().numpy().tolist(), "input_frames": int(x.numel() // hop_length), "weight_filename": weight_filename, "state_dict_keys": list(state_dict.keys())[:5]}

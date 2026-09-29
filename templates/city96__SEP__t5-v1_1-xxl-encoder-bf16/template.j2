@@ -1,30 +1,39 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("city96/t5-v1_1-xxl-encoder-bf16") %}
-{% set text_input = text_input | default("An image of a cat sitting on a mat with a playful expression.") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('a photo of a cute cat sitting on a chair') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+prompt = "{{ prompt }}"
 
-from pathlib import Path
-
-import numpy as np
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer, T5EncoderModel
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
-model = AutoModel.from_pretrained(repo_id, torch_dtype=torch.bfloat16).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+
+model = T5EncoderModel.from_pretrained(
+    repo_id,
+    local_files_only=True,
+    torch_dtype=torch.bfloat16,
+)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(text_input, return_tensors="pt", padding=True, truncation=True)
-inputs = {key: value.to(device) for key, value in inputs.items()}
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True, use_fast=False)
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-with torch.inference_mode():
-    encoder_outputs = model.encoder(
-        input_ids=inputs["input_ids"],
-        attention_mask=inputs.get("attention_mask"),
-        return_dict=True,
-    )
+with torch.no_grad():
+    outputs = model(**inputs)
 
-last_hidden_state = encoder_outputs.last_hidden_state.to(torch.float32).detach().cpu().numpy()
+last_hidden_state = outputs.last_hidden_state
+pooler_output = last_hidden_state.mean(dim=1)
 
-RESULT = {"last_hidden_state": last_hidden_state}
+RESULT = {
+    "last_hidden_state": last_hidden_state,
+    "pooler_output": pooler_output,
+}

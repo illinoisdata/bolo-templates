@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("stanfordnlp/stanza-tr") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Benim adım Ahmet. İstanbul\'a gidiyorum!') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import os
+import sys
+import subprocess
+
+subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', 'torch==2.7.1+cu128', '--index-url', 'https://download.pytorch.org/whl/cu128'])
+subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', 'stanza'])
+
+import stanza
+
+model_dir = os.path.join('/workspace', 'stanza_models')
+os.makedirs(model_dir, exist_ok=True)
+
+pipeline = stanza.Pipeline(lang='tr', dir=model_dir, package='default', processors='tokenize,pos,lemma,depparse,ner', use_gpu=(device.startswith('cuda')))
+doc = pipeline(text)
+
+sentences = []
+for sent in doc.sentences:
+    tokens = []
+    for w in sent.words:
+        tokens.append({
+            'text': w.text,
+            'lemma': w.lemma,
+            'upos': w.upos,
+            'xpos': w.xpos,
+            'head': w.head,
+            'deprel': w.deprel,
+        })
+    entities = []
+    for ent in sent.ents:
+        entities.append({
+            'text': ent.text,
+            'type': ent.type,
+            'start_char': ent.start_char,
+            'end_char': ent.end_char,
+        })
+    sentences.append({'tokens': tokens, 'entities': entities})
+
+RESULT = {'sentences': sentences}

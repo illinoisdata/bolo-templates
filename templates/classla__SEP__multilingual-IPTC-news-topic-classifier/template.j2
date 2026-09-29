@@ -1,0 +1,56 @@
+{% set repo_id = repo_id | default("classla/multilingual-IPTC-news-topic-classifier") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Moment dog sparks house fire after chewing power bank An indoor monitoring camera shows the moment a dog unintentionally caused a house fire after chewing on a portable lithium-ion battery power bank. In the video released by Tulsa Fire Department in Oklahoma, two dogs and a cat can be seen in the living room before a spark started the fire that spread within minutes. Tulsa Fire Department public information officer Andy Little said the pets escaped through a dog door, and according to local media the family was also evacuated safely. Had there not been a dog door, they very well could have passed away, he told CBS affiliate KOTV.') %}
+{% set max_length = max_length | default(512) %}
+{% set truncation = truncation | default(true) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_length = {{ max_length }}
+truncation = {{ truncation }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+sentencepiece_path = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+
+model = AutoModelForSequenceClassification.from_pretrained(
+    repo_id,
+    config=config_path,
+).to(device)
+model.load_state_dict(load_file(weights_path))
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    tokenizer_file=tokenizer_json_path,
+    tokenizer_config_file=tokenizer_config_path,
+    special_tokens_map_file=special_tokens_path,
+    sentencepiece_model_file=sentencepiece_path,
+)
+
+inputs = tokenizer(
+    text,
+    return_tensors="pt",
+    max_length=max_length,
+    truncation=truncation,
+)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    probs = torch.softmax(outputs.logits, dim=-1)[0]
+
+id2label = model.config.id2label
+scores = [{"label": id2label[int(i)] if isinstance(next(iter(id2label.keys())), str) else id2label[i], "score": float(probs[i].item())} for i in range(probs.shape[0])]
+scores = sorted(scores, key=lambda x: x["score"], reverse=True)
+
+RESULT = {"predictions": scores}

@@ -1,0 +1,27 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Pharma-Tiny-60M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Administration of metformin reduced glucose levels significantly.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+from huggingface_hub import hf_hub_download
+import json
+import torch
+from transformers import AutoTokenizer
+
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+config = json.load(open(config_path))
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+input_ids = tokenizer(text, return_tensors="pt", truncation=True)["input_ids"]
+
+RESULT = {"config_keys": sorted(list(config.keys())), "tokenized_length": int(input_ids.shape[1])}

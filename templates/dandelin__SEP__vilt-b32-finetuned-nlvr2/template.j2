@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("dandelin/vilt-b32-finetuned-nlvr2") %}
+{% set device = device | default("cuda:0") %}
+{% set image1 = image1 | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set image2 = image2 | default('/u/yunqili4/projects/ML-code-generation/data/image2.jpeg') %}
+{% set text = text | default('The left image contains twice the number of dogs as the right image.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image1 = "{{ image1 }}"
+image2 = "{{ image2 }}"
+text = "{{ text }}"
+
+import requests
+from PIL import Image
+import torch
+from transformers import ViltProcessor, ViltForImagesAndTextClassification
+
+processor = ViltProcessor.from_pretrained(repo_id)
+model = ViltForImagesAndTextClassification.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+def load_image(path_or_url):
+    if str(path_or_url).startswith(("http://", "https://")):
+        return Image.open(requests.get(path_or_url, stream=True).raw).convert("RGB")
+    return Image.open(path_or_url).convert("RGB")
+
+img1 = load_image(image1)
+img2 = load_image(image2)
+encoding = processor(images=[img1, img2], text=text, return_tensors="pt")
+encoding = {k: v.to(device) for k, v in encoding.items()}
+with torch.no_grad():
+    outputs = model(
+        input_ids=encoding["input_ids"],
+        attention_mask=encoding.get("attention_mask"),
+        token_type_ids=encoding.get("token_type_ids"),
+        pixel_values=encoding["pixel_values"].unsqueeze(0),
+        pixel_mask=encoding["pixel_mask"].unsqueeze(0),
+    )
+logits = outputs.logits
+pred_idx = int(logits.argmax(-1).item())
+pred_label = model.config.id2label[str(pred_idx)] if str(pred_idx) in model.config.id2label else model.config.id2label[pred_idx]
+
+RESULT = {"logits": logits.detach().cpu().numpy(), "predicted_label": pred_label}

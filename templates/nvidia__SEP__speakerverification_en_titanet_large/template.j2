@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("nvidia/speakerverification_en_titanet_large") %}
+{% set device = device | default("cuda:0") %}
+{% set audio1 = audio1 | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set audio2 = audio2 | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio1 = "{{ audio1 }}"
+audio2 = "{{ audio2 }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+
+nemo_path = hf_hub_download(repo_id=repo_id, filename="speakerverification_en_titanet_large.nemo")
+RESULT = {
+    "nemo_file": nemo_path,
+    "device": device,
+    "repo_id": repo_id,
+}

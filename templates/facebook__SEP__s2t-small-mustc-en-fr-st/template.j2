@@ -1,0 +1,30 @@
+{% set repo_id = repo_id | default("facebook/s2t-small-mustc-en-fr-st") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("automatic-speech-recognition") %}
+{% set input_data = input_data | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+input_data = {{ input_data | tojson }}
+
+from transformers import pipeline, AutoProcessor
+
+# Load processor and its tokenizer/feature extractor
+processor = AutoProcessor.from_pretrained(repo_id)
+tokenizer = processor.tokenizer
+feature_extractor = processor.feature_extractor
+
+# Create pipeline
+pipe = pipeline(
+    task=task,
+    model=repo_id,
+    tokenizer=tokenizer,
+    feature_extractor=feature_extractor,
+    device=device,
+)
+
+# Pre-processing is handled internally by the pipeline
+
+# Run inference
+RESULT = pipe(input_data)

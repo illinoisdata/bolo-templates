@@ -1,22 +1,38 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("google/t5-efficient-small") %}
-{% set prompt = prompt | default("Translate English to German: The house is wonderful.") %}
-{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("summarize: The quick brown fox jumps over the lazy dog. This sentence is used as a simple example for testing text generation.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = {{ prompt | tojson }}
-max_new_tokens = {{ max_new_tokens }}
+input_text = "{{ input_text }}"
 
-import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+tokenizer = AutoTokenizer.from_pretrained(
+    tokenizer_path.rsplit("/", 1)[0],
+    use_fast=True,
+)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    weights_path.rsplit("/", 1)[0],
+    torch_dtype=torch.float32,
+)
+model.to(device)
 model.eval()
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
 
-inputs = tokenizer(prompt, return_tensors="pt", truncation=True, padding=True).to(device)
-outputs = model.generate(**inputs, max_new_tokens=max_new_tokens)
-generated_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0].strip()
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-RESULT = {"generated_text": generated_text}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=32)
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("koheiduck/bert-japanese-finetuned-sentiment") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set input_prompt = input_prompt | default("今日は素晴らしい一日です。") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+preprocessed_inputs = input_prompt
+
+pipeline_results = pipe(preprocessed_inputs)
+
+RESULT = pipeline_results

@@ -1,0 +1,44 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set repo_id = repo_id | default("speechbrain/spkrec-xvect-voxceleb") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+import os
+import torch
+import torchaudio
+from speechbrain.inference.speaker import EncoderClassifier
+from urllib.parse import urlparse
+
+model_files = [
+    "classifier.ckpt",
+    "embedding_model.ckpt",
+    "mean_var_norm_emb.ckpt",
+    "config.json",
+    "hyperparams.yaml",
+    "label_encoder.txt",
+]
+
+from huggingface_hub import hf_hub_download
+
+local_files = {}
+for filename in model_files:
+    local_files[filename] = hf_hub_download(repo_id=repo_id, filename=filename)
+
+if audio_path.startswith('http://') or audio_path.startswith('https://'):
+    waveform, sample_rate = torchaudio.load(torch.hub.download_url_to_file(audio_path, '/tmp/input_audio.wav') or '/tmp/input_audio.wav')
+else:
+    waveform, sample_rate = torchaudio.load(audio_path)
+
+classifier = EncoderClassifier.from_hparams(
+    source=repo_id,
+    savedir=os.path.dirname(local_files["config.json"]),
+    run_opts={"device": device},
+)
+
+embeddings = classifier.encode_batch(waveform.to(device))
+output = embeddings.detach().cpu().numpy()
+
+RESULT = {"embeddings": output}

@@ -1,0 +1,47 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set language = language | default('th') %}
+{% set task = task | default('transcribe') %}
+{% set repo_id = repo_id | default("biodatlab/distill-whisper-th-large-v3") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+language = "{{ language }}"
+task = "{{ task }}"
+
+import json
+import os
+from pathlib import Path
+from urllib.parse import urlparse
+
+import torch
+import librosa
+from huggingface_hub import hf_hub_download
+from transformers import AutoProcessor, WhisperForConditionalGeneration
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor = AutoProcessor.from_pretrained(repo_id)
+model = WhisperForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+if isinstance(audio_path, str) and audio_path.startswith(("http://", "https://")):
+    import requests
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    audio_local = Path("/tmp/audio_input.wav")
+    audio_local.write_bytes(audio_bytes)
+    audio_path_local = str(audio_local)
+else:
+    audio_path_local = audio_path
+
+audio, sr = librosa.load(audio_path_local, sr=16000)
+inputs = processor(audio, sampling_rate=16000, return_tensors="pt")
+input_features = inputs.input_features.to(device)
+
+forced_decoder_ids = processor.get_decoder_prompt_ids(language=language, task=task)
+with torch.no_grad():
+    generated_ids = model.generate(input_features, forced_decoder_ids=forced_decoder_ids, max_new_tokens=256)
+transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"text": transcription}

@@ -1,13 +1,31 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("myshell-ai/MeloTTS-English-v3") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Did you ever hear a folk tale about a giant turtle?') %}
+{% set speed = speed | default(1.0) %}
+{% set language = language | default('EN_NEWEST') %}
+{% set speaker_name = speaker_name | default('EN-Newest') %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
+text = {{ text | tojson }}
+speed = {{ speed }}
+language = "{{ language }}"
+speaker_name = "{{ speaker_name }}"
 
-from huggingface_hub import hf_hub_download
 import json
+from huggingface_hub import hf_hub_download
+import torch
 
-config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
-with open(config_path, "r") as f:
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+checkpoint_path = hf_hub_download(repo_id=repo_id, filename='checkpoint.pth')
+
+with open(config_path, 'r') as f:
     config = json.load(f)
 
-print(config)
+sampling_rate = config['data']['sampling_rate']
+# Minimal, dependency-light inference path using the packaged checkpoint for output inspection.
+state_dict = torch.load(checkpoint_path, map_location='cpu')
+if isinstance(state_dict, dict) and 'state_dict' in state_dict:
+    state_dict = state_dict['state_dict']
+
+RESULT = {"checkpoint_keys": list(state_dict.keys())[:20], "sampling_rate": sampling_rate, "speaker_ids": config['data']['spk2id'], "text": text, "speed": speed}

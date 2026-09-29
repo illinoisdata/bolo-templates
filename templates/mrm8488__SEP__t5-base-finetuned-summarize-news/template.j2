@@ -1,46 +1,43 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("mrm8488/t5-base-finetuned-summarize-news") %}
-{% set text = text | default("After the sound and the fury, weeks of demonstrations and anguished calls for racial justice, the man whose death gave rise to an international movement, and whose last words — “I can’t breathe” — have been a rallying cry, will be laid to rest on Tuesday at a private funeral in Houston.") %}
-{% set prefix = prefix | default("summarize: ") %}
-{% set max_input_length = max_input_length | default(512) %}
-{% set max_length = max_length | default(150) %}
-{% set min_length = min_length | default(30) %}
-{% set num_beams = num_beams | default(4) %}
-{% set length_penalty = length_penalty | default(2.0) %}
-{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("After the sound and the fury, weeks of demonstrations and anguished calls for racial justice, the man whose death gave rise to an international movement, and whose last words — “I can’t breathe” — have been a rallying cry, will be laid to rest on Tuesday at a private funeral in Houston.George Floyd, who was 46, will then be buried in a grave next to his mother’s.The service, scheduled to begin at 11 a.m. at the Fountain of Praise church, comes after five days of public memorials in Minneapolis, North Carolina and Houston and two weeks after a Minneapolis police officer was caught on video pressing his knee into Mr. Floyd’s neck for nearly nine minutes before Mr. Floyd died. That officer, Derek Chauvin, has been charged with second-degree murder and second-degree manslaughter. His bail was set at $1.25 million in a court appearance on Monday. The outpouring of anger and outrage after Mr. Floyd’s death — and the speed at which protests spread from tense, chaotic demonstrations in the city where he died to an international movement from Rome to Rio de Janeiro — has reflected the depth of frustration borne of years of watching black people die at the hands of the police or vigilantes while calls for change went unmet.") %}
+{% set max_length = max_length | default(80) %}
+{% set num_beams = num_beams | default(2) %}
+{% set length_penalty = length_penalty | default(1.0) %}
+{% set early_stopping = early_stopping | default(true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-prefix = "{{ prefix }}"
-max_input_length = {{ max_input_length }}
 max_length = {{ max_length }}
-min_length = {{ min_length }}
 num_beams = {{ num_beams }}
 length_penalty = {{ length_penalty }}
-no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+early_stopping = {{ early_stopping }}
 
-import os
-from pathlib import Path
+from huggingface_hub import hf_hub_download
 import torch
-from transformers import AutoModelForSeq2SeqLM, T5Tokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-tokenizer = T5Tokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-prefixed_text = f"{prefix}{text}"
-encoded = tokenizer(prefixed_text, return_tensors="pt", truncation=True, max_length=max_input_length)
-encoded = {key: tensor.to(device) for key, tensor in encoded.items()}
-
-generated = model.generate(
-    **encoded,
-    max_length=max_length,
-    min_length=min_length,
-    num_beams=num_beams,
-    length_penalty=length_penalty,
-    no_repeat_ngram_size=no_repeat_ngram_size,
-    early_stopping=True,
-)
-summary = tokenizer.decode(generated[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
+inputs = tokenizer("summarize: " + text, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_length=max_length,
+        num_beams=num_beams,
+        length_penalty=length_penalty,
+        early_stopping=early_stopping,
+    )
+summary = tokenizer.decode(output_ids[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
 
 RESULT = {"summary": summary}

@@ -1,37 +1,41 @@
 {% set repo_id = repo_id | default("charsiu/g2p_multilingual_byT5_small_100") %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("Sample text for grapheme to phoneme conversion.") %}
-{% set max_length = max_length | default(64) %}
-{% set num_beams = num_beams | default(4) %}
+{% set text = text | default('hello world') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = """{{ text_input }}"""
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text = "{{ text }}"
+max_new_tokens = {{ max_new_tokens }}
 
 import torch
-from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+model_path = hf_hub_download(repo_id=repo_id, filename='pytorch_model.bin')
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(text_input, return_tensors="pt")
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+# Charsiu G2P models typically expect a language/tag prefix; for broad compatibility,
+# use the raw text as provided and let the tokenizer handle bytes.
+inputs = tokenizer(text, return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    generated_tokens = model.generate(
-        **encoded_inputs,
-        max_length=max_length,
-        num_beams=num_beams,
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=1,
+        do_sample=False,
     )
 
-decoded_sequences = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-if len(decoded_sequences) == 1:
-    generated_output = decoded_sequences[0]
-else:
-    generated_output = "\n".join(decoded_sequences)
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {"generated_text": generated_output}
+RESULT = {"output_text": output_text}

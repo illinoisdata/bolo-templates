@@ -1,0 +1,30 @@
+{% set image = image | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("Xenova/depth-anything-small-hf") %}
+{% set device = device | default("cuda:0") %}
+{% set model_filename = model_filename | default('onnx/model.onnx') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image = "{{ image }}"
+model_filename = "{{ model_filename }}"
+
+import requests
+import numpy as np
+from PIL import Image
+from huggingface_hub import hf_hub_download
+import onnxruntime as ort
+
+if image.startswith('http://') or image.startswith('https://'):
+    image = Image.open(requests.get(image, stream=True).raw).convert('RGB')
+else:
+    image = Image.open(image).convert('RGB')
+
+model_path = hf_hub_download(repo_id=repo_id, filename=model_filename)
+sess = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
+input_name = sess.get_inputs()[0].name
+h, w = image.size[1], image.size[0]
+arr = np.array(image).astype(np.float32) / 255.0
+arr = np.transpose(arr, (2, 0, 1))[None, ...]
+arr = np.ascontiguousarray(arr)
+outputs = sess.run(None, {input_name: arr})
+predicted_depth = np.array(outputs[0]).squeeze()
+RESULT = {"predicted_depth": predicted_depth}

@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("segolilylabs/Lily-Cybersecurity-7B-v0.2-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('Lily-7B-Instruct-v0.2.Q4_K_M.gguf') %}
+{% set prompt = prompt | default('Write a concise cybersecurity best-practices checklist for securing a Linux server exposed to the internet.') %}
+{% set max_tokens = max_tokens | default(96) %}
+{% set temperature = temperature | default(0.2) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+max_tokens = {{ max_tokens }}
+temperature = {{ temperature }}
+
+import os
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+llm = Llama(
+    model_path=model_path,
+    n_ctx=4096,
+    n_threads=max(1, os.cpu_count() or 1),
+    n_gpu_layers=-1 if device.startswith("cuda") else 0,
+    verbose=False,
+)
+
+result = llm.create_completion(
+    prompt=prompt,
+    max_tokens=max_tokens,
+    temperature=temperature,
+    stop=["</s>"],
+)
+output_text = result["choices"][0]["text"]
+RESULT = {"text": output_text}

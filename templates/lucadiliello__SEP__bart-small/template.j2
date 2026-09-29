@@ -1,34 +1,35 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("lucadiliello/bart-small") %}
-{% set prompt = prompt | default("The quick brown fox jumps over the lazy dog.") %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(4) %}
-{% set result_file_name = result_file_name | default("generated.txt") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('BART-small is a lighter version of BART-base. Summarize this text in one sentence: The model is designed for efficient summarization with fewer attention heads, a smaller feed-forward network, and a reduced hidden size, while retaining the encoder-decoder architecture and standard BART generation capabilities.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-result_file_name = "{{ result_file_name }}"
-
-from pathlib import Path
+text = "{{ text }}"
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, BartForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+if weights_path is None:
+    weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-inputs = tokenizer(prompt, return_tensors="pt", truncation=True)
-inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = BartForConditionalGeneration.from_pretrained(repo_id).to(device)
+model.eval()
 
-generated_ids = model.generate(
-    **inputs,
-    max_length=max_length,
-    num_beams=num_beams,
-    early_stopping=True,
-)
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-decoded_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_length=64,
+        num_beams=4,
+        length_penalty=1.0,
+        no_repeat_ngram_size=3,
+    )
 
-RESULT = {"generated_text": decoded_text}
+summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"summary": summary}

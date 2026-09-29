@@ -1,0 +1,51 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("smp-hub/resnet34.imagenet") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import json
+import requests
+import torch
+from PIL import Image
+from torchvision import transforms
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+import segmentation_models_pytorch as smp
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+mean = config["mean"]
+std = config["std"]
+input_size = config["input_size"]
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    img = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    img = Image.open(image_path).convert("RGB")
+
+preprocess = transforms.Compose([
+    transforms.Resize((input_size[1], input_size[2])),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=mean, std=std),
+])
+
+x = preprocess(img).unsqueeze(0).to(device)
+
+model = smp.encoders.get_encoder("resnet34", in_channels=3, depth=5, weights=None)
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
+
+with torch.no_grad():
+    features = model(x)
+    output = [f.detach().cpu() for f in features]
+
+RESULT = {"features": output}

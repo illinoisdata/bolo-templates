@@ -1,0 +1,15 @@
+{% set repo_id = repo_id | default("monologg/kobert") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set input_text = input_text | default("KoBERT is a Korean BERT model suitable for extracting contextualized embeddings.") %}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_text = {{ input_text | tojson }}
+
+from transformers import BertTokenizer, pipeline
+
+tokenizer = BertTokenizer.from_pretrained(model, do_lower_case=False)
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_text)

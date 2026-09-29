@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("facebook/mask2former-swin-large-mapillary-vistas-panoptic") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-segmentation") %}
+{% set input_image = input_image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = {{ task | tojson }}
+input_image = {{ input_image | tojson }}
+model = repo_id
+
+from PIL import Image
+from transformers import pipeline
+
+image = Image.open(input_image)
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(image)

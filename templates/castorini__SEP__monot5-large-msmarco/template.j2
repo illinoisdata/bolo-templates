@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("castorini/monot5-large-msmarco") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set input_prompt = input_prompt | default("I love natural language processing.") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_prompt = "{{ input_prompt }}"
+
+from transformers import pipeline, T5EncoderModel, AutoTokenizer
+
+model = T5EncoderModel.from_pretrained(repo_id).to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt)

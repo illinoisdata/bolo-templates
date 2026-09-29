@@ -1,25 +1,37 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("ai-forever/T5-large-spell") %}
-{% set prefix = prefix | default("grammar: ") %}
-{% set text = text | default("If you bought something goregous, you well be very happy.") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('If you bought something goregous, you well be very happy.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prefix = "{{ prefix }}"
-text = "{{ text }}"
+input_text = "{{ input_text }}"
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
-import os
+from transformers import AutoTokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+
+_ = config_path
+_ = tokenizer_path
+_ = tokenizer_config_path
+_ = special_tokens_map_path
+_ = spiece_path
+
+model = T5ForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.to(device)
+model.eval()
 
-input_text = prefix + text
-inputs = tokenizer(input_text, return_tensors="pt")
+prefix = "grammar: "
+inputs = tokenizer(prefix + input_text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_tokens = model.generate(**inputs, max_new_tokens=64)
+output_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
-generated_ids = model.generate(**inputs)
-decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-result_text = decoded[0]
-
-RESULT = {"generated_text": result_text}
+RESULT = {"output_text": output_text}

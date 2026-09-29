@@ -1,0 +1,43 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("ZhengPeng7/BiRefNet_HR") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import os
+import torch
+from PIL import Image
+from torchvision import transforms
+from huggingface_hub import hf_hub_download
+from transformers import AutoModelForImageSegmentation
+
+model = AutoModelForImageSegmentation.from_pretrained(repo_id, trust_remote_code=True)
+
+image_size = (2048, 2048)
+transform_image = transforms.Compose([
+    transforms.Resize(image_size),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+])
+
+if str(image_path).startswith(("http://", "https://")):
+    from urllib.request import urlopen
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model.to(device)
+model.eval()
+model.half()
+
+tensor = transform_image(image).unsqueeze(0).to(device).half()
+with torch.no_grad():
+    preds = model(tensor)[-1].sigmoid().cpu()
+
+pred = preds[0].squeeze()
+mask = transforms.ToPILImage()(pred).resize(image.size)
+rgba = image.copy()
+rgba.putalpha(mask)
+
+RESULT = {"mask": mask, "rgba_image": rgba}

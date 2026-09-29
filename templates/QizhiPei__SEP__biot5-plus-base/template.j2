@@ -1,32 +1,37 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("QizhiPei/biot5-plus-base") %}
-{% set input_text = input_text | default("Summarize the role of mitochondria in a single sentence.") %}
-{% set max_new_tokens = max_new_tokens | default(128) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default('Generate a concise biological summary of the following sequence: ATGGCCATTGTAATGGGCCGCTGAAAGGGTGCCCGATAG') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = """{{ input_text }}"""
-max_new_tokens = {{ max_new_tokens }}
-num_beams = {{ num_beams }}
+text_input = "{{ text_input }}"
 
-from pathlib import Path
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+from transformers import AutoTokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+# Load tokenizer and model on the requested device
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = T5ForConditionalGeneration.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(input_text, return_tensors="pt")
-inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+inputs = tokenizer(text_input, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(
-    **inputs,
-    max_new_tokens=max_new_tokens,
-    num_beams=num_beams,
-)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=32,
+        do_sample=False,
+    )
 
-generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {
-    "generated_text": generated_text,
-}
+RESULT = {"output": output_text}

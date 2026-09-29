@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("jonfd/electra-small-nordic") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Norrønt språk er viktig for nordisk språkteknologi.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, ElectraForPreTraining
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+# Load tokenizer/model
+# ElectraForPreTraining returns logits for replaced-token detection.
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_path), local_files_only=True)
+model = ElectraForPreTraining.from_pretrained(os.path.dirname(weights_path), local_files_only=True)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+probs = torch.sigmoid(logits)
+RESULT = {
+    "logits": logits.detach().cpu().tolist(),
+    "probabilities": probs.detach().cpu().tolist(),
+}

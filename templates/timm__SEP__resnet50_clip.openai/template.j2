@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("timm/resnet50_clip.openai") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text_prompt = text_prompt | default('a photo of a cat') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text_prompt = "{{ text_prompt }}"
+
+import json
+import requests
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from open_clip import create_model_from_pretrained, get_tokenizer
+
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+with open(config_path, "r") as f:
+    open_clip_cfg = json.load(f)
+
+model, preprocess = create_model_from_pretrained(
+    model_name=open_clip_cfg.get("model_name", "RN50"),
+    pretrained=weights_path,
+    device=device,
+)
+model.eval()
+tokenizer = get_tokenizer(open_clip_cfg.get("model_name", "RN50"))
+
+img = Image.open(image_path).convert("RGB") if not str(image_path).startswith(("http://", "https://")) else Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+image = preprocess(img).unsqueeze(0).to(device)
+text = tokenizer([text_prompt]).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image)
+    text_features = model.encode_text(text)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logits_per_image = model.logit_scale.exp() * image_features @ text_features.T
+    probs = logits_per_image.softmax(dim=-1)
+
+RESULT = {
+    "text_prompt": text_prompt,
+    "logits_per_image": logits_per_image.detach().cpu().tolist(),
+    "probabilities": probs.detach().cpu().tolist(),
+}

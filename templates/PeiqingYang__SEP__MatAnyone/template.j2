@@ -1,0 +1,49 @@
+{% set video_path = video_path | default('/u/yunqili4/projects/ML-code-generation/data/video.avi') %}
+{% set mask_path = mask_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set output_path = output_path | default('/workspace/matanyone_output') %}
+{% set repo_id = repo_id | default("PeiqingYang/MatAnyone") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+video_path = "{{ video_path }}"
+mask_path = "{{ mask_path }}"
+output_path = "{{ output_path }}"
+
+import os
+from PIL import Image
+from urllib.parse import urlparse
+from urllib.request import urlopen
+from huggingface_hub import hf_hub_download
+
+video_is_url = urlparse(video_path).scheme in ("http", "https")
+mask_is_url = urlparse(mask_path).scheme in ("http", "https")
+
+if video_is_url:
+    video_local_path = video_path
+else:
+    video_local_path = video_path
+
+if mask_is_url:
+    mask_img = Image.open(urlopen(mask_path)).convert("RGB")
+else:
+    mask_img = Image.open(mask_path).convert("RGB")
+
+os.makedirs(output_path, exist_ok=True)
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+api_path = hf_hub_download(repo_id=repo_id, filename="inference_matanyone_api.py")
+
+api_text = open(api_path, "r").read()
+output_files = sorted({"weights_path": weights_path, "config_path": config_path}.keys())
+
+RESULT = {
+    "weights_path": weights_path,
+    "config_path": config_path,
+    "api_path": api_path,
+    "mask_image": mask_img,
+    "video_path": video_local_path,
+    "output_dir": output_path,
+    "api_preview": api_text[:500],
+}

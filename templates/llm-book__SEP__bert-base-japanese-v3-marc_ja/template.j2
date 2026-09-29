@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("llm-book/bert-base-japanese-v3-marc_ja") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set input_prompt = input_prompt | default("世界には言葉がわからなくても感動する音楽がある。") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+
+model = repo_id
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+inputs = input_prompt
+pipeline_output = pipe(inputs)
+RESULT = {"text_classification": pipeline_output}

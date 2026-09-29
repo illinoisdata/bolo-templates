@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("Freepik/nsfw_image_detector") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+# Python assignment emissions
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+image_path = {{ image_path | tojson }}
+
+# Imports
+from transformers import pipeline
+
+# Load tokenizer/processor & model
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+# Pre-process input
+default_input = image_path
+
+# Run inference
+RESULT = pipe(default_input)

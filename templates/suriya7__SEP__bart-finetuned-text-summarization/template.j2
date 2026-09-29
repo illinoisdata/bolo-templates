@@ -1,30 +1,39 @@
 {% set repo_id = repo_id | default("suriya7/bart-finetuned-text-summarization") %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("Now, there is no doubt that one of the most important aspects of any Pixel phone is its camera. And there might be good news for all camera lovers. Rumours have suggested that the Pixel 9 could come with a telephoto lens, improving its photography capabilities even further. Google will likely continue to focus on using AI to enhance its camera performance, in order to make sure that Pixel phones remain top contenders in the world of mobile photography.") %}
-{% set max_input_length = max_input_length | default(1024) %}
-{% set max_new_tokens = max_new_tokens | default(142) %}
+{% set text = text | default('Now, there is no doubt that one of the most important aspects of any Pixel phone is its camera. And there might be good news for all camera lovers. Rumours have suggested that the Pixel 9 could come with a telephoto lens, improving its photography capabilities even further. Google will likely continue to focus on using AI to enhance its camera performance, in order to make sure that Pixel phones remain top contenders in the world of mobile photography.', true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = """{{ text_input }}"""
-max_input_length = {{ max_input_length }}
-max_new_tokens = {{ max_new_tokens }}
+text = """{{ text }}"""
 
-import os
+from huggingface_hub import hf_hub_download
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-torch_device = torch.device(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+merges_file = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+generation_config_file = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
 model.eval()
 
-prepared_inputs = tokenizer(text_input, return_tensors="pt", truncation=True, max_length=max_input_length)
-prepared_inputs = {key: tensor.to(torch_device) for key, tensor in prepared_inputs.items()}
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=1024)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    summary_ids = model.generate(**prepared_inputs, max_new_tokens=max_new_tokens)
+    output_ids = model.generate(
+        **inputs,
+        max_new_tokens=100,
+        do_sample=False,
+    )
 
-summary_text = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+summary = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-RESULT = {"summary": summary_text}
+RESULT = {"summary": summary}

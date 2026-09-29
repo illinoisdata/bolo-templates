@@ -1,48 +1,46 @@
 {% set repo_id = repo_id | default("Yale-LILY/brio-cnndm-uncased") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("The quick brown fox jumps over the lazy dog. The lazy dog stays asleep, ignoring the energetic fox.") %}
-{% set max_length = max_length | default(142) %}
-{% set min_length = min_length | default(56) %}
+{% set article = article | default('The United Nations said on Tuesday that climate change is accelerating and called for stronger international cooperation to reduce emissions. Scientists warned that extreme weather events are becoming more frequent and more intense, threatening coastal cities, agriculture, and public health. Leaders meeting this week are expected to discuss policy measures, including renewable energy investment and methane reduction efforts.') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 {% set num_beams = num_beams | default(4) %}
-{% set output_file_name = output_file_name | default("summary.txt") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = """{{ input_text }}"""
-max_length = {{ max_length }}
-min_length = {{ min_length }}
+article = "{{ article }}"
+max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
-output_file_name = "{{ output_file_name }}"
-
-import os
 
 import torch
+from huggingface_hub import hf_hub_download
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-device_obj = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_files = [
+    hf_hub_download(repo_id=repo_id, filename="vocab.json"),
+    hf_hub_download(repo_id=repo_id, filename="merges.txt"),
+    hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json"),
+    hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json"),
+]
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device_obj)
+model_dir = "/".join(model_path.split("/")[:-1])
 
-inputs = tokenizer(
-    input_text,
-    return_tensors="pt",
-    truncation=True,
-)
-inputs = {key: tensor.to(device_obj) for key, tensor in inputs.items()}
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
+model.to(device)
+model.eval()
 
-generated_tokens = model.generate(
-    **inputs,
-    max_length=max_length,
-    min_length=min_length,
-    num_beams=num_beams,
-    early_stopping=True,
-)
-decoded = tokenizer.batch_decode(
-    generated_tokens,
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-)
-summary = decoded[0]
+inputs = tokenizer(article, return_tensors="pt", truncation=True, max_length=1024)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        num_beams=num_beams,
+        max_new_tokens=max_new_tokens,
+        length_penalty=2.0,
+        no_repeat_ngram_size=3,
+        early_stopping=True,
+    )
+summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"summary": summary}

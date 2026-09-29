@@ -1,0 +1,23 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Pathology-XLarge-770M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Early detection of breast cancer improves survival rates.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+with open(config_path, "r", encoding="utf-8") as f:
+    config = json.load(f)
+
+with open(weights_path, "rb") as f:
+    weights_bytes = f.read()
+labels = config.get("labels", ["DISEASE"])
+threshold = config.get("threshold", 0.5)
+RESULT = {"weights_bytes_len": len(weights_bytes), "config": config, "labels": labels, "threshold": threshold, "text": text}

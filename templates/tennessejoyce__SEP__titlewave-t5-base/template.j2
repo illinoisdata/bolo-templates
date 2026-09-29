@@ -1,40 +1,40 @@
 {% set repo_id = repo_id | default("tennessejoyce/titlewave-t5-base") %}
 {% set device = device | default("cuda:0") %}
-{% set question_body = question_body | default("Example question body.") %}
-{% set summarization_prefix = summarization_prefix | default("summarize: ") %}
-{% set max_length = max_length | default(40) %}
-{% set min_length = min_length | default(5) %}
-{% set num_beams = num_beams | default(4) %}
-{% set early_stopping = early_stopping | default(true) %}
-{% set no_repeat_ngram_size = no_repeat_ngram_size | default(1) %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-question_body = {{ question_body | tojson }}
-summarization_prefix = {{ summarization_prefix | tojson }}
-max_length = {{ max_length }}
-min_length = {{ min_length }}
-num_beams = {{ num_beams }}
-early_stopping = {{ early_stopping }}
-no_repeat_ngram_size = {{ no_repeat_ngram_size }}
-from pathlib import Path
+{% set input_text = input_text | default("Example question body.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+
+import os
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-device_obj = torch.device(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device_obj)
-prompt = f"{summarization_prefix}{question_body}"
-encoded_inputs = tokenizer(prompt, return_tensors="pt", truncation=True, padding="longest")
-encoded_inputs = encoded_inputs.to(device_obj)
-generated_ids = model.generate(
-    input_ids=encoded_inputs["input_ids"],
-    attention_mask=encoded_inputs.get("attention_mask"),
-    max_length=max_length,
-    min_length=min_length,
-    num_beams=num_beams,
-    early_stopping=early_stopping,
-    no_repeat_ngram_size=no_repeat_ngram_size,
-)
-decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-RESULT = {
-    "title_suggestions": [suggestion.strip() for suggestion in decoded]
-}
+from transformers import T5Tokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+
+model_dir = os.path.dirname(weights_path)
+tokenizer = T5Tokenizer.from_pretrained(model_dir)
+model = T5ForConditionalGeneration.from_pretrained(model_dir)
+model.to(device)
+model.eval()
+
+inputs = tokenizer("summarize: " + input_text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_length=40,
+        min_length=5,
+        length_penalty=2.0,
+        no_repeat_ngram_size=1,
+        num_beams=4,
+        early_stopping=True,
+    )
+
+summary_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+RESULT = {"summary_text": summary_text}

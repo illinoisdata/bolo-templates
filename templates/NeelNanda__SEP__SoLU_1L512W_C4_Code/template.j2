@@ -1,9 +1,53 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("NeelNanda/SoLU_1L512W_C4_Code") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Hello, world!") %}
 repo_id = "{{ repo_id }}"
-import json
-from huggingface_hub import HfApi
+device = "{{ device }}"
+text = {{ text | tojson }}
 
-api = HfApi()
-files = api.list_repo_files(repo_id)
-print(json.dumps(files, indent=2))
+import json
+import torch
+from transformers import AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformer_lens import HookedTransformer
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_path, "r") as f:
+    raw_cfg = json.load(f)
+
+ckpt_path = hf_hub_download(repo_id=repo_id, filename="checkpoints/tokens_019580321792.pth")
+
+tokenizer = AutoTokenizer.from_pretrained(raw_cfg["tokenizer_name"])
+model_cfg = {
+    "n_layers": raw_cfg["n_layers"],
+    "d_model": raw_cfg["d_model"],
+    "d_head": raw_cfg["d_head"],
+    "n_heads": raw_cfg["n_heads"],
+    "d_mlp": raw_cfg["d_mlp"],
+    "d_vocab": raw_cfg["d_vocab"],
+    "n_ctx": raw_cfg["n_ctx"],
+    "act_fn": raw_cfg["act_fn"],
+    "normalization_type": raw_cfg["normalization"],
+    "tokenizer_name": raw_cfg["tokenizer_name"],
+}
+
+state = torch.load(ckpt_path, map_location="cpu")
+if isinstance(state, dict) and "state_dict" in state:
+    state_dict = state["state_dict"]
+elif isinstance(state, dict) and "model_state_dict" in state:
+    state_dict = state["model_state_dict"]
+elif isinstance(state, dict):
+    state_dict = state
+else:
+    state_dict = state
+
+model = HookedTransformer(model_cfg, tokenizer=tokenizer, move_to_device=False)
+model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
+
+input_ids = tokenizer.encode(text, return_tensors="pt").to(device)
+logits = model(input_ids)
+next_token_id = int(torch.argmax(logits[0, -1]).item())
+output_text = tokenizer.decode([next_token_id])
+
+RESULT = {"next_token_id": next_token_id, "output_text": output_text}

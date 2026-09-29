@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("mlx-community/Josiefied-Qwen2.5-0.5B-Instruct-abliterated-v1-float32") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('hello') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+
+model_dir = config_path.rsplit('/', 1)[0]
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir, trust_remote_code=False)
+model = AutoModelForCausalLM.from_pretrained(model_dir, torch_dtype=torch.float32, device_map=None)
+model.to(device)
+model.eval()
+
+if hasattr(tokenizer, "apply_chat_template") and tokenizer.chat_template is not None:
+    messages = [{"role": "user", "content": prompt}]
+    prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=32, do_sample=False)
+output = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output": output}

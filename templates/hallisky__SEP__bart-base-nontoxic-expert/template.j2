@@ -1,19 +1,51 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("hallisky/bart-base-nontoxic-expert") %}
-{% set text = text | default("This is a toxic example sentence that needs rewriting into a non-toxic form.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The company reported strong quarterly earnings, with revenue growth driven by new products and improved efficiency.') %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
+{% set num_beams = num_beams | default(4) %}
+{% set do_sample = do_sample | default(false) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
+do_sample = {{ do_sample }}
 
+import os
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+from transformers import BartForConditionalGeneration, BartTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-inputs = tokenizer(text, return_tensors="pt").to(device)
-output_ids = model.generate(**inputs)
-decoded = tokenizer.batch_decode(output_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-result_text = decoded[0]
+model = BartForConditionalGeneration.from_pretrained(
+    os.path.dirname(weights_path),
+    local_files_only=True,
+)
+model.to(device)
+model.eval()
 
-RESULT = {"generated_text": result_text}
+tokenizer = BartTokenizer.from_pretrained(
+    os.path.dirname(vocab_path),
+    local_files_only=True,
+)
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+        do_sample=do_sample,
+    )
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

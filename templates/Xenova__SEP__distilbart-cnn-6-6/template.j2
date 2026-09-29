@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("Xenova/distilbart-cnn-6-6") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The economy is showing signs of recovery, with inflation cooling and consumer spending stabilizing. Analysts say the outlook remains uncertain, but the latest data is encouraging.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+import json
+import numpy as np
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="onnx/decoder_model.onnx")
+
+model_dir = os.path.dirname(model_path)
+
+# Load tokenizer/config artifacts to ensure repo files are available, though inference uses PyTorch model API.
+with open(config_path, "r") as f:
+    _config = json.load(f)
+
+model_name = "sshleifer/distilbart-cnn-6-6"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=1024)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    summary_ids = model.generate(
+        **inputs,
+        num_beams=4,
+        max_length=142,
+        min_length=56,
+        no_repeat_ngram_size=3,
+        length_penalty=2.0,
+        early_stopping=True,
+    )
+
+summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+
+RESULT = {"summary_text": summary}

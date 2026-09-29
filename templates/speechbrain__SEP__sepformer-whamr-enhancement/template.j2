@@ -1,0 +1,41 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set repo_id = repo_id | default("speechbrain/sepformer-whamr-enhancement") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+import os
+import tempfile
+from urllib.parse import urlparse
+
+import soundfile as sf
+import torch
+from speechbrain.inference.separation import SepformerSeparation
+from huggingface_hub import hf_hub_download
+
+
+def load_audio(path_or_url):
+    if str(path_or_url).startswith(("http://", "https://")):
+        parsed = urlparse(path_or_url)
+        filename = os.path.basename(parsed.path)
+        local_path = hf_hub_download(repo_id=repo_id, filename=filename)
+        waveform, sample_rate = sf.read(local_path, always_2d=True)
+    else:
+        waveform, sample_rate = sf.read(path_or_url, always_2d=True)
+    waveform = torch.tensor(waveform.T, dtype=torch.float32)
+    return waveform, sample_rate
+
+
+waveform, sample_rate = load_audio(audio_path)
+savedir = tempfile.mkdtemp(prefix='sb_sepformer_')
+model = SepformerSeparation.from_hparams(
+    source=repo_id,
+    savedir=savedir,
+    run_opts={"device": device},
+)
+
+est_sources = model.separate_batch(waveform.to(device))
+output = est_sources.detach().cpu()
+
+RESULT = {"enhanced_sources": output}

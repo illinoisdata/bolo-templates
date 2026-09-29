@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("deepset/gelectra-base-germanquad") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Was ist eine beliebte Programmiersprache?') %}
+{% set context = context | default('Python ist eine beliebte Programmiersprache. Sie wird für Webentwicklung, Datenanalyse und vieles mehr verwendet.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = {{ question | tojson }}
+context = {{ context | tojson }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+model = AutoModelForQuestionAnswering.from_pretrained(repo_id, config=config_path, state_dict=None)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, vocab_file=vocab_path)
+
+model.to(device)
+model.eval()
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits
+end_logits = outputs.end_logits
+start_idx = int(torch.argmax(start_logits, dim=-1).item())
+end_idx = int(torch.argmax(end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+answer_ids = inputs["input_ids"][0, start_idx:end_idx + 1]
+answer = tokenizer.decode(answer_ids, skip_special_tokens=True).strip()
+score = float((start_logits[0, start_idx] + end_logits[0, end_idx]).item())
+
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx, "score": score}

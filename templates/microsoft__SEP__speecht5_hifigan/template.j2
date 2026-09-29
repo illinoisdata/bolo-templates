@@ -1,56 +1,23 @@
 {% set repo_id = repo_id | default("microsoft/speecht5_hifigan") %}
 {% set device = device | default("cuda:0") %}
-{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-audio_path = "{{ audio_path }}"
 
-from transformers.models.speecht5.modeling_speecht5 import SpeechT5HifiGan, SpeechT5HifiGanConfig
-from transformers.models.speecht5.feature_extraction_speecht5 import SpeechT5FeatureExtractor
-import os
-import io
-import requests
+import numpy as np
 import torch
-import soundfile as sf
+from huggingface_hub import hf_hub_download
+from transformers import SpeechT5HifiGan
 
-# Initialize device, config, model, and feature extractor
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-device = torch.device(device)
-config = SpeechT5HifiGanConfig.from_pretrained(repo_id)
-feature_extractor = SpeechT5FeatureExtractor()
-model = SpeechT5HifiGan.from_pretrained(repo_id, config=config).to(device)
+model = SpeechT5HifiGan.from_pretrained(repo_id)
+model.to(device)
 model.eval()
 
-# Load audio input
-if audio_path.startswith("http"):
-    response = requests.get(audio_path)
-    audio_bytes = io.BytesIO(response.content)
-    speech_array, _ = sf.read(audio_bytes)
-else:
-    speech_array, _ = sf.read(audio_path)
-
-# Ensure mono float32 audio
-if speech_array.ndim > 1:
-    speech_array = speech_array[:, 0]
-speech_array = speech_array.astype("float32")
-
-# Extract mel-spectrogram features from audio targets and move to device
-inputs = feature_extractor(
-    audio_target=speech_array,
-    sampling_rate=config.sampling_rate,
-    return_tensors="pt",
-)["input_values"]
-inputs = inputs.to(device=device, dtype=torch.float32)
-
-# Run inference
+mel = np.zeros((1, 10, 80), dtype=np.float32)
+inputs = torch.tensor(mel, dtype=torch.float32, device=device)
 with torch.no_grad():
     waveform = model(inputs)
 
-# Remove batch dim if necessary and convert to numpy
-if waveform.ndim == 2 and waveform.size(0) == 1:
-    waveform = waveform.squeeze(0)
-waveform = waveform.detach().cpu()
-audio = waveform.numpy()
-sampling_rate = config.sampling_rate
-
-RESULT = {"audio": audio, "sampling_rate": sampling_rate}
+RESULT = {"audio": waveform.detach().cpu().numpy()}

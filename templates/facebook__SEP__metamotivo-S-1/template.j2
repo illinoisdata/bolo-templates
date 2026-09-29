@@ -1,0 +1,138 @@
+{% set repo_id = repo_id | default("facebook/metamotivo-S-1") %}
+{% set device = device | default("cuda:0") %}
+{% set obs_dim = obs_dim | default(358) %}
+{% set action_dim = action_dim | default(69) %}
+{% set z_dim = z_dim | default(256) %}
+{% set obs_text = obs_text | default('zero-shot humanoid control observation vector') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+obs_dim = {{ obs_dim }}
+action_dim = {{ action_dim }}
+z_dim = {{ z_dim }}
+obs_text = "{{ obs_text }}"
+
+import json
+import os
+from pathlib import Path
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from huggingface_hub import hf_hub_download
+
+
+class MLP(nn.Module):
+    def __init__(self, input_dim, output_dim, hidden_dim, hidden_layers, embedding_layers=0, first_layernorm=True, ensemble_out=1):
+        super().__init__()
+        self.embedding_layers = embedding_layers
+        self.ensemble_out = ensemble_out
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.hidden_dim = hidden_dim
+        self.hidden_layers = hidden_layers
+        self.first_layernorm = first_layernorm
+
+        emb_in = input_dim
+        emb1_out = hidden_dim
+        emb2_out = hidden_dim // 2 if embedding_layers >= 2 else hidden_dim
+        self.emb1_ln = nn.LayerNorm(emb_in) if first_layernorm else nn.Identity()
+        self.emb1 = nn.Linear(emb_in, emb1_out)
+        if embedding_layers >= 2:
+            self.emb2_ln = nn.LayerNorm(emb_in)
+            self.emb2 = nn.Linear(emb_in, emb2_out)
+            trunk_in = emb1_out + emb2_out
+        else:
+            trunk_in = emb1_out
+
+        layers = []
+        in_dim = trunk_in
+        for i in range(hidden_layers):
+            layers.append(nn.Linear(in_dim, hidden_dim))
+            layers.append(nn.ReLU())
+            in_dim = hidden_dim
+        self.trunk = nn.Sequential(*layers)
+        self.head = nn.Linear(in_dim, output_dim * ensemble_out)
+
+    def forward(self, x):
+        x1 = torch.tanh(self.emb1(self.emb1_ln(x)))
+        if self.embedding_layers >= 2:
+            x2 = torch.tanh(self.emb2(self.emb2_ln(x)))
+            x = torch.cat([x1, x2], dim=-1)
+        else:
+            x = x1
+        x = self.trunk(x)
+        x = self.head(x)
+        if self.ensemble_out > 1:
+            x = x.view(x.shape[0], self.ensemble_out, -1)
+        return x
+
+
+class BackwardNet(nn.Module):
+    def __init__(self, output_dim):
+        super().__init__()
+        self.ln = nn.LayerNorm(obs_dim)
+        self.fc1 = nn.Linear(obs_dim, 256)
+        self.fc2 = nn.Linear(256, output_dim)
+
+    def forward(self, s):
+        x = torch.tanh(self.fc1(self.ln(s)))
+        x = self.fc2(x)
+        return F.normalize(x, dim=-1)
+
+
+class FBcprModel(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        arch = config["archi"]
+        self.actor = MLP(obs_dim, action_dim, arch["actor"]["hidden_dim"], arch["actor"]["hidden_layers"], arch["actor"]["embedding_layers"])
+        self.forward_net = MLP(obs_dim + z_dim, z_dim, arch["f"]["hidden_dim"], arch["f"]["hidden_layers"], arch["f"]["embedding_layers"], ensemble_out=arch["f"]["num_parallel"])
+        self.critic = MLP(obs_dim + z_dim, 1, arch["critic"]["hidden_dim"], arch["critic"]["hidden_layers"], arch["critic"]["embedding_layers"], ensemble_out=arch["critic"]["num_parallel"])
+        self.backward = BackwardNet(z_dim)
+        self.discriminator = MLP(obs_dim + z_dim, 1, arch["discriminator"]["hidden_dim"], arch["discriminator"]["hidden_layers"], embedding_layers=0)
+        self.actor_std = config.get("actor_std", 0.2)
+
+    @classmethod
+    def from_pretrained(cls, repo_id):
+        config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+        weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+        config = json.loads(Path(config_path).read_text())
+        model = cls(config)
+        from safetensors.torch import load_file
+        state = load_file(weights_path)
+        missing, unexpected = model.load_state_dict(state, strict=False)
+        model.eval()
+        return model
+
+    def act(self, obs):
+        mean = self.actor(obs)
+        return mean, torch.full_like(mean, self.actor_std)
+
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config = json.loads(Path(config_path).read_text())
+
+model = FBcprModel(config).to(device)
+from safetensors.torch import load_file
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict, strict=False)
+model.eval()
+
+obs = torch.zeros(1, obs_dim, device=device)
+obs[:, 0] = float(len(obs_text)) / 100.0
+with torch.no_grad():
+    action_mean, action_std = model.act(obs)
+    z = model.backward(obs)
+    f_out = model.forward_net(torch.cat([obs, z], dim=-1))
+    critic_out = model.critic(torch.cat([obs, z], dim=-1))
+    disc_out = model.discriminator(torch.cat([obs, z], dim=-1))
+
+RESULT = {
+    "action_mean": action_mean.detach().cpu(),
+    "action_std": action_std.detach().cpu(),
+    "latent_z": z.detach().cpu(),
+    "forward_prediction": f_out.detach().cpu(),
+    "critic_value": critic_out.detach().cpu(),
+    "discriminator_score": disc_out.detach().cpu(),
+}

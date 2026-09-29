@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("facebook/timesformer-hr-finetuned-k400") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("video-classification") %}
+{% set video_path = video_path | default("/u/yunqili4/projects/ML-code-generation/data/video.avi") %}
+{% set num_frames = num_frames | default(16) %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+video_path = {{ video_path | tojson }}
+num_frames = {{ num_frames }}
+
+import cv2
+import numpy as np
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+capture = cv2.VideoCapture(video_path)
+if not capture.isOpened():
+    raise RuntimeError(f"Unable to open video at {video_path}")
+
+frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+if frame_count <= 0:
+    capture.release()
+    raise RuntimeError(f"Video at {video_path} contains no frames")
+
+max_index = max(frame_count - 1, 0)
+indices = np.linspace(0, max_index, num=num_frames)
+indices = np.clip(indices, 0, max_index).astype(int)
+frames = []
+for index in indices:
+    capture.set(cv2.CAP_PROP_POS_FRAMES, int(index))
+    success, frame = capture.read()
+    if not success:
+        continue
+    frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+
+capture.release()
+
+if not frames:
+    raise RuntimeError(f"No readable frames extracted from {video_path}")
+
+while len(frames) < num_frames:
+    frames.append(frames[-1].copy())
+
+video_tensor = np.stack(frames)
+input_data = [video_tensor]
+
+RESULT = pipe(input_data)

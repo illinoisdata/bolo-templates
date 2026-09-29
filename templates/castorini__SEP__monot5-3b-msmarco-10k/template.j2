@@ -1,32 +1,44 @@
+{% set text = text | default('passage: The Eiffel Tower is located in Paris and is one of the most famous landmarks in the world. query: Where is the Eiffel Tower located?') %}
+{% set max_new_tokens = max_new_tokens | default(8) %}
+{% set num_beams = num_beams | default(1) %}
 {% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("castorini/monot5-3b-msmarco-10k") %}
-{% set query = query | default("What does MonoT5 use for passage reranking?") %}
-{% set passage = passage | default("MonoT5 is a reranker built on T5 trained on MS MARCO for high-quality passage ranking.") %}
-{% set max_new_tokens = max_new_tokens | default(16) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-query = """{{ query }}"""
-passage = """{{ passage }}"""
+text = "{{ text }}"
 max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
 
-import pathlib
+import os
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import T5Tokenizer, T5ForConditionalGeneration
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+model_dir = os.path.dirname(model_file)
+
+tokenizer = T5Tokenizer(vocab_file=tokenizer_file)
+model = T5ForConditionalGeneration.from_pretrained(model_dir, local_files_only=True)
+model.to(device)
 model.eval()
 
-input_text = f"Query: {query}\nPassage: {passage}"
-encoded_inputs = tokenizer(
-    input_text,
-    padding=True,
-    truncation=True,
-    return_tensors="pt",
-)
-encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_tokens = model.generate(**encoded_inputs, max_new_tokens=max_new_tokens)
-generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+        do_sample=False,
+    )
 
-RESULT = {"generated_text": generated_text}
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

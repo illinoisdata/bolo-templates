@@ -1,11 +1,37 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Qdrant/all_miniLM_L6_v2_with_attentions") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Qdrant provides embeddings for sentence similarity.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
+text = {{ text | tojson }}
 
-from huggingface_hub import HfApi
+import os
+import numpy as np
+import torch
+import onnxruntime as ort
+from transformers import AutoTokenizer
+from huggingface_hub import hf_hub_download
 
-api = HfApi()
-files = api.list_repo_files(repo_id)
+onnx_path = hf_hub_download(repo_id=repo_id, filename="model.onnx")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-RESULT = {"files": files}
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_json_path), use_fast=True)
+
+tokens = tokenizer(text, return_tensors="np", truncation=True, padding=True)
+providers = ["CUDAExecutionProvider", "CPUExecutionProvider"] if str(device).startswith("cuda") else ["CPUExecutionProvider"]
+session = ort.InferenceSession(onnx_path, providers=providers)
+inputs = {k: v for k, v in tokens.items() if k in {i.name for i in session.get_inputs()}}
+outputs = session.run(None, inputs)
+
+# Common ONNX export order: last_hidden_state, pooler_output, attentions
+last_hidden_state = outputs[0]
+pooler_output = outputs[1] if len(outputs) > 1 else None
+attentions = outputs[2:] if len(outputs) > 2 else None
+
+RESULT = {"last_hidden_state": last_hidden_state, "pooler_output": pooler_output, "attentions": attentions}

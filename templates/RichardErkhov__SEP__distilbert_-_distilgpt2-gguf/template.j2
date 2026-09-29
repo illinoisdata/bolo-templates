@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("RichardErkhov/distilbert_-_distilgpt2-gguf") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('distilgpt2.Q4_K_M.gguf') %}
+{% set prompt = prompt | default('Hello, I am a language model') %}
+{% set max_tokens = max_tokens | default(32) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.95) %}
+{% set seed = seed | default(42) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+max_tokens = {{ max_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+seed = {{ seed }}
+
+import os
+import numpy as np
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+llm = Llama(model_path=model_path, n_ctx=512, n_threads=max(1, os.cpu_count() or 1), verbose=False)
+
+output = llm(
+    prompt,
+    max_tokens=max_tokens,
+    temperature=temperature,
+    top_p=top_p,
+    seed=seed,
+)
+
+generated_text = output["choices"][0]["text"]
+RESULT = {"generated_text": generated_text, "raw_output": output}

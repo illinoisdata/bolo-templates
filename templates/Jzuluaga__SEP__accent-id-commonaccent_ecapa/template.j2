@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("Jzuluaga/accent-id-commonaccent_ecapa") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set text_norm = text_norm | default(true) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+text_norm = {{ text_norm }}
+
+import os
+import json
+import torch
+import torchaudio
+from speechbrain.pretrained import EncoderClassifier
+from huggingface_hub import hf_hub_download
+
+classifier_ckpt = hf_hub_download(repo_id=repo_id, filename="classifier.ckpt")
+embedding_model_ckpt = hf_hub_download(repo_id=repo_id, filename="embedding_model.ckpt")
+normalizer_input_ckpt = hf_hub_download(repo_id=repo_id, filename="normalizer_input.ckpt")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+hparams_path = hf_hub_download(repo_id=repo_id, filename="hyperparams.yaml")
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    audio_path_local = torchaudio.utils.download_asset(audio_path)
+else:
+    audio_path_local = audio_path
+
+classifier = EncoderClassifier.from_hparams(
+    source=repo_id,
+    savedir=os.path.dirname(classifier_ckpt),
+    run_opts={"device": device},
+)
+
+out_prob, score, index, text_lab = classifier.classify_file(audio_path_local)
+
+RESULT = {
+    "label": text_lab,
+    "score": float(score.squeeze().item()) if torch.is_tensor(score) else float(score),
+    "index": int(index.squeeze().item()) if torch.is_tensor(index) else int(index),
+    "probabilities": out_prob.squeeze().detach().cpu().tolist() if torch.is_tensor(out_prob) else out_prob,
+}

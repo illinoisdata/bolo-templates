@@ -1,0 +1,61 @@
+{% set repo_id = repo_id | default("antoinelouis/colbertv2-camembert-L4-mmarcoFR") %}
+{% set device = device | default("cuda:0") %}
+{% set query_text = query_text | default('Comment effectuer une recherche avec ColBERT ?') %}
+{% set passages = passages | default(['Ceci est un premier document.', 'Voici un second document.', 'Le troisième document parle de recherche sémantique en français.']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query_text = {{ query_text | tojson }}
+passages = {{ passages | tojson }}
+
+import os
+import torch
+from safetensors.torch import load_file
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModel
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+class HF_ColBERT(torch.nn.Module):
+    def __init__(self, base_model, projection):
+        super().__init__()
+        self.base_model = base_model
+        self.projection = projection
+
+    def encode(self, input_ids, attention_mask):
+        outputs = self.base_model(input_ids=input_ids, attention_mask=attention_mask)
+        hidden = outputs.last_hidden_state
+        emb = self.projection(hidden)
+        emb = torch.nn.functional.normalize(emb, p=2, dim=-1)
+        return emb
+
+base_model = AutoModel.from_pretrained(repo_id)
+state_dict = load_file(weights_path)
+base_state = {k[len("base_model."):]: v for k, v in state_dict.items() if k.startswith("base_model.")}
+proj_state = {k[len("projection."):]: v for k, v in state_dict.items() if k.startswith("projection.")}
+if base_state:
+    base_model.load_state_dict(base_state, strict=False)
+projection = torch.nn.Linear(base_model.config.hidden_size, 32, bias=False)
+if proj_state:
+    projection.load_state_dict(proj_state, strict=False)
+model = HF_ColBERT(base_model, projection).to(device).eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+with torch.no_grad():
+    q = tokenizer(query_text, return_tensors="pt", truncation=True, max_length=32, padding=True).to(device)
+    q_emb = model.encode(q["input_ids"], q["attention_mask"])
+    doc_scores = []
+    for passage in passages:
+        d = tokenizer(passage, return_tensors="pt", truncation=True, max_length=160, padding=True).to(device)
+        d_emb = model.encode(d["input_ids"], d["attention_mask"])
+        sim = torch.matmul(q_emb, d_emb.transpose(1, 2))
+        d_mask = d["attention_mask"].unsqueeze(1).bool()
+        sim = sim.masked_fill(~d_mask, -1e9)
+        max_sim = sim.max(dim=-1).values
+        q_mask = q["attention_mask"].bool()
+        max_sim = max_sim.masked_fill(~q_mask, 0.0)
+        score = max_sim.sum(dim=-1).item()
+        doc_scores.append(score)
+    ranked = sorted(zip(passages, doc_scores), key=lambda x: x[1], reverse=True)
+
+RESULT = {"query": query_text, "ranked_passages": ranked}

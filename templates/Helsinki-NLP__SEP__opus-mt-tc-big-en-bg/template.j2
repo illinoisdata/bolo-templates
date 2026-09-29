@@ -1,24 +1,32 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-en-bg") %}
 {% set device = device | default("cuda:0") %}
-{% set src_text = src_text | default(["2001 is the year when the 21st century begins.", "This is Copacabana!"]) %}
-{% set num_beams = num_beams | default(4) %}
+{% set src_text = src_text | default(['2001 is the year when the 21st century begins.', 'This is Copacabana!']) %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 src_text = {{ src_text }}
-num_beams = {{ num_beams }}
+max_new_tokens = {{ max_new_tokens }}
 
-import os
+from huggingface_hub import hf_hub_download
+from transformers import MarianMTModel, MarianTokenizer
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
+model = MarianMTModel.from_pretrained(repo_id, local_files_only=True)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(src_text, return_tensors="pt", padding=True)
-inputs = inputs.to(device)
+inputs = tokenizer(src_text, return_tensors="pt", padding=True, truncation=True).to(device)
+with torch.no_grad():
+    generated_tokens = model.generate(**inputs, num_beams=4, max_new_tokens=max_new_tokens)
+translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
-translated_tokens = model.generate(**inputs, num_beams=num_beams)
-
-translations = tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)
 RESULT = {"translations": translations}

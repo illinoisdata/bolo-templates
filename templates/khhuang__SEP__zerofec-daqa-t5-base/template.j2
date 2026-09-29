@@ -1,39 +1,33 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("khhuang/zerofec-daqa-t5-base") %}
-{% set question = question | default("What is Night of the Living Dead?") %}
-{% set context = context | default("Night of the Living Dead is a 1968 American independent horror film , directed by George A.") %}
-{% set max_length = max_length | default(64) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What is Night of the Living Dead?') %}
+{% set context = context | default('Night of the Living Dead is a 1968 American independent horror film , directed by George A. Romero , starring Duane Jones and Judith O\'Dea . George A. Romero George A. Romero Duane Jones Duane Jones Judith O\'Dea Judith O\'Dea independent Independent film horror film horror film.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-question = "{{ question }}"
-context = "{{ context }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+question = {{ question | tojson }}
+context = {{ context | tojson }}
 
-import json
-import os
-
+from huggingface_hub import hf_hub_download
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-formatted_input = f"{question} \n {context}"
-inputs = tokenizer(formatted_input, return_tensors="pt")
-input_ids = inputs.input_ids.to(device)
-attention_mask = inputs.attention_mask.to(device)
-
+text = f"{question} \n {context}"
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    generated_ids = model.generate(
-        input_ids=input_ids,
-        attention_mask=attention_mask,
-        max_length=max_length,
-        num_beams=num_beams,
-    )
+    generated_ids = model.generate(**inputs, max_length=32, num_beams=4)
+output = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
-generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-
-RESULT = {"answer": generated_texts}
+RESULT = {"generated_text": output}

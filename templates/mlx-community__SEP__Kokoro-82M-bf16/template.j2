@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("mlx-community/Kokoro-82M-bf16") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Hello world") %}
+{% set voice = voice | default("af_heart") %}
+{% set speed = speed | default(1.0) %}
+{% set sample_rate = sample_rate | default(24000) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+voice = "{{ voice }}"
+speed = {{ speed }}
+sample_rate = {{ sample_rate }}
+
+import os
+from pathlib import Path
+import numpy as np
+from huggingface_hub import hf_hub_download
+
+RESULT = {"audio": np.zeros(1, dtype=np.float32), "sample_rate": sample_rate}

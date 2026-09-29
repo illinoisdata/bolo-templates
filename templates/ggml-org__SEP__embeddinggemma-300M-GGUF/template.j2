@@ -1,0 +1,31 @@
+{% set repo_id = repo_id | default("ggml-org/embeddinggemma-300M-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('embeddinggemma-300M-Q8_0.gguf') %}
+{% set text = text | default('Hello, world!') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+text = "{{ text }}"
+
+import os
+import numpy as np
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+n_gpu_layers = -1 if str(device).startswith('cuda') else 0
+llm = Llama(
+    model_path=model_path,
+    embedding=True,
+    n_ctx=512,
+    n_batch=1,
+    n_threads=max(1, os.cpu_count() or 1),
+    n_gpu_layers=n_gpu_layers,
+    verbose=False,
+)
+
+emb = llm.create_embedding(text)
+output = np.asarray(emb['data'][0]['embedding'], dtype=np.float32)
+
+RESULT = {"embedding": output}

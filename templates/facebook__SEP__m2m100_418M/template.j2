@@ -1,34 +1,45 @@
 {% set repo_id = repo_id | default("facebook/m2m100_418M") %}
 {% set device = device | default("cuda:0") %}
-{% set source_text = source_text | default("Life is like a box of chocolate.") %}
-{% set source_lang = source_lang | default("en") %}
-{% set target_lang = target_lang | default("fr") %}
+{% set src_text = src_text | default('जीवन एक चॉकलेट बॉक्स की तरह है।') %}
+{% set src_lang = src_lang | default('hi') %}
+{% set tgt_lang = tgt_lang | default('fr') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_text = """{{ source_text }}"""
-source_lang = "{{ source_lang }}"
-target_lang = "{{ target_lang }}"
+src_text = {{ src_text | tojson }}
+src_lang = {{ src_lang | tojson }}
+tgt_lang = {{ tgt_lang | tojson }}
+max_new_tokens = {{ max_new_tokens }}
 
-from pathlib import Path
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import M2M100ForConditionalGeneration, M2M100Tokenizer
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
 
-# 4. Load tokenizer/processor & model
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-tokenizer.src_lang = source_lang
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+model = M2M100ForConditionalGeneration.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-# 5. Pre-process input
-encoded_inputs = tokenizer(source_text, return_tensors="pt", padding=True, truncation=True)
-encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
+tokenizer = M2M100Tokenizer.from_pretrained(repo_id)
+tokenizer.src_lang = src_lang
+inputs = tokenizer(src_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# 6. Run inference
-forced_bos_token_id = tokenizer.get_lang_id(target_lang)
-generated_tokens = model.generate(**encoded_inputs, forced_bos_token_id=forced_bos_token_id)
+with torch.no_grad():
+    generated_tokens = model.generate(
+        **inputs,
+        forced_bos_token_id=tokenizer.get_lang_id(tgt_lang),
+        max_new_tokens=max_new_tokens,
+    )
 
-# 7. Post-process & build RESULT dict
-translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-RESULT = {"translation": translations}
+output_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
-# 8. Main guard
+RESULT = {"translation": output_text}

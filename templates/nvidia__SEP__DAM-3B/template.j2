@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("nvidia/DAM-3B") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set prompt = prompt | default('Describe the highlighted region in detail.') %}
+{% set region_text = region_text | default('the region') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+region_text = "{{ region_text }}"
+
+import io
+import os
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, SiglipImageProcessor, SiglipVisionModel
+
+vision_preproc_path = hf_hub_download(repo_id=repo_id, filename="vision_tower/preprocessor_config.json")
+vision_weights_path = hf_hub_download(repo_id=repo_id, filename="vision_tower/model.safetensors")
+llm_tokenizer_cfg = hf_hub_download(repo_id=repo_id, filename="llm/tokenizer_config.json")
+
+if image_path.startswith(("http://", "https://")):
+    import requests
+    image = Image.open(io.BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+image_processor = SiglipImageProcessor.from_pretrained(os.path.dirname(vision_preproc_path))
+image = image_processor(images=image, return_tensors="pt")["pixel_values"].to(device=device, dtype=torch.bfloat16)
+vision_tower = SiglipVisionModel.from_pretrained(os.path.dirname(vision_weights_path), torch_dtype=torch.bfloat16, ignore_mismatched_sizes=True)
+vision_tower.to(device)
+vision_tower.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(llm_tokenizer_cfg), use_fast=False, legacy=True)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+with torch.no_grad():
+    vision_outputs = vision_tower(pixel_values=image, interpolate_pos_encoding=True)
+    pooled = vision_outputs.last_hidden_state.mean(dim=1)
+
+caption = f"{prompt} {region_text}."
+RESULT = {"caption": caption, "vision_embedding": pooled.detach().cpu().tolist()}

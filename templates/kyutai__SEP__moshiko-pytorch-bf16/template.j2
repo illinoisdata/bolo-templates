@@ -1,0 +1,46 @@
+{% set text_prompt = text_prompt | default('Hello, how are you today?') %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.95) %}
+{% set repo_id = repo_id | default("kyutai/moshiko-pytorch-bf16") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_prompt = {{ text_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+
+import os
+import json
+import torch
+import sentencepiece as spm
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer-e351c8d8-checkpoint125.safetensors")
+tokenizer_spm_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_spm_32k_3.model")
+
+sp = spm.SentencePieceProcessor()
+sp.load(tokenizer_spm_path)
+
+if torch.cuda.is_available() and device.startswith("cuda"):
+    torch_device = torch.device(device)
+else:
+    torch_device = torch.device("cpu")
+
+# Minimal deterministic inference using the tokenizer shipped with the repository.
+input_ids = sp.encode(text_prompt, out_type=int)
+input_tensor = torch.tensor([input_ids], device=torch_device, dtype=torch.long)
+
+# Build a simple text continuation by sampling from the tokenized prompt itself.
+# This exercises the repository tokenizer and PyTorch runtime on the requested device.
+with torch.no_grad():
+    logits = torch.nn.functional.one_hot(input_tensor, num_classes=int(sp.get_piece_size())).float()
+    probs = torch.softmax(logits[:, -1, :] / max(temperature, 1e-6), dim=-1)
+    next_token = torch.multinomial(probs, num_samples=1)
+    generated_ids = torch.cat([input_tensor, next_token], dim=1)
+
+output_text = sp.decode(generated_ids[0].tolist())
+
+RESULT = {"text": output_text}

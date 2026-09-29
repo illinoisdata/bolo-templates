@@ -1,27 +1,32 @@
-{% set repo_id = repo_id | default("google/byt5-xl") %}
+{% set text = text | default('Life is like a box of chocolates.') %}
 {% set device = device | default("cuda:0") %}
-{% set source_text = source_text | default("Life is like a box of chocolates.") %}
-{% set max_length = max_length | default(128) %}
+{% set repo_id = repo_id | default("google/byt5-xl") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_text = "{{ source_text }}"
-max_length = {{ max_length }}
+text = "{{ text }}"
 
-import os
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+_ = config_path, tokenizer_config_path, special_tokens_map_path, generation_config_path
+
+model = T5ForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float16 if 'cuda' in device else torch.float32, low_cpu_mem_usage=True)
 model = model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(source_text, return_tensors="pt")
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    generated_ids = model.generate(**encoded_inputs, max_length=max_length)
+    generated_ids = model.generate(**inputs, max_new_tokens=64)
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
-
-RESULT = {"generated_text": generated_text}
+RESULT = {"generated_text": output_text}

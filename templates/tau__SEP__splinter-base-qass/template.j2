@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("tau/splinter-base-qass") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What is the answer?') %}
+{% set context = context | default('Splinter is a model pretrained in a self-supervised fashion for few-shot question answering. It was pretrained on raw texts and uses the QASS layer for question-aware span selection.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+from transformers import SplinterForQuestionAnswering
+
+model = SplinterForQuestionAnswering.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    use_fast=False,
+    vocab_file=vocab_path,
+)
+
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits[0]
+end_logits = outputs.end_logits[0]
+start_idx = int(torch.argmax(start_logits).item())
+end_idx = int(torch.argmax(end_logits).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+
+input_ids = inputs["input_ids"][0]
+answer = tokenizer.decode(input_ids[start_idx:end_idx + 1], skip_special_tokens=True)
+
+RESULT = {"answer": answer, "start_logits": start_logits.detach().cpu().numpy(), "end_logits": end_logits.detach().cpu().numpy()}

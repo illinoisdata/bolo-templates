@@ -1,0 +1,36 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Oncology-XLarge-770M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Mutations in KRAS gene drive oncogenic transformation. The tumor suppressor p53 pathway was disrupted. EGFR amplification promotes cancer cell proliferation. Loss of function of the PTEN gene is common in many cancers. The PI3K/AKT/mTOR pathway is a critical regulator of cell growth.') %}
+{% set labels = labels | default(['Amino_acid', 'Anatomical_system', 'Cancer', 'Cell', 'Cellular_component', 'Developing_anatomical_structure', 'Gene_or_gene_product', 'Immaterial_anatomical_entity', 'Multi-tissue_structure', 'Organ', 'Organism', 'Organism_subdivision', 'Organism_substance', 'Pathological_formation', 'Simple_chemical', 'Tissue']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+labels = {{ labels }}
+
+import os
+import json
+import torch
+from transformers import AutoTokenizer, MT5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+gliner_cfg_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+_ = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+model_dir = os.path.dirname(weights_path)
+
+gliner_cfg = json.load(open(gliner_cfg_path))
+encoder_name = gliner_cfg["encoder_config"]["_name_or_path"]
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False)
+model = MT5ForConditionalGeneration.from_pretrained(encoder_name).to(device)
+model.eval()
+
+prompt = text + "\nEntities: " + ", ".join(labels)
+inputs = tokenizer(prompt, return_tensors="pt", truncation=True).to(device)
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=64)
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+RESULT = {"output": output_text}

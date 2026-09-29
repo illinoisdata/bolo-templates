@@ -1,0 +1,59 @@
+{% set repo_id = repo_id | default("NakJun/Llama-3.2-1B-Instruct-korQuAD-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('아이브의 리더는 누구야?') %}
+{% set context = context | default('아이브(IVE)는 대한민국의 스타쉽 엔터테인먼트 소속의 6인조 걸그룹으로, 2021년 12월 1일에 데뷔했습니다. 그룹 이름인 IVE는 "I HAVE"에서 유래했으며, "내가 가진 것을 당당하게 보여주겠다"는 의미를 담고 있습니다. 멤버 구성: 안유진 (리더), 가을, 레이, 장원영, 리즈, 이서.') %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
+{% set temperature = temperature | default(0.1) %}
+{% set repetition_penalty = repetition_penalty | default(1.3) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = {{ question | tojson }}
+context = {{ context | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+repetition_penalty = {{ repetition_penalty }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float16 if str(device).startswith("cuda") else torch.float32,
+    device_map=None,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+prompt = f"""### Question:\n{question}\n### Context:\n{context}\n### Answer:\n"""
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        temperature=temperature,
+        repetition_penalty=repetition_penalty,
+        do_sample=True,
+        eos_token_id=tokenizer.eos_token_id,
+        pad_token_id=tokenizer.pad_token_id,
+    )
+
+generated_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+answer = generated_text.split("### Answer:")[-1].strip().splitlines()[0].strip()
+
+RESULT = {"answer": answer, "generated_text": generated_text}

@@ -1,27 +1,35 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("AgentPublic/dpr-ctx_encoder-fr_qa-camembert") %}
-{% set query_text = query_text | default("Quelle ville abrite la Tour Eiffel ?") %}
+{% set device = device | default("cuda:0") %}
+{% set query_text = query_text | default('Salut, mon chien est-il mignon ?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 query_text = "{{ query_text }}"
 
-from pathlib import Path
-
-import numpy as np
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id)
-model = model.to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+sentencepiece_path = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-encoding = tokenizer(query_text, return_tensors="pt")
-encoding = {k: v.to(device) for k, v in encoding.items()}
+device_obj = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    use_fast=True,
+)
+model = AutoModel.from_pretrained(repo_id, return_dict=True)
+model.to(device_obj)
+model.eval()
+
+inputs = tokenizer(query_text, return_tensors="pt")
+inputs = {k: v.to(device_obj) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**encoding)
-    embeddings_tensor = outputs.pooler_output
+    outputs = model(**inputs)
+    embeddings = outputs.pooler_output
 
-embeddings = embeddings_tensor.detach().cpu().numpy()
-
-RESULT = {"embeddings": embeddings}
+RESULT = {"embeddings": embeddings.detach().cpu().numpy()}

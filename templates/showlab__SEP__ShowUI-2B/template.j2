@@ -1,0 +1,93 @@
+{% set repo_id = repo_id | default("showlab/ShowUI-2B") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set query = query | default('Search the weather for New York city.') %}
+{% set split = split | default('web') %}
+{% set min_pixels = min_pixels | default(200704) %}
+{% set max_pixels = max_pixels | default(1053696) %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+query = "{{ query }}"
+split = "{{ split }}"
+min_pixels = {{ min_pixels }}
+max_pixels = {{ max_pixels }}
+max_new_tokens = {{ max_new_tokens }}
+
+import ast
+import requests
+import torch
+from PIL import Image
+from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
+from qwen_vl_utils import process_vision_info
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor = AutoProcessor.from_pretrained(repo_id, min_pixels=min_pixels, max_pixels=max_pixels)
+model = Qwen2VLForConditionalGeneration.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+model.eval()
+
+if isinstance(image_path, str) and image_path.startswith(("http://", "https://")):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+if split == "web":
+    action_space = """
+1. `CLICK`: Click on an element, value is not applicable and the position [x,y] is required. 
+2. `INPUT`: Type a string into an element, value is a string to type and the position [x,y] is required. 
+3. `SELECT`: Select a value for an element, value is not applicable and the position [x,y] is required. 
+4. `HOVER`: Hover on an element, value is not applicable and the position [x,y] is required.
+5. `ANSWER`: Answer the question, value is the answer and the position is not applicable.
+6. `ENTER`: Enter operation, value and position are not applicable.
+7. `SCROLL`: Scroll the screen, value is the direction to scroll and the position is not applicable.
+8. `SELECT_TEXT`: Select some text content, value is not applicable and position [[x1,y1], [x2,y2]] is the start and end position of the select operation.
+9. `COPY`: Copy the text, value is the text to copy and the position is not applicable.
+"""
+else:
+    action_space = """
+1. `INPUT`: Type a string into an element, value is a string to type and the position [x,y] is required. 
+2. `SWIPE`: Swipe the screen, value is not applicable and the position [[x1,y1], [x2,y2]] is the start and end position of the swipe operation.
+3. `TAP`: Tap on an element, value is not applicable and the position [x,y] is required.
+4. `ANSWER`: Answer the question, value is the status (e.g., 'task complete') and the position is not applicable.
+5. `ENTER`: Enter operation, value and position are not applicable.
+"""
+
+system_prompt = (
+    f"You are an assistant trained to navigate the {split} screen. \n"
+    f"Given a task instruction, a screen observation, and an action history sequence, \n"
+    f"output the next action and wait for the next observation. \nHere is the action space:\n{action_space}\n"
+    "Format the action as a dictionary with the following keys:\n"
+    "{'action': 'ACTION_TYPE', 'value': 'element', 'position': [x,y]}\n\n"
+    "If value or position is not applicable, set it as `None`.\n"
+    "Position might be [[x1,y1], [x2,y2]] if the action requires a start and end position.\n"
+    "Position represents the relative coordinates on the screenshot and should be scaled to a range of 0-1.\n"
+)
+
+messages = [{
+    "role": "user",
+    "content": [
+        {"type": "text", "text": system_prompt},
+        {"type": "text", "text": f"Task: {query}"},
+        {"type": "image", "image": image, "min_pixels": min_pixels, "max_pixels": max_pixels},
+    ],
+}]
+
+text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+image_inputs, video_inputs = process_vision_info(messages)
+inputs = processor(text=[text], images=image_inputs, videos=video_inputs, padding=True, return_tensors="pt")
+inputs = inputs.to(device)
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+generated_ids_trimmed = [out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)]
+output_text = processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
+
+RESULT = {"output_text": output_text}

@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("laion/CLIP-ViT-L-14-CommonPool.XL.laion-s13B-b90K") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set candidate_labels = candidate_labels | default(['a cat', 'a dog', 'a car', 'a person', 'a tree']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+candidate_labels = {{ candidate_labels }}
+
+import requests
+from PIL import Image
+import torch
+from huggingface_hub import hf_hub_download
+from open_clip import create_model_from_pretrained, get_tokenizer
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+model, preprocess = create_model_from_pretrained(
+    "ViT-L-14",
+    pretrained=weights_path,
+    device=device,
+)
+model.eval()
+
+image_tensor = preprocess(image).unsqueeze(0).to(device)
+
+tokenizer = get_tokenizer("ViT-L-14")
+text_tokens = tokenizer(candidate_labels).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_tensor)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logits = 100.0 * image_features @ text_features.T
+    probs = logits.softmax(dim=-1).squeeze(0)
+
+best_idx = int(torch.argmax(probs).item())
+RESULT = {
+    "candidate_labels": candidate_labels,
+    "probabilities": probs.detach().cpu().tolist(),
+    "predicted_label": candidate_labels[best_idx],
+}

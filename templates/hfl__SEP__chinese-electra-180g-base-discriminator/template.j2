@@ -1,40 +1,37 @@
 {% set repo_id = repo_id | default("hfl/chinese-electra-180g-base-discriminator") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("今天天气很好。我今天心情不错。") %}
-{% set max_length = max_length | default(128) %}
+{% set text = text | default('今天天气很好，适合出去散步。') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-max_length = {{ max_length }}
-
-from pathlib import Path
+text = "{{ text }}"
 
 import torch
-from transformers import AutoModelForPreTraining, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, ElectraForPreTraining
+
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+if device.startswith("cuda") and torch.cuda.is_available():
+    torch_device = torch.device(device)
+else:
+    torch_device = torch.device("cpu")
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+model = ElectraForPreTraining.from_pretrained(repo_id)
+model.to(torch_device)
 model.eval()
 
-encoding = tokenizer(
-    input_text,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-    max_length=max_length,
-)
-input_tensors = {key: tensor.to(device) for key, tensor in encoding.items()}
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(torch_device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    model_outputs = model(**input_tensors)
-
-logits = model_outputs.logits
-probabilities = torch.sigmoid(logits)
-
-result_logits = logits.cpu()
-result_probabilities = probabilities.cpu()
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probs = torch.sigmoid(logits)
+    token_scores = probs[0].detach().cpu().tolist()
 
 RESULT = {
-    "replaced_token_logits": result_logits,
-    "replaced_token_probabilities": result_probabilities,
+    "logits": logits.detach().cpu().tolist(),
+    "token_scores": token_scores,
 }

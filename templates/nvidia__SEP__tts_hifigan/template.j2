@@ -1,0 +1,28 @@
+{% set repo_id = repo_id | default("nvidia/tts_hifigan") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('You can type your sentence here to get nemo to produce speech.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+import tarfile
+import tempfile
+from pathlib import Path
+
+import torch
+import soundfile as sf
+from huggingface_hub import hf_hub_download
+
+import tarfile
+import tempfile
+from pathlib import Path
+
+import torch
+import soundfile as sf
+from huggingface_hub import hf_hub_download
+
+nemo_path = hf_hub_download(repo_id=repo_id, filename="tts_hifigan.nemo")
+with open(nemo_path, "rb") as f:
+    data = f.read()
+RESULT = {"nemo_bytes_len": len(data)}

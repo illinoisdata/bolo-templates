@@ -1,24 +1,28 @@
 {% set repo_id = repo_id | default("izumi-lab/electra-base-japanese-discriminator") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("東京大学で[MASK]の研究をしています。") %}
+{% set text = text | default('東京大学で[MASK]の研究をしています。') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
-from transformers import AutoTokenizer, AutoModelForPreTraining
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, ElectraForPreTraining
 import torch
-import os
-import json
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+if not weights_path:
+    weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = ElectraForPreTraining.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
 inputs = tokenizer(text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-outputs = model(**inputs)
-logits = outputs.logits
-probs = logits.sigmoid().squeeze().tolist()
-tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"].squeeze().tolist())
+with torch.no_grad():
+    outputs = model(**inputs)
 
-RESULT = {"tokens": tokens, "probs": probs}
+RESULT = {"logits": outputs.logits.detach().cpu()}

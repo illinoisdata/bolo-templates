@@ -1,24 +1,30 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("classla/bcms-bertic") %}
-{% set text = text | default("Primjer rečenice na bosanskom jeziku.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('BERTić je transformer jezični model za bosanski, hrvatski, crnogorski i srpski jezik.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = "{{ text }}"
+text = {{ text | tojson }}
 
-import os
-import json
 import torch
-from transformers import AutoTokenizer, AutoModelForPreTraining
+from huggingface_hub import hf_hub_download
+from transformers import ElectraTokenizer, ElectraForPreTraining
 
-device = torch.device(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-encoded = tokenizer(text, return_tensors="pt")
-encoded = {key: value.to(device) for key, value in encoded.items()}
+tokenizer = ElectraTokenizer(vocab_file=vocab_path)
+model = ElectraForPreTraining.from_pretrained(repo_id, local_files_only=True)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**encoded)
+    outputs = model(**inputs)
 
-logits = outputs.logits.cpu()
-RESULT = {"logits": logits.tolist()}
+RESULT = {
+    "logits": outputs.logits.detach().cpu().tolist(),
+}

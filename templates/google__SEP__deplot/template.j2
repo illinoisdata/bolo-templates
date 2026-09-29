@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("google/deplot") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set prompt = prompt | default('Generate underlying data table of the figure below:') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+
+import os
+from io import BytesIO
+from PIL import Image
+import requests
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import Pix2StructProcessor, Pix2StructForConditionalGeneration
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+processor = Pix2StructProcessor.from_pretrained(repo_id, use_fast=False)
+model = Pix2StructForConditionalGeneration.from_pretrained(repo_id)
+model = model.to(device)
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    image = Image.open(BytesIO(requests.get(image_path, stream=True).content)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+inputs = processor(images=image, text=prompt, return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    predictions = model.generate(**inputs, max_new_tokens=512)
+
+output_text = processor.decode(predictions[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

@@ -1,90 +1,62 @@
 {% set repo_id = repo_id | default("Neleac/SpaceTimeGPT") %}
 {% set device = device | default("cuda:0") %}
-{% set video_path = video_path | default("/u/yli77/projects/ML-code-generation/data/video.avi") %}
+{% set video_path = video_path | default('/u/yunqili4/projects/ML-code-generation/data/video.avi') %}
 {% set min_length = min_length | default(10) %}
 {% set max_length = max_length | default(20) %}
-{% set num_beams = num_beams | default(4) %}
-{% set image_processor_repo = image_processor_repo | default("facebook/timesformer-base-finetuned-k600") %}
-{% set tokenizer_repo = tokenizer_repo | default("gpt2") %}
+{% set num_beams = num_beams | default(8) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 video_path = "{{ video_path }}"
 min_length = {{ min_length }}
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-image_processor_repo = "{{ image_processor_repo }}"
-tokenizer_repo = "{{ tokenizer_repo }}"
 
-from io import BytesIO
-from pathlib import Path
-
-import av
+import os
 import numpy as np
-import requests
 import torch
+import av
+from PIL import Image
 from transformers import AutoImageProcessor, AutoTokenizer, VisionEncoderDecoderModel
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 
-processor = AutoImageProcessor.from_pretrained(image_processor_repo)
-tokenizer = AutoTokenizer.from_pretrained(tokenizer_repo)
-if tokenizer.pad_token_id is None:
-    tokenizer.pad_token_id = tokenizer.eos_token_id
-
-model = VisionEncoderDecoderModel.from_pretrained(repo_id).to(torch_device)
+image_processor = AutoImageProcessor.from_pretrained("facebook/timesformer-base-finetuned-k600")
+tokenizer = AutoTokenizer.from_pretrained("gpt2")
+model = VisionEncoderDecoderModel.from_pretrained(repo_id, local_files_only=True).to(device)
 model.eval()
 
-def _is_remote_path(path: str) -> bool:
-    lower_path = path.lower()
-    return lower_path.startswith("http://") or lower_path.startswith("https://")
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+if model.config.pad_token_id is None:
+    model.config.pad_token_id = tokenizer.pad_token_id
+if model.config.decoder_start_token_id is None:
+    model.config.decoder_start_token_id = tokenizer.bos_token_id or tokenizer.eos_token_id
 
-def _read_video_frames(source: str, target_frame_count: int):
-    target_frame_count = max(1, int(target_frame_count))
-    if _is_remote_path(source):
-        response = requests.get(source)
-        response.raise_for_status()
-        container = av.open(BytesIO(response.content))
-    else:
-        container = av.open(source)
-    frames = [frame.to_ndarray(format="rgb24") for frame in container.decode(video=0)]
-    container.close()
-    if not frames:
-        raise ValueError("No frames could be decoded from the provided video source.")
-    total_frames = len(frames)
-    max_index = total_frames - 1
-    indices = np.linspace(0, max_index, num=target_frame_count, dtype=np.int64)
-    return [frames[int(idx)] for idx in indices]
+if str(video_path).startswith(("http://", "https://")):
+    import requests
+    video_bytes = requests.get(video_path, timeout=30).content
+    container = av.open(video_bytes)
+else:
+    container = av.open(video_path)
 
-encoder_config = model.config.encoder
-expected_frames = getattr(encoder_config, "num_frames", None)
-expected_frames = int(expected_frames) if expected_frames is not None else 8
-video_frames = _read_video_frames(video_path, expected_frames)
+seg_len = container.streams.video[0].frames
+clip_len = model.config.encoder.num_frames
+indices = set(np.linspace(0, max(seg_len - 1, 0), num=clip_len, endpoint=True).astype(np.int64))
+frames = []
+container.seek(0)
+for i, frame in enumerate(container.decode(video=0)):
+    if i in indices:
+        frames.append(frame.to_ndarray(format="rgb24"))
 
-pixel_values = processor(video_frames, return_tensors="pt").pixel_values.to(torch_device)
+if len(frames) < clip_len:
+    last = frames[-1] if frames else np.zeros((224, 224, 3), dtype=np.uint8)
+    while len(frames) < clip_len:
+        frames.append(last)
 
-generation_kwargs = {
-    "max_length": max_length,
-    "min_length": min_length,
-    "num_beams": num_beams,
-    "early_stopping": True,
-}
-
-decoder_start_token_id = model.config.decoder_start_token_id
-if decoder_start_token_id is None:
-    decoder_start_token_id = tokenizer.eos_token_id
-
-eos_token_id = tokenizer.eos_token_id
-pad_token_id = tokenizer.pad_token_id
-
-with torch.no_grad():
-    generated_ids = model.generate(
-        pixel_values,
-        pad_token_id=pad_token_id,
-        eos_token_id=eos_token_id,
-        decoder_start_token_id=decoder_start_token_id,
-        **generation_kwargs,
-    )
-
-caption = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+pixel_values = image_processor(frames, return_tensors="pt").pixel_values.to(device)
+output_tokens = model.generate(pixel_values, min_length=min_length, max_length=max_length, num_beams=num_beams)
+caption = tokenizer.batch_decode(output_tokens, skip_special_tokens=True)[0]
 
 RESULT = {"caption": caption}

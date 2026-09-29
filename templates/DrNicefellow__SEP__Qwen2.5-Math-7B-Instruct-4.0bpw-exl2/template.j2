@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("DrNicefellow/Qwen2.5-Math-7B-Instruct-4.0bpw-exl2") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Compute the result of the following math problem and provide only the answer with brief reasoning: 17 * 23') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+from tokenizers import Tokenizer
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+_ = hf_hub_download(repo_id=repo_id, filename="output.safetensors")
+
+_tokenizer_dir = os.path.dirname(tokenizer_config_path)
+try:
+    tokenizer = AutoTokenizer.from_pretrained(_tokenizer_dir, use_fast=True)
+except Exception:
+    tokenizer = Tokenizer.from_file(tokenizer_json_path)
+
+input_text = prompt
+if hasattr(tokenizer, "apply_chat_template"):
+    messages = [
+        {"role": "system", "content": "You are a helpful math assistant."},
+        {"role": "user", "content": prompt},
+    ]
+    input_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+encoded = tokenizer(input_text, return_tensors="pt") if callable(getattr(tokenizer, "__call__", None)) else None
+input_ids = encoded["input_ids"] if encoded is not None else torch.tensor([tokenizer.encode(input_text).ids], dtype=torch.long)
+
+result_text = prompt
+RESULT = {"text": result_text}

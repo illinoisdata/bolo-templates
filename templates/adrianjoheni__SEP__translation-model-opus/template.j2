@@ -1,34 +1,33 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("adrianjoheni/translation-model-opus") %}
-{% set source_text = source_text | default("Hello, how are you doing today?") %}
-{% set max_length = max_length | default(128) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hello, how are you today?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_text = "{{ source_text }}"
-max_length = {{ max_length }}
+text = {{ text | tojson }}
 
+import os
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(
-    source_text,
-    return_tensors="pt",
-    truncation=True,
-    max_length=max_length,
-)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    generated_tokens = model.generate(**encoded_inputs)
+    generated_ids = model.generate(**inputs, num_beams=4, max_new_tokens=64)
 
-decoded_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-translation = decoded_texts[0] if decoded_texts else ""
+translated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-RESULT = {"translation": translation}
+RESULT = {"translation": translated_text}

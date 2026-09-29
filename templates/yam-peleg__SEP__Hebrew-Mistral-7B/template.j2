@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("yam-peleg/Hebrew-Mistral-7B") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") -%}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") -%}
+{% set tokenizer_repo = tokenizer_repo | default("mistralai/Mistral-7B-Instruct-v0.1") -%}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+tokenizer_repo = {{ tokenizer_repo | tojson }}
+
+from transformers import AutoTokenizer, pipeline
+
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_repo)
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt)

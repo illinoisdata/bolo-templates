@@ -1,45 +1,60 @@
-{% set repo_id = repo_id | default("microsoft/unispeech-sat-large") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set sample_rate = sample_rate | default(16000) %}
 {% set device = device | default("cuda:0") %}
-{% set audio_file = audio_file | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
+{% set repo_id = repo_id | default("microsoft/unispeech-sat-large") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-audio_file = "{{ audio_file }}"
+audio_path = "{{ audio_path }}"
+sample_rate = {{ sample_rate }}
 
-import requests
 import io
-import soundfile as sf
+import json
+import math
+import os
+import numpy as np
 import torch
-import torchaudio
-from transformers import AutoFeatureExtractor, AutoModelForPreTraining
+import soundfile as sf
+import torch.nn.functional as F
+from transformers import AutoModel
+from huggingface_hub import hf_hub_download
 
-# Load feature extractor and model
-feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-# Load and preprocess audio
-if audio_file.startswith("http"):  # URL
-    response = requests.get(audio_file)
-    audio_bytes = io.BytesIO(response.content)
-    speech_array, sampling_rate = sf.read(audio_bytes)
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+with open(preprocessor_path, "r") as f:
+    preprocessor_config = json.load(f)
+
+if audio_path.startswith(("http://", "https://")):
+    import requests
+    audio_bytes = requests.get(audio_path).content
+    waveform, file_sr = sf.read(io.BytesIO(audio_bytes))
 else:
-    speech_array, sampling_rate = sf.read(audio_file)
+    waveform, file_sr = sf.read(audio_path)
 
-# Resample if necessary
-expected_sr = feature_extractor.sampling_rate
-if sampling_rate != expected_sr:
-    resampler = torchaudio.transforms.Resample(orig_freq=sampling_rate, new_freq=expected_sr)
-    waveform = torch.from_numpy(speech_array).float()
-    if waveform.ndim == 1:
-        waveform = waveform.unsqueeze(0)
-    speech_array = resampler(waveform).squeeze(0).numpy()
-    sampling_rate = expected_sr
+if waveform.ndim > 1:
+    waveform = waveform.mean(axis=1)
 
-inputs = feature_extractor(speech_array, sampling_rate=sampling_rate, return_tensors="pt")
-inputs = {k: v.to(device) for k, v in inputs.items()}
+waveform = waveform.astype(np.float32)
+if file_sr != sample_rate:
+    ratio = sample_rate / file_sr
+    new_length = max(1, int(math.floor(len(waveform) * ratio)))
+    x_old = np.linspace(0, 1, num=len(waveform), endpoint=False)
+    x_new = np.linspace(0, 1, num=new_length, endpoint=False)
+    waveform = np.interp(x_new, x_old, waveform).astype(np.float32)
 
-# Run inference
+input_values = torch.tensor(waveform, dtype=torch.float32).unsqueeze(0).to(device)
+
+model = AutoModel.from_pretrained(repo_id, local_files_only=True).to(device)
+model.eval()
+
 with torch.no_grad():
-    outputs = model(**inputs)
+    outputs = model(input_values=input_values)
 
-# Post-process outputs to dict
-RESULT = vars(outputs)
+RESULT = {
+    "last_hidden_state": outputs.last_hidden_state.detach().cpu().numpy(),
+    "hidden_states": outputs.hidden_states,
+}

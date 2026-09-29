@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("visheratin/nllb-clip-base-siglip") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set class_options = class_options | default(['бабочка', 'butterfly', 'kat']) %}
+{% set class_langs = class_langs | default(['rus_Cyrl', 'eng_Latn', 'afr_Latn']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+class_options = {{ class_options }}
+class_langs = {{ class_langs }}
+
+import json
+import requests
+import torch
+import open_clip
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+model, _, preprocess = open_clip.create_model_and_transforms(
+    "nllb-clip-base-siglip",
+    pretrained=weights_path,
+    device=device,
+)
+
+tokenizer = open_clip.get_tokenizer("facebook/nllb-200-distilled-600M")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+text_inputs = []
+for text in class_options:
+    text_inputs.append(tokenizer(text))
+text_inputs = torch.stack(text_inputs).squeeze(1).to(device)
+
+image_inputs = preprocess(image).unsqueeze(0).to(device)
+
+with torch.inference_mode():
+    logits_per_image, logits_per_text = model.get_logits(image_inputs, text_inputs)
+    probs = logits_per_image.softmax(dim=-1)
+
+RESULT = {"probs": probs.detach().cpu().tolist(), "classes": class_options}

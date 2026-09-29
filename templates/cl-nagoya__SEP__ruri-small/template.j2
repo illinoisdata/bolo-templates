@@ -1,0 +1,31 @@
+{% set repo_id = repo_id | default("cl-nagoya/ruri-small") %}
+{% set device = device | default("cuda:0") %}
+{% set query_text = query_text | default("クエリ: 瑠璃色はどんな色？") %}
+{% set passage_text = passage_text | default("文章: 瑠璃色（るりいろ）は、紫みを帯びた濃い青。名は、半貴石の瑠璃（ラピスラズリ、英: lapis lazuli）による。JIS慣用色名では「こい紫みの青」（略号 dp-pB）と定義している[1][2]。") %}
+{% set query_text_2 = query_text_2 | default("クエリ: ワシやタカのように、鋭いくちばしと爪を持った大型の鳥類を総称して「何類」というでしょう?") %}
+{% set passage_text_2 = passage_text_2 | default("文章: ワシ、タカ、ハゲワシ、ハヤブサ、コンドル、フクロウが代表的である。これらの猛禽類はリンネ前後の時代(17~18世紀)には鷲類・鷹類・隼類及び梟類に分類された。ちなみにリンネは狩りをする鳥を単一の目(もく)にまとめ、vultur(コンドル、ハゲワシ)、falco(ワシ、タカ、ハヤブサなど)、strix(フクロウ)、lanius(モズ)の4属を含めている。") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query_text = "{{ query_text }}"
+passage_text = "{{ passage_text }}"
+query_text_2 = "{{ query_text_2 }}"
+passage_text_2 = "{{ passage_text_2 }}"
+
+import os
+import torch
+import torch.nn.functional as F
+from huggingface_hub import snapshot_download
+from sentence_transformers import SentenceTransformer
+
+local_dir = snapshot_download(repo_id=repo_id)
+model = SentenceTransformer(local_dir, trust_remote_code=True, device=device)
+
+sentences = [query_text, passage_text, query_text_2, passage_text_2]
+embeddings = model.encode(sentences, convert_to_tensor=True, device=device)
+similarities = F.cosine_similarity(embeddings.unsqueeze(0), embeddings.unsqueeze(1), dim=2)
+
+RESULT = {
+    "embeddings": embeddings,
+    "similarities": similarities,
+}

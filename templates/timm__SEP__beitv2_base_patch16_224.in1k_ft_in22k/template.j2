@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("timm/beitv2_base_patch16_224.in1k_ft_in22k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+repo_id = "{{ repo_id }}"
+task = "{{ task }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+from PIL import Image
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+raw_image = Image.open(image_path).convert("RGB")
+
+predictions = pipe(raw_image)
+RESULT = {"predictions": predictions}

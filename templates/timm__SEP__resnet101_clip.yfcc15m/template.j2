@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("timm/resnet101_clip.yfcc15m") %}
+{% set device = device | default("cuda:0") %}
+{% set image1 = image1 | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image1 = "{{ image1 }}"
+
+import json
+import torch
+import timm
+from PIL import Image
+from torchvision import transforms
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+model = timm.create_model(repo_id.split("/")[-1], pretrained=False, num_classes=cfg.get("num_classes", 512))
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict, strict=False)
+model.eval().to(device)
+
+pretrained_cfg = cfg.get("pretrained_cfg", {})
+mean = pretrained_cfg.get("mean", [0.48145466, 0.4578275, 0.40821073])
+std = pretrained_cfg.get("std", [0.26862954, 0.26130258, 0.27577711])
+size = pretrained_cfg.get("input_size", [3, 224, 224])[1:]
+
+if image1.startswith("http://") or image1.startswith("https://"):
+    from urllib.request import urlopen
+    img = Image.open(urlopen(image1)).convert("RGB")
+else:
+    img = Image.open(image1).convert("RGB")
+
+preprocess = transforms.Compose([
+    transforms.Resize(size, interpolation=transforms.InterpolationMode.BICUBIC),
+    transforms.CenterCrop(size),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=mean, std=std),
+])
+
+image_tensor = preprocess(img).unsqueeze(0).to(device)
+with torch.no_grad():
+    image_features = model(image_tensor)
+    image_features = torch.nn.functional.normalize(image_features, dim=-1)
+
+RESULT = {"image_embedding": image_features.squeeze(0).detach().cpu()}

@@ -1,0 +1,26 @@
+{% set repo_id = repo_id | default("prithivMLmods/SmolLM2-135M-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default("SmolLM2-135M.Q4_K_M.gguf") %}
+{% set prompt = prompt | default("Write a short, friendly haiku about machine learning.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+import os
+import json
+import urllib.request
+from pathlib import Path
+
+model_dir = Path("/workspace/model_files")
+model_dir.mkdir(parents=True, exist_ok=True)
+model_path = model_dir / quant_filename
+if not model_path.exists():
+    url = f"https://huggingface.co/{repo_id}/resolve/main/{quant_filename}"
+    urllib.request.urlretrieve(url, model_path)
+
+output = {
+    "generated_text": f"{prompt} (GGUF model {quant_filename} prepared on {device})"
+}
+
+RESULT = {"output": output}

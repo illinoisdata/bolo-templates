@@ -1,0 +1,15 @@
+{% set repo_id = repo_id | default("microsoft/BiomedVLP-CXR-BERT-specialized") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") -%}
+{% set masked_prompt = masked_prompt | default("Left pleural effusion with adjacent {mask}.") -%}
+task = {{ task | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device, trust_remote_code=True)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

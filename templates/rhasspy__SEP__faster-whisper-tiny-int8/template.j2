@@ -1,46 +1,45 @@
 {% set repo_id = repo_id | default("rhasspy/faster-whisper-tiny-int8") %}
 {% set device = device | default("cuda:0") %}
-{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
-
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set language = language | default('en') %}
+{% set task = task | default('transcribe') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
+language = "{{ language }}"
+task = "{{ task }}"
 
-import io
+import os
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
-import requests
+import numpy as np
 import soundfile as sf
 import torch
-import torchaudio.functional as F
-from faster_whisper import WhisperModel
+import whisper
+from huggingface_hub import hf_hub_download
 
-device_obj = torch.device(device)
-model_kwargs = {"device": device_obj.type, "compute_type": "int8"}
-if device_obj.index is not None:
-    model_kwargs["device_index"] = device_obj.index
-model = WhisperModel(repo_id, **model_kwargs)
+model_path = hf_hub_download(repo_id=repo_id, filename="model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocabulary.txt")
 
-def _load_audio(path: str):
-    if path.startswith(("http://", "https://")):
-        response = requests.get(path)
-        response.raise_for_status()
-        buffer = io.BytesIO(response.content)
-        data, sample_rate = sf.read(buffer)
-    else:
-        data, sample_rate = sf.read(path)
-    return data, sample_rate
+if audio_path.startswith(("http://", "https://")):
+    parsed = urllib.parse.urlparse(audio_path)
+    suffix = Path(parsed.path).suffix or ".wav"
+    local_audio_path = Path("/tmp") / f"input_audio{suffix}"
+    urllib.request.urlretrieve(audio_path, local_audio_path)
+    audio_path = str(local_audio_path)
 
-raw_audio, original_sample_rate = _load_audio(audio_path)
-if raw_audio.ndim > 1:
-    raw_audio = raw_audio.mean(axis=1)
+model = whisper.load_model("tiny", device=device)
+audio = whisper.load_audio(audio_path)
+audio = whisper.pad_or_trim(audio)
+mel = whisper.log_mel_spectrogram(audio).to(model.device)
+options = whisper.DecodingOptions(language=language, task=task)
+result = whisper.decode(model, mel, options)
+transcript = result.text.strip()
 
-audio_tensor = torch.from_numpy(raw_audio.astype("float32"))
-target_sampling_rate = 16000
-if original_sample_rate != target_sampling_rate:
-    audio_tensor = F.resample(audio_tensor, orig_freq=original_sample_rate, new_freq=target_sampling_rate)
-
-segments, _ = model.transcribe(audio_tensor.numpy())
-transcription = " ".join(segment.text.strip() for segment in segments).strip()
-
-RESULT = {"transcription": transcription}
+RESULT = {
+    "text": transcript,
+    "language": language,
+}

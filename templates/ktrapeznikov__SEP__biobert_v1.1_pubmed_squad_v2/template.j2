@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("ktrapeznikov/biobert_v1.1_pubmed_squad_v2") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What is BioBERT trained on?') %}
+{% set context = context | default('BioBERT is a language representation model that has been pre-trained on large-scale biomedical corpora, including PubMed abstracts and PMC full-text articles.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+model_dir = weights_path.rsplit("/", 1)[0]
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = AutoModelForQuestionAnswering.from_pretrained(model_dir, local_files_only=True)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits
+end_logits = outputs.end_logits
+start_index = int(torch.argmax(start_logits, dim=-1).item())
+end_index = int(torch.argmax(end_logits, dim=-1).item())
+if end_index < start_index:
+    end_index = start_index
+answer = tokenizer.decode(inputs["input_ids"][0, start_index:end_index + 1], skip_special_tokens=True).strip()
+
+RESULT = {"answer": answer, "start_index": start_index, "end_index": end_index}

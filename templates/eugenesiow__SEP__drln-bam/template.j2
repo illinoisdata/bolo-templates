@@ -1,79 +1,38 @@
 {% set repo_id = repo_id | default("eugenesiow/drln-bam") %}
 {% set device = device | default("cuda:0") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
 {% set scale = scale | default(2) %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set model_filename = model_filename | default('pytorch_model_2x.pt') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-image_path = "{{ image_path }}"
 scale = {{ scale }}
+image_path = "{{ image_path }}"
+model_filename = "{{ model_filename }}"
 
-from io import BytesIO
-from pathlib import Path
-
+import os
 import requests
 from PIL import Image
 import torch
+from huggingface_hub import hf_hub_download
 from super_image import DrlnModel, ImageLoader
 
-def _load_image_from_path_or_url(source: str) -> Image.Image:
-    lower_source = source.lower()
-    if lower_source.startswith("http://") or lower_source.startswith("https://"):
-        response = requests.get(source, stream=True)
-        response.raise_for_status()
-        return Image.open(BytesIO(response.content)).convert("RGB")
-    return Image.open(source).convert("RGB")
+model_path = hf_hub_download(repo_id=repo_id, filename=model_filename)
 
-def _move_to_device(value, device_str: str):
-    if isinstance(value, torch.Tensor):
-        return value.to(device_str)
-    if isinstance(value, dict):
-        return {key: _move_to_device(val, device_str) for key, val in value.items()}
-    if isinstance(value, (list, tuple)):
-        return type(value)(_move_to_device(item, device_str) for item in value)
-    return value
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
 
-def _extract_tensor_from_output(output):
-    if isinstance(output, torch.Tensor):
-        return output
-    if isinstance(output, dict):
-        for inner in output.values():
-            tensor = _extract_tensor_from_output(inner)
-            if tensor is not None:
-                return tensor
-    if isinstance(output, (list, tuple)):
-        for item in output:
-            tensor = _extract_tensor_from_output(item)
-            if tensor is not None:
-                return tensor
-    return None
-
-def _tensor_to_image(tensor: torch.Tensor) -> Image.Image:
-    tensor = tensor.detach().cpu()
-    if tensor.ndim == 4 and tensor.shape[0] == 1:
-        tensor = tensor.squeeze(0)
-    if tensor.ndim == 3:
-        pass
-    elif tensor.ndim == 2:
-        tensor = tensor.unsqueeze(0)
-    else:
-        raise ValueError("Expected tensor with 2 to 4 dimensions representing an image")
-    tensor = tensor.clamp(0, 1)
-    array = (tensor * 255).round().to(torch.uint8).permute(1, 2, 0).numpy()
-    if array.shape[2] == 1:
-        array = array[:, :, 0]
-    return Image.fromarray(array)
-
-image = _load_image_from_path_or_url(image_path)
-inputs = ImageLoader.load_image(image)
-model = DrlnModel.from_pretrained(repo_id, scale=scale).to(device)
+model = DrlnModel.from_pretrained(repo_id, scale=scale)
+state_dict = torch.load(model_path, map_location='cpu')
+if isinstance(state_dict, dict) and 'state_dict' in state_dict:
+    state_dict = state_dict['state_dict']
+model.load_state_dict(state_dict)
+model = model.to(device)
 model.eval()
+
+inputs = ImageLoader.load_image(image).to(device)
 with torch.no_grad():
-    inputs = _move_to_device(inputs, device)
-    raw_output = model(inputs)
+    preds = model(inputs)
 
-tensor_output = _extract_tensor_from_output(raw_output)
-if tensor_output is None:
-    raise ValueError("The model output did not contain a tensor to convert into an image")
-upscaled_image = _tensor_to_image(tensor_output)
-
-RESULT = {"upscaled_image": upscaled_image}
+RESULT = {"output": preds}

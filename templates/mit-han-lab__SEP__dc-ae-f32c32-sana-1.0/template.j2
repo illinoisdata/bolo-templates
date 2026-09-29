@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("mit-han-lab/dc-ae-f32c32-sana-1.0") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+{% set prompt = prompt | default("A detailed description of the image.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+
+import json
+import os
+from pathlib import Path
+from urllib.parse import urlparse
+
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+repo_config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+repo_weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(repo_config_path, "r") as f:
+    config = json.load(f)
+
+state_dict = load_file(repo_weights_path, device="cpu")
+
+img_source = image_path
+if urlparse(img_source).scheme in ("http", "https"):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(img_source, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(img_source).convert("RGB")
+
+width, height = image.size
+pixel_sum = int(torch.tensor(list(image.getdata()), dtype=torch.float32).sum().item())
+weight_numel = sum(v.numel() for v in state_dict.values())
+weight_keys = list(state_dict.keys())
+
+model_name = config.get("model_name", repo_id.split("/")[-1])
+
+RESULT = {
+    "model_name": model_name,
+    "image_size": [width, height],
+    "prompt": prompt,
+    "num_parameters_tensors": len(weight_keys),
+    "total_numel": int(weight_numel),
+    "pixel_sum": pixel_sum,
+    "first_weight_key": weight_keys[0] if weight_keys else None,
+}

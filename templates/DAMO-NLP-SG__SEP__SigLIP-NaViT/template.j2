@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("DAMO-NLP-SG/SigLIP-NaViT") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-feature-extraction") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+image_path = "{{ image_path }}"
+
+from transformers import pipeline
+
+# Load the pipeline with trust_remote_code since the model relies on custom repo code
+pipe = pipeline(task=task, model=repo_id, device=device, trust_remote_code=True)
+# Ensure merge_size attribute exists to satisfy custom preprocessing
+if not hasattr(pipe.image_processor, "merge_size"):
+    pipe.image_processor.merge_size = pipe.image_processor.patch_size
+# Run inference on the image
+RESULT = pipe(image_path)

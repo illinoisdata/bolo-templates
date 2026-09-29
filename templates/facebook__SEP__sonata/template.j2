@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("facebook/sonata") %}
+{% set device = device | default("cuda:0") %}
+{% set input_tensor = input_tensor | default('None') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_tensor = {{ input_tensor }}
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file as safe_load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+config = json.load(open(config_path, "r"))
+state_dict = safe_load_file(weights_path)
+
+class SonataNet(torch.nn.Module):
+    def __init__(self, in_channels=9, out_channels=9):
+        super().__init__()
+        self.net = torch.nn.Sequential(
+            torch.nn.Conv2d(in_channels, 64, kernel_size=3, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(64, 64, kernel_size=3, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(64, out_channels, kernel_size=1),
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+model = SonataNet(in_channels=config.get("in_channels", 9), out_channels=config.get("in_channels", 9))
+model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
+model.eval()
+
+if input_tensor is None:
+    input_tensor = torch.randn(1, config.get("in_channels", 9), 64, 64)
+elif isinstance(input_tensor, list):
+    input_tensor = torch.tensor(input_tensor)
+elif not torch.is_tensor(input_tensor):
+    input_tensor = torch.tensor(input_tensor)
+
+input_tensor = input_tensor.to(device)
+with torch.no_grad():
+    output = model(input_tensor)
+
+RESULT = {"output": output.cpu()}

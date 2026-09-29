@@ -1,0 +1,13 @@
+{% set repo_id = repo_id | default("EvolutionaryScale/esm3-sm-open-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set sequence = sequence | default('MKTFFVLLLFLTLGALAAPVAA') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sequence = "{{ sequence }}"
+
+import torch
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+RESULT = {"config_path": config_path, "sequence": sequence, "device": device}

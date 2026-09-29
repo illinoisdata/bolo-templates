@@ -1,0 +1,55 @@
+{% set repo_id = repo_id | default("SmilingWolf/wd-v1-4-convnextv2-tagger-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set threshold = threshold | default(0.5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+threshold = {{ threshold }}
+
+import os
+import requests
+import numpy as np
+from PIL import Image
+import onnxruntime as ort
+from huggingface_hub import hf_hub_download
+
+variables_path = hf_hub_download(repo_id=repo_id, filename="variables/variables.index")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.onnx")
+
+labels = []
+with open(variables_path, "r", encoding="latin-1") as f:
+    for line in f:
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split(",")
+        labels.append(parts[0])
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+image = image.resize((448, 448))
+image_array = np.asarray(image).astype(np.float32) / 255.0
+image_array = image_array[None, ...]
+
+providers = ["CPUExecutionProvider"]
+if device.startswith("cuda"):
+    providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+
+session = ort.InferenceSession(model_path, providers=providers)
+input_name = session.get_inputs()[0].name
+output = session.run(None, {input_name: image_array})[0]
+
+probs = 1.0 / (1.0 + np.exp(-output))
+flat = probs[0]
+pairs = list(zip(labels, flat.tolist()))
+selected = [
+    {"tag": tag, "score": float(score)}
+    for tag, score in sorted(pairs, key=lambda x: x[1], reverse=True)
+    if score >= threshold
+]
+
+RESULT = {"predictions": selected, "all_scores": {tag: float(score) for tag, score in pairs}}

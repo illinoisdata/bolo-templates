@@ -1,0 +1,14 @@
+{% set repo_id = repo_id | default("shi-labs/oneformer_coco_swin_large") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-segmentation") %}
+{% set input_image = input_image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_image = {{ input_image | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = pipe(input_image)

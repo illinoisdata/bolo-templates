@@ -1,78 +1,72 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("llava-hf/LLaVA-NeXT-Video-7B-hf") %}
-{% set video_path = video_path | default("/u/yli77/projects/ML-code-generation/data/video.avi") %}
-{% set prompt_text = prompt_text | default("Describe what happens in this video.") %}
-{% set num_frames = num_frames | default(8) %}
-{% set max_new_tokens = max_new_tokens | default(150) %}
+{% set device = device | default("cuda:0") %}
+{% set video_path = video_path | default('/u/yunqili4/projects/ML-code-generation/data/video.avi') %}
+{% set question = question | default('Why is this video interesting?') %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 video_path = "{{ video_path }}"
-prompt_text = "{{ prompt_text }}"
-num_frames = {{ num_frames }}
+question = "{{ question }}"
 max_new_tokens = {{ max_new_tokens }}
 
-from io import BytesIO
-from urllib.parse import urlparse
 import os
-
 import av
 import numpy as np
-import requests
 import torch
-from transformers import AutoProcessor, LlavaNextVideoForConditionalGeneration
+from urllib.parse import urlparse
+from huggingface_hub import hf_hub_download
+from transformers import LlavaNextVideoProcessor, LlavaNextVideoForConditionalGeneration
 
-processor = AutoProcessor.from_pretrained(repo_id)
-model = LlavaNextVideoForConditionalGeneration.from_pretrained(repo_id).to(device)
+processor = LlavaNextVideoProcessor.from_pretrained(repo_id)
+model = LlavaNextVideoForConditionalGeneration.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float16 if torch.cuda.is_available() and device.startswith("cuda") else torch.float32,
+    low_cpu_mem_usage=True,
+).to(device)
+model.eval()
 
-def _read_video_frames(path, frame_count):
-    parsed = urlparse(path)
-    is_url = parsed.scheme in {"http", "https"}
-    if is_url:
-        response = requests.get(path, stream=True)
-        response.raise_for_status()
-        buffer = BytesIO(response.content)
-        container = av.open(buffer)
+def load_video_frames(path, num_frames=8):
+    if urlparse(path).scheme in ("http", "https"):
+        import tempfile
+        import requests
+        suffix = os.path.splitext(urlparse(path).path)[1] or ".mp4"
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
+            f.write(requests.get(path, stream=True).content)
+            local_path = f.name
     else:
-        container = av.open(path)
-    try:
-        frames = [frame.to_ndarray(format="rgb24") for frame in container.decode(video=0)]
-    finally:
-        container.close()
-    if not frames:
-        raise ValueError("Video has no decodable frames.")
-    if len(frames) >= frame_count:
-        indices = np.linspace(0, len(frames) - 1, frame_count, dtype=int)
-        sampled_frames = [frames[i] for i in indices]
+        local_path = path
+    container = av.open(local_path)
+    stream = container.streams.video[0]
+    total_frames = stream.frames
+    if total_frames and total_frames > 0:
+        indices = np.linspace(0, total_frames - 1, num_frames).astype(int)
     else:
-        sampled_frames = frames.copy()
-        last_frame = frames[-1]
-        while len(sampled_frames) < frame_count:
-            sampled_frames.append(last_frame.copy())
-    return np.stack(sampled_frames)
-
-video_array = _read_video_frames(video_path, num_frames)
+        indices = np.arange(num_frames)
+    frames = []
+    wanted = set(indices.tolist())
+    container.seek(0)
+    for i, frame in enumerate(container.decode(video=0)):
+        if i > indices[-1]:
+            break
+        if i in wanted:
+            frames.append(frame.to_ndarray(format="rgb24"))
+    return np.stack(frames)
 
 conversation = [
     {
         "role": "user",
         "content": [
-            {"type": "text", "text": prompt_text},
+            {"type": "text", "text": question},
             {"type": "video"},
         ],
-    },
+    }
 ]
 prompt = processor.apply_chat_template(conversation, add_generation_prompt=True)
-inputs = processor(
-    text=prompt,
-    videos=video_array,
-    num_frames=num_frames,
-    padding=True,
-    return_tensors="pt",
-).to(device)
-
+video = load_video_frames(video_path, num_frames=8)
+inputs = processor(text=prompt, videos=video, return_tensors="pt", padding=True)
+inputs = {k: v.to(device) if torch.is_tensor(v) else v for k, v in inputs.items()}
 with torch.inference_mode():
-    generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
+    output_ids = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
+output_text = processor.batch_decode(output_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
 
-generated_text = processor.decode(generated_ids[0], skip_special_tokens=True)
-
-RESULT = {"generated_text": generated_text}
+RESULT = {"generated_text": output_text}

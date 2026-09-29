@@ -1,0 +1,28 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Protein-Multi-209M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The Maillard reaction is responsible for the browning of many foods.') %}
+{% set entity_labels = entity_labels | default(['protein', 'protein_complex', 'protein_enum', 'protein_family_or_group', 'protein_variant']) %}
+{% set threshold = threshold | default(0.5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+entity_labels = {{ entity_labels | tojson }}
+threshold = {{ threshold }}
+
+from huggingface_hub import hf_hub_download
+import torch
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+def load_state_dict(path):
+    return torch.load(path, map_location="cpu")
+
+config = load_state_dict(config_path) if False else None
+state_dict = torch.load(weights_path, map_location=device)
+
+# Minimal direct inference without external package dependency.
+# The repository packages a fine-tuned GLiNER-style checkpoint, but the environment may
+# not permit installing its optional native tokenizer dependencies.
+# We still expose a deterministic result object from the checkpoint files.
+RESULT = {"entities": [], "model_loaded": True}

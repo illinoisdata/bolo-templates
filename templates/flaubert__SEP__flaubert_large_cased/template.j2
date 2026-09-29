@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("flaubert/flaubert_large_cased") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+import os
+
+_ld_paths = ["/workspace/.pip/nvidia/cu13/lib", "/workspace/.pip/torchvision.libs"]
+_ld_paths = [p for p in _ld_paths if p]
+_existing_ld = os.environ.get("LD_LIBRARY_PATH")
+if _existing_ld:
+    _ld_paths.append(_existing_ld)
+os.environ["LD_LIBRARY_PATH"] = ":".join(_ld_paths)
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+_transformer = getattr(pipe.model, "transformer", None)
+if _transformer is not None:
+    _transformer.pre_norm = False
+    _transformer.config.pre_norm = False
+pipe.model.config.pre_norm = False
+
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+_result = pipe(text)
+RESULT = {"outputs": _result}

@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("timm/PE-Core-L-14-336") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set labels_list = labels_list | default(['a dog', 'a cat', 'a donut', 'a beignet']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+labels_list = {{ labels_list }}
+
+import os
+import torch
+from PIL import Image
+from urllib.request import urlopen
+import open_clip
+
+from huggingface_hub import hf_hub_download
+
+model_weights = hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_cfg_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+if str(image_path).startswith("http://") or str(image_path).startswith("https://"):
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model, _, preprocess = open_clip.create_model_and_transforms(f"hf-hub:{repo_id}")
+tokenizer = open_clip.get_tokenizer(f"hf-hub:{repo_id}")
+model = model.to(device)
+model.eval()
+
+image_input = preprocess(image).unsqueeze(0).to(device)
+text = tokenizer(labels_list, context_length=model.context_length).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_input, normalize=True)
+    text_features = model.encode_text(text, normalize=True)
+    text_probs = (100.0 * image_features @ text_features.T).softmax(dim=-1)
+
+output = list(zip(labels_list, [float(p) for p in text_probs[0].detach().cpu().tolist()]))
+
+RESULT = {"predictions": output}

@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("flair/ner-french") %}
+{% set device = device | default("cuda:0") %}
+{% set sentence_text = sentence_text | default('George Washington est allé à Washington') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sentence_text = "{{ sentence_text }}"
+
+from huggingface_hub import hf_hub_download
+import torch
+from flair.data import Sentence
+from flair.models import SequenceTagger
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+device_obj = torch.device(device)
+
+tagger = SequenceTagger.load(weights_path)
+tagger.to(device_obj)
+
+sentence = Sentence(sentence_text)
+tagger.predict(sentence)
+
+entities = []
+for span in sentence.get_spans("ner"):
+    entities.append({
+        "text": span.text,
+        "tag": span.get_label("ner").value,
+        "score": float(span.get_label("ner").score),
+        "start": span.start_position,
+        "end": span.end_position,
+    })
+
+RESULT = {"sentence": sentence.to_plain_string(), "entities": entities}

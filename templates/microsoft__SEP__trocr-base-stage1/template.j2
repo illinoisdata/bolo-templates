@@ -1,9 +1,0 @@
-{% set device = device | default("cuda:0") %}
-{% set repo_id = repo_id | default("microsoft/trocr-base-stage1") %}
-repo_id = "{{ repo_id }}"
-
-import torch
-from transformers import VisionEncoderDecoderModel
-
-model = VisionEncoderDecoderModel.from_pretrained(repo_id)
-print(model.decoder)

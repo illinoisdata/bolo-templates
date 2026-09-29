@@ -1,0 +1,63 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("Kansallisarkisto/multicentury-htr-model-onnx") %}
+{% set device = device | default("cuda:0") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+max_new_tokens = {{ max_new_tokens }}
+
+import os
+import numpy as np
+from PIL import Image
+import requests
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+from transformers import TrOCRProcessor, VisionEncoderDecoderConfig, ViTImageProcessor, XLMRobertaTokenizerFast
+import onnxruntime
+
+encoder_path = hf_hub_download(repo_id=repo_id, filename="encoder_model.onnx")
+decoder_path = hf_hub_download(repo_id=repo_id, filename="decoder_model.onnx")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+repo_dir = os.path.dirname(preprocessor_path)
+encoder_data_path = hf_hub_download(repo_id=repo_id, filename="encoder_model.onnx.data")
+decoder_data_path = hf_hub_download(repo_id=repo_id, filename="decoder_model.onnx.data")
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processor = TrOCRProcessor(image_processor=ViTImageProcessor.from_pretrained(repo_dir), tokenizer=XLMRobertaTokenizerFast.from_pretrained(repo_dir))
+config = VisionEncoderDecoderConfig.from_json_file(config_path)
+
+so = onnxruntime.SessionOptions()
+so.intra_op_num_threads = 1
+so.inter_op_num_threads = 1
+providers = ["CPUExecutionProvider"]
+
+encoder = onnxruntime.InferenceSession(encoder_path, sess_options=so, providers=providers)
+decoder = onnxruntime.InferenceSession(decoder_path, sess_options=so, providers=providers)
+
+pixel_values = processor(images=image, return_tensors="np").pixel_values
+encoder_outputs = encoder.run(None, {"pixel_values": pixel_values})[0]
+
+batch_size = pixel_values.shape[0]
+decoder_input_ids = np.full((batch_size, 1), config.decoder_start_token_id, dtype=np.int64)
+finished = np.zeros(batch_size, dtype=bool)
+
+for _ in range(max_new_tokens):
+    outputs = decoder.run(None, {"input_ids": decoder_input_ids, "encoder_hidden_states": encoder_outputs})[0]
+    next_token_logits = outputs[:, -1, :]
+    next_tokens = np.argmax(next_token_logits, axis=-1)
+    just_finished = next_tokens == config.eos_token_id
+    finished = finished | just_finished
+    next_tokens[finished] = config.pad_token_id
+    decoder_input_ids = np.concatenate([decoder_input_ids, next_tokens[:, None]], axis=1)
+    if np.all(finished):
+        break
+
+text = processor.tokenizer.batch_decode(decoder_input_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
+RESULT = {"text": text}

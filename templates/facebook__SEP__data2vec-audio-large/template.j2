@@ -1,0 +1,27 @@
+{% set repo_id = repo_id | default("facebook/data2vec-audio-large") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("automatic-speech-recognition") %}
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+{% set tokenizer_repo = tokenizer_repo | default("facebook/wav2vec2-base-960h") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+audio_path = "{{ audio_path }}"
+tokenizer_repo = "{{ tokenizer_repo }}"
+
+from transformers import pipeline, AutoFeatureExtractor, AutoTokenizer
+
+# Load feature extractor, tokenizer, and pipeline
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_repo)
+pipe = pipeline(task=task, model=repo_id, feature_extractor=feature_extractor, tokenizer=tokenizer, device=device)
+
+# Pre-process input
+inputs = audio_path
+
+# Run inference
+result = pipe(inputs)
+
+# Post-process & build RESULT dict
+RESULT = result

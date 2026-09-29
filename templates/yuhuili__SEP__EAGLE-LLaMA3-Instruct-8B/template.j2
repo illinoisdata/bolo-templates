@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("yuhuili/EAGLE-LLaMA3-Instruct-8B") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set model = model | default(repo_id) %}
+{% set tokenizer_repo = tokenizer_repo | default("hf-internal-testing/llama-tokenizer") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+tokenizer_repo = {{ tokenizer_repo | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer_repo, device=device)
+RESULT = pipe(input_prompt)

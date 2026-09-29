@@ -1,29 +1,37 @@
+{% set prompt = prompt | default('parse the scene graph from the following description: A person riding a bicycle next to a dog in a park.') %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set num_beams = num_beams | default(4) %}
 {% set repo_id = repo_id | default("lizhuang144/flan-t5-base-VG-factual-sg") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("A man playing guitar on a stage.") %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-max_length = {{ max_length }}
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
-import os
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spm_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-# Pre-process input
-inputs = tokenizer(input_text, return_tensors="pt")
+_tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+inputs = _tokenizer(prompt, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Run inference
-generated_ids = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+with torch.no_grad():
+    generated = model.generate(**inputs, max_new_tokens=max_new_tokens, num_beams=num_beams)
 
-# Post-process & build RESULT dict
-generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-RESULT = {"generated_text": generated_text}
+decoded = _tokenizer.batch_decode(generated, skip_special_tokens=True)
+output_text = decoded[0] if decoded else ""
+
+RESULT = {"output": output_text}

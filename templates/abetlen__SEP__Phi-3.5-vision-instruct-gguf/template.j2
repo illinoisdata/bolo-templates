@@ -1,0 +1,26 @@
+{% set repo_id = repo_id | default("abetlen/Phi-3.5-vision-instruct-gguf") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('Phi-3.5-3.8B-vision-instruct-Q8_0.gguf') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set prompt = prompt | default('Describe this image in detail.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+
+from PIL import Image
+import requests
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+RESULT = {
+    'image_size': image.size,
+    'prompt': prompt,
+    'device': device,
+    'repo_id': repo_id,
+    'quant_filename': quant_filename,
+}

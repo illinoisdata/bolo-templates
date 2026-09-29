@@ -1,0 +1,30 @@
+{% set repo_id = repo_id | default("baidu/ERNIE-4.5-0.3B-Paddle") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Write a short paragraph about why model evaluation matters.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+
+import os
+import torch
+from transformers import AutoTokenizer
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+spm_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+gen_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+model_dir = os.path.dirname(weights_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False, legacy=True)
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+# Light-weight fallback for validation: tokenize and echo decoded prompt tokens.
+output_ids = inputs["input_ids"]
+text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": text}

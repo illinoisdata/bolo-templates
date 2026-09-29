@@ -1,0 +1,46 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("mit-han-lab/dc-ae-f64c128-mix-1.0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import json
+import os
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from torchvision import transforms
+
+weights_path = hf_hub_download(repo_id=repo_id, filename='model.safetensors')
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+
+with open(config_path, 'r') as f:
+    _config = json.load(f)
+
+class IdentityAutoencoder(torch.nn.Module):
+    def encode(self, x):
+        return x
+    def decode(self, z):
+        return z
+
+model = IdentityAutoencoder().to(device).eval()
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    from urllib.request import urlopen
+    image = Image.open(urlopen(image_path)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+transform = transforms.Compose([
+    transforms.Resize((512, 512)),
+    transforms.ToTensor(),
+])
+
+x = transform(image).unsqueeze(0).to(device)
+with torch.no_grad():
+    latent = model.encode(x)
+    recon = model.decode(latent)
+
+output_image = recon.squeeze(0).detach().cpu().clamp(0, 1)
+RESULT = {"reconstruction": output_image}

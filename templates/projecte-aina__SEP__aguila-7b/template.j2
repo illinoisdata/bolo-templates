@@ -1,0 +1,71 @@
+{% set repo_id = repo_id | default("projecte-aina/aguila-7b") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set model_id = model_id | default(repo_id) %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+task = {{ task | tojson }}
+model_id = {{ model_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+import importlib.util
+import sys
+import types
+from pathlib import Path
+
+import torch
+from huggingface_hub import snapshot_download
+from transformers import AutoTokenizer, GenerationMixin, pipeline
+
+model_repo_path = Path(snapshot_download(repo_id=model_id, repo_type="model"))
+package_name = "hf_{}".format(model_id.replace("/", "__"))
+package_module = types.ModuleType(package_name)
+package_module.__path__ = [str(model_repo_path)]
+sys.modules[package_name] = package_module
+
+config_spec = importlib.util.spec_from_file_location(
+    f"{package_name}.configuration_RW",
+    model_repo_path / "configuration_RW.py",
+)
+config_module = importlib.util.module_from_spec(config_spec)
+sys.modules[config_spec.name] = config_module
+config_spec.loader.exec_module(config_module)
+
+modelling_spec = importlib.util.spec_from_file_location(
+    f"{package_name}.modelling_RW",
+    model_repo_path / "modelling_RW.py",
+)
+modelling_module = importlib.util.module_from_spec(modelling_spec)
+sys.modules[modelling_spec.name] = modelling_module
+modelling_spec.loader.exec_module(modelling_module)
+RWForCausalLM = modelling_module.RWForCausalLM
+RWModel = modelling_module.RWModel
+
+class RWForCausalLMWithGeneration(RWForCausalLM, GenerationMixin):
+    pass
+
+model_class = RWForCausalLMWithGeneration
+model_class.can_generate = classmethod(lambda cls: True)
+
+def _rw_get_head_mask(self, head_mask, num_hidden_layers):
+    if head_mask is None:
+        return [None] * num_hidden_layers
+    return head_mask
+
+RWModel.get_head_mask = _rw_get_head_mask
+
+tokenizer = AutoTokenizer.from_pretrained(model_repo_path)
+model = model_class.from_pretrained(model_repo_path)
+
+target_device = torch.device(device)
+model = model.to(target_device)
+if target_device.type == "cuda":
+    pipeline_device = target_device.index if target_device.index is not None else 0
+else:
+    pipeline_device = -1
+
+prompt = input_prompt
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=pipeline_device)
+RESULT = {"generated": pipe(prompt)}

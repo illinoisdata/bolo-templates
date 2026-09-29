@@ -1,31 +1,35 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("google/bert2bert_L-24_wmt_de_en") %}
-{% set input_text = input_text | default("Willst du einen Kaffee trinken gehen mit mir?") %}
-{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set device = device | default("cuda:0") %}
+{% set sentence = sentence | default('Willst du einen Kaffee trinken gehen mit mir?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-max_new_tokens = {{ max_new_tokens }}
+sentence = "{{ sentence }}"
 
-import os
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
 tokenizer = AutoTokenizer.from_pretrained(
     repo_id,
+    vocab_file=vocab_path,
     pad_token="<pad>",
     eos_token="</s>",
     bos_token="<s>",
 )
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = model.to(device)
 model.eval()
 
-inputs = tokenizer(input_text, return_tensors="pt", add_special_tokens=False)
-input_ids = inputs.input_ids.to(torch_device)
+inputs = tokenizer(sentence, return_tensors="pt", add_special_tokens=False)
+inputs = {k: v.to(device) for k, v in inputs.items() if k != "token_type_ids"}
 
 with torch.no_grad():
-    generated_ids = model.generate(input_ids, max_new_tokens=max_new_tokens)
+    output_ids = model.generate(**inputs)
 
-translation = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
-RESULT = {"translation": translation}
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"translation": output_text}

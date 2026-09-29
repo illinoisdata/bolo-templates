@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("ai21labs/Jamba-tiny-dev") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Write a short, friendly haiku about debugging.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+# Load tokenizer and model
+# Jamba supports standard causal LM loading via AutoModelForCausalLM.
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=False)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+    trust_remote_code=False,
+)
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=32,
+        do_sample=False,
+        pad_token_id=tokenizer.eos_token_id,
+    )
+
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+RESULT = {"text": output_text}

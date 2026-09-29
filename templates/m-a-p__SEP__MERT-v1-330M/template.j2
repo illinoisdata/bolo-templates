@@ -1,0 +1,82 @@
+{% set repo_id = repo_id | default("m-a-p/MERT-v1-330M") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+{% set custom_code_download_dir = custom_code_download_dir | default("/workspace/m-a-p-mert-v1-code") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+audio_path = "{{ audio_path }}"
+custom_code_download_dir = "{{ custom_code_download_dir }}"
+
+import json
+import sys
+import importlib
+from pathlib import Path
+
+import torch
+import soundfile as sf
+from huggingface_hub import hf_hub_download
+from transformers import pipeline, Wav2Vec2FeatureExtractor
+
+code_dir = Path(custom_code_download_dir)
+code_dir.mkdir(parents=True, exist_ok=True)
+package_dir = code_dir / "m_a_p_MERT_v1_330M"
+package_dir.mkdir(parents=True, exist_ok=True)
+
+
+def fetch_repo_file(filename: str) -> Path:
+    return Path(
+        hf_hub_download(
+            repo_id=repo_id,
+            filename=filename,
+            cache_dir=str(code_dir),
+        )
+    )
+
+file_paths = {
+    filename: fetch_repo_file(filename)
+    for filename in ("configuration_MERT.py", "modeling_MERT.py", "config.json")
+}
+
+for filename, src_path in file_paths.items():
+    dest_path = package_dir / filename
+    if not dest_path.exists() or dest_path.stat().st_size == 0:
+        dest_path.write_bytes(src_path.read_bytes())
+init_file = package_dir / "__init__.py"
+if not init_file.exists():
+    init_file.write_text("")
+
+if str(code_dir) not in sys.path:
+    sys.path.insert(0, str(code_dir))
+
+configuration_module = importlib.import_module("m_a_p_MERT_v1_330M.configuration_MERT")
+modeling_module = importlib.import_module("m_a_p_MERT_v1_330M.modeling_MERT")
+
+config_dict = json.loads((package_dir / "config.json").read_text())
+config = configuration_module.MERTConfig(**config_dict)
+feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(repo_id)
+model = modeling_module.MERTModel.from_pretrained(repo_id, config=config)
+
+torch_device = torch.device(device)
+model = model.to(torch_device)
+
+if torch_device.type == "cpu":
+    pipeline_device = -1
+else:
+    pipeline_device = torch_device.index if torch_device.index is not None else 0
+
+# Pre-process input audio
+audio_array, sr = sf.read(audio_path)
+
+def preprocess_fn(audio, **kwargs):
+    return feature_extractor(audio, sampling_rate=config.sample_rate, return_tensors="pt")
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=preprocess_fn,
+    device=pipeline_device,
+)
+RESULT = pipe(audio_array)

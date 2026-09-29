@@ -1,66 +1,73 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 {% set repo_id = repo_id | default("usyd-community/vitpose-base-simple") %}
 {% set device = device | default("cuda:0") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set pose_score_threshold = pose_score_threshold | default(0.3) %}
+{% set threshold = threshold | default(0.3) %}
+{% set max_people = max_people | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-pose_score_threshold = {{ pose_score_threshold }}
+threshold = {{ threshold }}
+max_people = {{ max_people }}
 
-from pathlib import Path
 import json
-from typing import List, Dict
-
-import numpy as np
-import requests
+import os
 import torch
+import requests
 from PIL import Image
-from transformers import AutoProcessor
-from transformers.models.vitpose import VitPoseForPoseEstimation
+from huggingface_hub import hf_hub_download
+from transformers import AutoProcessor, VitPoseForPoseEstimation, RTDetrForObjectDetection
 
-if image_path.startswith("http://") or image_path.startswith("https://"):
+if str(image_path).startswith(("http://", "https://")):
     image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
 else:
     image = Image.open(image_path).convert("RGB")
 
+person_detector_id = "PekingU/rtdetr_r50vd_coco_o365"
+person_image_processor = AutoProcessor.from_pretrained(person_detector_id)
+person_model = RTDetrForObjectDetection.from_pretrained(person_detector_id)
+person_model.to(device)
+person_model.eval()
+
+person_inputs = person_image_processor(images=image, return_tensors="pt")
+person_inputs = {k: v.to(device) for k, v in person_inputs.items()}
+with torch.no_grad():
+    person_outputs = person_model(**person_inputs)
+
+person_results = person_image_processor.post_process_object_detection(
+    person_outputs,
+    target_sizes=torch.tensor([(image.height, image.width)], device=device),
+    threshold=threshold,
+)
+result = person_results[0]
+labels = result["labels"]
+boxes = result["boxes"]
+person_boxes = boxes[labels == 0]
+if person_boxes.numel() == 0:
+    person_boxes = boxes[:1]
+person_boxes = person_boxes[:max_people].detach().cpu().numpy()
+person_boxes[:, 2] = person_boxes[:, 2] - person_boxes[:, 0]
+person_boxes[:, 3] = person_boxes[:, 3] - person_boxes[:, 1]
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 processor = AutoProcessor.from_pretrained(repo_id)
-model = VitPoseForPoseEstimation.from_pretrained(repo_id).to(device)
+model = VitPoseForPoseEstimation.from_pretrained(repo_id, local_files_only=True)
+model.to(device)
 model.eval()
 
-width, height = image.size
-full_box = np.array([[0.0, 0.0, float(width), float(height)]], dtype=np.float32)
-inputs = processor(image, boxes=[full_box], return_tensors="pt").to(device)
-
+inputs = processor(images=image, boxes=[person_boxes], return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
     outputs = model(**inputs)
 
-pose_results = processor.post_process_pose_estimation(
-    outputs, boxes=[full_box], threshold=pose_score_threshold
-)
+pose_results = processor.post_process_pose_estimation(outputs, boxes=[person_boxes], threshold=threshold)
 image_pose_result = pose_results[0]
-pose_estimations: List[Dict[str, object]] = []
-
+output = []
 for person_pose in image_pose_result:
-    keypoints_tensor = person_pose["keypoints"]
-    scores_tensor = person_pose["scores"]
-    labels_tensor = person_pose["labels"]
-    box_tensor = person_pose.get("box")
-
-    keypoint_names = []
-    for label in labels_tensor:
-        label_idx = int(label.item())
-        name = model.config.id2label.get(str(label_idx), str(label_idx))
-        keypoint_names.append(name)
-
-    pose_dict: Dict[str, object] = {
-        "keypoints": keypoints_tensor.tolist(),
-        "scores": scores_tensor.tolist(),
-        "keypoint_names": keypoint_names,
+    person = {
+        "keypoints": person_pose["keypoints"].detach().cpu().tolist(),
+        "labels": person_pose["labels"].detach().cpu().tolist(),
+        "scores": person_pose["scores"].detach().cpu().tolist(),
     }
+    output.append(person)
 
-    if box_tensor is not None:
-        pose_dict["box"] = box_tensor.tolist()
-
-    pose_estimations.append(pose_dict)
-
-RESULT = {"pose_estimations": pose_estimations}
+RESULT = {"output": output}

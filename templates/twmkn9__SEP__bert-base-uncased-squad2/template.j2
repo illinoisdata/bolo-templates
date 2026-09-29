@@ -1,0 +1,52 @@
+{% set repo_id = repo_id | default("twmkn9/bert-base-uncased-squad2") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default("What model is this based on?") %}
+{% set context = context | default("This model is BERT base uncased trained on SQuAD v2.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+local_files_only = True
+
+tokenizer = AutoTokenizer.from_pretrained(
+    os.path.dirname(vocab_path),
+    use_fast=True,
+    local_files_only=local_files_only,
+)
+model = AutoModelForQuestionAnswering.from_pretrained(
+    os.path.dirname(weights_path),
+    local_files_only=local_files_only,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits[0]
+end_logits = outputs.end_logits[0]
+start_idx = int(torch.argmax(start_logits).item())
+end_idx = int(torch.argmax(end_logits).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+
+input_ids = inputs["input_ids"][0]
+answer_tokens = input_ids[start_idx:end_idx + 1]
+answer = tokenizer.decode(answer_tokens, skip_special_tokens=True).strip()
+
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx}

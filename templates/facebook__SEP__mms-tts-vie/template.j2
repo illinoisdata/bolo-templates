@@ -1,27 +1,27 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("facebook/mms-tts-vie") %}
-{% set text_input = text_input | default("Xin chào! Đây là một ví dụ tạo giọng nói tiếng Việt.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Xin chào, đây là một ví dụ tổng hợp giọng nói tiếng Việt.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+text = "{{ text }}"
 
-from pathlib import Path
-
-import numpy as np
-import scipy.io.wavfile
 import torch
-from transformers import AutoTokenizer, VitsModel
+from transformers import VitsModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
 
-model = VitsModel.from_pretrained(repo_id).to(device)
-model.eval()
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
 
-tokenized_inputs = tokenizer(text_input, return_tensors="pt")
-tokenized_inputs = {key: value.to(device) for key, value in tokenized_inputs.items()}
+model = VitsModel.from_pretrained(repo_id, local_files_only=True).to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    model_outputs = model(**tokenized_inputs)
+    waveform = model(**inputs).waveform
 
-waveform = model_outputs.waveform.squeeze(0).cpu().numpy()
-
-RESULT = {"waveform": waveform}
+RESULT = {"waveform": waveform.detach().cpu().numpy(), "sampling_rate": model.config.sampling_rate}

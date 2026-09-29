@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("facebook/xmod-base") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set language = language | default("en_XX") %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+language = {{ language | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+pipe.model.set_default_language(language)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

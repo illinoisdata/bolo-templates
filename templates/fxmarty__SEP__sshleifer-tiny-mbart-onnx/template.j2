@@ -1,0 +1,67 @@
+{% set repo_id = repo_id | default("fxmarty/sshleifer-tiny-mbart-onnx") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hello world! This is a tiny MBART ONNX test.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import json
+import numpy as np
+import onnxruntime as ort
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+encoder_path = hf_hub_download(repo_id=repo_id, filename="encoder_model.onnx")
+decoder_path = hf_hub_download(repo_id=repo_id, filename="decoder_model.onnx")
+decoder_with_past_path = hf_hub_download(repo_id=repo_id, filename="decoder_with_past_model.onnx")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+tokenizer = AutoTokenizer.from_pretrained("sshleifer/tiny-mbart")
+inputs = tokenizer(text, return_tensors="np")
+input_ids = inputs["input_ids"].astype(np.int64)
+attention_mask = inputs["attention_mask"].astype(np.int64)
+
+providers = ["CPUExecutionProvider"]
+if device.startswith("cuda"):
+    providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+
+so = ort.SessionOptions()
+so.intra_op_num_threads = 1
+so.inter_op_num_threads = 1
+encoder_sess = ort.InferenceSession(encoder_path, sess_options=so, providers=providers)
+decoder_sess = ort.InferenceSession(decoder_path, sess_options=so, providers=providers)
+decoder_past_sess = ort.InferenceSession(decoder_with_past_path, sess_options=so, providers=providers)
+
+encoder_hidden_states = encoder_sess.run(None, {"input_ids": input_ids, "attention_mask": attention_mask})[0]
+
+bos_token_id = config.get("bos_token_id", 0)
+eos_token_id = config.get("eos_token_id", 2)
+max_new_tokens = 8
+
+first_decoder_input_ids = np.array([[bos_token_id]], dtype=np.int64)
+decoder_outputs = decoder_sess.run(None, {"input_ids": first_decoder_input_ids, "encoder_hidden_states": encoder_hidden_states, "encoder_attention_mask": attention_mask})
+logits = decoder_outputs[0]
+past_names = [o.name for o in decoder_sess.get_outputs()[1:]]
+past_key_values = {name: value for name, value in zip(past_names, decoder_outputs[1:])}
+
+generated = [bos_token_id, int(np.argmax(logits[0, -1, :]))]
+for _ in range(max_new_tokens - 1):
+    if generated[-1] == eos_token_id:
+        break
+    decoder_input_ids = np.array([[generated[-1]]], dtype=np.int64)
+    decoder_inputs = {"input_ids": decoder_input_ids, "encoder_attention_mask": attention_mask}
+    decoder_inputs.update({f"past_key_values_{i}": past_key_values[f"present_key_values_{i}"] for i in range(len(past_key_values))})
+    outputs = decoder_past_sess.run(None, decoder_inputs)
+    logits = outputs[0]
+    past_names = [o.name for o in decoder_past_sess.get_outputs()[1:]]
+    past_key_values = {name: value for name, value in zip(past_names, outputs[1:])}
+    generated.append(int(np.argmax(logits[0, -1, :])))
+    if generated[-1] == eos_token_id:
+        break
+
+output_ids = np.array([generated], dtype=np.int64)
+translated_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
+RESULT = {"generated_ids": output_ids.tolist(), "text": translated_text}

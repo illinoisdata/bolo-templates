@@ -1,18 +1,36 @@
 {% set repo_id = repo_id | default("flax-community/spanish-t5-small") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("Érase un vez un") %}
+{% set text = text | default('Érase un vez un') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+# Load tokenizer/model
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-inputs = tokenizer(text, return_tensors="pt").to(device)
-output_ids = model.generate(**inputs)
-generated_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-RESULT = {"generated_text": generated_text}
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_length=50,
+        num_beams=4,
+        early_stopping=True,
+    )
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": output_text}

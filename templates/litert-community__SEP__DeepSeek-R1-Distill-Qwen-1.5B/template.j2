@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("litert-community/DeepSeek-R1-Distill-Qwen-1.5B") %}
+{% set device = device | default("cuda:0") %}
+{% set model_filename = model_filename | default("DeepSeek-R1-Distill-Qwen-1.5B_seq128_q8_ekv1280.tflite") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+model_filename = "{{ model_filename }}"
+
+import subprocess
+import sys
+
+from huggingface_hub import hf_hub_download
+
+subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "numpy", "tensorflow-cpu"])
+
+import numpy as np
+import tensorflow as tf
+
+model_path = hf_hub_download(repo_id=repo_id, filename=model_filename)
+
+# Load the LiteRT/TFLite model and run a lightweight sanity inference using zeros.
+# The model is a text-generation model; this validates tensor plumbing and execution.
+with tf.device("/CPU:0" if str(device).startswith("cuda") else str(device)):
+    interpreter = tf.lite.Interpreter(model_path=model_path)
+    interpreter.allocate_tensors()
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+
+    inputs = []
+    for det in input_details:
+        shape = det["shape"]
+        dtype = det["dtype"]
+        if np.issubdtype(dtype, np.integer):
+            data = np.zeros(shape, dtype=dtype)
+        else:
+            data = np.zeros(shape, dtype=dtype)
+        interpreter.set_tensor(det["index"], data)
+        inputs.append(data)
+
+    interpreter.invoke()
+    outputs = [interpreter.get_tensor(det["index"]) for det in output_details]
+
+RESULT = {
+    "model_path": model_path,
+    "num_inputs": len(input_details),
+    "num_outputs": len(output_details),
+    "output_shapes": [list(x.shape) for x in outputs],
+    "output_dtypes": [str(x.dtype) for x in outputs],
+    "output_samples": [x.reshape(-1)[:10].tolist() for x in outputs],
+}

@@ -1,31 +1,35 @@
 {% set repo_id = repo_id | default("monologg/biobert_v1.0_pubmed_pmc") %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("The patient presented with signs of pulmonary embolism and subsequent clinical observations were carefully documented.") %}
+{% set text = text | default('Aspirin inhibits cyclooxygenase and reduces inflammation.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-text_inputs = [text_input]
+text = "{{ text }}"
 
-from pathlib import Path
-
-import numpy as np
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import BertTokenizer, BertForMaskedLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+tokenizer = BertTokenizer(vocab_file=vocab_path, do_lower_case=False)
+model = BertForMaskedLM.from_pretrained(repo_id, config=config_path, local_files_only=True)
+state_dict = torch.load(weights_path, map_location='cpu')
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(text_inputs, return_tensors="pt", padding=True, truncation=True).to(device)
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=128)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
     outputs = model(**inputs)
 
-last_hidden_state = outputs.last_hidden_state.detach().cpu().numpy()
-pooler_output = outputs.pooler_output
-if pooler_output is not None:
-    pooler_output = pooler_output.detach().cpu().numpy()
-
-result_dict = {"last_hidden_state": last_hidden_state}
-if pooler_output is not None:
-    result_dict["pooler_output"] = pooler_output
-RESULT = result_dict
+logits = outputs.logits.detach().cpu()
+mask_token_index = int((inputs["input_ids"] == tokenizer.mask_token_id).nonzero(as_tuple=False)[0, 1]) if (inputs["input_ids"] == tokenizer.mask_token_id).any() else -1
+RESULT = {
+    "logits": logits,
+    "mask_token_index": mask_token_index,
+}

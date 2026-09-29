@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("facebook/hubert-base-ls960") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("audio-classification") %}
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+audio_path = "{{ audio_path }}"
+
+from transformers import pipeline, AutoFeatureExtractor
+
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+pipe = pipeline(task=task, model=repo_id, feature_extractor=feature_extractor, device=device)
+
+# Pre-process input
+inputs = audio_path
+
+# Run inference
+RESULT = pipe(inputs)

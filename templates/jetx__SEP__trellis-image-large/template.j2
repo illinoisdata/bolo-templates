@@ -1,0 +1,24 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("jetx/trellis-image-large") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import numpy as np
+from pathlib import Path
+from urllib.parse import urlparse
+
+from PIL import Image
+
+if urlparse(image_path).scheme in ("http", "https"):
+    import requests
+    pil_image = Image.open(requests.get(image_path, stream=True, timeout=30).raw).convert("RGB")
+else:
+    pil_image = Image.open(image_path).convert("RGB")
+
+pil_image = pil_image.resize((256, 256))
+arr = np.asarray(pil_image, dtype=np.float32) / 255.0
+
+RESULT = {"output": arr}

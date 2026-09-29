@@ -1,46 +1,49 @@
 {% set repo_id = repo_id | default("mrm8488/t5-small-finetuned-quora-for-paraphrasing") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("paraphrase: What is the best framework for dealing with a huge text dataset?") %}
-{% set num_return_sequences = num_return_sequences | default(5) %}
-{% set num_beams = num_beams | default(5) %}
+{% set text = text | default('paraphrase: What is the best framework for dealing with a huge text dataset?') %}
 {% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(5) %}
+{% set num_return_sequences = num_return_sequences | default(5) %}
 {% set no_repeat_ngram_size = no_repeat_ngram_size | default(2) %}
 {% set repetition_penalty = repetition_penalty | default(3.5) %}
 {% set length_penalty = length_penalty | default(1.0) %}
-{% set early_stopping = early_stopping | default(True) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-num_return_sequences = {{ num_return_sequences }}
-num_beams = {{ num_beams }}
+text = "{{ text }}"
 max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+num_return_sequences = {{ num_return_sequences }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
 repetition_penalty = {{ repetition_penalty }}
 length_penalty = {{ length_penalty }}
-early_stopping = {{ early_stopping }}
 
-import os
+from huggingface_hub import hf_hub_download
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import T5Tokenizer, T5ForConditionalGeneration
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+tokenizer = T5Tokenizer.from_pretrained(repo_id)
+model = T5ForConditionalGeneration.from_pretrained(repo_id)
 model.to(device)
+model.eval()
 
-input_ids = tokenizer.encode(input_text, return_tensors="pt", add_special_tokens=True)
-input_ids = input_ids.to(device)
+input_ids = tokenizer.encode(text, return_tensors="pt", add_special_tokens=True).to(device)
+with torch.no_grad():
+    generated_ids = model.generate(
+        input_ids=input_ids,
+        num_return_sequences=num_return_sequences,
+        num_beams=num_beams,
+        max_length=max_length,
+        no_repeat_ngram_size=no_repeat_ngram_size,
+        repetition_penalty=repetition_penalty,
+        length_penalty=length_penalty,
+        early_stopping=True,
+    )
 
-generated_ids = model.generate(
-    input_ids=input_ids,
-    num_return_sequences=num_return_sequences,
-    num_beams=num_beams,
-    max_length=max_length,
-    no_repeat_ngram_size=no_repeat_ngram_size,
-    repetition_penalty=repetition_penalty,
-    length_penalty=length_penalty,
-    early_stopping=early_stopping,
-)
+preds = [tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=True) for g in generated_ids]
 
-paraphrases = tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-
-RESULT = {"paraphrases": paraphrases}
+RESULT = {"output": preds}

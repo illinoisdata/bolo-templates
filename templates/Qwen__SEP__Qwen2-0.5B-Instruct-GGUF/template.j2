@@ -1,0 +1,30 @@
+{% set repo_id = repo_id | default("Qwen/Qwen2-0.5B-Instruct-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('qwen2-0_5b-instruct-q5_k_m.gguf') %}
+{% set prompt = prompt | default('Explain what Qwen2 is in one short paragraph.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+llm = Llama(model_path=model_path, n_ctx=1024, n_threads=4, n_gpu_layers=0, verbose=False)
+
+messages = [
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user", "content": prompt},
+]
+
+response = llm.create_chat_completion(
+    messages=messages,
+    temperature=0.2,
+    top_p=0.95,
+    max_tokens=128,
+)
+
+output_text = response["choices"][0]["message"]["content"]
+
+RESULT = {"text": output_text}

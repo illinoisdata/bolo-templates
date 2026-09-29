@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("selfrag/selfrag_llama2_7b") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set model = model | default(repo_id) %}
+{% set input_prompt = input_prompt | default("### Instruction:\nDescribe the goals of Self-RAG and why reflection matters.\n\n### Response:\n") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+
+prepared_prompt = input_prompt
+
+inference_outputs = pipe(prepared_prompt)
+
+RESULT = {"generated_text": inference_outputs}

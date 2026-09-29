@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("NlpHUST/vibert4news-base-cased") %}
+{% set task = task | default("fill-mask") %}
+{% set model = model | default(repo_id) %}
+{% set device = device | default("cuda:0") %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+from transformers import BertTokenizer, BertConfig, pipeline
+
+config = BertConfig.from_pretrained(model)
+tokenizer = BertTokenizer.from_pretrained(model)
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, config=config, device=device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

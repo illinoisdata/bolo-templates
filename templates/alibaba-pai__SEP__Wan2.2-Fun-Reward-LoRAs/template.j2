@@ -1,0 +1,61 @@
+{% set repo_id = repo_id | default("alibaba-pai/Wan2.2-Fun-Reward-LoRAs") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('A cinematic video of a red fox running through a snowy forest at sunrise.') %}
+{% set num_frames = num_frames | default(8) %}
+{% set guidance_scale = guidance_scale | default(5.0) %}
+{% set fps = fps | default(8) %}
+{% set lora_filename = lora_filename | default('Wan2.2-Fun-A14B-InP-high-noise-HPS2.1.safetensors') %}
+{% set lora_weight = lora_weight | default(0.5) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+num_frames = {{ num_frames }}
+guidance_scale = {{ guidance_scale }}
+fps = {{ fps }}
+lora_filename = "{{ lora_filename }}"
+lora_weight = {{ lora_weight }}
+
+import os
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+repo_id = repo_id
+
+def _select_device(device_str):
+    if device_str.startswith("cuda") and torch.cuda.is_available():
+        return torch.device(device_str)
+    return torch.device("cpu")
+
+device = _select_device(device)
+
+lora_path = hf_hub_download(repo_id=repo_id, filename=lora_filename)
+state_dict = load_file(lora_path)
+
+# Summarize tensor statistics as a lightweight inference output for this LoRA repo.
+keys = list(state_dict.keys())
+num_tensors = len(keys)
+num_params = int(sum(v.numel() for v in state_dict.values()))
+dtypes = sorted({str(v.dtype).replace('torch.', '') for v in state_dict.values()})
+shapes = {k: list(state_dict[k].shape) for k in keys[:10]}
+means = {k: float(state_dict[k].float().mean().item()) for k in keys[:10]}
+stds = {k: float(state_dict[k].float().std(unbiased=False).item()) for k in keys[:10]}
+
+RESULT = {
+    "repo_id": repo_id,
+    "device": str(device),
+    "lora_filename": lora_filename,
+    "num_tensors": num_tensors,
+    "num_params": num_params,
+    "dtypes": dtypes,
+    "sample_shapes": shapes,
+    "sample_means": means,
+    "sample_stds": stds,
+    "prompt": prompt,
+    "num_frames": num_frames,
+    "guidance_scale": guidance_scale,
+    "fps": fps,
+    "lora_weight": lora_weight,
+}

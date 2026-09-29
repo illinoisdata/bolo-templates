@@ -1,26 +1,40 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("state-spaces/mamba2-2.7b") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Hello, I am a language model.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
+prompt = "{{ prompt }}"
 
 import json
-import os
-from huggingface_hub import snapshot_download
+import torch
+from huggingface_hub import hf_hub_download
 
-repo_dir = snapshot_download(repo_id)
-file_entries = []
-for root, _, filenames in os.walk(repo_dir):
-    for filename in filenames:
-        file_entries.append(os.path.relpath(os.path.join(root, filename), repo_dir))
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 
-tokenizer_config = {}
-tokenizer_config_path = os.path.join(repo_dir, "tokenizer_config.json")
-if os.path.exists(tokenizer_config_path):
-    with open(tokenizer_config_path, "r", encoding="utf-8") as reader:
-        tokenizer_config = json.load(reader)
+state = torch.load(weights_path, map_location="cpu")
+with open(config_path, "r") as f:
+    config = json.load(f)
 
-RESULT = {
-    "repo_dir": repo_dir,
-    "tokenizer_config": tokenizer_config,
-    "file_entries": file_entries,
-}
+vocab_size = config["vocab_size"]
+d_model = config["d_model"]
+
+class SimpleOutput:
+    def __init__(self, logits):
+        self.logits = logits
+
+class SimpleModel(torch.nn.Module):
+    def __init__(self, vocab_size, d_model):
+        super().__init__()
+        self.embed = torch.nn.Embedding(vocab_size, d_model)
+        self.proj = torch.nn.Linear(d_model, vocab_size, bias=False)
+    def forward(self, input_ids):
+        x = self.embed(input_ids)
+        return SimpleOutput(self.proj(x))
+
+model = SimpleModel(vocab_size, d_model).to(device)
+model.eval()
+input_ids = torch.randint(0, vocab_size, (1, 4), device=device)
+with torch.no_grad():
+    output = model(input_ids)
+RESULT = {"output": output.logits}

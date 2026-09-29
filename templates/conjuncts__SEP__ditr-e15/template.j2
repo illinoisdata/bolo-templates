@@ -1,0 +1,52 @@
+{% set repo_id = repo_id | default("conjuncts/ditr-e15") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("object-detection") %}
+{% set input_data = input_data | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+input_data = {{ input_data | tojson }}
+
+import json
+import os
+import shutil
+from huggingface_hub import hf_hub_download
+from transformers import pipeline
+
+local_model_dir = "/workspace/conjuncts_ditr_e15_local"
+os.makedirs(local_model_dir, exist_ok=True)
+
+config_src = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_src, "r", encoding="utf-8") as config_file:
+    config_dict = json.load(config_file)
+config_dict["dilation"] = False
+if config_dict.get("backbone_kwargs") is None:
+    config_dict["backbone_kwargs"] = {}
+target_config_path = os.path.join(local_model_dir, "config.json")
+with open(target_config_path, "w", encoding="utf-8") as config_file:
+    json.dump(config_dict, config_file, ensure_ascii=False)
+
+weights_src = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+target_weights_path = os.path.join(local_model_dir, "model.safetensors")
+if not os.path.exists(target_weights_path):
+    shutil.copy(weights_src, target_weights_path)
+
+preprocessor_src = hf_hub_download(
+    repo_id="microsoft/table-transformer-structure-recognition-v1.1-all",
+    filename="preprocessor_config.json",
+)
+with open(preprocessor_src, "r", encoding="utf-8") as preprocessor_file:
+    preprocessor_dict = json.load(preprocessor_file)
+preprocessor_dict["size"] = {"shortest_edge": 800, "longest_edge": 800}
+target_preprocessor_path = os.path.join(local_model_dir, "preprocessor_config.json")
+with open(target_preprocessor_path, "w", encoding="utf-8") as preprocessor_file:
+    json.dump(preprocessor_dict, preprocessor_file, ensure_ascii=False)
+
+pipe = pipeline(task=task, model=local_model_dir, device=device)
+
+processed_input = input_data
+
+detection_outputs = pipe(processed_input)
+
+RESULT = {"detections": detection_outputs}

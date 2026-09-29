@@ -1,45 +1,54 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("ibm-granite/granite-embedding-107m-multilingual") %}
-{% set query_texts = query_texts | default(["Who made the song My achy breaky heart?", "summit define"]) %}
-{% set passage_texts = passage_texts | default(["Achy Breaky Heart is a country song written by Don Von Tress. Originally titled Don't Tell My Heart and performed by The Marcy Brothers in 1991.", "Definition of summit: the highest point of a mountain, the highest level, or a meeting of governments."]) %}
+{% set device = device | default("cuda:0") %}
+{% set input_queries = input_queries | default([
+  'Who made the song My achy breaky heart?',
+  'summit define'
+]) %}
+{% set input_passages = input_passages | default([
+  "Achy Breaky Heart is a country song written by Don Von Tress. Originally titled Don't Tell My Heart and performed by The Marcy Brothers in 1991.",
+  'Definition of summit for English Language Learners: the highest point of a mountain; the top of a mountain; the highest level; a meeting or series of meetings between the leaders of two or more governments.'
+]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-query_texts = {{ query_texts }}
-passage_texts = {{ passage_texts }}
+input_queries = {{ input_queries }}
+input_passages = {{ input_passages }}
 
-from pathlib import Path
-import json
-
+import os
 import torch
-from torch.nn import functional as F
+import torch.nn.functional as F
 from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
 
-model = AutoModel.from_pretrained(repo_id)
-model.eval()
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spm_path = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+pooling_path = hf_hub_download(repo_id=repo_id, filename="1_Pooling/config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+model_dir = os.path.dirname(model_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = AutoModel.from_pretrained(model_dir)
 model.to(device)
+model.eval()
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-
-queries_tokenized = tokenizer(query_texts, padding=True, truncation=True, return_tensors="pt")
-passages_tokenized = tokenizer(passage_texts, padding=True, truncation=True, return_tensors="pt")
-
-queries_tokenized = {k: v.to(device) for k, v in queries_tokenized.items()}
-passages_tokenized = {k: v.to(device) for k, v in passages_tokenized.items()}
+query_inputs = tokenizer(input_queries, padding=True, truncation=True, return_tensors="pt")
+passage_inputs = tokenizer(input_passages, padding=True, truncation=True, return_tensors="pt")
+query_inputs = {k: v.to(device) for k, v in query_inputs.items()}
+passage_inputs = {k: v.to(device) for k, v in passage_inputs.items()}
 
 with torch.no_grad():
-    query_outputs = model(**queries_tokenized)
-    passage_outputs = model(**passages_tokenized)
-
-query_embeddings = F.normalize(query_outputs.last_hidden_state[:, 0], dim=1)
-passage_embeddings = F.normalize(passage_outputs.last_hidden_state[:, 0], dim=1)
-similarity_scores = torch.matmul(query_embeddings, passage_embeddings.T)
-
-query_embeddings_cpu = query_embeddings.cpu()
-passage_embeddings_cpu = passage_embeddings.cpu()
-similarity_scores_cpu = similarity_scores.cpu()
+    query_outputs = model(**query_inputs)
+    passage_outputs = model(**passage_inputs)
+    query_embeddings = query_outputs.last_hidden_state[:, 0].float()
+    passage_embeddings = passage_outputs.last_hidden_state[:, 0].float()
+    query_embeddings = F.normalize(query_embeddings, p=2, dim=1)
+    passage_embeddings = F.normalize(passage_embeddings, p=2, dim=1)
+    similarity = query_embeddings @ passage_embeddings.T
 
 RESULT = {
-    "query_embeddings": query_embeddings_cpu.tolist(),
-    "passage_embeddings": passage_embeddings_cpu.tolist(),
-    "similarity": similarity_scores_cpu.tolist(),
+    "query_embeddings": query_embeddings.detach().cpu().numpy(),
+    "passage_embeddings": passage_embeddings.detach().cpu().numpy(),
+    "similarity": similarity.detach().cpu().numpy(),
 }

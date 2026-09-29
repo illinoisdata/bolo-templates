@@ -1,0 +1,61 @@
+{% set repo_id = repo_id | default("deepset/gelectra-base-germanquad-distilled") %}
+{% set device = device | default("cuda:0") %}
+{% set context = context | default('Die option, Modelle zwischen FARM und Transformers zu konvertieren, gibt den Nutzern Freiheit und ermöglicht es, leicht zwischen Frameworks zu wechseln.') %}
+{% set question = question | default('Warum ist Modellkonvertierung wichtig?') %}
+{% set max_length = max_length | default(384) %}
+{% set doc_stride = doc_stride | default(128) %}
+{% set max_answer_len = max_answer_len | default(30) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+context = "{{ context }}"
+question = "{{ question }}"
+max_length = {{ max_length }}
+doc_stride = {{ doc_stride }}
+max_answer_len = {{ max_answer_len }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+model = AutoModelForQuestionAnswering.from_pretrained(
+    repo_id,
+    config=config_file,
+    ignore_mismatched_sizes=False,
+)
+state_dict = torch.load(weights_file, map_location="cpu")
+state_dict.pop("electra.embeddings.position_ids", None)
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+inputs = tokenizer(
+    question,
+    context,
+    max_length=max_length,
+    truncation="only_second",
+    stride=doc_stride,
+    return_tensors="pt",
+)
+input_ids = inputs["input_ids"].to(device)
+attention_mask = inputs["attention_mask"].to(device)
+outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+
+start_logits = outputs.start_logits[0]
+end_logits = outputs.end_logits[0]
+start_idx = int(torch.argmax(start_logits).item())
+end_idx = int(torch.argmax(end_logits).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+if end_idx - start_idx + 1 > max_answer_len:
+    end_idx = min(start_idx + max_answer_len - 1, start_logits.shape[0] - 1)
+answer = tokenizer.decode(inputs["input_ids"][0][start_idx:end_idx + 1], skip_special_tokens=True).strip()
+score = float((start_logits[start_idx] + end_logits[end_idx]).item())
+RESULT = {"answer": answer, "score": score, "start_index": start_idx, "end_index": end_idx}

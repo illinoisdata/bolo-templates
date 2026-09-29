@@ -1,31 +1,52 @@
 {% set repo_id = repo_id | default("microsoft/layoutlm-base-uncased") %}
 {% set device = device | default("cuda:0") %}
-{% set image = image | default("/u/yli77/projects/ML-code-generation/data/doc.jpeg") %}
-{% set words = words | default(["Hello", "world", "!"]) %}
-{% set boxes = boxes | default([[0, 0, 100, 100], [100, 0, 200, 100], [200, 0, 300, 150]]) %}
+{% set question = question | default('What information is shown in the document?') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-image = "{{ image }}"
-words = {{ words }}
-boxes = {{ boxes }}
+question = "{{ question }}"
+image_path = "{{ image_path }}"
 
-from transformers import AutoModel, AutoProcessor
 import torch
 from PIL import Image
-import requests
-from io import BytesIO
-import os
+from transformers import AutoTokenizer, LayoutLMModel
+from huggingface_hub import hf_hub_download
 
-processor = AutoProcessor.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
 
-if image.startswith("http://") or image.startswith("https://"):
-    image = Image.open(BytesIO(requests.get(image).content)).convert("RGB")
-else:
-    image = Image.open(image).convert("RGB")
+# Download model files
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+weights_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-encoding = processor(image=image, text=words, boxes=boxes, return_tensors="pt", is_split_into_words=True).to(device)
-outputs = model(**encoding)
-last_hidden_state = outputs.last_hidden_state
 
-RESULT = {"last_hidden_state": last_hidden_state}
+def load_image(path_or_url):
+    if str(path_or_url).startswith(("http://", "https://")):
+        import requests
+        from io import BytesIO
+        return Image.open(BytesIO(requests.get(path_or_url, timeout=30).content)).convert("RGB")
+    return Image.open(path_or_url).convert("RGB")
+
+
+# Pre-process input & load model
+image = load_image(image_path)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = LayoutLMModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+words = question.split()
+bboxes = [[0, 0, 1000, 1000] for _ in words]
+encoding = tokenizer(words, boxes=bboxes, return_tensors="pt", truncation=True, padding=True)
+encoding = {k: v.to(device) for k, v in encoding.items()}
+
+# Run inference
+with torch.no_grad():
+    outputs = model(**encoding)
+    last_hidden_state = outputs.last_hidden_state
+    pooled = last_hidden_state[:, 0, :]
+    output_value = pooled.detach().cpu().tolist()
+
+# Post-process & build RESULT dict
+RESULT = {
+    "output": output_value,
+}

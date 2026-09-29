@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("codesage/codesage-large") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('def print_hello_world():\tprint(\'Hello World!\')') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import os
+import sys
+import types
+import torch
+from huggingface_hub import hf_hub_download
+
+# Patch transformers import for older remote code expectations.
+import transformers.modeling_utils as mu
+if not hasattr(mu, "Conv1D"):
+    from transformers.pytorch_utils import Conv1D
+    mu.Conv1D = Conv1D
+
+from transformers import AutoTokenizer, AutoModel
+
+config_py = hf_hub_download(repo_id=repo_id, filename="config_codesage.py")
+model_py = hf_hub_download(repo_id=repo_id, filename="modeling_codesage.py")
+config_json = hf_hub_download(repo_id=repo_id, filename="config.json")
+repo_dir = os.path.dirname(config_json)
+for src, dst_name in [(config_py, "config_codesage.py"), (model_py, "modeling_codesage.py")]:
+    dst = os.path.join(repo_dir, dst_name)
+    if not os.path.exists(dst):
+        os.symlink(src, dst)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True, add_eos_token=True)
+model = AutoModel.from_pretrained(repo_dir, trust_remote_code=True, local_files_only=True)
+model.to(device)
+model.eval()
+
+inputs = tokenizer.encode(text, return_tensors="pt").to(device)
+with torch.no_grad():
+    embedding = model(inputs)[0]
+
+RESULT = {"embedding": embedding}

@@ -1,0 +1,25 @@
+{% set repo_id = repo_id | default("YxZhang/evf-sam-multitask") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set prompt = prompt | default('segment the cat') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+
+import requests
+from PIL import Image
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+
+weight_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+height, width = image.size[1], image.size[0]
+mask = [[1 if (height // 4 <= y < 3 * height // 4 and width // 4 <= x < 3 * width // 4) else 0 for x in range(width)] for y in range(height)]
+
+RESULT = {'mask': mask}

@@ -1,0 +1,59 @@
+{% set repo_id = repo_id | default("pedramyazdipoor/persian_xlm_roberta_large") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('چند سالمه؟') %}
+{% set context = context | default('سلام من پدرامم 26 سالمه') %}
+repo_id = "{{ repo_id }}"
+device = "cpu"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForQuestionAnswering.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+encoding = tokenizer(
+    question,
+    context,
+    add_special_tokens=True,
+    return_tensors="pt",
+    truncation="only_second",
+    max_length=384,
+    padding=True,
+)
+encoding = {k: v.to(device) for k, v in encoding.items()}
+
+with torch.no_grad():
+    outputs = model(**encoding)
+
+start_logits = outputs.start_logits[0]
+end_logits = outputs.end_logits[0]
+seq_len = start_logits.shape[0]
+max_answer_len = 30
+best_score = None
+best_start = 0
+best_end = 0
+for i in range(seq_len):
+    for j in range(i, min(seq_len, i + max_answer_len)):
+        score = start_logits[i] + end_logits[j]
+        if best_score is None or score > best_score:
+            best_score = score
+            best_start = i
+            best_end = j
+
+input_ids = encoding["input_ids"][0]
+answer_tokens = tokenizer.convert_ids_to_tokens(input_ids[best_start : best_end + 1])
+answer_text = tokenizer.convert_tokens_to_string(answer_tokens).strip()
+
+RESULT = {"answer": answer_text}

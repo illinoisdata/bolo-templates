@@ -1,26 +1,39 @@
 {% set repo_id = repo_id | default("schhwmn/mbart-large-50-finetuned-ukr-gec") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default('я й не думав що комп\'ютерна лінгвістика це легкоо.') %}
-{% set num_beams = num_beams | default(5) %}
-{% set max_length = max_length | default(200) %}
-{% set early_stopping = early_stopping | default(true) %}
+{% set text = text | default("я й не думав що комп'ютерна лінгвістика це легкоо.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = "{{ text }}"
-num_beams = {{ num_beams }}
-max_length = {{ max_length }}
-early_stopping = {{ early_stopping }}
+text = {{ text | tojson }}
 
-import os
+import torch
+from huggingface_hub import hf_hub_download
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+sentencepiece_path = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
 
-inputs = tokenizer(text, return_tensors="pt")
+# Pre-process input & load model
+_tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+_model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+_model.to(device)
+_model.eval()
+
+inputs = _tokenizer(text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-outputs = model.generate(**inputs, num_beams=num_beams, max_length=max_length, early_stopping=early_stopping)
-generated_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
+# Run inference
+with torch.no_grad():
+    generated_ids = _model.generate(
+        **inputs,
+        max_length=200,
+        num_beams=5,
+        early_stopping=True,
+    )
 
-RESULT = {"generated_text": generated_text}
+# Post-process & build RESULT dict
+output_text = _tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+RESULT = {"corrected_text": output_text}

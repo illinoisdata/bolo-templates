@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("timm/eva02_large_patch14_224.mim_in22k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-feature-extraction") %}
+{% set input_image = input_image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_image = {{ input_image | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+input_data = input_image
+
+RESULT = pipe(input_data)

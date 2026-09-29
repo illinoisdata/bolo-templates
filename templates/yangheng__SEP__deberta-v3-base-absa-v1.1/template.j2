@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("yangheng/deberta-v3-base-absa-v1.1") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set input_text = input_text | default("The user interface is brilliant, but the documentation is a total mess.") %}
+{% set text_pair = text_pair | default("documentation") %}
+
+task = {{ task | tojson }}
+input_text = {{ input_text | tojson }}
+text_pair = {{ text_pair | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+input_payload = {"inputs": input_text, "text_pair": text_pair}
+
+RESULT = pipe(**input_payload)

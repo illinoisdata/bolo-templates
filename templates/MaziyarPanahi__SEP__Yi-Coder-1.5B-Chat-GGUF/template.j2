@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("MaziyarPanahi/Yi-Coder-1.5B-Chat-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default("Yi-Coder-1.5B-Chat.Q4_K_M.gguf") %}
+{% set prompt = prompt | default("Write a short Python function that returns the Fibonacci sequence up to n.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+import torch
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+llm = Llama(
+    model_path=model_path,
+    n_ctx=2048,
+    n_threads=4,
+    n_gpu_layers=-1 if device.startswith("cuda") else 0,
+    verbose=False,
+)
+
+output = llm(
+    prompt,
+    max_tokens=64,
+    temperature=0.0,
+    top_p=1.0,
+    stop=["</s>"]
+)
+
+output_text = output["choices"][0]["text"]
+RESULT = {"output_text": output_text}

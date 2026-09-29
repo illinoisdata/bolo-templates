@@ -1,0 +1,29 @@
+---
+base_model: Qwen/Qwen2.5-3B
+language:
+- en
+license: other
+license_name: qwen-research
+license_link: https://huggingface.co/Qwen/Qwen2.5-3B-Instruct/blob/main/LICENSE
+pipeline_tag: text-generation
+tags:
+- chat
+- mlx
+---
+
+# mlx-community/Qwen2.5-3B-Instruct-4bit
+
+The Model [mlx-community/Qwen2.5-3B-Instruct-4bit](https://huggingface.co/mlx-community/Qwen2.5-3B-Instruct-4bit) was converted to MLX format from [Qwen/Qwen2.5-3B-Instruct](https://huggingface.co/Qwen/Qwen2.5-3B-Instruct) using mlx-lm version **0.18.1**.
+
+## Use with mlx
+
+```bash
+pip install mlx-lm
+```
+
+```python
+from mlx_lm import load, generate
+
+model, tokenizer = load("mlx-community/Qwen2.5-3B-Instruct-4bit")
+response = generate(model, tokenizer, prompt="hello", verbose=True)
+```

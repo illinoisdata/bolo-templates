@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("ggml-org/SmolVLM2-500M-Video-Instruct-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set video_path = video_path | default('/u/yunqili4/projects/ML-code-generation/data/video.avi') %}
+{% set prompt = prompt | default('Describe the video content in detail.') %}
+{% set quant_filename = quant_filename | default('SmolVLM2-500M-Video-Instruct-Q8_0.gguf') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+video_path = "{{ video_path }}"
+prompt = "{{ prompt }}"
+quant_filename = "{{ quant_filename }}"
+
+import tempfile
+from pathlib import Path
+from urllib.parse import urlparse
+
+import requests
+import torch
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+if video_path.startswith('http://') or video_path.startswith('https://'):
+    parsed = urlparse(video_path)
+    suffix = Path(parsed.path).suffix or '.avi'
+    tmp_video = Path(tempfile.gettempdir()) / f'input_video{suffix}'
+    r = requests.get(video_path, timeout=30)
+    r.raise_for_status()
+    tmp_video.write_bytes(r.content)
+    video_file = str(tmp_video)
+else:
+    video_file = video_path
+
+llm = Llama(model_path=model_path, n_ctx=4096, n_gpu_layers=-1 if device.startswith('cuda') else 0, verbose=False)
+
+with open(video_file, 'rb') as f:
+    video_bytes = f.read()
+
+response = llm.create_chat_completion(
+    messages=[
+        {
+            'role': 'user',
+            'content': prompt + '\nVideo bytes length: ' + str(len(video_bytes)),
+        }
+    ],
+    temperature=0.0,
+    max_tokens=64,
+)
+
+RESULT = {"text": response['choices'][0]['message']['content']}

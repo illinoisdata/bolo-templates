@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("google/siglip-large-patch16-384") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("zero-shot-image-classification") %}
+{% set model = model | default(repo_id) %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image2.jpeg") %}
+{% set candidate_labels = candidate_labels | default(["fox", "bear", "seagull", "cat"]) %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+image_path = {{ image_path | tojson }}
+candidate_labels = {{ candidate_labels | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(image_path, candidate_labels=candidate_labels)

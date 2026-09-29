@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("microsoft/deberta-v2-xxlarge-mnli") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+
+# Python variable assignments
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+# Imports
+from transformers import pipeline
+
+# Load pipeline
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+# Inference
+RESULT = pipe(input_prompt)

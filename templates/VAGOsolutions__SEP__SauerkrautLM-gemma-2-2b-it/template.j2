@@ -1,0 +1,48 @@
+{% set repo_id = repo_id | default("VAGOsolutions/SauerkrautLM-gemma-2-2b-it") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Schreibe eine kurze Zusammenfassung auf Deutsch über die Vorteile von Spectrum Fine-Tuning.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+weights_1 = hf_hub_download(repo_id=repo_id, filename="model-00001-of-00002.safetensors")
+weights_2 = hf_hub_download(repo_id=repo_id, filename="model-00002-of-00002.safetensors")
+index_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+
+local_files_only = True
+
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_config_path), local_files_only=local_files_only)
+model = AutoModelForCausalLM.from_pretrained(
+    os.path.dirname(config_path),
+    torch_dtype=torch.bfloat16 if device.startswith("cuda") else torch.float32,
+    device_map=None,
+    local_files_only=local_files_only,
+)
+model.to(device)
+model.eval()
+
+input_text = f"<start_of_turn>user\n{prompt}<end_of_turn>\n<start_of_turn>model\n"
+input_ids = tokenizer(input_text, return_tensors="pt").input_ids.to(device)
+
+with torch.no_grad():
+    generated = model.generate(
+        input_ids=input_ids,
+        max_new_tokens=80,
+        do_sample=False,
+        eos_token_id=tokenizer.eos_token_id,
+        pad_token_id=tokenizer.pad_token_id,
+    )
+
+output_text = tokenizer.decode(generated[0][input_ids.shape[-1]:], skip_special_tokens=True)
+
+RESULT = {"text": output_text}

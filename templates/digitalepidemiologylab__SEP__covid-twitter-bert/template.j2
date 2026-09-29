@@ -1,35 +1,44 @@
 {% set repo_id = repo_id | default("digitalepidemiologylab/covid-twitter-bert") %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("Assess how Twitter discussions around COVID-19 vaccines evolve over time.") %}
+{% set text = text | default("In places with a lot of people, it's a good idea to wear a [MASK].") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+text = {{ text | tojson }}
 
 import torch
-from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+from huggingface_hub import hf_hub_download
 
-import numpy as np
-from transformers import AutoModel, AutoTokenizer
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-device_obj = torch.device(device)
-
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id)
-model.to(device_obj)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, vocab_file=vocab_path)
+model = AutoModelForMaskedLM.from_pretrained(repo_id, config=config_path)
+state_dict = torch.load(weights_path, map_location="cpu")
+state_dict.pop("bert.pooler.dense.weight", None)
+state_dict.pop("bert.pooler.dense.bias", None)
+state_dict.pop("cls.seq_relationship.weight", None)
+state_dict.pop("cls.seq_relationship.bias", None)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(text_input, return_tensors="pt", truncation=True)
-inputs = {key: tensor.to(device_obj) for key, tensor in inputs.items()}
-
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+mask_token_id = tokenizer.mask_token_id
+mask_positions = (inputs["input_ids"] == mask_token_id).nonzero(as_tuple=False)
 with torch.no_grad():
     outputs = model(**inputs)
+    logits = outputs.logits
 
-last_hidden_state = outputs.last_hidden_state
-cls_embedding = last_hidden_state[:, 0, :]
-last_hidden_state = last_hidden_state.detach().cpu()
-cls_embedding = cls_embedding.detach().cpu()
+if mask_positions.numel() > 0:
+    pos = mask_positions[0, 1]
+    mask_logits = logits[0, pos]
+    topk = torch.topk(mask_logits, k=5)
+    tokens = tokenizer.convert_ids_to_tokens(topk.indices.tolist())
+    output = [{"token": t, "score": float(s)} for t, s in zip(tokens, topk.values.tolist())]
+else:
+    output = []
 
-RESULT = {
-    "last_hidden_state": last_hidden_state,
-    "cls_embedding": cls_embedding,
-}
+RESULT = {"output": output}

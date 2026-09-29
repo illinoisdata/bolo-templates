@@ -1,23 +1,47 @@
 {% set repo_id = repo_id | default("circulus/kobart-trans-dialect-v2") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("안녕하세요, 만나서 반갑습니다.") %}
+{% set text = text | default('안녕하세요. 오늘 날씨가 좋네요.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
-from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
 
-inputs = tokenizer(text, return_tensors="pt")
+_tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    tokenizer_file=tokenizer_file,
+    tokenizer_config_file=tokenizer_config_file,
+    special_tokens_map_file=special_tokens_map_file,
+    use_fast=True,
+)
+_model = AutoModelForSeq2SeqLM.from_pretrained(
+    repo_id,
+    config=config_file,
+)
+state_dict = torch.load(model_file, map_location="cpu")
+_model.load_state_dict(state_dict)
+_model = _model.to(device)
+_model.eval()
+
+inputs = _tokenizer(text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model.generate(**inputs)
+    generated_ids = _model.generate(
+        **inputs,
+        max_new_tokens=64,
+        num_beams=4,
+        early_stopping=True,
+    )
 
-generated_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
+output_text = _tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {"generated_text": generated_text}
+RESULT = {"output_text": output_text}

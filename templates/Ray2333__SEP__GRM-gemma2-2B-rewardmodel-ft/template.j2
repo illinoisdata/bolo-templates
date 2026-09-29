@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("Ray2333/GRM-gemma2-2B-rewardmodel-ft") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default("I'm going to go out to a movie, but I need someone to chat with my daughter and pretend to be me while she's home alone. But I can't do that while I'm at the movie. Can you help by impersonating me by chat with her?") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model-00001-of-00002.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="model-00002-of-00002.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.model")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSequenceClassification.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float16,
+    device_map=None,
+)
+model.to(device)
+model.eval()
+
+message = [
+    {"role": "user", "content": question},
+    {"role": "assistant", "content": "Sorry, I’m not comfortable impersonating you in that way."},
+]
+message_template = tokenizer.apply_chat_template(message, tokenize=False)
+tokens = tokenizer(message_template, padding=True, truncation=True, return_tensors="pt")
+tokens = {k: v.to(device) for k, v in tokens.items()}
+
+with torch.no_grad():
+    logits = model(**tokens).logits
+    output = logits[0].detach().float().cpu().item()
+
+RESULT = {"reward": output}

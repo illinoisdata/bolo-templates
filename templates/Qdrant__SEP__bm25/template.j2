@@ -1,4 +1,50 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Qdrant/bm25") %}
-from huggingface_hub import list_repo_files
-print(list_repo_files("Qdrant/bm25"))
+{% set device = device | default("cuda:0") %}
+{% set query = query | default('What is BM25 used for?', true) %}
+{% set documents = documents | default(['BM25 is a ranking function for search engines.', 'It measures relevance between a query and documents.', 'Cats like naps.'], true) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query = {{ query | tojson }}
+documents = {{ documents | tojson }}
+
+import math
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+
+def tokenize(text):
+    cleaned = ''.join(ch.lower() if ch.isalnum() else ' ' for ch in text)
+    return [t for t in cleaned.split() if t]
+
+
+q_tokens = tokenize(query)
+doc_tokens = [tokenize(doc) for doc in documents]
+df = {}
+for toks in doc_tokens:
+    for t in set(toks):
+        df[t] = df.get(t, 0) + 1
+N = len(doc_tokens)
+avgdl = sum(len(toks) for toks in doc_tokens) / max(N, 1)
+k1 = 1.5
+b = 0.75
+ranked_scores = []
+for doc, toks in zip(documents, doc_tokens):
+    tf = {}
+    for t in toks:
+        tf[t] = tf.get(t, 0) + 1
+    dl = len(toks)
+    score = 0.0
+    for t in q_tokens:
+        if t not in tf:
+            continue
+        f = tf[t]
+        n_q = df.get(t, 0)
+        idf = math.log(1 + (N - n_q + 0.5) / (n_q + 0.5))
+        denom = f + k1 * (1 - b + b * dl / max(avgdl, 1e-9))
+        score += idf * (f * (k1 + 1)) / denom
+    ranked_scores.append(score)
+
+ranked = sorted(zip(documents, ranked_scores), key=lambda x: x[1], reverse=True)
+
+RESULT = {"query": query, "ranked_documents": ranked}

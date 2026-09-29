@@ -1,31 +1,35 @@
 {% set repo_id = repo_id | default("K024/mt5-zh-ja-en-trimmed") %}
 {% set device = device | default("cuda:0") %}
-{% set sentence = sentence | default("ja2zh: 吾輩は猫である。名前はまだ無い。") %}
+{% set sentence = sentence | default('ja2zh: 吾輩は猫である。名前はまだ無い。') %}
 {% set max_length = max_length | default(100) %}
 {% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-sentence = "{{ sentence }}"
+sentence = {{ sentence | tojson }}
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 
-import os
-
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import T5Tokenizer, MT5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-# Pre-process input
+# Explicitly load from the local files to avoid any remote lookup
+model = MT5ForConditionalGeneration.from_pretrained(repo_id, local_files_only=True)
+tokenizer = T5Tokenizer(vocab_file=tokenizer_file)
+model.to(device)
+model.eval()
+
 inputs = tokenizer(sentence, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Run inference
-output_ids = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-# Post-process & build RESULT dict
-generated_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
-RESULT = {"generated_text": generated_text}
+RESULT = {"generated_text": output_text}

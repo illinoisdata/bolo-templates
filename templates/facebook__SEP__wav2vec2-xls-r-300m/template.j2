@@ -1,71 +1,56 @@
-{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set sampling_rate = sampling_rate | default(16000) %}
 {% set repo_id = repo_id | default("facebook/wav2vec2-xls-r-300m") %}
-{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
+{% set device = device | default("cuda:0") %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
+sampling_rate = {{ sampling_rate }}
 
-import io
-import json
 import os
-from pathlib import Path
-from urllib.parse import urlparse
-
 import numpy as np
-import requests
-import soundfile as sf
 import torch
-import torchaudio
-from transformers import AutoFeatureExtractor, AutoModelForPreTraining
+import soundfile as sf
+import requests
+from io import BytesIO
+from scipy.signal import resample_poly
+from huggingface_hub import hf_hub_download
+from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2ForPreTraining
 
-# Resolve device and output directory objects after imports
-device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-def _load_audio(source: str, target_sample_rate: int):
-    parsed = urlparse(source)
-    if parsed.scheme in {"http", "https"}:
-        response = requests.get(source)
-        response.raise_for_status()
-        buffer = io.BytesIO(response.content)
-        waveform_np, sample_rate = sf.read(buffer, dtype="float32")
-    else:
-        waveform_np, sample_rate = sf.read(source, dtype="float32")
-    if waveform_np.ndim > 1:
-        waveform_np = waveform_np.mean(axis=1)
-    waveform = torch.from_numpy(waveform_np)
-    if sample_rate != target_sample_rate:
-        resampler = torchaudio.transforms.Resample(sample_rate, target_sample_rate)
-        waveform = resampler(waveform.unsqueeze(0)).squeeze(0)
-        sample_rate = target_sample_rate
-    return waveform, sample_rate
-
-feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id)
+feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(os.path.dirname(preprocessor_path))
+model = Wav2Vec2ForPreTraining.from_pretrained(os.path.dirname(config_path), torch_dtype=torch.float32)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict)
 model.to(device)
 model.eval()
 
-target_sampling_rate = feature_extractor.sampling_rate
-waveform, sampling_rate = _load_audio(audio_path, target_sampling_rate)
-audio_samples = waveform.cpu().numpy()
-inputs = feature_extractor(audio_samples, sampling_rate=sampling_rate, return_tensors="pt")
-inputs = {k: v.to(device) for k, v in inputs.items()}
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    waveform, sr = sf.read(BytesIO(audio_bytes))
+else:
+    waveform, sr = sf.read(audio_path)
+
+if waveform.ndim > 1:
+    waveform = waveform.mean(axis=1)
+if sr != sampling_rate:
+    gcd = np.gcd(sr, sampling_rate)
+    waveform = resample_poly(waveform, sampling_rate // gcd, sr // gcd)
+    sr = sampling_rate
+
+inputs = feature_extractor(waveform, sampling_rate=sr, return_tensors="pt")
+input_values = inputs.input_values.to(device)
+attention_mask = inputs.attention_mask.to(device) if inputs.attention_mask is not None else None
 
 with torch.no_grad():
-    outputs = model(**inputs, output_hidden_states=True)
+    outputs = model(input_values=input_values, attention_mask=attention_mask)
 
-last_hidden_state = outputs.hidden_states[-1].cpu()
-RESULT = {"last_hidden_state": last_hidden_state}
-
-def _save_output(name: str, value, directory: Path):
-    if torch.is_tensor(value):
-        np.save(str(directory / f"{name}.npy"), value.numpy())
-        return
-    if isinstance(value, np.ndarray):
-        np.save(str(directory / f"{name}.npy"), value)
-        return
-    if isinstance(value, (str, int, float, bool)):
-        with open(directory / f"{name}.txt", "w", encoding="utf-8") as handle:
-            handle.write(str(value))
-        return
-    with open(directory / f"{name}.json", "w", encoding="utf-8") as handle:
-        json.dump(value, handle)
+RESULT = {
+    "projected_states": outputs.projected_states.detach().cpu().numpy(),
+    "projected_quantized_states": outputs.projected_quantized_states.detach().cpu().numpy(),
+    "codevector_perplexity": float(outputs.codevector_perplexity.detach().cpu().item()),
+}

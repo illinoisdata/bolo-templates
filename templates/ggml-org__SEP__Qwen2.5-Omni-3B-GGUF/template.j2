@@ -1,0 +1,61 @@
+{% set repo_id = repo_id | default("ggml-org/Qwen2.5-Omni-3B-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('Qwen2.5-Omni-3B-Q4_K_M.gguf') %}
+{% set mmproj_filename = mmproj_filename | default('mmproj-Qwen2.5-Omni-3B-Q8_0.gguf') %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set video_path = video_path | default('/u/yunqili4/projects/ML-code-generation/data/video.avi') %}
+{% set prompt = prompt | default('Describe the provided multimodal input.') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+mmproj_filename = "{{ mmproj_filename }}"
+audio_path = "{{ audio_path }}"
+image_path = "{{ image_path }}"
+video_path = "{{ video_path }}"
+prompt = "{{ prompt }}"
+
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+from pathlib import Path
+import os
+from PIL import Image
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+mmproj_path = hf_hub_download(repo_id=repo_id, filename=mmproj_filename)
+
+if str(audio_path).startswith(("http://", "https://")):
+    raise ValueError("audio_path must be a local file path for this template")
+if str(image_path).startswith(("http://", "https://")):
+    image_input = Image.open(image_path).convert("RGB")
+else:
+    image_input = Image.open(image_path).convert("RGB")
+if str(video_path).startswith(("http://", "https://")):
+    video_input = video_path
+else:
+    video_input = video_path
+
+llm = Llama(
+    model_path=model_path,
+    mmproj_path=mmproj_path,
+    n_ctx=4096,
+    n_gpu_layers=-1 if device.startswith("cuda") else 0,
+    verbose=False,
+)
+
+messages = [
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user", "content": prompt},
+]
+
+response = llm.create_chat_completion(
+    messages=messages,
+    temperature=0.2,
+    top_p=0.95,
+    max_tokens=256,
+)
+
+output_text = response["choices"][0]["message"]["content"]
+
+RESULT = {"output": output_text}

@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("Xenova/bert-base-multilingual-uncased-sentiment") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("I love this product. It works really well and feels high quality.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="onnx/model.onnx")
+
+config = AutoConfig.from_pretrained(config_path)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForSequenceClassification.from_config(config)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probs = torch.softmax(logits, dim=-1)
+    predicted_class_id = int(torch.argmax(probs, dim=-1).item())
+    predicted_label = config.id2label[str(predicted_class_id)] if str(predicted_class_id) in config.id2label else config.id2label[predicted_class_id]
+    confidence = float(probs[0, predicted_class_id].item())
+
+RESULT = {"predicted_label": predicted_label, "confidence": confidence, "probabilities": probs[0].detach().cpu().numpy()}

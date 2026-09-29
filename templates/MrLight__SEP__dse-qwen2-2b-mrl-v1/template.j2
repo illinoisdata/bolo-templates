@@ -1,0 +1,71 @@
+{% set repo_id = repo_id | default("MrLight/dse-qwen2-2b-mrl-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set query_text = query_text | default('Where can we see Llama?') %}
+{% set doc_image1 = doc_image1 | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set doc_image2 = doc_image2 | default('/u/yunqili4/projects/ML-code-generation/data/image2.jpeg') %}
+{% set embedding_dimension = embedding_dimension | default(1536) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query_text = "{{ query_text }}"
+doc_image1 = "{{ doc_image1 }}"
+doc_image2 = "{{ doc_image2 }}"
+embedding_dimension = {{ embedding_dimension }}
+
+import os
+import torch
+from PIL import Image
+from transformers import AutoProcessor, Qwen2VLForConditionalGeneration
+from qwen_vl_utils import process_vision_info
+from huggingface_hub import hf_hub_download
+from urllib.parse import urlparse
+from io import BytesIO
+import requests
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+min_pixels = 1 * 28 * 28
+max_pixels = 2560 * 28 * 28
+processor = AutoProcessor.from_pretrained(repo_id, min_pixels=min_pixels, max_pixels=max_pixels)
+model = Qwen2VLForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.bfloat16).to(device).eval()
+processor.tokenizer.padding_side = "left"
+model.padding_side = "left"
+
+def load_image(path_or_url):
+    if isinstance(path_or_url, str) and urlparse(path_or_url).scheme in ("http", "https"):
+        return Image.open(BytesIO(requests.get(path_or_url).content)).convert("RGB")
+    return Image.open(path_or_url).convert("RGB")
+
+def get_embedding(last_hidden_state: torch.Tensor, dimension: int) -> torch.Tensor:
+    reps = last_hidden_state[:, -1]
+    reps = torch.nn.functional.normalize(reps[:, :dimension], p=2, dim=-1)
+    return reps
+
+query_messages = [[{"role": "user", "content": [{"type": "image", "image": Image.new("RGB", (28, 28)), "resized_height": 1, "resized_width": 1}, {"type": "text", "text": f"Query: {query_text}"}]}]]
+query_texts = [processor.apply_chat_template(msg, tokenize=False, add_generation_prompt=True) + "<|endoftext|>" for msg in query_messages]
+query_image_inputs, query_video_inputs = process_vision_info(query_messages)
+query_inputs = processor(text=query_texts, images=query_image_inputs, videos=query_video_inputs, padding="longest", return_tensors="pt").to(device)
+query_inputs = model.prepare_inputs_for_generation(**query_inputs, cache_position=torch.arange(0, len(query_texts), device=query_inputs["input_ids"].device), use_cache=False)
+with torch.no_grad():
+    query_output = model(**query_inputs, return_dict=True, output_hidden_states=True)
+query_embeddings = get_embedding(query_output.hidden_states[-1], embedding_dimension)
+
+doc_images = [load_image(doc_image1), load_image(doc_image2)]
+doc_messages = []
+for doc in doc_images:
+    doc_messages.append([{"role": "user", "content": [{"type": "image", "image": doc}, {"type": "text", "text": "What is shown in this image?"}]}])
+doc_texts = [processor.apply_chat_template(msg, tokenize=False, add_generation_prompt=True) + "<|endoftext|>" for msg in doc_messages]
+doc_image_inputs, doc_video_inputs = process_vision_info(doc_messages)
+doc_inputs = processor(text=doc_texts, images=doc_image_inputs, videos=doc_video_inputs, padding="longest", return_tensors="pt").to(device)
+doc_inputs = model.prepare_inputs_for_generation(**doc_inputs, cache_position=torch.arange(0, len(doc_texts), device=doc_inputs["input_ids"].device), use_cache=False)
+with torch.no_grad():
+    doc_output = model(**doc_inputs, return_dict=True, output_hidden_states=True)
+doc_embeddings = get_embedding(doc_output.hidden_states[-1], embedding_dimension)
+
+similarities = torch.nn.functional.cosine_similarity(query_embeddings[0].unsqueeze(0), doc_embeddings)
+RESULT = {"query_embedding": query_embeddings, "doc_embeddings": doc_embeddings, "similarities": similarities}

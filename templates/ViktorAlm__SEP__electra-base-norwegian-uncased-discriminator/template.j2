@@ -1,33 +1,40 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("ViktorAlm/electra-base-norwegian-uncased-discriminator") %}
-{% set text_input = text_input | default("Dette er en testsetning for norsk Electra-modellen.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Dette er en enkel testsetning for norsk språkmodell.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+text = "{{ text }}"
 
-from pathlib import Path
-import json
 import torch
-from transformers import AutoModelForPreTraining, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForPreTraining, ElectraConfig
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-inputs = tokenizer(text_input, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+config = ElectraConfig.from_json_file(config_path)
+model = AutoModelForPreTraining.from_config(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
 
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    vocab_file=vocab_path,
+    tokenizer_config_file=tokenizer_config_path,
+    special_tokens_map_file=special_tokens_map_path,
+    use_fast=False,
+)
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
     outputs = model(**inputs)
 
-result_data = {}
-discriminator_logits = getattr(outputs, "discriminator_logits", None)
-if discriminator_logits is not None:
-    result_data["discriminator_logits"] = discriminator_logits.cpu().tolist()
-generator_logits = getattr(outputs, "generator_logits", None)
-if generator_logits is not None:
-    result_data["generator_logits"] = generator_logits.cpu().tolist()
-logits = getattr(outputs, "logits", None)
-if logits is not None:
-    result_data["logits"] = logits.cpu().tolist()
-
-RESULT = result_data
+logits = outputs.logits
+probabilities = torch.sigmoid(logits)
+RESULT = {"logits": logits.detach().cpu().tolist(), "probabilities": probabilities.detach().cpu().tolist()}

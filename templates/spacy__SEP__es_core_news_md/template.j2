@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("spacy/es_core_news_md") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('El presidente de España visitó Madrid y anunció nuevas medidas económicas.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import spacy
+from huggingface_hub import snapshot_download
+
+repo_dir = snapshot_download(repo_id)
+nlp = spacy.load(repo_dir)
+
+doc = nlp(text)
+
+RESULT = {
+    'text': doc.text,
+    'entities': [
+        {
+            'text': ent.text,
+            'label': ent.label_,
+            'start_char': ent.start_char,
+            'end_char': ent.end_char,
+        }
+        for ent in doc.ents
+    ],
+    'tokens': [
+        {
+            'text': token.text,
+            'lemma': token.lemma_,
+            'pos': token.pos_,
+            'tag': token.tag_,
+            'dep': token.dep_,
+            'head': token.head.text,
+            'morph': token.morph.to_dict(),
+        }
+        for token in doc
+    ],
+}

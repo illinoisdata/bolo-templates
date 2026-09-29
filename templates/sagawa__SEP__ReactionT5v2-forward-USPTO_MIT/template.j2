@@ -1,0 +1,31 @@
+{% set repo_id = repo_id | default("sagawa/ReactionT5v2-forward-USPTO_MIT") %}
+{% set device = device | default("cuda:0") %}
+{% set reaction_smiles = reaction_smiles | default('REACTANT:COC(=O)C1=CCCN(C)C1.O.[Al+3].[H-].[Li+].[Na+].[OH-]REAGENT:C1CCOC1') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+reaction_smiles = "{{ reaction_smiles }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(reaction_smiles, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated = model.generate(**inputs, num_beams=1, num_return_sequences=1)
+
+output = tokenizer.decode(generated[0], skip_special_tokens=True).replace(" ", "").rstrip(".")
+
+RESULT = {"output": output}

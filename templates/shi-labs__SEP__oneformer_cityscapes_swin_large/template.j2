@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("shi-labs/oneformer_cityscapes_swin_large") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-segmentation") %}
+{% set model = model | default(repo_id) %}
+{% set input_image = input_image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_image = {{ input_image | tojson }}
+
+from PIL import Image
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+
+preprocessed_image = Image.open(input_image).convert("RGB")
+
+inference_output = pipe(preprocessed_image)
+
+RESULT = {"segmentation": inference_output}

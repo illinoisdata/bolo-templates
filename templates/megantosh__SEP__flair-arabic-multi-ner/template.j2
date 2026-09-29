@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("megantosh/flair-arabic-multi-ner") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('عمرو عادلي أستاذ للاقتصاد السياسي المساعد في الجامعة الأمريكية بالقاهرة .') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import subprocess
+import sys
+
+import torch
+from huggingface_hub import hf_hub_download
+from flair.data import Sentence
+from flair.models import SequenceTagger
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+if device.startswith("cuda") and not torch.cuda.is_available():
+    device = "cpu"
+
+tagger = SequenceTagger.load(weights_path)
+_ = tagger.to(device)
+
+sentence = Sentence(text)
+tagger.predict(sentence)
+
+entities = []
+for ent in sentence.get_spans("ner"):
+    entities.append({
+        "text": ent.text,
+        "start_pos": ent.start_position,
+        "end_pos": ent.end_position,
+        "labels": [{"value": label.value, "score": float(label.score)} for label in ent.labels],
+    })
+
+RESULT = {"text": text, "entities": entities, "tagged_string": sentence.to_tagged_string("ner")}

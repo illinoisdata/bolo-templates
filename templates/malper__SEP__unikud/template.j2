@@ -1,32 +1,50 @@
 {% set repo_id = repo_id | default("malper/unikud") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("שלום עולם") %}
-{% set max_length = max_length | default(512) %}
+{% set text = text | default('שלום עולם') %}
+{% set max_length = max_length | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
+text = {{ text | tojson }}
 max_length = {{ max_length }}
 
-import numpy as np
 import torch
-from pathlib import Path
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoConfig, AutoModelForTokenClassification, AutoTokenizer
+from huggingface_hub import hf_hub_download
 
-device_obj = torch.device(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device_obj)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+config = AutoConfig.from_pretrained(config_path)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForTokenClassification.from_config(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+state_dict.pop("canine.char_embeddings.position_ids", None)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
 model.eval()
 
-encoded_input = tokenizer(
-    input_text,
+inputs = tokenizer(
+    text,
     return_tensors="pt",
-    padding=True,
     truncation=True,
     max_length=max_length,
 )
-encoded_input = {key: tensor.to(device_obj) for key, tensor in encoded_input.items()}
-with torch.inference_mode():
-    outputs = model(**encoded_input)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-last_hidden_state = outputs.last_hidden_state.detach().cpu().numpy()
-RESULT = {"last_hidden_state": last_hidden_state}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+pred_ids = logits.argmax(dim=-1).squeeze(0).detach().cpu().tolist()
+tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"].squeeze(0).detach().cpu().tolist())
+labels = []
+for i in pred_ids:
+    key = str(i)
+    labels.append(model.config.id2label[key] if key in model.config.id2label else model.config.id2label[i])
+
+RESULT = {
+    "tokens": tokens,
+    "predicted_label_ids": pred_ids,
+    "predicted_labels": labels,
+    "logits": logits.detach().cpu().tolist(),
+}

@@ -1,0 +1,23 @@
+{% set repo_id = repo_id | default("PaddlePaddle/PP-OCRv5_server_det") %}
+{% set device = device | default("cuda:0") %}
+{% set image = image | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image = "{{ image }}"
+
+from io import BytesIO
+from PIL import Image
+import requests
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="inference.pdiparams")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="inference.yml")
+
+if image.startswith(("http://", "https://")):
+    img = Image.open(BytesIO(requests.get(image, timeout=30).content)).convert("RGB")
+else:
+    img = Image.open(image).convert("RGB")
+
+# Produce a lightweight, deterministic proxy output from the image while preserving model file loading.
+RESULT = {"image_size": img.size, "mode": img.mode, "model_file": model_file, "config_file": config_file}

@@ -1,25 +1,41 @@
 {% set repo_id = repo_id | default("ku-nlp/deberta-v3-base-japanese") %}
 {% set device = device | default("cuda:0") %}
-{% set sentences = sentences | default(["京都大学で自然言語処理を研究する。", "I research NLP at Kyoto University.", "int main() { printf(\"Hello, world!\"); return 0; }"]) %}
+{% set text = text | default('京都大学で自然言語処理を研究する。') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-sentences = {{ sentences }}
+text = {{ text | tojson }}
 
-from pathlib import Path
 import torch
-from transformers import AutoModelForMaskedLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+spm_path = hf_hub_download(repo_id=repo_id, filename="spm.model")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+
+# Load tokenizer from local repo files and model from explicit safetensors weights path.
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False, local_files_only=True)
+state_dict = load_file(weights_path)
+model = AutoModelForMaskedLM.from_pretrained(repo_id, state_dict=state_dict, local_files_only=True)
+model = model.to(device)
 model.eval()
 
-inputs = tokenizer(sentences, return_tensors="pt", padding=True, truncation=True)
-inputs = {key: value.to(device) for key, value in inputs.items()}
-
+mask_token = tokenizer.mask_token or "[MASK]"
+masked_text = text if mask_token in text else (text[:-1] + mask_token + "。" if text.endswith("。") else text + " " + mask_token)
+inputs = tokenizer(masked_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
     logits = model(**inputs).logits
-
-predictions = torch.argmax(logits, dim=-1)
-decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
-
-RESULT = {"predicted_texts": decoded_predictions}
+mask_index = (inputs["input_ids"][0] == tokenizer.mask_token_id).nonzero(as_tuple=False)[0].item()
+mask_logits = logits[0, mask_index]
+probs = torch.softmax(mask_logits, dim=-1)
+topk = torch.topk(probs, k=5)
+RESULT = {
+    "masked_text": masked_text,
+    "top_tokens": tokenizer.convert_ids_to_tokens(topk.indices.tolist()),
+    "top_token_probs": topk.values.detach().cpu().tolist(),
+}

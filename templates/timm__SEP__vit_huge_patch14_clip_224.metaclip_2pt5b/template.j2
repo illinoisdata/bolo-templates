@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("timm/vit_huge_patch14_clip_224.metaclip_2pt5b") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set labels = labels | default(['cat', 'dog', 'bird', 'car', 'person']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+labels = {{ labels }}
+
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+import open_clip
+
+if str(image_path).startswith(("http://", "https://")):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model = open_clip.create_model("ViT-H-14-quickgelu", pretrained=None)
+state_dict_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+state_dict = torch.load(state_dict_path, map_location="cpu")
+model.load_state_dict(state_dict)
+model = model.to(device).eval()
+
+tokenizer = open_clip.get_tokenizer("ViT-H-14-quickgelu")
+text_tokens = tokenizer(labels).to(device)
+preprocess = open_clip.image_transform(model.visual.image_size, is_train=False)
+image_input = preprocess(image).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_input)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logits = (image_features @ text_features.T).squeeze(0)
+    probabilities = torch.softmax(logits, dim=-1)
+
+RESULT = {
+    "predicted_label": labels[int(probabilities.argmax().item())],
+    "probabilities": {label: float(prob) for label, prob in zip(labels, probabilities.detach().cpu().tolist())},
+}

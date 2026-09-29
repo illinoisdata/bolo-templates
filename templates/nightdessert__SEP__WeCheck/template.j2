@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("nightdessert/WeCheck") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set model = model | default(repo_id) %}
+{% set premise = premise | default("I first thought that I liked the movie, but upon second thought it was actually disappointing.") %}
+{% set hypothesis = hypothesis | default("The movie was not good.") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+premise = {{ premise | tojson }}
+hypothesis = {{ hypothesis | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+
+sequence_pair_batch = [(premise, hypothesis)]
+
+RESULT = pipe(sequence_pair_batch, padding=True, truncation=True, max_length=512)

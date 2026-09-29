@@ -1,0 +1,42 @@
+{% set repo_id = repo_id | default("speechbrain/sepformer-dns4-16k-enhancement") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set sample_rate = sample_rate | default(16000) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+sample_rate = {{ sample_rate }}
+
+from pathlib import Path
+import torch
+import torchaudio
+from speechbrain.inference.separation import SepformerSeparation
+from huggingface_hub import hf_hub_download
+from urllib.parse import urlparse
+
+weights = [
+    "brain.ckpt",
+    "decoder.ckpt",
+    "encoder.ckpt",
+    "masknet.ckpt",
+    "config.json",
+    "hyperparams.yaml",
+]
+local_paths = [hf_hub_download(repo_id=repo_id, filename=filename) for filename in weights]
+savedir = str(Path(local_paths[0]).parent)
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    input_audio = audio_path
+else:
+    input_audio = audio_path
+
+model = SepformerSeparation.from_hparams(
+    source=repo_id,
+    savedir=savedir,
+    run_opts={"device": device},
+)
+
+est_sources = model.separate_file(path=input_audio)
+output_audio = est_sources.detach().cpu().numpy()
+
+RESULT = {"enhanced_audio": output_audio}

@@ -1,0 +1,24 @@
+{% set repo_id = repo_id | default("Cyborg-AI/openai_oss_20b_evo") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set base_model = base_model | default("unsloth/gpt-oss-20b-unsloth-bnb-4bit") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+task = {{ task | tojson }}
+base_model = {{ base_model | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+adapter_repo = repo_id
+
+from transformers import pipeline
+from peft import PeftModel
+
+pipe = pipeline(task=task, model=base_model, device=device)
+pipe.model = PeftModel.from_pretrained(pipe.model, adapter_repo)
+pipe.model = pipe.model.to(device)
+pipe.model.eval()
+
+preprocessed_prompt = input_prompt
+
+RESULT = pipe(preprocessed_prompt)

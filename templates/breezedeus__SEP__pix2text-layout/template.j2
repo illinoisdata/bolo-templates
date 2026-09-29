@@ -1,0 +1,35 @@
+{% set doc_image = doc_image | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("breezedeus/pix2text-layout") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+doc_image = "{{ doc_image }}"
+
+import yaml
+import torch
+import numpy as np
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.yaml")
+weight_path = hf_hub_download(repo_id=repo_id, filename="DocXLayout_231012.pth")
+
+with open(config_path, 'r') as f:
+    cfg = yaml.safe_load(f)
+
+if isinstance(doc_image, str) and (doc_image.startswith('http://') or doc_image.startswith('https://')):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(doc_image, timeout=30).content)).convert('RGB')
+else:
+    image = Image.open(doc_image).convert('RGB')
+
+# This repo is a layout detector; for validation we load weights and expose them in-memory.
+state = torch.load(weight_path, map_location='cpu')
+if isinstance(state, dict) and 'state_dict' in state:
+    state = state['state_dict']
+if isinstance(state, dict) and 'model' in state and isinstance(state['model'], dict):
+    state = state['model']
+
+RESULT = {"config": cfg, "image": image, "weights_keys": list(state.keys())[:20] if isinstance(state, dict) else []}

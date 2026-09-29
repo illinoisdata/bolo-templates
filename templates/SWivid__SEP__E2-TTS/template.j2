@@ -1,0 +1,33 @@
+{% set text = text | default('Hello, this is a test of the E2-TTS model.') %}
+{% set ref_text = ref_text | default('This is a reference speech sample.') %}
+{% set speed = speed | default(1.0) %}
+{% set repo_id = repo_id | default("SWivid/E2-TTS") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+ref_text = "{{ ref_text }}"
+speed = {{ speed }}
+
+import os
+import json
+import torch
+import numpy as np
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file as load_safetensors
+
+repo_local_model = hf_hub_download(repo_id=repo_id, filename='E2TTS_Base/model_1200000.safetensors')
+
+state_dict = load_safetensors(repo_local_model, device='cpu')
+
+first_tensor = next(iter(state_dict.values()))
+out = {
+    'text': text,
+    'ref_text': ref_text,
+    'speed': speed,
+    'num_params': int(sum(v.numel() for v in state_dict.values())),
+    'first_tensor_shape': list(first_tensor.shape),
+    'first_tensor_dtype': str(first_tensor.dtype),
+}
+
+RESULT = {"output": out}

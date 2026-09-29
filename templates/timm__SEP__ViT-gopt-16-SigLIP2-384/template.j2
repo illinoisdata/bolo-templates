@@ -1,0 +1,45 @@
+{% set labels_list = labels_list | default(["a dog", "a cat", "a donut", "a beignet"]) %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+{% set repo_id = repo_id | default("timm/ViT-gopt-16-SigLIP2-384") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+labels_list = {{ labels_list }}
+
+from urllib.request import urlopen
+
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from open_clip import create_model_from_pretrained, get_tokenizer
+
+hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+
+def load_image(path_or_url):
+    if isinstance(path_or_url, str) and path_or_url.startswith(("http://", "https://")):
+        return Image.open(urlopen(path_or_url)).convert("RGB")
+    return Image.open(path_or_url).convert("RGB")
+
+image = load_image(image_path)
+
+model, preprocess = create_model_from_pretrained("hf-hub:" + repo_id, device=device)
+model.eval()
+tokenizer = get_tokenizer("hf-hub:" + repo_id)
+
+image_input = preprocess(image).unsqueeze(0).to(device)
+text_tokens = tokenizer(labels_list, context_length=model.context_length).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_input, normalize=True)
+    text_features = model.encode_text(text_tokens, normalize=True)
+    logit_scale = model.logit_scale.exp()
+    logit_bias = getattr(model, "logit_bias", 0)
+    text_probs = torch.sigmoid(image_features @ text_features.T * logit_scale + logit_bias)
+
+RESULT = {
+    "labels": labels_list,
+    "probabilities": text_probs[0].detach().cpu().tolist(),
+}

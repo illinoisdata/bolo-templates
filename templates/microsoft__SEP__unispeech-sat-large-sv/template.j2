@@ -1,69 +1,58 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("microsoft/unispeech-sat-large-sv") %}
-{% set input_audio = input_audio | default('/u/yli77/projects/ML-code-generation/data/audio.wav') %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+{% set target_audio_path = target_audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_audio = "{{ input_audio }}"
+audio_path = "{{ audio_path }}"
+target_audio_path = "{{ target_audio_path }}"
 
 import os
-import tempfile
-from pathlib import Path
-from urllib.parse import urlparse
-
-import numpy as np
-import requests
-import soundfile as sf
 import torch
-from scipy.signal import resample
-from transformers import AutoFeatureExtractor, UniSpeechSatForXVector
+import numpy as np
+import soundfile as sf
+from transformers import Wav2Vec2FeatureExtractor, UniSpeechSatForXVector
+from huggingface_hub import hf_hub_download
 
-feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
-model = UniSpeechSatForXVector.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+model_dir = os.path.dirname(weights_path)
+preprocessor_dir = os.path.dirname(preprocessor_path)
+
+feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(preprocessor_dir)
+model = UniSpeechSatForXVector.from_pretrained(model_dir, local_files_only=True, ignore_mismatched_sizes=True)
+model = model.to(device)
 model.eval()
 
-def _is_url(path: str) -> bool:
-    parsed = urlparse(path)
-    return parsed.scheme in {"http", "https"}
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    raise ValueError("URL audio inputs are not supported in this validation script")
+else:
+    audio_1, sr1 = sf.read(audio_path)
+if target_audio_path.startswith("http://") or target_audio_path.startswith("https://"):
+    raise ValueError("URL audio inputs are not supported in this validation script")
+else:
+    audio_2, sr2 = sf.read(target_audio_path)
 
-def _read_audio(path: str):
-    source_path = path
-    temp_path = None
-    if _is_url(path):
-        with requests.get(path, stream=True) as response:
-            response.raise_for_status()
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        temp_file.write(chunk)
-                temp_path = temp_file.name
-        source_path = temp_path
-    try:
-        array, sampling_rate = sf.read(source_path)
-    finally:
-        if temp_path is not None and os.path.exists(temp_path):
-            os.remove(temp_path)
-    if array.ndim > 1:
-        array = np.mean(array, axis=1)
-    array = array.astype(np.float32)
-    return array, sampling_rate
+if audio_1.ndim > 1:
+    audio_1 = np.mean(audio_1, axis=1)
+if audio_2.ndim > 1:
+    audio_2 = np.mean(audio_2, axis=1)
 
-def _prepare_audio(audio_path: str):
-    array, sampling_rate = _read_audio(audio_path)
-    target_sr = feature_extractor.sampling_rate
-    if sampling_rate != target_sr:
-        target_length = int(round(len(array) * target_sr / sampling_rate))
-        array = resample(array, target_length)
-        sampling_rate = target_sr
-    return array, sampling_rate
+if sr1 != 16000:
+    audio_1 = np.interp(np.linspace(0, len(audio_1), int(len(audio_1) * 16000 / sr1), endpoint=False), np.arange(len(audio_1)), audio_1).astype(np.float32)
+if sr2 != 16000:
+    audio_2 = np.interp(np.linspace(0, len(audio_2), int(len(audio_2) * 16000 / sr2), endpoint=False), np.arange(len(audio_2)), audio_2).astype(np.float32)
 
-processed_audio, processed_sr = _prepare_audio(input_audio)
-inputs = feature_extractor(processed_audio, sampling_rate=processed_sr, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs_1 = feature_extractor(audio_1, sampling_rate=16000, return_tensors="pt")
+inputs_2 = feature_extractor(audio_2, sampling_rate=16000, return_tensors="pt")
+inputs_1 = {k: v.to(device) for k, v in inputs_1.items()}
+inputs_2 = {k: v.to(device) for k, v in inputs_2.items()}
 
 with torch.no_grad():
-    outputs = model(**inputs)
-    embeddings = outputs.embeddings
-    normalized_embeddings = torch.nn.functional.normalize(embeddings, dim=-1)
+    emb1 = model(**inputs_1).embeddings
+    emb2 = model(**inputs_2).embeddings
+    emb1 = torch.nn.functional.normalize(emb1, dim=-1)
+    emb2 = torch.nn.functional.normalize(emb2, dim=-1)
+    cosine_sim = torch.nn.functional.cosine_similarity(emb1, emb2).item()
 
-speaker_embedding = normalized_embeddings.squeeze(0).cpu().numpy()
-RESULT = {"speaker_embedding": speaker_embedding}
+RESULT = {"cosine_similarity": cosine_sim, "embedding_1": emb1.squeeze(0).detach().cpu().numpy(), "embedding_2": emb2.squeeze(0).detach().cpu().numpy()}

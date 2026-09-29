@@ -1,0 +1,42 @@
+{% set repo_id = repo_id | default("garak-llm/roberta_toxicity_classifier") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('You are amazing!') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+hf_hub_download(repo_id=repo_id, filename="vocab.json")
+hf_hub_download(repo_id=repo_id, filename="merges.txt")
+
+_tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+model = AutoModelForSequenceClassification.from_pretrained(repo_id, local_files_only=True)
+state_dict = torch.load(model_path, map_location="cpu")
+state_dict.pop("roberta.pooler.dense.weight", None)
+state_dict.pop("roberta.pooler.dense.bias", None)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+inputs = _tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    logits = model(**inputs).logits
+    probs = torch.softmax(logits, dim=-1)
+    pred_idx = int(torch.argmax(probs, dim=-1).item())
+    pred_label = model.config.id2label[str(pred_idx)] if str(pred_idx) in model.config.id2label else model.config.id2label[pred_idx]
+
+RESULT = {
+    "text": text,
+    "predicted_label": pred_label,
+    "predicted_index": pred_idx,
+    "probabilities": probs.squeeze(0).detach().cpu().tolist(),
+}

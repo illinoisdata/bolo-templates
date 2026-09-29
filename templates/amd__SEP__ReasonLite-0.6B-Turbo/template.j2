@@ -1,0 +1,52 @@
+{% set repo_id = repo_id | default("amd/ReasonLite-0.6B-Turbo") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Solve the following math problem step by step, then give the final answer clearly.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens | default(256) }}
+temperature = {{ temperature | default(0.6) }}
+top_p = {{ top_p | default(0.95) }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+# Load tokenizer and model on the specified device
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+model.eval()
+
+messages = [
+    {"role": "system", "content": "You are a helpful assistant specialized in mathematical reasoning."},
+    {"role": "user", "content": prompt},
+]
+input_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = tokenizer(input_text, return_tensors="pt").to(device)
+
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=True,
+        temperature=temperature,
+        top_p=top_p,
+        eos_token_id=tokenizer.eos_token_id,
+        pad_token_id=tokenizer.eos_token_id,
+    )
+
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+RESULT = {"text": output_text}

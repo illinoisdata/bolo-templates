@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("ibm-research/biomed.sm.mv-te-84m") %}
+{% set device = device | default("cuda:0") %}
+{% set smiles = smiles | default('CC(C)CC1=CC=C(C=C1)C(C)C(=O)O') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+smiles = "{{ smiles }}"
+
+from huggingface_hub import hf_hub_download
+import json
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+config = json.load(open(config_path))
+with open(weights_path, "rb") as f:
+    weights_size = len(f.read())
+
+RESULT = {"config": config, "weights_size": weights_size, "smiles": smiles}

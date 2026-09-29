@@ -1,0 +1,30 @@
+{% set repo_id = repo_id | default("Xenova/toxic-bert") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('You are a horrible person and everyone hates you.', true) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="onnx/model.onnx")
+repo_dir = os.path.dirname(os.path.dirname(weights_path))
+
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, use_fast=True)
+config = AutoConfig.from_pretrained(config_path)
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+
+model = AutoModelForSequenceClassification.from_config(config)
+model.to(device)
+model.eval()
+
+with torch.no_grad():
+    outputs = model(**{k: v.to(device) for k, v in inputs.items()})
+    probabilities = torch.sigmoid(outputs.logits).cpu().numpy()[0]
+
+labels = [config.id2label[i] if i in config.id2label else config.id2label[str(i)] for i in range(len(probabilities))]
+RESULT = {"predictions": {label: float(prob) for label, prob in zip(labels, probabilities)}}

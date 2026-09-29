@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("keremberke/yolov8s-table-extraction") %}
+{% set device = device | default("cuda:0") %}
+{% set image = image | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set conf = conf | default(0.25) %}
+{% set iou = iou | default(0.45) %}
+{% set agnostic_nms = agnostic_nms | default(false) %}
+{% set max_det = max_det | default(1000) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image = "{{ image }}"
+conf = {{ conf }}
+iou = {{ iou }}
+agnostic_nms = {{ agnostic_nms }}
+max_det = {{ max_det }}
+
+import requests
+from io import BytesIO
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from ultralytics import YOLO
+
+if image.startswith('http://') or image.startswith('https://'):
+    image_input = Image.open(BytesIO(requests.get(image, timeout=30).content)).convert('RGB')
+else:
+    image_input = Image.open(image).convert('RGB')
+
+best_pt_path = hf_hub_download(repo_id=repo_id, filename='best.pt')
+model = YOLO(best_pt_path)
+results = model.predict(source=image_input, conf=conf, iou=iou, agnostic_nms=agnostic_nms, max_det=max_det, device=device, verbose=False)
+result0 = results[0]
+boxes = result0.boxes
+labels = []
+if boxes is not None and len(boxes) > 0:
+    names = model.names
+    for cls_id in boxes.cls.tolist():
+        labels.append(names[int(cls_id)])
+
+RESULT = {
+    'boxes_xyxy': boxes.xyxy.cpu().tolist() if boxes is not None else [],
+    'scores': boxes.conf.cpu().tolist() if boxes is not None else [],
+    'class_ids': boxes.cls.cpu().tolist() if boxes is not None else [],
+    'labels': labels,
+}

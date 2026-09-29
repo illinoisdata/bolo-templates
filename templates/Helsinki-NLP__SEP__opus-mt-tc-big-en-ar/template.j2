@@ -1,18 +1,41 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-en-ar") %}
-{% set source_text = source_text | default(["Hello world!", ">>ara<< I can't help you because I'm busy."]) %}
+{% set device = device | default("cuda:0") %}
+{% set src_text = src_text | default([">>ara<< I can't help you because I'm busy.", ">>ara<< I have to write a letter. Do you have some paper?"]) %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_text = {{ source_text | tojson }}
+src_text = {{ src_text }}
+max_new_tokens = {{ max_new_tokens }}
 
 from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import torch
+from transformers import MarianMTModel, MarianTokenizer
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
-model_inputs = tokenizer(source_text, return_tensors="pt", padding=True, truncation=True)
-model_inputs = {key: value.to(device) for key, value in model_inputs.items()}
-generated_tokens = model.generate(**model_inputs)
-translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+if not Path(model_path).exists():
+    model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+
+if isinstance(src_text, str):
+    inputs = [src_text]
+else:
+    inputs = src_text
+
+tokenizer = MarianTokenizer.from_pretrained(Path(tokenizer_config_path).parent)
+model = MarianMTModel.from_pretrained(Path(config_path).parent, torch_dtype=torch.float16 if device.startswith("cuda") else torch.float32)
+model.to(device)
+model.eval()
+
+batch = tokenizer(inputs, return_tensors="pt", padding=True, truncation=True)
+batch = {k: v.to(device) for k, v in batch.items()}
+with torch.no_grad():
+    generated = model.generate(**batch, max_new_tokens=max_new_tokens)
+translations = [tokenizer.decode(t, skip_special_tokens=True) for t in generated]
 
 RESULT = {"translations": translations}

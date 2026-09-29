@@ -1,44 +1,33 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("schen/longformer-chinese-base-4096") %}
-{% set text_input = text_input | default("今天天气很好，适合处理长文本。") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('今天天气很好，我们一起去公园散步。') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+text = "{{ text }}"
 
-import json
 import os
-
 import torch
-from transformers import AutoModelForPreTraining, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForPreTraining
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+model = AutoModelForPreTraining.from_pretrained(os.path.dirname(weights_path), local_files_only=True)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(
-    text_input,
-    return_tensors="pt",
-    truncation=True,
-    max_length=4096,
-)
-device_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(vocab_path), local_files_only=True, use_fast=False)
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=4096)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**device_inputs)
-
-prediction_token_ids = outputs.prediction_logits[0].argmax(dim=-1).cpu().tolist()
-predicted_tokens = tokenizer.convert_ids_to_tokens(prediction_token_ids)
-prediction_text = tokenizer.decode(
-    prediction_token_ids,
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-)
-next_sentence_logits = outputs.seq_relationship_logits[0].cpu().tolist()
-input_ids = encoded_inputs["input_ids"][0].tolist()
+    outputs = model(**inputs)
 
 RESULT = {
-    "input_ids": input_ids,
-    "predicted_tokens": predicted_tokens,
-    "prediction_text": prediction_text,
-    "next_sentence_logits": next_sentence_logits,
+    "prediction_logits": outputs.prediction_logits.detach().cpu(),
+    "seq_relationship_logits": outputs.seq_relationship_logits.detach().cpu(),
 }

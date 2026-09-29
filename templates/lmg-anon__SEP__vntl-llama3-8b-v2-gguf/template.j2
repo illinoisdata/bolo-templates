@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("lmg-anon/vntl-llama3-8b-v2-gguf") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('vntl-llama3-8b-v2-hf-q5_k_m.gguf') %}
+{% set prompt = prompt | default('Translate the following Japanese visual novel text into natural English. Return only the translation, preserving speaker tags and line breaks.\n\nJapanese:\n[桜乃]: 『……ごめん』') %}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+quant_filename = {{ quant_filename | tojson }}
+prompt = {{ prompt | tojson }}
+
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+llm = Llama(
+    model_path=model_path,
+    n_ctx=2048,
+    n_threads=4,
+    n_batch=128,
+    verbose=False,
+)
+
+system_prompt = "You are a professional Japanese-to-English translation engine for visual novels. Translate accurately and naturally."
+full_prompt = (
+    "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n"
+    + system_prompt
+    + "<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n"
+    + prompt
+    + "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+)
+
+outputs = llm(
+    full_prompt,
+    max_tokens=256,
+    temperature=0.0,
+    top_p=1.0,
+    repeat_penalty=1.0,
+    stop=["<|eot_id|>"],
+)
+text = outputs["choices"][0]["text"].strip()
+
+RESULT = {"translation": text}

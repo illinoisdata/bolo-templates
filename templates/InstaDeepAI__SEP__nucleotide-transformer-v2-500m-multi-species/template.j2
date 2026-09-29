@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("InstaDeepAI/nucleotide-transformer-v2-500m-multi-species") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set model = model | default(repo_id) %}
+{% set masked_prompt = masked_prompt | default("ACCTGA<mask>TTCTGAGTC") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+from transformers import AutoTokenizer, pipeline
+from transformers.models.esm.modeling_esm import EsmForMaskedLM
+
+tokenizer = AutoTokenizer.from_pretrained(model)
+model_obj = EsmForMaskedLM.from_pretrained(model, ignore_mismatched_sizes=True)
+pipe = pipeline(task=task, model=model_obj, tokenizer=tokenizer, device=device)
+mask_token = tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

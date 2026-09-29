@@ -1,32 +1,43 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("GanymedeNil/text2vec-base-chinese") %}
-{% set texts = texts | default(["这是第一句中文。", "这是第二句中文。"]) %}
+{% set device = device | default("cuda:0") %}
+{% set text1 = text1 | default('今天天气很好，我们去公园散步。') %}
+{% set text2 = text2 | default('今天阳光明媚，适合去户外走走。') %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-texts = {{ texts }}
-
-import json
-from pathlib import Path
+text1 = "{{ text1 }}"
+text2 = "{{ text2 }}"
 
 import torch
-from transformers import AutoModel, AutoTokenizer
+import torch.nn.functional as F
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+# ensure tokenizer assets are available for AutoTokenizer
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+# Load tokenizer/model from local repo files
+# AutoTokenizer can use the downloaded files directly via repo_id; weights loaded from local path.
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(texts, padding=True, truncation=True, return_tensors="pt")
-encoded_inputs = {key: tensor.to(device) for key, tensor in encoded_inputs.items()}
+inputs = tokenizer([text1, text2], padding=True, truncation=True, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    model_outputs = model(**encoded_inputs)
+    outputs = model(**inputs)
+    hidden = outputs.last_hidden_state
+    attention_mask = inputs["attention_mask"].unsqueeze(-1).type_as(hidden)
+    summed = (hidden * attention_mask).sum(dim=1)
+    counts = attention_mask.sum(dim=1).clamp(min=1e-9)
+    embeddings = F.normalize(summed / counts, p=2, dim=1)
+    similarity = torch.sum(embeddings[0] * embeddings[1]).item()
 
-attention_mask = encoded_inputs["attention_mask"]
-mask = attention_mask.unsqueeze(-1)
-masked_hidden_state = model_outputs.last_hidden_state * mask
-sum_embeddings = masked_hidden_state.sum(dim=1)
-mask_sum = mask.sum(dim=1).clamp_min(1e-9)
-pooled_embeddings = sum_embeddings / mask_sum
-sentence_embeddings = pooled_embeddings.cpu().tolist()
-
-RESULT = {"sentence_embeddings": sentence_embeddings}
+RESULT = {"similarity": similarity, "embeddings": embeddings.detach().cpu().tolist()}

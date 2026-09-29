@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("kiwhansong/DFoT") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('A scenic mountain landscape with a river flowing through it.') %}
+{% set num_frames = num_frames | default(4) %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+num_frames = {{ num_frames }}
+image_path = "{{ image_path }}"
+
+from pathlib import Path
+
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+
+def load_image(path_or_url):
+    if str(path_or_url).startswith(("http://", "https://")):
+        import requests
+        from io import BytesIO
+        return Image.open(BytesIO(requests.get(path_or_url, timeout=30).content)).convert("RGB")
+    return Image.open(path_or_url).convert("RGB")
+
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+ckpt_path = hf_hub_download(repo_id=repo_id, filename="pretrained_models/DFoT_RE10K.ckpt")
+
+image = load_image(image_path)
+image_tensor = torch.from_numpy(__import__('numpy').array(image)).permute(2, 0, 1).float() / 255.0
+ckpt = torch.load(ckpt_path, map_location="cpu")
+state_keys = list(ckpt.keys()) if isinstance(ckpt, dict) else []
+
+RESULT = {
+    "repo_id": repo_id,
+    "device": device,
+    "prompt": prompt,
+    "num_frames": num_frames,
+    "image_size": image.size,
+    "image_tensor": image_tensor,
+    "checkpoint_keys": state_keys,
+}

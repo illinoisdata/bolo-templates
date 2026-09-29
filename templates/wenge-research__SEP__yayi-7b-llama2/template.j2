@@ -1,0 +1,48 @@
+{% set repo_id = repo_id | default("wenge-research/yayi-7b-llama2") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") -%}
+{% set input_prompt = input_prompt | default("你是谁？") -%}
+{% set system_instructions = system_instructions | default("<|System|>:\nYou are a helpful, respectful and honest assistant named YaYi developed by Beijing Wenge Technology Co.,Ltd. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature.\n\nIf a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.") -%}
+{% set temperature = temperature | default(0.3) -%}
+{% set max_new_tokens = max_new_tokens | default(256) -%}
+{% set repetition_penalty = repetition_penalty | default(1.1) -%}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(0) -%}
+{% set do_sample = do_sample | default(true) -%}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+model = repo_id
+input_prompt = {{ input_prompt | tojson }}
+system_instructions = {{ system_instructions | tojson }}
+temperature = {{ temperature }}
+max_new_tokens = {{ max_new_tokens }}
+repetition_penalty = {{ repetition_penalty }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+do_sample = {{ do_sample }}
+
+from transformers import pipeline
+
+if isinstance(device, str) and device.startswith("cuda"):
+    device_parts = device.split(":")
+    pipeline_device = int(device_parts[1]) if len(device_parts) > 1 and device_parts[1].isdigit() else 0
+else:
+    pipeline_device = -1
+
+pipe = pipeline(task=task, model=model, device=pipeline_device)
+
+formatted_prompt = (
+    f"{system_instructions}\n\n"
+    f"<|Human|>:\n{input_prompt}\n\n"
+    "<|YaYi|>:\n"
+)
+
+RESULT = pipe(
+    formatted_prompt,
+    max_new_tokens=max_new_tokens,
+    temperature=temperature,
+    repetition_penalty=repetition_penalty,
+    no_repeat_ngram_size=no_repeat_ngram_size,
+    do_sample=do_sample,
+)
+
+RESULT = {"generated_text": RESULT}

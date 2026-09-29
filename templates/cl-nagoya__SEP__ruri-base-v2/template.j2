@@ -1,0 +1,36 @@
+{% set repo_id = repo_id | default("cl-nagoya/ruri-base-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default("クエリ: 瑠璃色はどんな色？") %}
+{% set passage = passage | default("文章: 瑠璃色（るりいろ）は、紫みを帯びた濃い青。名は、半貴石の瑠璃（ラピスラズリ、英: lapis lazuli）による。") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+passage = "{{ passage }}"
+
+import os
+import torch
+from sentence_transformers import SentenceTransformer
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+sentence_bert_config_path = hf_hub_download(repo_id=repo_id, filename="sentence_bert_config.json")
+config_sentence_transformers_path = hf_hub_download(repo_id=repo_id, filename="config_sentence_transformers.json")
+pooling_config_path = hf_hub_download(repo_id=repo_id, filename="1_Pooling/config.json")
+
+model = SentenceTransformer(repo_id, device=device)
+
+sentences = [question, passage]
+embeddings = model.encode(sentences, convert_to_tensor=True, normalize_embeddings=True)
+similarity = torch.nn.functional.cosine_similarity(
+    embeddings[0].unsqueeze(0), embeddings[1].unsqueeze(0), dim=1
+).item()
+
+RESULT = {
+    "embeddings": embeddings,
+    "similarity": similarity,
+}

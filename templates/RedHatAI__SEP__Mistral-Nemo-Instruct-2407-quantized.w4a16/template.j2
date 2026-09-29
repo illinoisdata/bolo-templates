@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("RedHatAI/Mistral-Nemo-Instruct-2407-quantized.w4a16") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('You are a helpful assistant.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+
+config = AutoConfig.from_pretrained(config_path, trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    config=config,
+    torch_dtype=torch.bfloat16,
+    device_map={"": device},
+    trust_remote_code=True,
+    local_files_only=False,
+)
+
+messages = [{"role": "user", "content": prompt}]
+input_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = tokenizer(input_text, return_tensors="pt").to(model.device)
+
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=32,
+        do_sample=False,
+        pad_token_id=tokenizer.eos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+output_text = tokenizer.decode(generated[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True)
+
+RESULT = {"generated_text": output_text}

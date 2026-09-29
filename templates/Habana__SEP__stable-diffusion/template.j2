@@ -1,0 +1,54 @@
+{% set repo_id = repo_id | default("Habana/stable-diffusion") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('An image of a squirrel in Picasso style') %}
+{% set model_id = model_id | default('runwayml/stable-diffusion-v1-5') %}
+{% set num_inference_steps = num_inference_steps | default(20) %}
+{% set guidance_scale = guidance_scale | default(7.5) %}
+{% set height = height | default(512) %}
+{% set width = width | default(512) %}
+{% set seed = seed | default(0) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+model_id = "{{ model_id }}"
+num_inference_steps = {{ num_inference_steps }}
+guidance_scale = {{ guidance_scale }}
+height = {{ height }}
+width = {{ width }}
+seed = {{ seed }}
+
+import json
+import torch
+from diffusers import StableDiffusionPipeline, DDIMScheduler
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gaudi_config.json")
+with open(config_path, "r") as f:
+    gaudi_config = json.load(f)
+
+scheduler = DDIMScheduler.from_pretrained(model_id, subfolder="scheduler")
+pipeline = StableDiffusionPipeline.from_pretrained(
+    model_id,
+    scheduler=scheduler,
+    torch_dtype=torch.float16 if device.startswith("cuda") else torch.float32,
+    safety_checker=None,
+    requires_safety_checker=False,
+)
+pipeline = pipeline.to(device)
+
+if device.startswith("cuda"):
+    pipeline.enable_attention_slicing()
+
+generator = torch.Generator(device=device if device.startswith("cuda") else "cpu").manual_seed(seed)
+
+result = pipeline(
+    prompt,
+    num_inference_steps=num_inference_steps,
+    guidance_scale=guidance_scale,
+    height=height,
+    width=width,
+    generator=generator,
+)
+image = result.images[0]
+
+RESULT = {"image": image}

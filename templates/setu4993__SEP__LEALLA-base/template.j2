@@ -1,42 +1,41 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("setu4993/LEALLA-base") %}
-{% set sentences = sentences | default(["A cat sits by the window.", "Birds are singing in the trees."]) %}
-{% set comparison_sentences = comparison_sentences | default(["The feline rests near the glass.", "Woodland melodies surround the park."]) %}
+{% set device = device | default("cuda:0") %}
+{% set sentences = sentences | default(["dog", "Puppies are nice.", "I enjoy taking long walks along the beach with my dog."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 sentences = {{ sentences }}
-comparison_sentences = {{ comparison_sentences }}
 
-from pathlib import Path
-import numpy as np
 import torch
 import torch.nn.functional as F
-from transformers import AutoModel, AutoTokenizer
+from transformers import BertModel, BertTokenizerFast
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id)
-model = model.to(device)
-model.eval()
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-tokenized_inputs = tokenizer(sentences, padding=True, truncation=True, return_tensors="pt")
-tokenized_comparison = tokenizer(comparison_sentences, padding=True, truncation=True, return_tensors="pt")
 
-tokenized_inputs = {key: value.to(device) for key, value in tokenized_inputs.items()}
-tokenized_comparison = {key: value.to(device) for key, value in tokenized_comparison.items()}
+tokenizer = BertTokenizerFast.from_pretrained(
+    pretrained_model_name_or_path=vocab_path.rsplit('/', 1)[0],
+    local_files_only=True,
+)
+model = BertModel.from_pretrained(
+    pretrained_model_name_or_path=weights_path.rsplit('/', 1)[0],
+    local_files_only=True,
+)
+model = model.to(device).eval()
+
+inputs = tokenizer(sentences, return_tensors="pt", padding=True, truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    embeddings_outputs = model(**tokenized_inputs)
-    comparison_outputs = model(**tokenized_comparison)
+    outputs = model(**inputs)
 
-embeddings = embeddings_outputs.pooler_output
-comparison_embeddings = comparison_outputs.pooler_output
+embeddings = outputs.pooler_output
+normalized_embeddings = F.normalize(embeddings, p=2, dim=1)
+similarity_matrix = torch.matmul(normalized_embeddings, normalized_embeddings.transpose(0, 1))
 
-normalized_embeddings = F.normalize(embeddings, p=2, dim=-1)
-normalized_comparison = F.normalize(comparison_embeddings, p=2, dim=-1)
-similarity_matrix = torch.matmul(normalized_embeddings, normalized_comparison.transpose(0, 1))
-
-RESULT = {
-    "normalized_embeddings": normalized_embeddings,
-    "comparison_normalized_embeddings": normalized_comparison,
-    "similarity_matrix": similarity_matrix,
-}
+RESULT = {"embeddings": embeddings.cpu(), "similarity_matrix": similarity_matrix.cpu()}

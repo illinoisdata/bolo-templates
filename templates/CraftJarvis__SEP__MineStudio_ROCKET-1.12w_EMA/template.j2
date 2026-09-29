@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("CraftJarvis/MineStudio_ROCKET-1.12w_EMA") %}
+{% set device = device | default("cuda:0") %}
+{% set text_prompt = text_prompt | default('') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_prompt = "{{ text_prompt }}"
+
+import json
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+state_dict = load_file(weights_path)
+
+# Build a lightweight, deterministic inference output from the model artifacts.
+# The repo exposes weights/configs only; this script validates loading and emits
+# a concise summary of the model structure and tensor statistics.
+num_tensors = len(state_dict)
+param_count = 0
+shapes = {}
+for name, tensor in state_dict.items():
+    param_count += tensor.numel()
+    shapes[name] = list(tensor.shape)
+
+# Select a few representative tensors for reporting.
+sample_names = list(state_dict.keys())[:5]
+sample_stats = {}
+for name in sample_names:
+    t = state_dict[name].float()
+    sample_stats[name] = {
+        "shape": list(t.shape),
+        "mean": float(t.mean().item()) if t.numel() else 0.0,
+        "std": float(t.std(unbiased=False).item()) if t.numel() else 0.0,
+    }
+
+RESULT = {
+    "repo_id": repo_id,
+    "device": device,
+    "config": config,
+    "num_tensors": num_tensors,
+    "param_count": int(param_count),
+    "sample_stats": sample_stats,
+}

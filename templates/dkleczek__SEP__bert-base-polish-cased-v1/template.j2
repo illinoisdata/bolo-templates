@@ -1,22 +1,26 @@
 {% set repo_id = repo_id | default("dkleczek/bert-base-polish-cased-v1") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("Adam Mickiewicz wielkim polskim <mask> był.") %}
+{% set mask_text = mask_text | default('Adam Mickiewicz wielkim polskim [MASK] był.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = "{{ text }}"
+mask_text = "{{ mask_text }}"
 
-import os
-import json
-from transformers import AutoTokenizer, pipeline
+import torch
+from transformers import AutoTokenizer, AutoModelForMaskedLM, pipeline
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-if device.startswith("cuda"):
-    device_id = int(device.split(":")[1])
-else:
-    device_id = -1
-nlp = pipeline("fill-mask", model=repo_id, tokenizer=tokenizer, device=device_id)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-input_text = text.replace("<mask>", tokenizer.mask_token)
-predictions = nlp(input_text)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForMaskedLM.from_pretrained(repo_id, torch_dtype=torch.float32, low_cpu_mem_usage=True)
+model.to(device)
+model.eval()
 
-RESULT = {"predictions": predictions}
+nlp = pipeline(task="fill-mask", model=model, tokenizer=tokenizer, device=0 if device.startswith("cuda") else -1)
+output = nlp(mask_text)
+
+RESULT = {"output": output}

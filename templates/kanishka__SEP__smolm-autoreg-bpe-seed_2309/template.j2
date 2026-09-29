@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("kanishka/smolm-autoreg-bpe-seed_2309") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, tokenizer=repo_id, device=device)
+text_input = input_prompt
+model_outputs = pipe(text_input)
+RESULT = {"outputs": model_outputs}

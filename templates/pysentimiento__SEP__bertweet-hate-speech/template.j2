@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("pysentimiento/bertweet-hate-speech") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("I love sunny days and friendly conversations on social media.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+model = AutoModelForSequenceClassification.from_pretrained(repo_id, config=config_path)
+state_dict = torch.load(weights_path, map_location="cpu")
+state_dict.pop("roberta.embeddings.position_ids", None)
+model.load_state_dict(state_dict, strict=True)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probs = torch.sigmoid(logits).squeeze(0).detach().cpu().tolist()
+
+labels = [model.config.id2label[i] for i in range(logits.shape[-1])]
+RESULT = {"labels": labels, "probabilities": probs}

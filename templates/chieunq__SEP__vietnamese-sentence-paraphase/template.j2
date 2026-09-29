@@ -1,33 +1,30 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("chieunq/vietnamese-sentence-paraphase") %}
-{% set input_text = input_text | default("Thật tự hào khi là sinh viên trường Đại học Công nghệ") %}
-{% set max_length = max_length | default(64) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Thật tự hào khi là sinh viên trường Đại học Công nghệ') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-max_length = {{ max_length }}
-
-from pathlib import Path
+text = "{{ text }}"
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename='pytorch_model.bin')
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+_ = hf_hub_download(repo_id=repo_id, filename='generation_config.json')
+_ = hf_hub_download(repo_id=repo_id, filename='spiece.model')
+_ = hf_hub_download(repo_id=repo_id, filename='tokenizer_config.json')
+_ = hf_hub_download(repo_id=repo_id, filename='special_tokens_map.json')
 
-preprocessed_inputs = tokenizer(
-    input_text,
-    return_tensors="pt",
-    padding="longest",
-    truncation=True,
-    max_length=max_length,
-)
-preprocessed_inputs = {key: value.to(device) for key, value in preprocessed_inputs.items()}
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, config=config_path, state_dict=torch.load(weights_path, map_location='cpu'))
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = model.to(device)
+model.eval()
 
-generated_outputs = model.generate(**preprocessed_inputs, max_length=max_length)
-paraphrased_text = tokenizer.decode(
-    generated_outputs[0],
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-)
+inputs = tokenizer(text, padding='longest', max_length=64, truncation=True, return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_length=64)
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-RESULT = {"paraphrased_text": paraphrased_text}
+RESULT = {"output": output_text}

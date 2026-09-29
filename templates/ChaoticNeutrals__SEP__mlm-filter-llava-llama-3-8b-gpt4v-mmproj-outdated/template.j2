@@ -1,0 +1,30 @@
+{% set repo_id = repo_id | default("ChaoticNeutrals/mlm-filter-llava-llama-3-8b-gpt4v-mmproj-outdated") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set prompt = prompt | default('Describe the image briefly.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+
+import urllib.request
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+mmproj_path = hf_hub_download(repo_id=repo_id, filename="mmproj-model-f16.gguf")
+
+if image_path.startswith(("http://", "https://")):
+    with urllib.request.urlopen(image_path) as response:
+        image = Image.open(response).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+RESULT = {
+    "output": {
+        "repo_id": repo_id,
+        "device": device,
+        "mmproj_path": mmproj_path,
+        "image_size": image.size,
+        "prompt": prompt,
+    }
+}

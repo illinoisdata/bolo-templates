@@ -1,0 +1,41 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("PaddlePaddle/PP-LCNet_x1_0_textline_ori") %}
+{% set device = device | default("cuda:0") %}
+{% set input_name = input_name | default('image') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+input_name = "{{ input_name }}"
+
+import numpy as np
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from paddleocr import TextLineOrientationClassification
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="inference.pdiparams")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="inference.yml")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+image = np.array(image)
+
+model = TextLineOrientationClassification(model_name="PP-LCNet_x1_0_textline_ori")
+output = model.predict(input=image, batch_size=1)
+
+predictions = []
+for res in output:
+    if hasattr(res, "json"):
+        data = res.json if not callable(res.json) else res.json()
+    elif hasattr(res, "to_dict"):
+        data = res.to_dict()
+    else:
+        data = {k: v for k, v in getattr(res, "__dict__", {}).items() if not k.startswith("_")}
+    predictions.append(data)
+
+RESULT = {"predictions": predictions}

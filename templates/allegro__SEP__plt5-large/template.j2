@@ -1,27 +1,38 @@
-{% set repo_id = repo_id | default("allegro/plt5-large") %}
+{% set input_text = input_text | default('Transformers are powerful models for natural language processing tasks.') %}
+{% set text = text | default('Napisz krótkie podsumowanie poniższego tekstu: ' ~ input_text) %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("To jest test.") %}
-{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set repo_id = repo_id | default("allegro/plt5-large") %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
+input_text = "{{ input_text }}"
 text = "{{ text }}"
 max_new_tokens = {{ max_new_tokens }}
 
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import T5Tokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-device = torch.device(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+
+_ = config_path, weights_path, tokenizer_config_path, special_tokens_path
+
+tokenizer = T5Tokenizer(vocab_file=spiece_path)
+model = T5ForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-# Pre-process input
-encoded = tokenizer(text, return_tensors="pt").to(device)
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Run inference
-with torch.inference_mode():
-    generated_ids = model.generate(**encoded, max_new_tokens=max_new_tokens)
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
 
-# Post-process & build RESULT dict
-generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-RESULT = {"generated_text": generated_text}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("TencentGameMate/chinese-hubert-base") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set wav_path = wav_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+wav_path = "{{ wav_path }}"
+
+from pathlib import Path
+import numpy as np
+import soundfile as sf
+from transformers import pipeline, Wav2Vec2FeatureExtractor
+
+feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(repo_id)
+
+class _AudioFeatureTokenizer:
+    def __init__(self, extractor):
+        self.extractor = extractor
+        self.target_sampling_rate = extractor.sampling_rate
+
+    def _resample(self, data, sr):
+        if sr == self.target_sampling_rate:
+            return data
+        duration = data.shape[0] / sr
+        target_length = int(round(duration * self.target_sampling_rate))
+        if target_length <= 0:
+            raise ValueError("Resampled audio would have zero length!")
+        interpolator = np.interp(
+            np.linspace(0, data.shape[0] - 1, target_length),
+            np.arange(data.shape[0]),
+            data,
+        )
+        return interpolator
+
+    def __call__(self, inputs, return_tensors="pt", **kwargs):
+        if isinstance(inputs, (str, Path)):
+            data, sampling_rate = sf.read(inputs)
+            if data.ndim > 1:
+                data = data.mean(axis=1)
+            data = data.astype(np.float32)
+            data = self._resample(data, sampling_rate)
+            return self.extractor(data, sampling_rate=self.target_sampling_rate, return_tensors=return_tensors, **kwargs)
+        return self.extractor(inputs, sampling_rate=self.target_sampling_rate, return_tensors=return_tensors, **kwargs)
+
+audio_tokenizer = _AudioFeatureTokenizer(feature_extractor)
+pipe = pipeline(task=task, model=repo_id, tokenizer=audio_tokenizer, device=device)
+
+RESULT = pipe(wav_path)

@@ -1,0 +1,75 @@
+{% set repo_id = repo_id | default("Pushti/BirefNetHR") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set image_size = image_size | default(2048) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+image_size = {{ image_size }}
+
+import os
+import sys
+import types
+import importlib.util
+import torch
+from PIL import Image
+from torchvision import transforms
+from safetensors.torch import load_file
+from huggingface_hub import hf_hub_download
+
+config_py = hf_hub_download(repo_id=repo_id, filename="BiRefNet_config.py")
+birefnet_py = hf_hub_download(repo_id=repo_id, filename="birefnet.py")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+repo_file_dir = os.path.dirname(birefnet_py)
+parent_pkg = "birefnet_remote"
+if repo_file_dir not in sys.path:
+    sys.path.insert(0, repo_file_dir)
+
+pkg = types.ModuleType(parent_pkg)
+pkg.__path__ = [repo_file_dir]
+sys.modules[parent_pkg] = pkg
+
+spec_cfg = importlib.util.spec_from_file_location(f"{parent_pkg}.BiRefNet_config", config_py)
+cfg_mod = importlib.util.module_from_spec(spec_cfg)
+sys.modules[f"{parent_pkg}.BiRefNet_config"] = cfg_mod
+spec_cfg.loader.exec_module(cfg_mod)
+
+spec = importlib.util.spec_from_file_location(f"{parent_pkg}.birefnet", birefnet_py)
+mod = importlib.util.module_from_spec(spec)
+mod.__package__ = parent_pkg
+sys.modules[f"{parent_pkg}.birefnet"] = mod
+spec.loader.exec_module(mod)
+BiRefNet = mod.BiRefNet
+BiRefNetConfig = cfg_mod.BiRefNetConfig
+
+config = BiRefNetConfig()
+model = BiRefNet(config)
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict, strict=True)
+model.to(device)
+model.eval()
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    from urllib.request import urlopen
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+transform_image = transforms.Compose([
+    transforms.Resize((image_size, image_size)),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+])
+input_tensor = transform_image(image).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    preds = model(input_tensor)[-1].sigmoid().cpu()
+
+pred = preds[0].squeeze()
+mask = transforms.ToPILImage()(pred).resize(image.size)
+rgba = image.copy()
+rgba.putalpha(mask)
+output_mask = mask
+output_image = rgba
+
+RESULT = {"output_image": output_image, "output_mask": output_mask}

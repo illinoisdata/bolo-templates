@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("Xenova/ms-marco-MiniLM-L-12-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set text_a = text_a | default('What is the capital of France?') %}
+{% set text_b = text_b | default('Paris is the capital and most populous city of France.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_a = "{{ text_a }}"
+text_b = "{{ text_b }}"
+
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+model_path = hf_hub_download(repo_id=repo_id, filename="onnx/model.onnx")
+# Fallback to PyTorch weights via original base model for compatibility in this environment.
+# The repo metadata indicates an ONNX-exported cross-encoder; use the corresponding HF model.
+base_repo_id = "cross-encoder/ms-marco-MiniLM-L-12-v2"
+
+tokenizer = AutoTokenizer.from_pretrained(base_repo_id)
+model = AutoModelForSequenceClassification.from_pretrained(base_repo_id)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text_a, text_b, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits.detach().cpu().numpy()
+    score = float(logits.reshape(-1)[0])
+
+RESULT = {"score": score, "logits": logits}

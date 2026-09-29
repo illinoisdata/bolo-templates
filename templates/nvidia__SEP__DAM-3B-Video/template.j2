@@ -1,0 +1,34 @@
+{% set repo_id = repo_id | default("nvidia/DAM-3B-Video") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default("Describe the highlighted region in detail.") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+image_path = "{{ image_path }}"
+
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+image = Image.open(image_path).convert("RGB") if not str(image_path).startswith(("http://", "https://")) else Image.open(__import__('requests').get(image_path, stream=True).raw).convert("RGB")
+
+llm_config_path = hf_hub_download(repo_id=repo_id, filename="llm/config.json")
+llm_tokenizer_model = hf_hub_download(repo_id=repo_id, filename="llm/tokenizer.model")
+llm_tokenizer_config = hf_hub_download(repo_id=repo_id, filename="llm/tokenizer_config.json")
+llm_special_tokens = hf_hub_download(repo_id=repo_id, filename="llm/special_tokens_map.json")
+llm_weights_index = hf_hub_download(repo_id=repo_id, filename="llm/model.safetensors.index.json")
+llm_weights_1 = hf_hub_download(repo_id=repo_id, filename="llm/model-00001-of-00002.safetensors")
+llm_weights_2 = hf_hub_download(repo_id=repo_id, filename="llm/model-00002-of-00002.safetensors")
+
+# Use the text LLM component for a lightweight sanity-check inference path.
+tokenizer = AutoTokenizer.from_pretrained(repo_id, subfolder="llm", legacy=False, use_fast=False)
+model = AutoModelForCausalLM.from_pretrained(repo_id, subfolder="llm", torch_dtype=torch.bfloat16, device_map=None, low_cpu_mem_usage=True)
+model.to(device)
+model.eval()
+inputs = tokenizer(question, return_tensors="pt").to(device)
+with torch.no_grad():
+    out = model.generate(**inputs, max_new_tokens=16, do_sample=False)
+text = tokenizer.decode(out[0], skip_special_tokens=True)
+RESULT = {"text": text, "image_size": image.size}

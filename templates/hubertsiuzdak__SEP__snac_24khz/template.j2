@@ -1,40 +1,44 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
 {% set repo_id = repo_id | default("hubertsiuzdak/snac_24khz") %}
 {% set device = device | default("cuda:0") %}
-{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
-{% set sampling_rate = sampling_rate | default(24000) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
-sampling_rate = {{ sampling_rate }}
 
-import os
-import requests
-from io import BytesIO
-import torch
-import torchaudio
-from snac import SNAC
 import json
+import torch
+from huggingface_hub import hf_hub_download
+from snac import SNAC
+from scipy.io import wavfile
+import numpy as np
 
-model = SNAC.from_pretrained(repo_id).eval().to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 
-if audio_path.startswith("http"):
-    response = requests.get(audio_path)
-    response.raise_for_status()
-    waveform, sr = torchaudio.load(BytesIO(response.content))
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+sample_rate, audio = wavfile.read(audio_path)
+if audio.ndim > 1:
+    audio = audio[:, 0]
+
+if audio.dtype.kind in {"i", "u"}:
+    max_val = np.iinfo(audio.dtype).max
+    audio = audio.astype(np.float32) / max_val
 else:
-    waveform, sr = torchaudio.load(audio_path)
+    audio = audio.astype(np.float32)
 
-if sr != sampling_rate:
-    waveform = torchaudio.functional.resample(waveform, sr, sampling_rate)
+audio_tensor = torch.from_numpy(audio).unsqueeze(0).unsqueeze(0)
 
-waveform = waveform.to(device)
-audio_input = waveform.unsqueeze(0)
+model = SNAC.from_pretrained(repo_id)
+model = model.to(device).eval()
+audio_tensor = audio_tensor.to(device)
 
 with torch.inference_mode():
-    codes = model.encode(audio_input)
-    audio_hat = model.decode(codes)
+    audio_hat, codes = model(audio_tensor)
 
-audio_hat = audio_hat.squeeze(0).cpu()
-codes = [code.cpu().numpy().tolist() for code in codes]
-
-RESULT = {"audio_hat": audio_hat, "codes": codes}
+RESULT = {
+    "reconstructed_audio": audio_hat.detach().cpu(),
+    "codes": [c.detach().cpu() for c in codes],
+}

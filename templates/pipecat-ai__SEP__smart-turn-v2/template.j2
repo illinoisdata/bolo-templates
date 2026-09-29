@@ -1,0 +1,57 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set repo_id = repo_id | default("pipecat-ai/smart-turn-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set threshold = threshold | default(0.5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+threshold = {{ threshold }}
+
+import tempfile
+from pathlib import Path
+
+import numpy as np
+import requests
+import soundfile as sf
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+from transformers import AutoConfig, Wav2Vec2FeatureExtractor, Wav2Vec2ForSequenceClassification
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+feature_extractor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+if audio_path.startswith(("http://", "https://")):
+    audio_local_path = Path(tempfile.gettempdir()) / "smart_turn_input_audio.wav"
+    audio_local_path.write_bytes(requests.get(audio_path, timeout=30).content)
+    audio_path = str(audio_local_path)
+
+waveform, sample_rate = sf.read(audio_path)
+if waveform.ndim > 1:
+    waveform = waveform.mean(axis=1)
+waveform = waveform.astype(np.float32)
+expected_sample_rate = 16000
+if sample_rate != expected_sample_rate:
+    resample_ratio = expected_sample_rate / float(sample_rate)
+    new_length = int(round(len(waveform) * resample_ratio))
+    waveform = np.interp(np.linspace(0, len(waveform) - 1, new_length), np.arange(len(waveform)), waveform).astype(np.float32)
+    sample_rate = expected_sample_rate
+
+config = AutoConfig.from_pretrained(config_path)
+feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(Path(feature_extractor_path).parent, local_files_only=True)
+model = Wav2Vec2ForSequenceClassification(config)
+state_dict = load_file(model_path)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+inputs = feature_extractor(waveform, sampling_rate=sample_rate, return_tensors="pt", padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probability = torch.sigmoid(logits).squeeze().item() if logits.shape[-1] == 1 else torch.softmax(logits, dim=-1)[..., -1].squeeze().item()
+
+RESULT = {"probability": probability, "finished_turn": probability >= threshold}

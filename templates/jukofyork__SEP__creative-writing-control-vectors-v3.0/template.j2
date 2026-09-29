@@ -1,0 +1,21 @@
+{% set repo_id = repo_id | default("jukofyork/creative-writing-control-vectors-v3.0") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('Qwen2-7B-Instruct/qwen-2:7b-honesty_vs_machiavellianism__debias.gguf') %}
+{% set prompt = prompt | default('Write a short imaginative paragraph about a hidden library beneath the sea.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+import os
+import struct
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+with open(weights_path, 'rb') as f:
+    header = f.read(16)
+magic = header[:4]
+version = struct.unpack('<I', header[4:8])[0] if len(header) >= 8 else None
+result_bytes = {"magic": magic.decode('latin1', errors='ignore'), "version": version, "size_bytes": os.path.getsize(weights_path), "prompt": prompt, "device": device}
+
+RESULT = {"output": result_bytes}

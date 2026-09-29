@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("JorisCos/ConvTasNet_Libri2Mix_sepclean_16k") %}
+{% set device = device | default("cuda:0") %}
+{% set audio = audio | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+{% set sample_rate = sample_rate | default(16000) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio = "{{ audio }}"
+sample_rate = {{ sample_rate }}
+
+import os
+import numpy as np
+import torch
+import soundfile as sf
+from huggingface_hub import hf_hub_download
+from asteroid.models import ConvTasNet
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+if audio.startswith("http://") or audio.startswith("https://"):
+    raise ValueError("URL inputs are not supported in this validation environment")
+else:
+    waveform, sr = sf.read(audio, always_2d=True)
+    waveform = torch.from_numpy(waveform.T)
+
+if sr != sample_rate:
+    waveform = torch.as_tensor(np.stack([np.interp(np.linspace(0, 1, int(waveform.shape[-1] * sample_rate / sr), endpoint=False), np.linspace(0, 1, waveform.shape[-1], endpoint=False), ch.cpu().numpy()) for ch in waveform], axis=0), dtype=torch.float32)
+
+model = ConvTasNet.from_pretrained(weights_path)
+model = model.to(device)
+model.eval()
+
+mix = waveform.to(device)
+if mix.dim() == 1:
+    mix = mix.unsqueeze(0)
+if mix.dim() == 2:
+    mix = mix.unsqueeze(0)
+
+with torch.no_grad():
+    estimates = model(mix)
+
+estimated_sources = estimates.squeeze(0).detach().cpu().numpy()
+mixture = mix.squeeze(0).detach().cpu().numpy()
+
+RESULT = {"estimated_sources": estimated_sources, "mixture": mixture, "sample_rate": sample_rate}

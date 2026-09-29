@@ -1,50 +1,47 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("ilsilfverskiold/tech-keywords-extractor") %}
-{% set text_input = text_input | default("If a task raises an exception, or a worker process dies, Celery will by default lose the job. So if you happen to reboot or redeploy, any running jobs with be lost to the sands of time.") %}
-{% set max_length = max_length | default(128) %}
-{% set min_length = min_length | default(12) %}
-{% set num_beams = num_beams | default(4) %}
-{% set result_filename = result_filename | default("keywords.txt") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('If a task raises an exception, or a worker process dies, Celery will by default lose the job. So if you happen to reboot or redeploy, any running jobs with be lost to the sands of time.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = """{{ text_input }}"""
-max_length = {{ max_length }}
-min_length = {{ min_length }}
-num_beams = {{ num_beams }}
-result_filename = "{{ result_filename }}"
+text = "{{ text }}"
 
-import os
+import re
+from collections import OrderedDict
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-inference_device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+
 tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(inference_device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-inputs = tokenizer(
-    text_input,
-    return_tensors="pt",
-    truncation=True,
-)
-inputs = {key: value.to(inference_device) for key, value in inputs.items()}
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    generated_tokens = model.generate(
+    generated_ids = model.generate(
         **inputs,
-        max_length=max_length,
-        min_length=min_length,
-        num_beams=num_beams,
+        num_beams=4,
+        max_new_tokens=32,
         no_repeat_ngram_size=3,
         early_stopping=True,
     )
 
-decoded = tokenizer.batch_decode(
-    generated_tokens,
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-)
-keywords = decoded[0].strip()
+raw_output = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+keywords = [k.strip() for k in re.split(r",|;|\n", raw_output) if k.strip()]
+ordered = OrderedDict()
+for k in keywords:
+    ordered[k] = True
+output = list(ordered.keys())
 
-RESULT = {"keywords": keywords}
+RESULT = {"keywords": output, "raw_output": raw_output}

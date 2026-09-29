@@ -1,0 +1,58 @@
+{% set repo_id = repo_id | default("ltg/gpt-bert-babylm-base") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('The quick brown fox') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import os
+import sys
+import importlib.util
+import torch
+from huggingface_hub import hf_hub_download, snapshot_download
+from transformers import AutoTokenizer
+
+repo_dir = snapshot_download(repo_id=repo_id)
+package_name = "ltgbert_remote"
+package = type(sys)(package_name)
+package.__path__ = [repo_dir]
+sys.modules[package_name] = package
+
+spec_cfg = importlib.util.spec_from_file_location(f"{package_name}.configuration_ltgbert", os.path.join(repo_dir, "configuration_ltgbert.py"))
+mod_cfg = importlib.util.module_from_spec(spec_cfg)
+spec_cfg.loader.exec_module(mod_cfg)
+sys.modules[f"{package_name}.configuration_ltgbert"] = mod_cfg
+
+spec_mod = importlib.util.spec_from_file_location(f"{package_name}.modeling_ltgbert", os.path.join(repo_dir, "modeling_ltgbert.py"))
+mod_model = importlib.util.module_from_spec(spec_mod)
+spec_mod.loader.exec_module(mod_model)
+sys.modules[f"{package_name}.modeling_ltgbert"] = mod_model
+
+LtgbertConfig = mod_cfg.LtgbertConfig
+LtgbertForCausalLM = mod_model.LtgbertForCausalLM
+
+config = LtgbertConfig.from_pretrained(repo_dir)
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, use_fast=True)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token is not None else tokenizer.unk_token
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+state_dict = torch.load(weights_path, map_location="cpu")
+model = LtgbertForCausalLM(config)
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs[0] if isinstance(outputs, tuple) else outputs.logits
+    next_token_logits = logits[:, -1, :]
+    next_token = torch.argmax(next_token_logits, dim=-1, keepdim=True)
+    generated = torch.cat([inputs["input_ids"], next_token], dim=-1)
+
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": output_text}

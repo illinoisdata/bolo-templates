@@ -1,62 +1,39 @@
 {% set repo_id = repo_id | default("monologg/koelectra-base-v3-goemotions") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("요즘 기분이 어떠세요?") %}
-{% set threshold = threshold | default(0.5) %}
-{% set top_k = top_k | default(5) %}
+{% set text = text|default('I am so grateful for your help!') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-threshold = {{ threshold }}
-top_k = {{ top_k }}
+text = "{{ text }}"
 
-import json
-from pathlib import Path
-
+import os
 import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSequenceClassification.from_pretrained(repo_id)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+local_dir = os.path.dirname(model_path)
+
+tokenizer = AutoTokenizer.from_pretrained(local_dir, use_fast=False)
+model = AutoModelForSequenceClassification.from_pretrained(local_dir)
 model.to(device)
 model.eval()
 
-encoding = tokenizer(input_text, return_tensors="pt", truncation=True, padding=True)
-encoding = {key: value.to(device) for key, value in encoding.items()}
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-with torch.inference_mode():
-    outputs = model(**encoding)
-
-logits = outputs.logits[0]
-probabilities = torch.sigmoid(logits)
-
-logits_list = logits.detach().cpu().tolist()
-probabilities_list = probabilities.detach().cpu().tolist()
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probabilities = torch.sigmoid(logits)[0].detach().cpu().tolist()
 
 id2label = model.config.id2label
+labels = [id2label.get(i, id2label.get(str(i), str(i))) for i in range(len(probabilities))]
+label_scores = dict(zip(labels, probabilities))
+ranked = sorted(label_scores.items(), key=lambda x: x[1], reverse=True)
 
-def _resolve_label(index: int) -> str:
-    if index in id2label:
-        return id2label[index]
-    return id2label.get(str(index), str(index))
-
-threshold_predictions = [
-    {"label": _resolve_label(idx), "score": float(score)}
-    for idx, score in enumerate(probabilities_list)
-    if score >= threshold
-]
-
-sorted_predictions = sorted(
-    enumerate(probabilities_list), key=lambda element: element[1], reverse=True
-)
-top_k = min(top_k, len(sorted_predictions))
-top_predictions = [
-    {"label": _resolve_label(idx), "score": float(score)}
-    for idx, score in sorted_predictions[:top_k]
-]
-
-RESULT = {
-    "logits": logits_list,
-    "probabilities": probabilities_list,
-    "threshold_predictions": threshold_predictions,
-    "top_predictions": top_predictions,
-}
+RESULT = {"logits": logits.detach().cpu().tolist(), "probabilities": probabilities, "label_scores": label_scores, "top_labels": ranked[:5]}

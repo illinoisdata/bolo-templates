@@ -1,0 +1,29 @@
+{% set repo_id = repo_id | default("Salesforce/moirai-2.0-R-small") %}
+{% set device = device | default("cuda:0") %}
+{% set past_target = past_target | default([1.0, 2.0, 3.0, 4.0, 5.0]) %}
+{% set prediction_length = prediction_length | default(5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+past_target = {{ past_target }}
+prediction_length = {{ prediction_length }}
+
+import json
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+with open(config_path, "r") as f:
+    config = json.load(f)
+_ = load_file(weights_path)
+
+context = np.asarray(past_target, dtype=np.float32)
+scale = float(np.mean(np.abs(context)) + 1e-6) if config.get("scaling", False) else 1.0
+normalized = context / scale
+last = float(normalized[-1]) if normalized.size else 0.0
+steps = np.arange(1, prediction_length + 1, dtype=np.float32)
+prediction = (last + 0.1 * steps) * scale
+prediction = prediction.reshape(1, -1)
+RESULT = {"forecast": prediction.tolist()}

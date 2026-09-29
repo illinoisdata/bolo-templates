@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("microsoft/wavlm-base-sv") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set threshold = threshold | default(0.86) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+threshold = {{ threshold }}
+
+import os
+import numpy as np
+import torch
+import soundfile as sf
+import urllib.request
+import librosa
+from huggingface_hub import hf_hub_download
+from transformers import Wav2Vec2FeatureExtractor, WavLMForXVector
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(os.path.dirname(preprocessor_path))
+model = WavLMForXVector.from_pretrained(os.path.dirname(weights_path), local_files_only=True)
+model = model.to(device)
+model.eval()
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    tmp_audio = "/tmp/wavlm_input_audio.wav"
+    urllib.request.urlretrieve(audio_path, tmp_audio)
+    audio, sample_rate = sf.read(tmp_audio)
+else:
+    audio, sample_rate = sf.read(audio_path)
+
+if audio.ndim > 1:
+    audio = audio.mean(axis=1)
+if sample_rate != 16000:
+    audio = librosa.resample(audio.astype(np.float32), orig_sr=sample_rate, target_sr=16000)
+
+inputs = feature_extractor(audio, sampling_rate=16000, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    embeddings = model(**inputs).embeddings
+embeddings = torch.nn.functional.normalize(embeddings, dim=-1)
+cosine_sim = torch.nn.CosineSimilarity(dim=-1)
+if embeddings.shape[0] >= 2:
+    similarity = cosine_sim(embeddings[0], embeddings[1]).item()
+else:
+    similarity = None
+RESULT = {"embeddings": embeddings.detach().cpu().numpy(), "similarity": similarity, "threshold": threshold}

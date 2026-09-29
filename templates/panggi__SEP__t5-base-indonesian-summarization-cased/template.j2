@@ -1,35 +1,44 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("panggi/t5-base-indonesian-summarization-cased") %}
-{% set text_to_summarize = text_to_summarize | default("Indonesia terus memperkuat ekonomi digital guna mendukung UMKM dan mendorong inklusi keuangan bagi masyarakat di daerah terpencil.") %}
-{% set max_summary_length = max_summary_length | default(128) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set article_text = article_text | default("Secara umum, dispepsia adalah kumpulan gejala pada saluran pencernaan seperti nyeri, sensasi terbakar, dan rasa tidak nyaman pada perut bagian atas. Pada beberapa kasus, dispepsia yang dialami seseorang tidak dapat diketahui penyebabnya. Jenis dispepsia ini disebut dengan dispepsia fungsional. Apa saja gejala dispepsia fungsional? Apa itu dispepsia fungsional? Dispepsia fungsional adalah kumpulan gejala tanpa sebab pada saluran pencernaan bagian atas. Gejala tersebut dapat berupa rasa sakit, nyeri, dan tak nyaman pada perut bagian atas atau ulu hati.") %}
+{% set max_length = max_length | default(100) %}
+{% set num_beams = num_beams | default(2) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_to_summarize = "{{ text_to_summarize }}"
-max_summary_length = {{ max_summary_length }}
+article_text = "{{ article_text }}"
+max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-from pathlib import Path
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import T5Tokenizer, T5ForConditionalGeneration
 
-encoded_inputs = tokenizer(text_to_summarize, return_tensors="pt", truncation=True)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
 
-generated_ids = model.generate(
-    **encoded_inputs,
-    max_length=max_summary_length,
-    num_beams=num_beams,
-    early_stopping=True,
-    length_penalty=1.0,
-    no_repeat_ngram_size=2,
-)
+model_dir = "/".join(weights_path.split("/")[:-1])
 
-summary_text = tokenizer.decode(
-    generated_ids[0],
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-).strip()
+tokenizer = T5Tokenizer.from_pretrained(model_dir)
+model = T5ForConditionalGeneration.from_pretrained(model_dir)
+model.to(device)
+model.eval()
 
-RESULT = {"summary": summary_text}
+input_ids = tokenizer.encode(article_text, return_tensors="pt").to(device)
+with torch.no_grad():
+    summary_ids = model.generate(
+        input_ids,
+        max_length=max_length,
+        num_beams=num_beams,
+        repetition_penalty=2.5,
+        length_penalty=1.0,
+        early_stopping=True,
+        no_repeat_ngram_size=2,
+        use_cache=True,
+    )
+summary_text = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+
+RESULT = {"summary_text": summary_text}

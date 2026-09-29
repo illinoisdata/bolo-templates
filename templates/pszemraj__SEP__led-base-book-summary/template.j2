@@ -1,46 +1,71 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("pszemraj/led-base-book-summary") %}
-{% set text_input = text_input | default("""The majority of available text summarization datasets include short-form source documents that lack long-range causal and temporal dependencies, and often contain strong layout and stylistic biases. BookSum introduces long-form narratives such as novels, plays, and stories with highly abstractive human-written summaries that pose challenges including very long documents, nontrivial causal and temporal dependencies, and rich discourse structures.""") %}
-{% set max_length = max_length | default(96) %}
-{% set min_length = min_length | default(8) %}
-{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
-{% set encoder_no_repeat_ngram_size = encoder_no_repeat_ngram_size | default(3) %}
-{% set num_beams = num_beams | default(4) %}
-{% set repetition_penalty = repetition_penalty | default(3.5) %}
-{% set length_penalty = length_penalty | default(0.3) %}
-{% set early_stopping = early_stopping | default(true) %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('The majority of available text summarization datasets include short-form source documents that lack long-range causal and temporal dependencies, and often contain strong layout and stylistic biases. While relevant, such datasets will offer limited challenges for future generations of text summarization systems. We address these issues by introducing BookSum, a collection of datasets for long-form narrative summarization.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = {{ text_input | tojson }}
-max_length = {{ max_length }}
-min_length = {{ min_length }}
-no_repeat_ngram_size = {{ no_repeat_ngram_size }}
-encoder_no_repeat_ngram_size = {{ encoder_no_repeat_ngram_size }}
-num_beams = {{ num_beams }}
-repetition_penalty = {{ repetition_penalty }}
-length_penalty = {{ length_penalty }}
-early_stopping = {{ early_stopping }}
+input_text = "{{ input_text }}"
+max_length = {{ max_length | default(96) }}
+min_length = {{ min_length | default(8) }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size | default(3) }}
+early_stopping = {{ early_stopping | default(True) }}
+repetition_penalty = {{ repetition_penalty | default(3.5) }}
+length_penalty = {{ length_penalty | default(0.3) }}
+encoder_no_repeat_ngram_size = {{ encoder_no_repeat_ngram_size | default(3) }}
+num_beams = {{ num_beams | default(4) }}
 
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import json
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, LEDForConditionalGeneration
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-inputs = tokenizer(text_input, return_tensors="pt", truncation=True, max_length=16384)
-inputs = {key: value.to(device) for key, value in inputs.items()}
+with open(config_path, "r") as f:
+    config = json.load(f)
+model_max_length = config.get("max_encoder_position_embeddings", 4096)
 
-generated_ids = model.generate(
-    **inputs,
-    max_length=max_length,
-    min_length=min_length,
-    no_repeat_ngram_size=no_repeat_ngram_size,
-    encoder_no_repeat_ngram_size=encoder_no_repeat_ngram_size,
-    num_beams=num_beams,
-    repetition_penalty=repetition_penalty,
-    length_penalty=length_penalty,
-    early_stopping=early_stopping,
+tokenizer = AutoTokenizer.from_pretrained(
+    os.path.dirname(tokenizer_config_path),
+    use_fast=True,
 )
+model = LEDForConditionalGeneration.from_pretrained(os.path.dirname(model_path), torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-summary_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
-RESULT = {"summary": summary_text}
+inputs = tokenizer(
+    input_text,
+    return_tensors="pt",
+    truncation=True,
+    max_length=model_max_length,
+)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+input_ids = inputs["input_ids"]
+attention_mask = inputs["attention_mask"]
+global_attention_mask = torch.zeros_like(attention_mask)
+global_attention_mask[:, 0] = 1
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        global_attention_mask=global_attention_mask,
+        max_length=max_length,
+        min_length=min_length,
+        no_repeat_ngram_size=no_repeat_ngram_size,
+        early_stopping=early_stopping,
+        repetition_penalty=repetition_penalty,
+        length_penalty=length_penalty,
+        encoder_no_repeat_ngram_size=encoder_no_repeat_ngram_size,
+        num_beams=num_beams,
+    )
+
+summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"summary": summary}

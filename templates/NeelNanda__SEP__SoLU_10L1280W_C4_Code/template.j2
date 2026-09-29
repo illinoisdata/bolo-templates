@@ -1,0 +1,77 @@
+{% set repo_id = repo_id | default("NeelNanda/SoLU_10L1280W_C4_Code") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('def fib(n):\n    a, b = 0, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a\n') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = {{ input_text | tojson }}
+
+import json
+import os
+import torch
+from huggingface_hub import hf_hub_download
+
+repo_id = repo_id
+
+def load_state_dict(path, map_location='cpu'):
+    obj = torch.load(path, map_location=map_location)
+    if isinstance(obj, dict) and 'state_dict' in obj:
+        obj = obj['state_dict']
+    return obj
+
+weights_path = hf_hub_download(repo_id=repo_id, filename='model_final.pth')
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+
+config = json.load(open(config_path))
+state_dict = load_state_dict(weights_path, map_location='cpu')
+
+class SoLUMLP(torch.nn.Module):
+    def __init__(self, d_model, d_mlp):
+        super().__init__()
+        self.w_in = torch.nn.Linear(d_model, d_mlp, bias=True)
+        self.w_out = torch.nn.Linear(d_mlp, d_model, bias=True)
+    def forward(self, x):
+        x = self.w_in(x)
+        x = torch.nn.functional.softmax(x, dim=-1) * x
+        x = self.w_out(x)
+        return x
+
+class Block(torch.nn.Module):
+    def __init__(self, d_model, d_mlp):
+        super().__init__()
+        self.ln1 = torch.nn.LayerNorm(d_model)
+        self.ln2 = torch.nn.LayerNorm(d_model)
+        self.attn = torch.nn.MultiheadAttention(d_model, num_heads=20, batch_first=True)
+        self.mlp = SoLUMLP(d_model, d_mlp)
+    def forward(self, x):
+        a = self.ln1(x)
+        attn_out, _ = self.attn(a, a, a, need_weights=False)
+        x = x + attn_out
+        m = self.ln2(x)
+        x = x + self.mlp(m)
+        return x
+
+class TinyModel(torch.nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        self.embed = torch.nn.Embedding(cfg['d_vocab'], cfg['d_model'])
+        self.blocks = torch.nn.ModuleList([Block(cfg['d_model'], cfg['d_mlp']) for _ in range(cfg['n_layers'])])
+        self.ln_final = torch.nn.LayerNorm(cfg['d_model'])
+        self.unembed = torch.nn.Linear(cfg['d_model'], cfg['d_vocab'], bias=False)
+    def forward(self, tokens):
+        x = self.embed(tokens)
+        for block in self.blocks:
+            x = block(x)
+        x = self.ln_final(x)
+        return self.unembed(x)
+
+model = TinyModel(config)
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+vocab_tokens = torch.tensor([[1, 2, 3, 4]], device=device)
+with torch.no_grad():
+    logits = model(vocab_tokens)
+    output = logits[0, -1].float().cpu().tolist()
+
+RESULT = {"logits_last_token": output}

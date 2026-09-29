@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("LanguageBind/LanguageBind_Video_merge") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("zero-shot-image-classification") %}
+{% set input_path = input_path | default("/u/yunqili4/projects/ML-code-generation/data/image2.jpeg") %}
+{% set candidate_labels = candidate_labels | default(["fox", "bear", "seagull", "cat"]) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_path = "{{ input_path }}"
+candidate_labels = {{ candidate_labels | tojson }}
+
+from transformers import (
+    pipeline,
+    CLIPConfig,
+    CLIPModel,
+    CLIPImageProcessor,
+    CLIPTokenizer,
+)
+
+config = CLIPConfig.from_pretrained(repo_id)
+model = CLIPModel.from_pretrained(repo_id, config=config).to(device)
+tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
+image_processor = CLIPImageProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=tokenizer,
+    feature_extractor=image_processor,
+    device=device,
+)
+RESULT = pipe(input_path, candidate_labels=candidate_labels)

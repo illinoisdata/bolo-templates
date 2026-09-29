@@ -1,19 +1,37 @@
 {% set repo_id = repo_id | default("uclanlp/plbart-java-cs") %}
 {% set device = device | default("cuda:0") %}
-{% set src_code = src_code | default("public class Example { public static int add(int a, int b) { return a + b; } }") %}
+{% set src_text = src_text | default('public int add(int a, int b) { return a + b; }') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-src_code = "{{ src_code }}"
+src_text = {{ src_text | tojson }}
 
 import os
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, PLBartForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+sentencepiece_path = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
 
-inputs = tokenizer(src_code, return_tensors="pt").to(device)
-generated_ids = model.generate(**inputs)
-generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-RESULT = {"generated_text": generated_text}
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = PLBartForConditionalGeneration.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(src_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_length=128,
+        num_beams=5,
+        early_stopping=True,
+    )
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

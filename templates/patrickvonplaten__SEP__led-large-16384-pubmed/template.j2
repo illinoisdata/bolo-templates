@@ -1,54 +1,54 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("patrickvonplaten/led-large-16384-pubmed") %}
-{% set text_input = text_input | default("Anxiety affects quality of life in those living with Parkinson's disease more so than overall cognitive status, motor deficits, apathy, and depression. Recent research suggests anxiety rather than depression is the most prominent mood disorder in PD patients. This model is fine-tuned on PubMed abstracts to provide concise summaries for long scientific texts.") %}
-{% set num_beams = num_beams | default(4) %}
-{% set min_length = min_length | default(100) %}
-{% set max_length = max_length | default(256) %}
-{% set early_stopping = early_stopping | default(true) %}
+{% set device = device | default("cuda:0") %}
+{% set article_text = article_text | default('Long article text for summarization.', true) %}
+{% set max_new_tokens = max_new_tokens | default(128, true) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-num_beams = {{ num_beams }}
-min_length = {{ min_length }}
-max_length = {{ max_length }}
-early_stopping = {{ early_stopping }}
+article_text = {{ article_text | tojson }}
+max_new_tokens = {{ max_new_tokens }}
 
-from pathlib import Path
-
+import os
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import LEDForConditionalGeneration, LEDTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+if article_text.startswith("http://") or article_text.startswith("https://"):
+    raise ValueError("article_text must be a local path or text string, not a URL")
+
+# Use the provided text directly; if a path is supplied, load its contents.
+if os.path.exists(article_text):
+    with open(article_text, "r", encoding="utf-8") as f:
+        article = f.read()
+else:
+    article = article_text
+
+tokenizer = LEDTokenizer.from_pretrained(repo_id)
+model = LEDForConditionalGeneration.from_pretrained(repo_id).to(device)
 model.eval()
 
-inputs = tokenizer(
-    text_input,
-    truncation=True,
-    max_length=16384,
-    return_tensors="pt",
-)
-
-input_ids = inputs.input_ids.to(device)
-attention_mask = inputs.attention_mask.to(device)
-global_attention_mask = torch.zeros_like(input_ids)
+inputs = tokenizer(article, return_tensors="pt", truncation=True, max_length=16384)
+input_ids = inputs["input_ids"].to(device)
+attention_mask = inputs["attention_mask"].to(device)
+global_attention_mask = torch.zeros_like(attention_mask)
 global_attention_mask[:, 0] = 1
 
-generated_sequences = model.generate(
-    input_ids,
-    attention_mask=attention_mask,
-    global_attention_mask=global_attention_mask,
-    num_beams=num_beams,
-    max_length=max_length,
-    min_length=min_length,
-    early_stopping=early_stopping,
-)
+with torch.no_grad():
+    generated_ids = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        global_attention_mask=global_attention_mask,
+        max_new_tokens=max_new_tokens,
+    )
 
-decoded_sequences = tokenizer.batch_decode(
-    generated_sequences,
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-)
+summary = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+output_value = summary[0] if len(summary) == 1 else summary
 
-summary_text = decoded_sequences[0] if decoded_sequences else ""
-RESULT = {"summary": summary_text}
+RESULT = {"summary": output_value}

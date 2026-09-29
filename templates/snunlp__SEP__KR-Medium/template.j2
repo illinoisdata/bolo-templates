@@ -1,26 +1,36 @@
 {% set repo_id = repo_id | default("snunlp/KR-Medium") %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("오늘 기분이 어떠신가요?") %}
+{% set text = text | default('한국어 문장에서 감정이 긍정적인지 부정적인지 분류해줘.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+text = "{{ text }}"
 
-import json
 import os
-
 import torch
-from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, BertConfig, BertForMaskedLM
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+tokenizer_dir = os.path.dirname(vocab_file)
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir, use_fast=False)
+config = BertConfig.from_json_file(config_file)
+model = BertForMaskedLM(config)
+state_dict = torch.load(model_file, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
 model.eval()
 
-encoded_input = tokenizer(text_input, return_tensors="pt", truncation=True)
-encoded_input = {key: value.to(device) for key, value in encoded_input.items()}
-
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=128)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    outputs = model(**encoded_input)
-
-cls_embedding = outputs.last_hidden_state[:, 0, :].squeeze(0).cpu().tolist()
-
-RESULT = {"cls_embedding": cls_embedding}
+    outputs = model(**inputs)
+    logits = outputs.logits
+    token_scores = logits[0, -1]
+    topk = torch.topk(token_scores, k=5)
+    top_tokens = tokenizer.convert_ids_to_tokens(topk.indices.tolist())
+    top_scores = topk.values.detach().cpu().tolist()
+RESULT = {"last_token_topk_tokens": top_tokens, "last_token_topk_scores": top_scores, "logits_shape": list(logits.shape)}

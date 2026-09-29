@@ -1,0 +1,27 @@
+{% set repo_id = repo_id | default("facebook/s2t-large-librispeech-asr") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("automatic-speech-recognition") %}
+{% set input_data = input_data | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+
+repo_id = "{{ repo_id }}"
+task = "{{ task }}"
+device = "{{ device }}"
+input_data = "{{ input_data }}"
+
+from transformers import pipeline, Speech2TextProcessor, Speech2TextForConditionalGeneration
+
+# Load processor and model
+processor = Speech2TextProcessor.from_pretrained(repo_id)
+model = Speech2TextForConditionalGeneration.from_pretrained(repo_id).to(device)
+
+# Create ASR pipeline
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=processor.tokenizer,
+    feature_extractor=processor.feature_extractor,
+    device=device,
+)
+
+# Run inference
+RESULT = pipe(input_data)

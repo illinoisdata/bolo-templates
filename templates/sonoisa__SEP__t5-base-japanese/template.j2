@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("sonoisa/t5-base-japanese") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("今日はいい天気ですね。日本語のテキストを記述します。") %}
+
+repo_id = {{ repo_id | tojson }}
+task = {{ task | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, pipeline
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt)

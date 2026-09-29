@@ -1,26 +1,32 @@
 {% set repo_id = repo_id | default("google/mt5-large") %}
 {% set device = device | default("cuda:0") %}
-{% set text_prompt = text_prompt | default("translate English to French: The house is wonderful.") %}
+{% set text = text | default('translate English to German: The house is wonderful.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_prompt = "{{ text_prompt }}"
+text = "{{ text }}"
 
-from pathlib import Path
-
+import os
 import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+repo_dir = os.path.dirname(tokenizer_file)
 
-torch_device = torch.device(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_dir)
+model.to(device)
+model.eval()
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(torch_device)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=32)
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-encoded_inputs = tokenizer(text_prompt, return_tensors="pt")
-input_tensors = {key: value.to(torch_device) for key, value in encoded_inputs.items()}
-
-generated_ids = model.generate(**input_tensors)
-generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-
-RESULT = {"generated_text": generated_text}
+RESULT = {"text": output_text}

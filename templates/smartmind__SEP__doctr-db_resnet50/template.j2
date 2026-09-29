@@ -1,0 +1,45 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+{% set repo_id = repo_id | default("smartmind/doctr-db_resnet50") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import json
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from doctr.io import DocumentFile
+from doctr.models import db_resnet50
+from doctr.models.preprocessor import PreProcessor
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+weights_path = hf_hub_download(repo_id=repo_id, filename='pytorch_model.bin')
+
+with open(config_path, 'r') as f:
+    config = json.load(f)
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    from urllib.request import urlopen
+    img = Image.open(urlopen(image_path)).convert('RGB')
+    doc = DocumentFile.from_images([img])
+else:
+    doc = DocumentFile.from_images([image_path])
+
+preproc = PreProcessor(batch_size=1, output_size=tuple(config['input_shape'][1:]), mean=config['mean'], std=config['std'])
+images = preproc(doc)
+if isinstance(images, list):
+    images = images[0]
+images = images.to(device)
+
+model = db_resnet50(pretrained=False)
+state_dict = torch.load(weights_path, map_location='cpu')
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
+
+with torch.no_grad():
+    out = model(images)
+
+RESULT = {"output": out}

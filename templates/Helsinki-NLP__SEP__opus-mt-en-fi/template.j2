@@ -1,22 +1,38 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-en-fi") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("This is a test.") %}
+{% set text = text | default('Hello, how are you?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
-import os
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    use_fast=False,
+    tokenizer_file=None,
+)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
 inputs = tokenizer(text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-outputs = model.generate(**inputs)
+with torch.no_grad():
+    output_ids = model.generate(**inputs, num_beams=4, max_length=128)
 
-translation = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+translated_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
 
-RESULT = {"translation": translation}
+RESULT = {"translation": translated_text}

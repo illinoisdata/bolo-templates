@@ -1,0 +1,24 @@
+{% set repo_id = repo_id | default("SkyworkAIGC/SkyTextTiny") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") -%}
+{% set input_prompt = input_prompt | default("今天是个好天气") -%}
+{% set max_new_tokens = max_new_tokens | default(20) -%}
+{% set do_sample = do_sample | default(true) -%}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+do_sample = {{ do_sample }}
+
+from transformers import pipeline
+from tokenization_sky import SkyTokenizer
+
+class SkyTokenizerFixed(SkyTokenizer):
+    def __init__(self, *args, **kwargs):
+        self.encoder = {}
+        super().__init__(*args, **kwargs)
+
+tokenizer = SkyTokenizerFixed.from_pretrained(repo_id)
+pipe = pipeline(task=task, model=repo_id, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt, max_new_tokens=max_new_tokens, do_sample=do_sample)

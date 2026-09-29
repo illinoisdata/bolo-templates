@@ -1,0 +1,14 @@
+{% set repo_id = repo_id | default("Formzu/roberta-base-japanese-jsnli") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set input_prompt = input_prompt | default("私は香港科技大学が大好きで、MATH4343: Introduction to Graph Theoryの講義が一番好きです。") %}
+
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = pipe(input_prompt)

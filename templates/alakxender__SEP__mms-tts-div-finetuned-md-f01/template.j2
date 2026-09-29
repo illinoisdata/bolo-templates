@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("alakxender/mms-tts-div-finetuned-md-f01") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-to-audio") %}
+{% set text = text | default("މޫސުން ވަރަށް ގޯސްވެ، ފުވައްމުލަކުން ފެށިގެން އައްޑުއަށް އޮރެންޖް އެލާޓް ނެރެފި") %}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+text = {{ text | tojson }}
+
+import torch
+from transformers import pipeline
+from transformers.tokenization_utils_base import BatchEncoding
+
+# Patch BatchEncoding.to to accept dtype argument and restrict dtype conversion to floating tensors
+_orig_batchencoding_to = BatchEncoding.to
+
+def _patched_batchencoding_to(self, device=None, *, non_blocking=False, dtype=None):
+    # Move tensors to device if specified
+    if device is not None:
+        _orig_batchencoding_to(self, device, non_blocking=non_blocking)
+    # Convert only floating-point tensors to the specified dtype
+    if dtype is not None:
+        for key, value in list(self.items()):
+            if isinstance(value, torch.Tensor) and value.dtype.is_floating_point:
+                self[key] = value.to(dtype=dtype)
+    return self
+
+BatchEncoding.to = _patched_batchencoding_to
+
+# Initialize the text-to-audio pipeline
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+# Run inference
+raw_result = pipe(text)
+
+# Post-process and expose the output
+RESULT = raw_result

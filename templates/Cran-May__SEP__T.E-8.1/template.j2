@@ -1,0 +1,48 @@
+{% set repo_id = repo_id | default("Cran-May/T.E-8.1") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('You are a helpful assistant. Write a short roleplay-style greeting in English and Chinese.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+from huggingface_hub import hf_hub_download
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model-00001-of-00004.safetensors")
+index_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+# Load tokenizer and model directly from the repo cache via Hub downloads.
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=False)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+    trust_remote_code=False,
+)
+model = model.to(device)
+model.eval()
+
+messages = [
+    {"role": "system", "content": "You are a helpful, creative roleplay assistant."},
+    {"role": "user", "content": prompt},
+]
+input_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = tokenizer(input_text, return_tensors="pt").to(device)
+
+with torch.inference_mode():
+    output_ids = model.generate(
+        **inputs,
+        max_new_tokens=80,
+        do_sample=True,
+        temperature=0.8,
+        top_p=0.95,
+        repetition_penalty=1.05,
+    )
+
+# Return only the newly generated tokens.
+generated = output_ids[0, inputs["input_ids"].shape[1]:]
+output_text = tokenizer.decode(generated, skip_special_tokens=True)
+
+RESULT = {"text": output_text}

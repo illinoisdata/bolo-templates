@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("kuro-08/bert-transaction-categorization") %}
+{% set device = device | default("cuda:0") %}
+{% set transaction_text = transaction_text | default('Transaction: Payment at Starbucks for coffee - Type: expense') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+transaction_text = "{{ transaction_text }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+model_dir = os.path.dirname(model_path)
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = AutoModelForSequenceClassification.from_pretrained(model_dir)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(transaction_text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probabilities = torch.softmax(logits, dim=-1)
+    predicted_id = int(torch.argmax(logits, dim=-1).item())
+    predicted_label = model.config.id2label.get(predicted_id, str(predicted_id))
+    confidence = float(probabilities[0, predicted_id].item())
+
+RESULT = {
+    "predicted_id": predicted_id,
+    "predicted_label": predicted_label,
+    "confidence": confidence,
+    "logits": logits.detach().cpu().tolist(),
+    "probabilities": probabilities.detach().cpu().tolist(),
+}

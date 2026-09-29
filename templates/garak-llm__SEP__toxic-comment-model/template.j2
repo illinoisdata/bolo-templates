@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("garak-llm/toxic-comment-model") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('This is a test text.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+model = AutoModelForSequenceClassification.from_pretrained(repo_id, local_files_only=True)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    probs = torch.softmax(outputs.logits, dim=-1)
+    pred_id = int(torch.argmax(probs, dim=-1).item())
+    pred_label = model.config.id2label[pred_id]
+    score = float(probs[0, pred_id].item())
+
+RESULT = {"label": pred_label, "score": score, "logits": outputs.logits.detach().cpu().tolist()}

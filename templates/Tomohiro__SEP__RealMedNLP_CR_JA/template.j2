@@ -1,0 +1,29 @@
+{% set repo_id = repo_id | default("Tomohiro/RealMedNLP_CR_JA") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("token-classification") %}
+{% set model = model | default(repo_id) %}
+{% set tokenizer = tokenizer | default("cl-tohoku/bert-base-japanese-whole-word-masking") %}
+{% set input_prompt = input_prompt | default("肥大型心筋症、心房細動に対してＷＦ投与が開始となった。") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+tokenizer = {{ tokenizer | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+import os
+
+cuda_lib_path = "/workspace/.pip/nvidia/cu13/lib"
+current_ld_library_path = os.environ.get("LD_LIBRARY_PATH", "")
+ld_library_paths = current_ld_library_path.split(":") if current_ld_library_path else []
+if cuda_lib_path not in ld_library_paths:
+    os.environ["LD_LIBRARY_PATH"] = cuda_lib_path + (":" + current_ld_library_path if current_ld_library_path else "")
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+
+preprocessed_prompt = input_prompt
+
+RESULT = pipe(preprocessed_prompt)
+RESULT = {"predictions": RESULT}

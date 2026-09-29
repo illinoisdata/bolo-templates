@@ -1,51 +1,53 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("BeIR/query-gen-msmarco-t5-large-v1") %}
-{% set prompt = prompt | default("Python is an interpreted, high-level and general-purpose programming language. Python's design philosophy emphasizes code readability with its notable use of significant whitespace. Its language constructs and object-oriented approach aim to help programmers write clear, logical code for small and large-scale projects.") %}
+{% set device = device | default("cuda:0") %}
+{% set paragraph = paragraph | default('Python is an interpreted, high-level and general-purpose programming language. Python\'s design philosophy emphasizes code readability with its notable use of significant whitespace. Its language constructs and object-oriented approach aim to help programmers write clear, logical code for small and large-scale projects.') %}
 {% set max_length = max_length | default(64) %}
-{% set num_return_sequences = num_return_sequences | default(3) %}
 {% set do_sample = do_sample | default(True) %}
 {% set top_p = top_p | default(0.95) %}
-{% set temperature = temperature | default(1.0) %}
+{% set num_return_sequences = num_return_sequences | default(3) %}
+{% set seed = seed | default(42) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = {{ prompt | tojson }}
+paragraph = "{{ paragraph }}"
 max_length = {{ max_length }}
-num_return_sequences = {{ num_return_sequences }}
 do_sample = {{ do_sample }}
 top_p = {{ top_p }}
-temperature = {{ temperature }}
+num_return_sequences = {{ num_return_sequences }}
+seed = {{ seed }}
 
-import os
 import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
 
-inputs = tokenizer(
-    prompt,
-    return_tensors="pt",
-    truncation=True,
-    padding=True,
-    max_length=512,
-)
+torch.manual_seed(seed)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(seed)
 
-input_ids = inputs["input_ids"].to(device)
-attention_mask = inputs.get("attention_mask")
-if attention_mask is not None:
-    attention_mask = attention_mask.to(device)
 
-generated_ids = model.generate(
-    input_ids=input_ids,
-    attention_mask=attention_mask,
-    max_length=max_length,
-    num_return_sequences=num_return_sequences,
-    do_sample=do_sample,
-    top_p=top_p,
-    temperature=temperature,
-)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, local_files_only=True)
+model = model.to(device)
+model.eval()
 
-queries = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+inputs = tokenizer(paragraph, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-RESULT = {"generated_queries": queries}
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_length=max_length,
+        do_sample=do_sample,
+        top_p=top_p,
+        num_return_sequences=num_return_sequences,
+    )
+
+queries = [tokenizer.decode(ids, skip_special_tokens=True) for ids in output_ids]
+
+RESULT = {"queries": queries}

@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("distilbert/distilbert-base-uncased-distilled-squad") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Which name is also used to describe the Amazon rainforest in English?') %}
+{% set context = context | default('The Amazon rainforest (Portuguese: Floresta Amaz\u00f4nica or Amaz\u00f4nia; Spanish: Selva Amaz\u00f3nica, Amazon\u00eda or usually Amazonia; French: For\u00eat amazonienne; Dutch: Amazoneregenwoud), also known in English as Amazonia or the Amazon Jungle, is a moist broadleaf forest that covers most of the Amazon basin of South America. This basin encompasses 7,000,000 square kilometres (2,700,000 sq mi), of which 5,500,000 square kilometres (2,100,000 sq mi) are covered by the rainforest. This region includes territory belonging to nine nations. The majority of the forest is contained within Brazil, with 60% of the rainforest, followed by Peru with 13%, Colombia with 10%, and with minor amounts in Venezuela, Ecuador, Bolivia, Guyana, Suriname and French Guiana. States or departments in four nations contain "Amazonas" in their names. The Amazon represents over half of the planet\'s remaining rainforests, and comprises the largest and most biodiverse tract of tropical rainforest in the world, with an estimated 390 billion individual trees divided into 16,000 species.') %}
+{% set max_length = max_length | default(384) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = {{ question | tojson }}
+context = {{ context | tojson }}
+max_length = {{ max_length }}
+
+from huggingface_hub import hf_hub_download
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+model = AutoModelForQuestionAnswering.from_pretrained(repo_id, device_map=None)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True, max_length=max_length)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_idx = int(torch.argmax(outputs.start_logits, dim=-1)[0])
+end_idx = int(torch.argmax(outputs.end_logits, dim=-1)[0])
+if end_idx < start_idx:
+    end_idx = start_idx
+answer_tokens = inputs["input_ids"][0, start_idx : end_idx + 1]
+answer = tokenizer.decode(answer_tokens, skip_special_tokens=True).strip()
+score = float(torch.softmax(outputs.start_logits, dim=-1)[0, start_idx] * torch.softmax(outputs.end_logits, dim=-1)[0, end_idx])
+
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx, "score": score}

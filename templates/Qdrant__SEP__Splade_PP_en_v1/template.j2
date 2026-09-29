@@ -1,39 +1,56 @@
 {% set repo_id = repo_id | default("Qdrant/Splade_PP_en_v1") %}
 {% set device = device | default("cuda:0") %}
-{% set input_texts = input_texts | default(["A curious cat is resting on the windowsill.", "A dog is running through the park on a sunny day."]) %}
+{% set text = text | default('query: neural sparse retrieval') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_texts = {{ input_texts }}
+text = "{{ text }}"
 
 import json
 import os
-
-import onnxruntime as ort
+import numpy as np
 import torch
-from optimum.onnxruntime import ORTModelForMaskedLM
+from huggingface_hub import hf_hub_download
 from transformers import AutoTokenizer
 
-device = torch.device(device)
-available_providers = ort.get_available_providers()
-provider = "CUDAExecutionProvider" if "CUDAExecutionProvider" in available_providers else "CPUExecutionProvider"
-if provider == "CPUExecutionProvider":
-    device = torch.device("cpu")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.onnx")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = ORTModelForMaskedLM.from_pretrained(repo_id, provider=provider)
+with open(config_path, "r") as f:
+    tokenizer_config = json.load(f)
 
-encoded_inputs = tokenizer(
-    input_texts,
-    padding=True,
-    truncation=True,
-    return_tensors="pt",
+# Load tokenizer using the repo files already downloaded locally.
+tokenizer = AutoTokenizer.from_pretrained(
+    os.path.dirname(tokenizer_path),
+    use_fast=True,
 )
-encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
 
-with torch.no_grad():
-    outputs = model(**encoded_inputs)
+def _torch_device(dev):
+    return torch.device(dev if torch.cuda.is_available() or dev == "cpu" else "cpu")
 
-logits = outputs.logits
-logits = logits.detach().cpu().tolist()
+device_obj = _torch_device(device)
 
-RESULT = {"logits": logits}
+import onnxruntime as ort
+providers = ["CUDAExecutionProvider", "CPUExecutionProvider"] if device_obj.type == "cuda" else ["CPUExecutionProvider"]
+session = ort.InferenceSession(model_path, providers=providers)
+
+inputs = tokenizer(text, return_tensors="np", truncation=True, padding=True)
+onnx_inputs = {k: v for k, v in inputs.items() if k in {i.name for i in session.get_inputs()}}
+outputs = session.run(None, onnx_inputs)
+
+# SPLADE-style sparse representation: logits -> relu -> log1p -> max over tokens
+logits = outputs[0]
+if logits.ndim == 3:
+    token_scores = np.log1p(np.maximum(logits, 0.0))
+    sparse_vector = token_scores.max(axis=1).squeeze(0)
+else:
+    sparse_vector = logits.squeeze(0)
+
+# Return top token weights as a compact in-memory result.
+token_ids = np.argsort(-sparse_vector)[:10]
+result_tokens = tokenizer.convert_ids_to_tokens(token_ids.tolist())
+result_scores = sparse_vector[token_ids].tolist()
+
+RESULT = {"tokens": result_tokens, "scores": result_scores}

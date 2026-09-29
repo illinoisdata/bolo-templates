@@ -1,0 +1,54 @@
+{% set repo_id = repo_id | default("jameslahm/yoloe") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set confidence = confidence | default(0.25) %}
+{% set iou = iou | default(0.7) %}
+{% set max_det = max_det | default(20) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+confidence = {{ confidence }}
+iou = {{ iou }}
+max_det = {{ max_det }}
+
+from PIL import Image
+import requests
+from huggingface_hub import hf_hub_download
+from ultralytics import YOLO
+import torchvision.ops as ops
+
+model_file = hf_hub_download(repo_id=repo_id, filename="yoloe-11s-seg.pt")
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(requests.get(image_path, stream=True, timeout=30).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model = YOLO(model_file)
+model.predictor = None
+model.overrides["nms"] = False
+results = model.predict(
+    source=image,
+    conf=confidence,
+    iou=iou,
+    max_det=max_det,
+    device=device,
+    verbose=False,
+)
+
+r0 = results[0]
+boxes = r0.boxes
+if boxes is not None:
+    xyxy = boxes.xyxy.detach().cpu().tolist()
+    cls = boxes.cls.detach().cpu().tolist()
+    confs = boxes.conf.detach().cpu().tolist()
+else:
+    xyxy = []
+    cls = []
+    confs = []
+
+RESULT = {
+    "boxes_xyxy": xyxy,
+    "boxes_cls": cls,
+    "boxes_conf": confs,
+}

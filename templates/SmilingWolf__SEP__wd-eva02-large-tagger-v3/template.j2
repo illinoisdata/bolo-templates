@@ -1,0 +1,64 @@
+{% set repo_id = repo_id | default("SmilingWolf/wd-eva02-large-tagger-v3") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set threshold = threshold | default(0.35) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+threshold = {{ threshold }}
+
+import json
+from PIL import Image
+import requests
+import torch
+import timm
+from huggingface_hub import hf_hub_download
+from timm.data import resolve_data_config, create_transform
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+model = timm.create_model(
+    cfg["architecture"],
+    pretrained=False,
+    num_classes=cfg["num_classes"],
+    img_size=cfg["model_args"]["img_size"],
+)
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict, strict=True)
+model.eval().to(device)
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True, timeout=30).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+config = resolve_data_config({}, model=model)
+transform = create_transform(**config, is_training=False)
+img = transform(image).unsqueeze(0).to(device)
+
+with torch.inference_mode():
+    logits = model(img)
+    probs = torch.sigmoid(logits)[0].detach().cpu()
+
+scores = probs.tolist()
+indexed = list(enumerate(scores))
+indexed.sort(key=lambda x: x[1], reverse=True)
+
+top_tags = [
+    {"index": int(i), "score": float(s)}
+    for i, s in indexed[:20]
+]
+filtered_tags = [
+    {"index": int(i), "score": float(s)}
+    for i, s in indexed if s >= threshold
+]
+
+RESULT = {
+    "top_tags": top_tags,
+    "filtered_tags": filtered_tags,
+    "probabilities": probs,
+}

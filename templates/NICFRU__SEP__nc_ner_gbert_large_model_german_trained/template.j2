@@ -1,0 +1,65 @@
+{% set repo_id = repo_id | default("NICFRU/nc_ner_gbert_large_model_german_trained") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Das Gericht ordnete an, dass Alexander Müller am 3. Mai 2021 in Berlin die Akte für die GmbH einreichte.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+tokenizer = AutoTokenizer.from_pretrained(
+    tokenizer_file.rsplit('/', 1)[0],
+    use_fast=True,
+)
+model = AutoModelForTokenClassification.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+    device_map=None,
+    local_files_only=False,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits[0]
+pred_ids = logits.argmax(dim=-1).tolist()
+tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
+labels = [model.config.id2label[str(i)] if str(i) in model.config.id2label else model.config.id2label[i] for i in pred_ids]
+
+entities = []
+current = None
+for token, label in zip(tokens, labels):
+    if token in tokenizer.all_special_tokens:
+        continue
+    if label.startswith("B-"):
+        if current is not None:
+            entities.append(current)
+        current = {"entity": label[2:], "tokens": [token]}
+    elif label.startswith("I-") and current is not None and current["entity"] == label[2:]:
+        current["tokens"].append(token)
+    else:
+        if current is not None:
+            entities.append(current)
+            current = None
+if current is not None:
+    entities.append(current)
+
+for ent in entities:
+    ent["text"] = tokenizer.convert_tokens_to_string(ent["tokens"])
+    del ent["tokens"]
+
+RESULT = {"entities": entities, "tokens": tokens, "labels": labels}

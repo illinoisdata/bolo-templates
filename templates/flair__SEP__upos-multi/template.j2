@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("flair/upos-multi") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Ich liebe Berlin, as they say.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from huggingface_hub import hf_hub_download
+from flair.data import Sentence
+from flair.models import SequenceTagger
+
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+tagger = SequenceTagger.load(model_path)
+if device != "cpu":
+    tagger.to(torch.device(device))
+else:
+    tagger.to(device)
+
+sentence = Sentence(text)
+tagger.predict(sentence)
+
+output = []
+for token in sentence:
+    label = token.get_label("upos")
+    output.append({
+        "token": token.text,
+        "upos": label.value,
+        "score": float(label.score),
+    })
+
+RESULT = {"output": output}

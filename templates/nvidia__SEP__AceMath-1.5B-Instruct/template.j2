@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("nvidia/AceMath-1.5B-Instruct") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default("Jen enters a lottery by picking $4$ distinct numbers from $S=\\{1,2,3,\\cdots,9,10\\}.$ $4$ numbers are randomly chosen from $S.$ She wins a prize if at least two of her numbers were $2$ of the randomly chosen numbers, and wins the grand prize if all four of her numbers were the randomly chosen numbers. The probability of her winning the grand prize given that she won a prize is $\\tfrac{m}{n}$ where $m$ and $n$ are relatively prime positive integers. Find $m+n$.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = 512
+temperature = 0.0
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+merges_file = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+generation_config_file = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+    local_files_only=True,
+)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+messages = [{"role": "user", "content": prompt}]
+text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+model_inputs = tokenizer([text], return_tensors="pt")
+model_inputs = {k: v.to(device) for k, v in model_inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **model_inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=False,
+        temperature=temperature,
+    )
+
+trimmed = [out_ids[len(in_ids):] for in_ids, out_ids in zip(model_inputs["input_ids"], generated_ids)]
+response = tokenizer.batch_decode(trimmed, skip_special_tokens=True)[0]
+
+RESULT = {"response": response}

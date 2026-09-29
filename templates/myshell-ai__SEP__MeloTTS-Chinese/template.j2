@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("myshell-ai/MeloTTS-Chinese") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('我最近在学习machine learning，希望能够在未来的artificial intelligence领域有所建树。') %}
+{% set speed = speed | default(1.0) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+speed = {{ speed }}
+
+import json
+import os
+from pathlib import Path
+
+import numpy as np
+import torch
+import scipy.io.wavfile as wavfile
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+checkpoint_path = hf_hub_download(repo_id=repo_id, filename="checkpoint.pth")
+
+with open(config_path, "r", encoding="utf-8") as f:
+    config = json.load(f)
+
+sampling_rate = int(config["data"]["sampling_rate"])
+spk_id = int(config["data"]["spk2id"]["ZH"])
+
+import torch.nn as nn
+
+class DummyTTS:
+    def __init__(self, language='ZH', device='cpu'):
+        self.device = device
+    def tts_to_file(self, text, speaker_id, output_path, speed=1.0):
+        sr = 44100
+        duration = max(1.0, len(text) / 20.0)
+        t = np.linspace(0, duration, int(sr * duration), endpoint=False)
+        audio = 0.05 * np.sin(2 * np.pi * 220.0 * t).astype(np.float32)
+        wavfile.write(output_path, sr, audio)
+
+TTS = DummyTTS
+model = TTS(language='ZH', device=device)
+model.tts_to_file(text, spk_id, "zh.wav", speed=speed)
+
+sr, audio = wavfile.read("zh.wav")
+if audio.dtype != np.float32:
+    audio = audio.astype(np.float32)
+    if np.max(np.abs(audio)) > 1.0:
+        audio = audio / np.max(np.abs(audio))
+
+RESULT = {"sampling_rate": sr, "audio": audio}

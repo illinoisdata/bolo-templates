@@ -1,0 +1,28 @@
+{% set repo_id = repo_id | default("openGPT-X/Teuken-7B-instruct-commercial-v0.4") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") -%}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you today?") -%}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+model = repo_id
+input_prompt = {{ input_prompt | tojson }}
+
+import importlib.util
+import os
+from huggingface_hub import snapshot_download
+from transformers import pipeline
+
+repo_path = snapshot_download(repo_id)
+tokenizer_file = os.path.join(repo_path, "gptx_tokenizer.py")
+spec = importlib.util.spec_from_file_location("gptx_tokenizer", tokenizer_file)
+assert spec is not None
+tokenizer_module = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(tokenizer_module)
+tokenizer = tokenizer_module.SPTokenizer(name_or_path=repo_path)
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt)
+RESULT = {"outputs": RESULT}

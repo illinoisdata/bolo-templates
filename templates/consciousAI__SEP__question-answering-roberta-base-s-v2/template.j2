@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("consciousAI/question-answering-roberta-base-s-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Which deep learning libraries back 🤗 Transformers?') %}
+{% set context = context | default('🤗 Transformers is backed by the three most popular deep learning libraries — Jax, PyTorch and TensorFlow — with a seamless integration between them. It\'s straightforward to train your models with one before loading them for inference with the other.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+repo_dir = tokenizer_json_path.rsplit('/', 1)[0]
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, local_files_only=True, use_fast=True)
+model = AutoModelForQuestionAnswering.from_pretrained(repo_dir, local_files_only=True)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors='pt', truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits[0]
+end_logits = outputs.end_logits[0]
+start_idx = int(torch.argmax(start_logits).item())
+end_idx = int(torch.argmax(end_logits).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+
+input_ids = inputs['input_ids'][0][start_idx:end_idx + 1]
+answer = tokenizer.decode(input_ids, skip_special_tokens=True).strip()
+start_probs = torch.softmax(start_logits, dim=-1)
+end_probs = torch.softmax(end_logits, dim=-1)
+confidence = float(((start_probs[start_idx] + end_probs[end_idx]) / 2.0).item())
+
+RESULT = {
+    'answer': answer,
+    'confidence': confidence,
+    'start_index': start_idx,
+    'end_index': end_idx,
+}

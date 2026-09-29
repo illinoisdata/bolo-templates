@@ -1,32 +1,33 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-ru-bg") %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("Привет, как дела?") %}
-{% set target_lang_token = target_lang_token | default(">>bg<<") %}
-{% set max_length = max_length | default(200) %}
-{% set output_filename = output_filename | default("translation.txt") %}
+{% set source_text = source_text | default('Привет, как дела?') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-target_lang_token = "{{ target_lang_token }}"
-max_length = {{ max_length }}
-output_filename = "{{ output_filename }}"
-
-import os
-from pathlib import Path
+source_text = {{ source_text | tojson }}
+max_new_tokens = {{ max_new_tokens }}
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import MarianMTModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+model = MarianMTModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-source_text = f"{target_lang_token} {text_input}"
-encoded_inputs = tokenizer(source_text, return_tensors="pt")
-encoded_inputs = {key: value.to(torch_device) for key, value in encoded_inputs.items()}
+inputs = tokenizer([">>bg<< " + source_text], return_tensors="pt", padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_tokens = model.generate(**encoded_inputs, max_length=max_length)
-translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+with torch.no_grad():
+    generated = model.generate(**inputs, max_new_tokens=max_new_tokens)
 
-RESULT = {"translation": translation}
+output_text = tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
+
+RESULT = {"translation": output_text}

@@ -1,0 +1,23 @@
+{% set repo_id = repo_id | default("mlc-ai/Llama-3.2-3B-Instruct-q4f16_0-MLC") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('What is the meaning of life?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import json
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="mlc-chat-config.json")
+with open(config_path, "r") as f:
+    chat_config = json.load(f)
+
+model_summary = {
+    "repo_id": repo_id,
+    "device": device,
+    "prompt": prompt,
+    "model_type": chat_config.get("model_type"),
+    "conv_template": chat_config.get("conv_template"),
+}
+
+RESULT = {"output": model_summary}

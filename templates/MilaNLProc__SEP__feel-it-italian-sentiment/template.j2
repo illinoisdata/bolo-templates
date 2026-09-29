@@ -1,0 +1,27 @@
+{% set repo_id = repo_id | default("MilaNLProc/feel-it-italian-sentiment") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set input_prompt = input_prompt | default("Oggi sono proprio contento!") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from huggingface_hub import hf_hub_download
+from transformers import PreTrainedTokenizerFast, pipeline
+
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer = PreTrainedTokenizerFast(
+    tokenizer_file=tokenizer_file,
+    bos_token="<s>",
+    eos_token="</s>",
+    sep_token="</s>",
+    cls_token="<s>",
+    unk_token="<unk>",
+    pad_token="<pad>",
+    mask_token="<mask>",
+)
+
+pipe = pipeline(task=task, model=repo_id, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt)

@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("state-spaces/mamba2-370m") %}
+{% set device = device | default("cuda:0") %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+max_new_tokens = {{ max_new_tokens }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers.models.mamba2.modeling_mamba2 import Mamba2ForCausalLM
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+device_obj = torch.device(device)
+model = Mamba2ForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float16 if device_obj.type == "cuda" else torch.float32,
+    low_cpu_mem_usage=True,
+    ignore_mismatched_sizes=True,
+)
+model.to(device_obj)
+model.eval()
+
+input_ids = torch.tensor([[1, 2, 3]], device=device_obj)
+with torch.no_grad():
+    output_ids = model.generate(
+        input_ids=input_ids,
+        max_new_tokens=max_new_tokens,
+        do_sample=False,
+        pad_token_id=0,
+        eos_token_id=0,
+    )
+
+RESULT = {"output_ids": output_ids.detach().cpu().tolist()}

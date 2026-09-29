@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("timm/vit_base_patch8_224.dino") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-feature-extraction") %}
+{% set input_data = input_data | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+repo_id = "{{ repo_id }}"
+task = "{{ task }}"
+device = "{{ device }}"
+input_data = "{{ input_data }}"
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+features = pipe(input_data)
+RESULT = {"features": features}

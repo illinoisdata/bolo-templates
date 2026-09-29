@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("timm/vit_base_patch32_clip_224.metaclip_2pt5b") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set labels = labels | default(['a cat', 'two cats', 'a dog', 'a car', 'a landscape']) %}
+{% set top_k = top_k | default(5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+labels = {{ labels }}
+top_k = {{ top_k }}
+
+import json
+import torch
+from PIL import Image
+from urllib.parse import urlparse
+from huggingface_hub import hf_hub_download
+from timm.models import create_model
+from timm.data import resolve_data_config, create_transform
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+if urlparse(image_path).scheme in ("http", "https"):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+pretrained_cfg = cfg["pretrained_cfg"]
+
+model = create_model(
+    cfg["architecture"],
+    pretrained=False,
+    checkpoint_path=weights_path,
+    num_classes=512,
+)
+model.eval().to(device)
+
+transform = create_transform(**resolve_data_config(pretrained_cfg, model=model))
+image_tensor = transform(image).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    logits = model(image_tensor)
+    probs = logits.softmax(dim=-1)[0]
+    top_probs, top_indices = probs.topk(min(top_k, probs.numel()))
+    output = [{"label": int(i), "score": float(p.cpu())} for i, p in zip(top_indices.tolist(), top_probs)]
+
+RESULT = {"output": output}

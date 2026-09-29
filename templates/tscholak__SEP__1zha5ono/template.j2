@@ -1,28 +1,33 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("tscholak/1zha5ono") %}
-{% set text_input = text_input | default("How many singers do we have? | concert_singer | stadium : stadium_id, location, name, capacity, highest, lowest, average | singer : singer_id, name, country, song_name, song_release_year, age, is_male | concert : concert_id, concert_name, theme, stadium_id, year | singer_in_concert : concert_id, singer_id") %}
-{% set num_beams = num_beams | default(4) %}
-{% set max_length = max_length | default(512) %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('How many singers do we have?') %}
+{% set db_id = db_id | default('concert_singer') %}
+{% set schema = schema | default('stadium : stadium_id, location, name, capacity, highest, lowest, average | singer : singer_id, name, country, song_name, song_release_year, age, is_male | concert : concert_id, concert_name, theme, stadium_id, year | singer_in_concert : concert_id, singer_id') %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-num_beams = {{ num_beams }}
-max_length = {{ max_length }}
+question = "{{ question }}"
+db_id = "{{ db_id }}"
+schema = "{{ schema }}"
 
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-encoded_inputs = tokenizer(text_input, return_tensors="pt")
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+input_text = f"{question} | {db_id} | {schema}"
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(
-    **encoded_inputs,
-    max_length=max_length,
-    num_beams=num_beams,
-)
-generated_sql = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_length=128, num_beams=4)
 
-RESULT = {"generated_sql": generated_sql}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+RESULT = {"output_text": output_text}

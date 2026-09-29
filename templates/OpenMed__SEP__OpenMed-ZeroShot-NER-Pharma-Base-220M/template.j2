@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Pharma-Base-220M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text|default("Administration of metformin reduced glucose levels significantly.") %}
+{% set labels = labels|default(["CHE"]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+labels = {{ labels | tojson }}
+
+import json
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+config = json.load(open(config_path))
+RESULT = {"config": config, "weights_path": weights_path, "text": text, "labels": labels}

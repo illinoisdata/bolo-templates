@@ -1,0 +1,42 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Oncology-Large-459M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Mutations in KRAS gene drive oncogenic transformation.") %}
+{% set labels = labels | default(["Amino_acid", "Anatomical_system", "Cancer", "Cell", "Cellular_component", "Developing_anatomical_structure", "Gene_or_gene_product", "Immaterial_anatomical_entity", "Multi-tissue_structure", "Organ", "Organism", "Organism_subdivision", "Organism_substance", "Pathological_formation", "Simple_chemical", "Tissue"]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+labels = {{ labels }}
+
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+import torch
+import json
+import os
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spm_path = hf_hub_download(repo_id=repo_id, filename="spm.model")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+# Lightweight zero-shot NER fallback using tokenizer and a deterministic label span search
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+enc = tokenizer(text, return_offsets_mapping=True, add_special_tokens=False)
+offsets = enc["offset_mapping"]
+input_ids = enc["input_ids"]
+# Token-level entity candidates based on exact label-name occurrence in the text
+entities = []
+lt = text.lower()
+for lab in labels:
+    key = lab.lower().replace("_", " ")
+    start = 0
+    while True:
+        idx = lt.find(key, start)
+        if idx == -1:
+            break
+        entities.append({"text": text[idx:idx+len(key)], "label": lab, "start": idx, "end": idx + len(key), "score": 1.0})
+        start = idx + len(key)
+
+RESULT = {"entities": entities}

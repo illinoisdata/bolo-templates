@@ -1,8 +1,43 @@
-{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 {% set repo_id = repo_id | default("hustvl/vitmatte-base-composition-1k") %}
+{% set device = device | default("cuda:0") %}
+
 repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
 
-from transformers.models.vitmatte import VitMatteImageProcessor
-import inspect
+import os
+import io
+import numpy as np
+import requests
+from PIL import Image
+import torch
+from transformers import VitMatteForImageMatting, VitMatteImageProcessor
+from huggingface_hub import hf_hub_download
 
-print(inspect.getsource(VitMatteImageProcessor))
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+image_processor = VitMatteImageProcessor.from_pretrained(os.path.dirname(preprocessor_config_path))
+model = VitMatteForImageMatting.from_pretrained(os.path.dirname(config_path), local_files_only=True)
+model.to(device)
+model.eval()
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(io.BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+trimap = Image.new("L", image.size, 128)
+inputs = image_processor(images=image, trimaps=trimap, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+alpha = outputs.alphas
+if isinstance(alpha, torch.Tensor):
+    alpha = alpha.detach().cpu().numpy()
+
+RESULT = {"alpha": alpha}

@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("openlm-research/open_llama_7b_v2") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.9) %}
+{% set do_sample = do_sample | default(True) %}
+{% set repetition_penalty = repetition_penalty | default(1.1) %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+do_sample = {{ do_sample }}
+repetition_penalty = {{ repetition_penalty }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+after_input = input_prompt
+RESULT = pipe(
+    after_input,
+    max_new_tokens=max_new_tokens,
+    temperature=temperature,
+    top_p=top_p,
+    do_sample=do_sample,
+    repetition_penalty=repetition_penalty,
+)

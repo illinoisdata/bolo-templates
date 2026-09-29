@@ -1,0 +1,25 @@
+{% set repo_id = repo_id | default("EmergentMethods/gliner_medium_news-v2.1") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("The Chihuahua State Public Security Secretariat (SSPE) arrested 35-year-old Salomón C. T. in Ciudad Juárez, found in possession of a stolen vehicle, a white GMC Yukon, which was reported stolen in the city's streets. The arrest was made by intelligence and police analysis personnel during an investigation in the border city. The arrest is related to a previous detention on February 6, which involved armed men in a private vehicle. The detainee and the vehicle were turned over to the Chihuahua State Attorney General's Office for further investigation into the case.") %}
+{% set labels = labels | default(["person", "location", "date", "event", "facility", "vehicle", "number", "organization"]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+labels = {{ labels | tojson }}
+
+import json
+import os
+import sys
+import subprocess
+
+subprocess.run([sys.executable, "-m", "pip", "install", "-q", "gliner", "huggingface_hub", "safetensors"], check=True)
+
+from huggingface_hub import hf_hub_download
+from gliner import GLiNER
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+model = GLiNER.from_pretrained(repo_id)
+model.to(device)
+entities = model.predict_entities(text, labels)
+
+RESULT = {"entities": entities}

@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("tugstugi/bert-large-mongolian-uncased") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Монгол улсын {mask} Улаанбаатар хотоос ярьж байна.") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+from transformers import pipeline, AutoTokenizer, AutoModelForMaskedLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("HYPJUDY/layoutlmv3-base-finetuned-funsd") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("token-classification") %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import LayoutLMv3TokenizerFast, pipeline
+
+class LayoutLMv3TokenizerWithBoxes(LayoutLMv3TokenizerFast):
+    @staticmethod
+    def _make_dummy_boxes(words: list[str]) -> list[list[int]]:
+        if not words:
+            return [[0, 0, 0, 0]]
+        box_width = max(1, 1000 // len(words))
+        dummy_boxes: list[list[int]] = []
+        for idx, _ in enumerate(words):
+            x0 = min(idx * box_width, 1000 - box_width)
+            dummy_boxes.append([x0, 0, x0 + box_width, 100])
+        return dummy_boxes
+
+    def __call__(self, text, text_pair=None, boxes=None, **kwargs):
+        words = text
+        if isinstance(text, str):
+            words = [word for word in text.split() if word]
+            if not words:
+                words = [text]
+        if boxes is None:
+            boxes = self._make_dummy_boxes(words)
+        return super().__call__(words, text_pair=text_pair, boxes=boxes, **kwargs)
+
+tokenizer = LayoutLMv3TokenizerWithBoxes.from_pretrained(model)
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt)

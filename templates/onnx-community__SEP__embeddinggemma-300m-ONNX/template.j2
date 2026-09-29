@@ -1,0 +1,55 @@
+{% set repo_id = repo_id | default("onnx-community/embeddinggemma-300m-ONNX") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('EmbeddingGemma produces useful text embeddings for semantic similarity tasks.') %}
+{% set max_length = max_length | default(256) %}
+{% set normalize = normalize | default(true) %}
+{% set model_filename = model_filename | default('onnx/model.onnx') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+max_length = {{ max_length }}
+normalize = {{ normalize }}
+model_filename = "{{ model_filename }}"
+
+import os
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+import onnxruntime as ort
+
+model_path = hf_hub_download(repo_id=repo_id, filename=model_filename)
+external_data_path = hf_hub_download(repo_id=repo_id, filename='onnx/model.onnx_data')
+model_dir = os.path.dirname(model_path)
+os.replace(external_data_path, os.path.join(model_dir, 'model.onnx_data'))
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True)
+
+if device.startswith("cuda") and torch.cuda.is_available():
+    providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+else:
+    providers = ["CPUExecutionProvider"]
+
+session_options = ort.SessionOptions()
+session_options.intra_op_num_threads = 1
+session_options.inter_op_num_threads = 1
+session = ort.InferenceSession(model_path, sess_options=session_options, providers=providers)
+
+encoded = tokenizer(
+    input_text,
+    return_tensors="np",
+    truncation=True,
+    max_length=max_length,
+    padding=False,
+)
+
+inputs = {k: v for k, v in encoded.items() if k in {inp.name for inp in session.get_inputs()}}
+outputs = session.run(None, inputs)
+last_hidden_state = outputs[0]
+attention_mask = encoded["attention_mask"].astype(np.float32)
+mask = attention_mask[..., None]
+pooled = (last_hidden_state * mask).sum(axis=1) / np.clip(mask.sum(axis=1), 1e-9, None)
+
+if normalize:
+    pooled = pooled / np.linalg.norm(pooled, axis=-1, keepdims=True)
+
+RESULT = {"embeddings": pooled}

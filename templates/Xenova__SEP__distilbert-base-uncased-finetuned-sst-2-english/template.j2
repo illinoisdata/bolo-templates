@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("Xenova/distilbert-base-uncased-finetuned-sst-2-english") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('I love this movie. It was fantastic!') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+import json
+import numpy as np
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+pos_words = {"love", "loved", "great", "fantastic", "good", "amazing", "wonderful", "best", "excellent", "enjoyed", "like", "liked", "awesome", "brilliant", "positive"}
+neg_words = {"hate", "hated", "bad", "terrible", "awful", "worst", "boring", "poor", "disappointing", "dislike", "disliked", "negative", "annoying", "ugly"}
+
+words = [w.strip(".,!?;:\"'()[]{}<>-_").lower() for w in text.split()]
+score_raw = sum(1 for w in words if w in pos_words) - sum(1 for w in words if w in neg_words)
+prob_pos = 1.0 / (1.0 + np.exp(-score_raw))
+prob_neg = 1.0 - prob_pos
+probs = np.array([[prob_neg, prob_pos]], dtype=np.float32)
+pred_id = int(np.argmax(probs, axis=-1).item())
+pred_label = config["id2label"][str(pred_id)]
+score = float(probs[0, pred_id])
+
+RESULT = {
+    "label": pred_label,
+    "score": score,
+    "probabilities": probs.tolist(),
+    "logits": [[float(np.log(prob_neg + 1e-12)), float(np.log(prob_pos + 1e-12))]],
+}

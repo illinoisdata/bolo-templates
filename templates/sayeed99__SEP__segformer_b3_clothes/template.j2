@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("sayeed99/segformer_b3_clothes") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-segmentation") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+image_path = {{ image_path | tojson }}
+
+from PIL import Image
+from transformers import pipeline
+
+image = Image.open(image_path).convert("RGB")
+pipe = pipeline(task=task, model=repo_id, device=device)
+segmentation = pipe(image)
+RESULT = {"segmentation": segmentation}

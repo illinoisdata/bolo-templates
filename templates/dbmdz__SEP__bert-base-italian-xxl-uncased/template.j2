@@ -1,0 +1,23 @@
+{% set repo_id = repo_id | default("dbmdz/bert-base-italian-xxl-uncased") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+import torch
+from transformers import pipeline
+
+# Map string device to pipeline device index: use CPU if CUDA unavailable
+if isinstance(device, str) and device.lower().startswith("cuda"):
+    pipeline_device = int(device.split(":", 1)[1]) if torch.cuda.is_available() else -1
+else:
+    pipeline_device = -1
+
+pipe = pipeline(task=task, model=repo_id, device=pipeline_device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

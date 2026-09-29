@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("knowledgator/gliclass-modern-base-v2.0-init") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("One day I will see the world!") %}
+{% set labels = labels | default(["travel", "dreams", "sport", "science", "politics"]) %}
+{% set threshold = threshold | default(0.5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+labels = {{ labels | tojson }}
+threshold = {{ threshold }}
+
+import os
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+from gliclass import GLiClassModel, ZeroShotClassificationPipeline
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+model = GLiClassModel.from_pretrained(repo_id, torch_dtype=torch.float32)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, add_prefix_space=True)
+pipeline = ZeroShotClassificationPipeline(model, tokenizer, classification_type='multi-label', device=device)
+
+results = pipeline(text, labels, threshold=threshold)[0]
+output = [{"label": r["label"], "score": float(r["score"])} for r in results]
+
+RESULT = {"output": output}

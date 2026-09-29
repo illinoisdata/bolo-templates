@@ -1,0 +1,26 @@
+{% set repo_id = repo_id | default("facebook/encodec_32khz") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+
+repo_id = "{{ repo_id }}"
+task = "{{ task }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+import librosa
+from transformers import AutoProcessor, pipeline
+
+# Load processor & model
+processor = AutoProcessor.from_pretrained(repo_id)
+pipe = pipeline(task=task, model=repo_id, feature_extractor=processor, tokenizer=processor, device=device)
+
+# Pre-process input
+audio_samples, _ = librosa.load(audio_path, sr=processor.sampling_rate, mono=True)
+inputs = audio_samples.astype("float32")
+
+# Run inference
+output = pipe(inputs, sampling_rate=processor.sampling_rate)
+
+# Post-process & build RESULT dict
+RESULT = {"output": output}

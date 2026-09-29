@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("neulab/Pangea-7B-hf") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default('Describe the image in detail.') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+image_path = "{{ image_path }}"
+
+import os
+import torch
+from PIL import Image
+from transformers import LlavaNextForConditionalGeneration, AutoProcessor
+from huggingface_hub import hf_hub_download
+
+weights_filename = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+config_filename = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_config_filename = hf_hub_download(repo_id=repo_id, filename="processor_config.json")
+
+image_input = Image.open(image_path).convert("RGB") if not str(image_path).startswith(("http://", "https://")) else Image.open(__import__('requests').get(image_path, stream=True).raw).convert("RGB")
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = LlavaNextForConditionalGeneration.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float16,
+    device_map=None,
+)
+model.to(device)
+model.resize_token_embeddings(len(processor.tokenizer))
+model.eval()
+
+messages = [
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user", "content": f"<image>\n{text_input}"},
+]
+chat_text = processor.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = processor(images=image_input, text=chat_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_new_tokens=128,
+        do_sample=False,
+    )
+
+output_text = processor.decode(output_ids[0], skip_special_tokens=True, clean_up_tokenization_spaces=False)
+
+RESULT = {"output": output_text}

@@ -1,0 +1,25 @@
+{% set repo_id = repo_id | default("urchade/gliner_large-v2.1") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Cristiano Ronaldo dos Santos Aveiro (Portuguese pronunciation: [kɾiʃˈtjɐnu ʁɔˈnaldu]; born 5 February 1985) is a Portuguese professional footballer who plays as a forward for and captains both Saudi Pro League club Al Nassr and the Portugal national team. Widely regarded as one of the greatest players of all time, Ronaldo has won five Ballon d'Or awards, a record three UEFA Men's Player of the Year Awards, and four European Golden Shoes, the most by a European player. He has won 33 trophies in his career, including seven league titles, five UEFA Champions Leagues, the UEFA European Championship and the UEFA Nations League. Ronaldo holds the records for most appearances (183), goals (140) and assists (42) in the Champions League, goals in the European Championship (14), international goals (128) and international appearances (205). He is one of the few players to have made over 1,200 professional career appearances, the most by an outfield player, and has scored over 850 official senior career goals for club and country, making him the top goalscorer of all time.") %}
+{% set labels = labels | default(["person", "award", "date", "competitions", "teams"]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+labels = {{ labels }}
+
+from huggingface_hub import hf_hub_download
+import json
+import torch
+from transformers import AutoTokenizer
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+model_name = cfg.get("model_name", "microsoft/deberta-v3-large")
+tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
+inputs = tokenizer(text, return_tensors="pt", truncation=True).to(device)
+
+RESULT = {"config": cfg, "labels": labels, "input_ids_shape": list(inputs["input_ids"].shape)}

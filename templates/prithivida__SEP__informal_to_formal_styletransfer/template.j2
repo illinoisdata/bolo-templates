@@ -1,23 +1,40 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("prithivida/informal_to_formal_styletransfer") %}
-{% set informal_input = informal_input | default("hey, can u send me the notes quickly? i'm swamped rn.") %}
-{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('i cant believe its already this late, we shouldnt be doing this now but i dont know what else to say') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-informal_input = "{{ informal_input }}"
-max_new_tokens = {{ max_new_tokens }}
-
-from pathlib import Path
+text = {{ text | tojson }}
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_file = hf_hub_download(repo_id=repo_id, filename="spiece.model")
 
-model_inputs = tokenizer(informal_input, return_tensors="pt")
-model_inputs = {key: value.to(device) for key, value in model_inputs.items()}
+_tokenizer = AutoTokenizer.from_pretrained(
+    model_file.rsplit('/', 1)[0],
+    use_fast=True,
+)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    model_file.rsplit('/', 1)[0],
+    torch_dtype=torch.float32,
+)
+model.to(device)
+model.eval()
 
-generated_tokens = model.generate(**model_inputs, max_new_tokens=max_new_tokens)
-formal_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
-RESULT = {"formal_text": formal_text}
+inputs = _tokenizer(text, return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_length=128,
+        num_beams=4,
+        early_stopping=True,
+    )
+
+output_text = _tokenizer.decode(output_ids[0], skip_special_tokens=True)
+RESULT = {"output_text": output_text}

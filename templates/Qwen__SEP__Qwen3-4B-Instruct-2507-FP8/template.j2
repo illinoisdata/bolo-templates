@@ -1,0 +1,21 @@
+{% set repo_id = repo_id | default("Qwen/Qwen3-4B-Instruct-2507-FP8") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+repo_id = {{ repo_id | tojson }}
+task = {{ task | tojson }}
+model = repo_id
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import AutoConfig, pipeline
+from transformers.integrations.finegrained_fp8 import FP8Experts
+
+FP8Experts._impl_tp_layer_overrides.setdefault(None, {})
+
+config = AutoConfig.from_pretrained(model)
+config._experts_implementation = "deepgemm_megamoe"
+
+pipe = pipeline(task=task, model=model, config=config, device=device)
+RESULT = pipe(input_prompt)

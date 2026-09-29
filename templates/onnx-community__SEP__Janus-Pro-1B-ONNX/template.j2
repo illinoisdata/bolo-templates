@@ -1,0 +1,26 @@
+{% set repo_id = repo_id | default("onnx-community/Janus-Pro-1B-ONNX") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Describe the image in detail.') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+image_path = "{{ image_path }}"
+
+import requests
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from transformers import AutoProcessor
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+processor = AutoProcessor.from_pretrained(repo_id)
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+text = f"{question} <image>"
+inputs = processor(text=text, return_tensors='pt')
+output_value = {'input_keys': list(inputs.keys())}
+RESULT = {'output': output_value}

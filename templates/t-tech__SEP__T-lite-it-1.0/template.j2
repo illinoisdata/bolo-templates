@@ -1,0 +1,69 @@
+{% set repo_id = repo_id | default("t-tech/T-lite-it-1.0") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Напиши короткий стих про машинное обучение.') %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.8) %}
+{% set repetition_penalty = repetition_penalty | default(1.05) %}
+{% set seed = seed | default(42) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+repetition_penalty = {{ repetition_penalty }}
+seed = {{ seed }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
+
+
+torch.manual_seed(seed)
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_index_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+
+tokenizer = AutoTokenizer.from_pretrained(
+    tokenizer_config_path.rsplit('/', 1)[0],
+    local_files_only=True,
+)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    low_cpu_mem_usage=True,
+    device_map=None,
+    local_files_only=False,
+)
+model.to(device)
+model.eval()
+
+messages = [
+    {"role": "system", "content": "Ты T-lite, виртуальный ассистент в Т-Технологии. Твоя задача - быть полезным диалоговым ассистентом."},
+    {"role": "user", "content": prompt},
+]
+text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+model_inputs = tokenizer([text], return_tensors="pt")
+model_inputs = {k: v.to(device) for k, v in model_inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **model_inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=True,
+        temperature=temperature,
+        top_p=top_p,
+        repetition_penalty=repetition_penalty,
+    )
+
+input_len = model_inputs["input_ids"].shape[1]
+output_ids = generated_ids[0][input_len:]
+response = tokenizer.decode(output_ids, skip_special_tokens=True)
+
+RESULT = {"response": response}

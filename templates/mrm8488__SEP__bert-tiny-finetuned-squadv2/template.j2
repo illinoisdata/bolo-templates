@@ -1,0 +1,42 @@
+{% set repo_id = repo_id | default("mrm8488/bert-tiny-finetuned-squadv2") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default("Who has been working hard for hugginface/transformers lately?") %}
+{% set context = context | default("Manuel Romero has been working hardly in the repository hugginface/transformers lately") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+_tokenizer_dir = __import__('os').path.dirname(vocab_path)
+model = AutoModelForQuestionAnswering.from_pretrained(repo_id, torch_dtype=torch.float32)
+tokenizer = AutoTokenizer.from_pretrained(_tokenizer_dir, use_fast=True)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits
+end_logits = outputs.end_logits
+start_idx = int(torch.argmax(start_logits, dim=-1).item())
+end_idx = int(torch.argmax(end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+
+answer_ids = inputs["input_ids"][0, start_idx:end_idx + 1]
+answer = tokenizer.decode(answer_ids, skip_special_tokens=True).strip()
+
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx}

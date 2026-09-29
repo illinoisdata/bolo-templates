@@ -1,0 +1,21 @@
+{% set repo_id = repo_id | default("CompendiumLabs/bge-base-en-v1.5-gguf") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('bge-base-en-v1.5-q4_k_m.gguf') %}
+{% set texts = texts | default(['Represent this sentence for searching relevant passages: The quick brown fox jumps over the lazy dog.']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+texts = {{ texts }}
+
+import os
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+llm = Llama(model_path=model_path, embedding=True, n_gpu_layers=-1 if str(device).startswith('cuda') else 0, verbose=False)
+embeddings = llm.embed(texts)
+if isinstance(embeddings, list) and len(embeddings) > 0 and hasattr(embeddings[0], 'tolist'):
+    embeddings = [e.tolist() for e in embeddings]
+
+RESULT = {"embeddings": embeddings}

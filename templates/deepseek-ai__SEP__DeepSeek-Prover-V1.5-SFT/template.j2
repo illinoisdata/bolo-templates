@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("deepseek-ai/DeepSeek-Prover-V1.5-SFT") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Prove that for all natural numbers n, n + 0 = n in Lean 4.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+index_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+weight_1 = hf_hub_download(repo_id=repo_id, filename="model-00001-of-000002.safetensors")
+weight_2 = hf_hub_download(repo_id=repo_id, filename="model-00002-of-000002.safetensors")
+
+# Use the downloaded tokenizer files directly; model weights are loaded from repo snapshots.
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=64,
+        do_sample=False,
+        pad_token_id=tokenizer.eos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": output_text}

@@ -1,0 +1,13 @@
+{% set repo_id = repo_id | default("RoversX/llama-2-7b-hf-small-shards-Samantha-V1-SFT") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default('text-generation') %}
+{% set input_prompt = input_prompt | default('I love AutoTrain because ') %}
+repo_id = '{{ repo_id }}'
+device = '{{ device }}'
+task = '{{ task }}'
+input_prompt = '{{ input_prompt }}'
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = pipe(input_prompt)

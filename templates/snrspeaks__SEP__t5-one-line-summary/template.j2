@@ -1,25 +1,44 @@
+{% set text = text | default('We describe a system called Overton, whose main design goal is to support engineers in building, monitoring, and improving production machine learning systems. Key challenges engineers face are monitoring fine-grained quality, diagnosing errors in sophisticated applications, and handling contradictory or incomplete supervision data. Overton automates the life cycle of model construction, deployment, and monitoring by providing a set of novel high-level, declarative abstractions. Overton\'s vision is to shift developers to these higher-level tasks instead of lower-level machine learning tasks. In fact, using Overton, engineers can build deep-learning-based applications without writing any code in frameworks like TensorFlow. For over a year, Overton has been used in production to support multiple applications in both near-real-time applications and back-of-house processing. In that time, Overton-based applications have answered billions of queries in multiple languages and processed trillions of records reducing errors 1.7-2.9 times versus production systems.') %}
+{% set max_length = max_length | default(50) %}
+{% set num_beams = num_beams | default(5) %}
+{% set do_sample = do_sample | default(false) %}
 {% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("snrspeaks/t5-one-line-summary") %}
-{% set summary_prefix = summary_prefix | default("summarize: ") %}
-{% set summary_input = summary_input | default("We describe a system called Overton, whose main design goal is to support engineers in building, monitoring, and improving production machine learning systems. Key challenges engineers face are monitoring fine-grained quality, diagnosing errors in sophisticated applications, and handling contradictory or incomplete supervision data. Overton automates the life cycle of model construction, deployment, and monitoring by providing a set of novel high-level, declarative abstractions. Overton's vision is to shift developers to these higher-level tasks instead of lower-level machine learning tasks. In fact, using Overton, engineers can build deep-learning-based applications without writing any code in frameworks like TensorFlow. For over a year, Overton has been used in production to support multiple applications in both near-real-time applications and back-of-house processing. In that time, Overton-based applications have answered billions of queries in multiple languages and processed trillions of records reducing errors 1.7-2.9 times versus production systems.") %}
-{% set generation_kwargs = generation_kwargs | default({"num_beams": 4, "max_length": 200, "early_stopping": true, "length_penalty": 2.0, "no_repeat_ngram_size": 3}) %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-summary_prefix = {{ summary_prefix | tojson }}
-summary_input = {{ summary_input | tojson }}
-generation_kwargs = {{ generation_kwargs }}
 
-from pathlib import Path
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+do_sample = {{ do_sample }}
+
+import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
 
-prompt = summary_prefix + summary_input
-inputs = tokenizer(prompt, return_tensors="pt", truncation=True, padding="longest")
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, local_files_only=True)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer("summarize: " + text, return_tensors="pt", truncation=True)
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(**inputs, **generation_kwargs)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        num_beams=num_beams,
+        max_length=max_length,
+        do_sample=do_sample,
+    )
 
-decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-RESULT = {"summaries": decoded}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
+
+RESULT = {"summary": output_text}

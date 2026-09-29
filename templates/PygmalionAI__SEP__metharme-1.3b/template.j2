@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("PygmalionAI/metharme-1.3b") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set model = model | default(repo_id) %}
+{% set tokenizer_filename = tokenizer_filename | default("tokenizer.json") %}
+{% set tokenizer_special_tokens = tokenizer_special_tokens | default(["<|system|>", "<|user|>", "<|model|>"]) %}
+{% set bos_token = bos_token | default("<|endoftext|>") %}
+{% set eos_token = eos_token | default("<|endoftext|>") %}
+{% set unk_token = unk_token | default("<|endoftext|>") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+tokenizer_filename = {{ tokenizer_filename | tojson }}
+tokenizer_special_tokens = {{ tokenizer_special_tokens | tojson }}
+bos_token = {{ bos_token | tojson }}
+eos_token = {{ eos_token | tojson }}
+unk_token = {{ unk_token | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from huggingface_hub import hf_hub_download
+from tokenizers import Tokenizer as TokenizersTokenizer
+from transformers import AddedToken, PreTrainedTokenizerFast, pipeline
+
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename=tokenizer_filename)
+backend_tokenizer = TokenizersTokenizer.from_file(tokenizer_file)
+special_tokens = [
+    AddedToken(token, lstrip=True, rstrip=True, single_word=False, normalized=False)
+    for token in tokenizer_special_tokens
+]
+tokenizer = PreTrainedTokenizerFast(
+    tokenizer_object=backend_tokenizer,
+    bos_token=bos_token,
+    eos_token=eos_token,
+    unk_token=unk_token,
+)
+tokenizer.add_special_tokens({"additional_special_tokens": special_tokens})
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+
+prompt = input_prompt
+RESULT = pipe(prompt)
+RESULT = {"outputs": RESULT}

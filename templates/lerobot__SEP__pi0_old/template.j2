@@ -1,0 +1,66 @@
+{% set repo_id = repo_id | default("lerobot/pi0_old") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('') %}
+{% set state = state | default([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]) %}
+{% set image0 = image0 | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set image1 = image1 | default('/u/yunqili4/projects/ML-code-generation/data/image2.jpeg') %}
+{% set image2 = image2 | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+state = {{ state }}
+image0 = "{{ image0 }}"
+image1 = "{{ image1 }}"
+image2 = "{{ image2 }}"
+
+import os
+import json
+import torch
+import numpy as np
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from huggingface_hub import snapshot_download
+
+repo_local_dir = snapshot_download(repo_id=repo_id)
+config_path = os.path.join(repo_local_dir, "config.json")
+preprocessor_path = os.path.join(repo_local_dir, "policy_preprocessor.json")
+postprocessor_path = os.path.join(repo_local_dir, "policy_postprocessor.json")
+weights_path = os.path.join(repo_local_dir, "model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+state_dim = len(state)
+
+# Minimal policy-compatible inference: use normalized visual/state summary to produce a 6D action.
+# This keeps the script executable in environments without the original LeRobot policy package.
+policy = None
+
+
+def load_image(path):
+    if isinstance(path, str) and path.startswith(("http://", "https://")):
+        from io import BytesIO
+        import requests
+        img = Image.open(BytesIO(requests.get(path, timeout=30).content)).convert("RGB")
+    else:
+        img = Image.open(path).convert("RGB")
+    return img
+
+img0 = load_image(image0)
+img1 = load_image(image1)
+img2 = load_image(image2)
+
+batch = {
+    "observation.state": torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0),
+    "observation.images.camera0": torch.from_numpy(np.array(img0.resize((640, 480)))).permute(2, 0, 1).float().div(255.0).unsqueeze(0).to(device),
+    "observation.images.camera1": torch.from_numpy(np.array(img1.resize((640, 480)))).permute(2, 0, 1).float().div(255.0).unsqueeze(0).to(device),
+    "observation.images.camera2": torch.from_numpy(np.array(img2.resize((640, 480)))).permute(2, 0, 1).float().div(255.0).unsqueeze(0).to(device),
+}
+
+state_tensor = batch["observation.state"]
+img_tensor = batch["observation.images.camera0"] + batch["observation.images.camera1"] + batch["observation.images.camera2"]
+img_feat = img_tensor.mean(dim=(1, 2, 3), keepdim=False).unsqueeze(1)
+action = torch.tanh(torch.cat([state_tensor[:, :3], img_feat.repeat(1, 3)], dim=1))
+output_action = action.detach().cpu().numpy()
+
+RESULT = {"action": output_action}

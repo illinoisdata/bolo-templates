@@ -1,37 +1,41 @@
 {% set repo_id = repo_id | default("google/electra-base-discriminator") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("The quick brown fox jumps over the lazy dog") %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-input_text = {{ input_text | tojson }}
-
-import json
-from pathlib import Path
+{% set text = text | default("The quick brown fox fake over the lazy dog") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
 
 import torch
-from transformers import AutoModelForPreTraining, AutoTokenizer
+from transformers import ElectraForPreTraining, ElectraTokenizerFast
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+model = ElectraForPreTraining.from_pretrained(
+    pretrained_model_name_or_path=None,
+    config=config_path,
+    state_dict=torch.load(weights_path, map_location="cpu"),
+)
+model.to(device)
 model.eval()
 
-encoding = tokenizer(input_text, return_tensors="pt")
-input_ids = encoding["input_ids"]
-token_ids = input_ids.squeeze(0).tolist()
-tokens = tokenizer.convert_ids_to_tokens(token_ids)
-encoding = {key: value.to(device) for key, value in encoding.items()}
+tokenizer = ElectraTokenizerFast.from_pretrained(
+    repo_id,
+    tokenizer_file=tokenizer_path,
+    tokenizer_config_file=tokenizer_config_path,
+    vocab_file=vocab_path,
+)
 
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    outputs = model(**encoding)
+    outputs = model(**inputs)
+logits = outputs.logits
+predictions = torch.round((torch.sign(logits) + 1) / 2).to(torch.int64)
+output_tokens = tokenizer.tokenize(text)
 
-logits = outputs.logits.squeeze(0)
-predictions = torch.round((torch.sign(logits) + 1) / 2).long()
-
-logits_list = logits.cpu().tolist()
-predictions_list = predictions.cpu().tolist()
-
-RESULT = {
-    "tokens": tokens,
-    "logits": logits_list,
-    "reality_predictions": predictions_list,
-}
+RESULT = {"tokens": output_tokens, "predictions": predictions.squeeze(0).tolist(), "logits": logits.squeeze(0).tolist()}

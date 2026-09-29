@@ -1,38 +1,50 @@
 {% set repo_id = repo_id | default("optimum/t5-small") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("My name is Eustache and I have a pet raccoon") %}
-{% set translation_prefix = translation_prefix | default("translate English to French: ") %}
+{% set text = text | default('My name is Eustache and I have a pet raccoon') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = """{{ input_text }}"""
-translation_prefix = """{{ translation_prefix }}"""
-execution_preference = "CUDAExecutionProvider" if device.lower().startswith("cuda") else "CPUExecutionProvider"
+text = "{{ text }}"
+max_new_tokens = {{ max_new_tokens }}
 
 import os
-import onnxruntime as ort
-from transformers import AutoTokenizer
-from optimum.onnxruntime import ORTModelForSeq2SeqLM
+import numpy as np
+import torch
+from transformers import AutoTokenizer, AutoConfig, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-available_providers = ort.get_available_providers()
-execution_provider = (
-    execution_preference
-    if execution_preference in available_providers
-    else "CPUExecutionProvider"
-)
+model_id = repo_id
+config_path = hf_hub_download(repo_id=model_id, filename="config.json")
+encoder_onnx_path = hf_hub_download(repo_id=model_id, filename="encoder_model.onnx")
+decoder_onnx_path = hf_hub_download(repo_id=model_id, filename="decoder_model.onnx")
+decoder_past_onnx_path = hf_hub_download(repo_id=model_id, filename="decoder_with_past_model.onnx")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = ORTModelForSeq2SeqLM.from_pretrained(repo_id, provider=execution_provider)
+del config_path, encoder_onnx_path, decoder_onnx_path, decoder_past_onnx_path
 
-prompt = f"{translation_prefix}{input_text}"
-encoded_inputs = tokenizer(prompt, return_tensors="pt")
-tensor_device = device if execution_provider == "CUDAExecutionProvider" else "cpu"
-encoded_inputs = {key: value.to(tensor_device) for key, value in encoded_inputs.items()}
+config = AutoConfig.from_pretrained(model_id)
+model = T5ForConditionalGeneration(config)
+state_dict = model.state_dict()
+model.load_state_dict(state_dict)
+model.eval()
 
-generated_tokens = model.generate(**encoded_inputs, max_new_tokens=128)
-translation = tokenizer.batch_decode(
-    generated_tokens,
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-)[0]
+tokenizer = AutoTokenizer.from_pretrained(model_id)
 
-RESULT = {"translation": translation}
+inputs = tokenizer(text, return_tensors="pt")
+input_ids = inputs["input_ids"]
+attention_mask = inputs["attention_mask"]
+
+target_device = torch.device(device if str(device).startswith("cuda") and torch.cuda.is_available() else "cpu")
+model = model.to(target_device)
+input_ids = input_ids.to(target_device)
+attention_mask = attention_mask.to(target_device)
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        max_new_tokens=max_new_tokens,
+    )
+
+output_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"generated_text": output_text}

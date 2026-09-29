@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("laion/CLIP-ViT-g-14-laion2B-s34B-b88K") %}
+{% set device = device | default("cuda:0") %}
+{% set text_prompt = text_prompt | default('a photo of a cat, a dog, and a bird') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_prompt = {{ text_prompt | tojson }}
+
+import json
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from open_clip import create_model_and_transforms, get_tokenizer
+import torch
+
+model_path = hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+data = json.load(open(config_path, "r"))
+model_cfg = data.get("model_cfg", data)
+
+model, _, preprocess = create_model_and_transforms(
+    model_cfg.get("model_name", "ViT-g-14"),
+    pretrained=model_path,
+    device=device,
+    precision="fp32",
+    **{k: v for k, v in model_cfg.items() if k not in {"model_name"}},
+)
+model.eval()
+
+image_path = "/u/yunqili4/projects/ML-code-generation/data/image1.jpeg"
+if str(image_path).startswith("http://") or str(image_path).startswith("https://"):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+image_tensor = preprocess(image).unsqueeze(0).to(device)
+tokenizer = get_tokenizer("ViT-g-14")
+text_tokens = tokenizer([text_prompt]).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_tensor)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logit_scale = model.logit_scale.exp()
+    logits_per_image = logit_scale * image_features @ text_features.T
+    probs = logits_per_image.softmax(dim=-1)
+
+RESULT = {"logits_per_image": logits_per_image.detach().cpu().tolist(), "probabilities": probs.detach().cpu().tolist()}

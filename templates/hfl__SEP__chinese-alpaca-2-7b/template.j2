@@ -1,0 +1,13 @@
+{% set repo_id = repo_id | default("hfl/chinese-alpaca-2-7b") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("你好，我的名字是Eric，请问你过得怎么样？") %}
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(input_prompt)

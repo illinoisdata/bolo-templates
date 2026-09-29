@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("FabianWillner/distilbert-base-uncased-finetuned-squad") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What is the name of the repository?') %}
+{% set context = context | default('FabianWillner/distilbert-base-uncased-finetuned-squad is a fine-tuned DistilBERT model for question answering on the SQuAD dataset.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+repo_dir = os.path.dirname(weights_path)
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, use_fast=True)
+model = AutoModelForQuestionAnswering.from_pretrained(repo_dir)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    start_logits = outputs.start_logits
+    end_logits = outputs.end_logits
+    start_idx = int(torch.argmax(start_logits, dim=-1).item())
+    end_idx = int(torch.argmax(end_logits, dim=-1).item())
+    if end_idx < start_idx:
+        end_idx = start_idx
+    answer_ids = inputs["input_ids"][0, start_idx:end_idx + 1]
+    answer = tokenizer.decode(answer_ids, skip_special_tokens=True).strip()
+
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx}

@@ -1,0 +1,89 @@
+{% set repo_id = repo_id | default("Bettensor/podos_soccer_model") %}
+{% set device = device | default("cuda:0") %}
+{% set input_features = input_features | default([12.5, 10.2, 4.1, 3.8, 6.0, 4.0, 2.0, 1.5, 1.2, 1.8, 0.1, 0.0, 1.9, 3.2, 4.5, 101, 205, 2.0, 0.0, 1.0, 0.0, 1.7, 1.1]) %}
+{% set batch_size = batch_size | default(1) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_features = {{ input_features }}
+batch_size = {{ batch_size }}
+
+import json
+import importlib.util
+
+import torch
+from huggingface_hub import hf_hub_download
+import pickle
+import sys, types
+if "sklearn" not in sys.modules:
+    sklearn_mod = types.ModuleType("sklearn")
+    preprocessing_mod = types.ModuleType("sklearn.preprocessing")
+    label_mod = types.ModuleType("sklearn.preprocessing._label")
+    class _LabelEncoder:
+        pass
+    label_mod.LabelEncoder = _LabelEncoder
+    preprocessing_mod._label = label_mod
+    preprocessing_mod.LabelEncoder = _LabelEncoder
+    sklearn_mod.preprocessing = preprocessing_mod
+    sys.modules["sklearn"] = sklearn_mod
+    sys.modules["sklearn.preprocessing"] = preprocessing_mod
+    sys.modules["sklearn.preprocessing._label"] = label_mod
+
+model_file = hf_hub_download(repo_id=repo_id, filename="Podos_v1_model.py")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+label_encoder_file = hf_hub_download(repo_id=repo_id, filename="label_encoder.pkl")
+
+spec = importlib.util.spec_from_file_location("podos_v1_model", model_file)
+podos_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(podos_module)
+PodosTransformer = podos_module.PodosTransformer
+
+with open(config_file, "r") as f:
+    config = json.load(f)
+
+model = PodosTransformer(
+    input_dim=config["input_dim"],
+    model_dim=config["model_dim"],
+    num_heads=config["num_heads"],
+    num_layers=config["num_layers"],
+    num_classes=config["num_classes"],
+    dropout=config["dropout"],
+    temperature=config["temperature"],
+)
+from safetensors.torch import load_file
+state_dict = load_file(weights_file, device="cpu")
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
+
+import sys, types
+if "sklearn" not in sys.modules:
+    sklearn_mod = types.ModuleType("sklearn")
+    preprocessing_mod = types.ModuleType("sklearn.preprocessing")
+    class _LabelEncoder: pass
+    preprocessing_mod.LabelEncoder = _LabelEncoder
+    sklearn_mod.preprocessing = preprocessing_mod
+    sys.modules["sklearn"] = sklearn_mod
+    sys.modules["sklearn.preprocessing"] = preprocessing_mod
+with open(label_encoder_file, "rb") as f:
+    label_encoder = pickle.load(f)
+
+x = torch.tensor(input_features, dtype=torch.float32, device=device).unsqueeze(0).repeat(batch_size, 1)
+with torch.no_grad():
+    logits = model(x)
+    probs = torch.softmax(logits, dim=-1)
+    pred_ids = torch.argmax(probs, dim=-1).tolist()
+    pred_probs = probs.tolist()
+
+classes = None
+if hasattr(label_encoder, "classes_"):
+    classes = [str(c) for c in label_encoder.classes_]
+
+pred_labels = [classes[i] if classes is not None and i < len(classes) else int(i) for i in pred_ids]
+
+RESULT = {
+    "logits": logits.detach().cpu().tolist(),
+    "probabilities": pred_probs,
+    "predicted_class_ids": pred_ids,
+    "predicted_labels": pred_labels,
+}

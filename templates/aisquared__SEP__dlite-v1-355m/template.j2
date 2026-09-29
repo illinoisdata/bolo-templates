@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("aisquared/dlite-v1-355m") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set model = model | default(repo_id) %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set pipeline_script = pipeline_script | default("instruct_pipeline.py") %}
+
+repo_id = {{ repo_id | tojson }}
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+pipeline_script = {{ pipeline_script | tojson }}
+
+import importlib.util
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, pipeline
+
+spec = importlib.util.spec_from_file_location(
+    "instruct_pipeline",
+    hf_hub_download(repo_id=repo_id, filename=pipeline_script),
+)
+instruct_pipeline = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(instruct_pipeline)
+InstructionTextGenerationPipeline = instruct_pipeline.InstructionTextGenerationPipeline
+
+tokenizer = AutoTokenizer.from_pretrained(model, padding_side="left")
+if not hasattr(tokenizer, "additional_special_tokens"):
+    tokenizer.additional_special_tokens = []
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=tokenizer,
+    device=device,
+    pipeline_class=InstructionTextGenerationPipeline,
+)
+RESULT = pipe(input_prompt)

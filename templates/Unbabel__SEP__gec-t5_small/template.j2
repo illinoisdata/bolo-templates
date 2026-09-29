@@ -1,28 +1,45 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Unbabel/gec-t5_small") %}
-{% set sentence = sentence | default("I like to swimming") %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(5) %}
-{% set early_stopping = early_stopping | default(True) %}
-sentence = "{{ sentence }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-early_stopping = {{ early_stopping }}
+{% set device = device | default("cuda:0") %}
+{% set sentence = sentence|default('I like to swimming') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
+sentence = "{{ sentence }}"
 
-import os
 from transformers import T5ForConditionalGeneration, T5Tokenizer
+import torch
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
 
 model = T5ForConditionalGeneration.from_pretrained(repo_id)
-tokenizer = T5Tokenizer.from_pretrained("t5-small")
+tokenizer = T5Tokenizer.from_pretrained(repo_id)
 model.to(device)
+model.eval()
 
-inputs = tokenizer("gec: " + sentence, max_length=max_length, truncation=True, padding="max_length", return_tensors="pt")
-input_ids = inputs.input_ids.to(device)
-attention_mask = inputs.attention_mask.to(device)
+inputs = tokenizer(
+    'gec: ' + sentence,
+    max_length=128,
+    truncation=True,
+    padding='max_length',
+    return_tensors='pt',
+)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(input_ids=input_ids, attention_mask=attention_mask, max_length=max_length, num_beams=num_beams, early_stopping=early_stopping)[0]
-corrected_sentence = tokenizer.decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+with torch.no_grad():
+    generated_ids = model.generate(
+        input_ids=inputs['input_ids'],
+        attention_mask=inputs['attention_mask'],
+        max_length=128,
+        num_beams=5,
+        early_stopping=True,
+    )
+
+corrected_sentence = tokenizer.decode(
+    generated_ids[0],
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=True,
+)
 
 RESULT = {"corrected_sentence": corrected_sentence}

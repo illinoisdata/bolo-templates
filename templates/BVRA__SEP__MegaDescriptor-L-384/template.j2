@@ -1,0 +1,52 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("BVRA/MegaDescriptor-L-384") %}
+{% set device = device | default("cuda:0") %}
+{% set image_size = image_size | default(384) %}
+{% set output_key = output_key | default('embeddings') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+image_size = {{ image_size }}
+output_key = "{{ output_key }}"
+
+import torch
+import timm
+import torchvision.transforms as T
+from PIL import Image
+from urllib.parse import urlparse
+from urllib.request import urlopen
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+if urlparse(image_path).scheme in ("http", "https"):
+    img = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    img = Image.open(image_path).convert("RGB")
+
+model = timm.create_model(f"hf-hub:{repo_id}", pretrained=False, num_classes=0)
+checkpoint = torch.load(weights_path, map_location="cpu")
+state_dict = checkpoint["model"] if isinstance(checkpoint, dict) and "model" in checkpoint else checkpoint
+model_state = model.state_dict()
+filtered_state_dict = {
+    k: v for k, v in state_dict.items()
+    if k in model_state and model_state[k].shape == v.shape
+}
+model.load_state_dict(filtered_state_dict, strict=False)
+model = model.to(device)
+model.eval()
+
+preprocess = T.Compose([
+    T.Resize((image_size, image_size)),
+    T.ToTensor(),
+    T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+])
+
+inputs = preprocess(img).unsqueeze(0).to(device)
+with torch.no_grad():
+    embeddings = model.forward_features(inputs)
+    if embeddings.ndim == 4:
+        embeddings = embeddings.mean(dim=(2, 3))
+
+RESULT = {"embeddings": embeddings.detach().cpu().numpy()}

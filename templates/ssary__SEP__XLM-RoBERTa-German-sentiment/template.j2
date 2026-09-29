@@ -1,0 +1,21 @@
+{% set repo_id = repo_id | default("ssary/XLM-RoBERTa-German-sentiment") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set input_text = input_text | default("Erneuter Streik in der S-Bahn.") %}
+
+# Jinja variable defaults
+# Set model repository ID and device are provided externally
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_text = {{ input_text | tojson }}
+
+# Imports
+from transformers import pipeline
+
+# Load pipeline
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+# Run inference
+RESULT = pipe(input_text)

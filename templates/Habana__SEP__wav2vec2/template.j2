@@ -1,0 +1,42 @@
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+{% set repo_id = repo_id | default("Habana/wav2vec2") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+import os
+import json
+import torch
+import librosa
+from huggingface_hub import hf_hub_download
+from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gaudi_config.json")
+with open(config_path, "r") as f:
+    gaudi_config = json.load(f)
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    import requests
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    local_audio_path = "/tmp/input_audio.wav"
+    with open(local_audio_path, "wb") as f:
+        f.write(audio_bytes)
+    audio_path = local_audio_path
+
+processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base")
+model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base")
+model.to(device)
+model.eval()
+
+speech, sampling_rate = librosa.load(audio_path, sr=16000)
+inputs = processor(speech, sampling_rate=16000, return_tensors="pt", padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    logits = model(**inputs).logits
+pred_ids = torch.argmax(logits, dim=-1)
+transcription = processor.batch_decode(pred_ids)[0]
+
+RESULT = {"transcription": transcription, "gaudi_config": gaudi_config}

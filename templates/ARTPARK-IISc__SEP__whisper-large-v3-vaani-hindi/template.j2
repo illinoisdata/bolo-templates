@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("ARTPARK-IISc/whisper-large-v3-vaani-hindi") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set chunk_length_s = chunk_length_s | default(30) %}
+{% set language = language | default('hi') %}
+{% set task = task | default('transcribe') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+chunk_length_s = {{ chunk_length_s }}
+language = "{{ language }}"
+task = "{{ task }}"
+
+import torch
+from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, pipeline
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor = AutoProcessor.from_pretrained(repo_id)
+model = AutoModelForSpeechSeq2Seq.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+
+if audio_path.startswith(("http://", "https://")):
+    input_audio = audio_path
+else:
+    input_audio = audio_path
+
+asr = pipeline(
+    task="automatic-speech-recognition",
+    model=model,
+    tokenizer=processor.tokenizer,
+    feature_extractor=processor.feature_extractor,
+    chunk_length_s=chunk_length_s,
+    device=device,
+)
+asr.model.config.forced_decoder_ids = asr.tokenizer.get_decoder_prompt_ids(language=language, task=task)
+output = asr(input_audio)
+
+RESULT = {"text": output["text"]}

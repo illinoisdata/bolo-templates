@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("timm/inception_v3.tv_in1k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set model = model | default(repo_id) %}
+{% set input_image = input_image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+model = "{{ model }}"
+input_image = "{{ input_image }}"
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+
+input_data = input_image
+RESULT = pipe(input_data)

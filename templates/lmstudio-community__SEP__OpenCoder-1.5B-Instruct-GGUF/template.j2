@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("lmstudio-community/OpenCoder-1.5B-Instruct-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('OpenCoder-1.5B-Instruct-Q4_K_M.gguf') %}
+{% set prompt = prompt | default('Write a Python function that returns the factorial of a non-negative integer.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+import os
+import json
+import subprocess
+import sys
+
+from huggingface_hub import hf_hub_download
+
+# Ensure llama-cpp-python is available for GGUF inference.
+try:
+    from llama_cpp import Llama
+except ImportError:
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'llama-cpp-python'])
+    from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+n_gpu_layers = -1 if str(device).startswith('cuda') else 0
+llm = Llama(
+    model_path=model_path,
+    n_ctx=2048,
+    n_threads=max(1, os.cpu_count() or 1),
+    n_gpu_layers=n_gpu_layers,
+    verbose=False,
+)
+
+messages = [
+    {"role": "system", "content": "You are a helpful coding assistant."},
+    {"role": "user", "content": prompt},
+]
+
+chat = llm.create_chat_completion(
+    messages=messages,
+    temperature=0.2,
+    top_p=0.95,
+    max_tokens=256,
+)
+
+output_text = chat["choices"][0]["message"]["content"]
+
+RESULT = {"text": output_text}

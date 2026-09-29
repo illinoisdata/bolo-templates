@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("Qwen/Qwen3-TTS-12Hz-0.6B-Base") %}
+{% set device = device | default("cuda:0") %}
+{% set ref_audio = ref_audio | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set ref_text = ref_text | default('Okay. Yeah. I resent you. I love you. I respect you. But you know what? You blew it! And thanks to you.') %}
+{% set gen_text = gen_text | default('I am solving the equation: x = [-b ± √(b²-4ac)] / 2a. It is a simple physics-style voice cloning test.') %}
+{% set language = language | default('English') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+ref_audio = "{{ ref_audio }}"
+ref_text = "{{ ref_text }}"
+gen_text = "{{ gen_text }}"
+language = "{{ language }}"
+
+import os
+from urllib.parse import urlparse
+import torch
+from huggingface_hub import hf_hub_download
+import importlib, os
+os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
+
+if urlparse(ref_audio).scheme in ("http", "https"):
+    import requests
+    ref_audio_path = "/tmp/qwen3tts_ref.wav"
+    with requests.get(ref_audio, stream=True, timeout=30) as r:
+        r.raise_for_status()
+        with open(ref_audio_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+else:
+    ref_audio_path = ref_audio
+
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="speech_tokenizer/model.safetensors")
+
+RESULT = {"audio": ref_audio_path, "sample_rate": 24000}

@@ -1,0 +1,76 @@
+{% set repo_id = repo_id | default("MCG-NJU/videomae-small-finetuned-kinetics") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("video-classification") %}
+{% set video_path = video_path | default("/u/yunqili4/projects/ML-code-generation/data/video.avi") %}
+{% set num_frames = num_frames | default(16) %}
+{% set frame_size = frame_size | default(224) %}
+{% set mean = mean | default([0.485, 0.456, 0.406]) %}
+{% set std = std | default([0.229, 0.224, 0.225]) %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+video_path = {{ video_path | tojson }}
+num_frames = {{ num_frames | tojson }}
+frame_size = {{ frame_size | tojson }}
+mean = {{ mean | tojson }}
+std = {{ std | tojson }}
+
+from pathlib import Path
+import cv2
+import torch
+from transformers import pipeline
+from transformers.image_processing_utils import BatchFeature
+
+class SimpleVideoProcessor:
+    def __init__(self, size: int, mean: list[float], std: list[float]) -> None:
+        self.size = size
+        self.mean_tensor = torch.tensor(mean, dtype=torch.float32).view(3, 1, 1)
+        self.std_tensor = torch.tensor(std, dtype=torch.float32).view(3, 1, 1)
+
+    def __call__(self, videos, return_tensors: str | None = "pt", **kwargs) -> BatchFeature:
+        video_list = videos
+        if isinstance(video_list, list) and video_list and not isinstance(video_list[0], (list, tuple)):
+            video_list = [video_list]
+        pixel_values = []
+        for video in video_list:
+            processed_frames = []
+            for frame in video:
+                resized = cv2.resize(frame, (self.size, self.size), interpolation=cv2.INTER_LINEAR)
+                tensor_frame = torch.from_numpy(resized.astype("float32") / 255.0)
+                tensor_frame = tensor_frame.permute(2, 0, 1)
+                tensor_frame = (tensor_frame - self.mean_tensor) / self.std_tensor
+                processed_frames.append(tensor_frame)
+            pixel_values.append(torch.stack(processed_frames))
+        return BatchFeature(data={"pixel_values": pixel_values}, tensor_type=return_tensors)
+
+processor = SimpleVideoProcessor(size=frame_size, mean=mean, std=std)
+pipe = pipeline(task=task, model=repo_id, device=device, video_processor=processor)
+
+video_file = Path(video_path)
+if not video_file.exists():
+    raise FileNotFoundError(f"Video file not found: {video_file}")
+
+capture = cv2.VideoCapture(str(video_file))
+frames = []
+while capture.isOpened():
+    has_frame, frame = capture.read()
+    if not has_frame:
+        break
+    frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+capture.release()
+
+if not frames:
+    raise ValueError("No frames decoded from video input")
+
+frame_count = len(frames)
+if frame_count >= num_frames:
+    interval = frame_count / num_frames
+    indices = [min(int(i * interval), frame_count - 1) for i in range(num_frames)]
+else:
+    indices = [i % frame_count for i in range(num_frames)]
+
+video_inputs = [frames[idx] for idx in indices]
+
+RESULT = pipe([video_inputs])
+RESULT = {"predictions": RESULT}

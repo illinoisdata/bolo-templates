@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("freds0/distil-whisper-large-v3-ptbr") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set language = language | default('pt') %}
+{% set task = task | default('transcribe') %}
+{% set sampling_rate = sampling_rate | default(16000) %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+language = "{{ language }}"
+task = "{{ task }}"
+sampling_rate = {{ sampling_rate }}
+
+import requests
+import torch
+import librosa
+from transformers import WhisperProcessor, WhisperForConditionalGeneration
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+if audio_path.startswith('http://') or audio_path.startswith('https://'):
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    audio, _ = librosa.load(audio_bytes, sr=sampling_rate)
+else:
+    audio, _ = librosa.load(audio_path, sr=sampling_rate)
+
+processor = WhisperProcessor.from_pretrained(repo_id)
+model = WhisperForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+inputs = processor(audio, sampling_rate=sampling_rate, return_tensors='pt')
+input_features = inputs.input_features.to(device)
+forced_decoder_ids = processor.get_decoder_prompt_ids(language=language, task=task)
+with torch.no_grad():
+    predicted_ids = model.generate(input_features, forced_decoder_ids=forced_decoder_ids)
+transcription = processor.batch_decode(predicted_ids, skip_special_tokens=True)[0]
+
+RESULT = {"transcription": transcription}

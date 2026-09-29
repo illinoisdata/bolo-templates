@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("unsloth/Qwen3-1.7B-Base-unsloth-bnb-4bit") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") -%}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") -%}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+import os
+from transformers import pipeline
+
+if device.startswith("cuda:"):
+    _, _, cuda_index = device.partition(":")
+    if cuda_index:
+        os.environ.setdefault("CUDA_VISIBLE_DEVICES", cuda_index)
+
+pipe = pipeline(task=task, model=repo_id)
+RESULT = pipe(input_prompt)

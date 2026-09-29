@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("rinna/japanese-clip-vit-b-16") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("zero-shot-image-classification") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+{% set candidate_labels = candidate_labels | default(["犬", "猫", "象"]) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+image_path = "{{ image_path }}"
+candidate_labels = {{ candidate_labels | tojson }}
+model = repo_id
+
+from transformers import pipeline, AutoImageProcessor
+
+processor = AutoImageProcessor.from_pretrained("openai/clip-vit-base-patch32")
+pipe = pipeline(task=task, model=model, device=device, image_processor=processor)
+RESULT = pipe(image_path, candidate_labels=candidate_labels)

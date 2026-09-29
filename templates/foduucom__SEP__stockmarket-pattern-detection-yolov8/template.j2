@@ -1,0 +1,54 @@
+{% set repo_id = repo_id | default("foduucom/stockmarket-pattern-detection-yolov8") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set conf = conf | default(0.25) %}
+{% set imgsz = imgsz | default(640) %}
+{% set max_det = max_det | default(100) %}
+{% set half = half | default(false) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+conf = {{ conf }}
+imgsz = {{ imgsz }}
+max_det = {{ max_det }}
+half = {{ half }}
+
+import os
+import json
+import numpy as np
+from PIL import Image
+import torch
+from ultralytics import YOLO
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.pt")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_file, "r") as f:
+    config = json.load(f)
+
+if image_path.startswith(("http://", "https://")):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model = YOLO(model_file)
+results = model.predict(source=np.array(image), device=device, imgsz=imgsz, conf=conf, max_det=max_det, verbose=False)
+result = results[0]
+
+names = result.names if hasattr(result, "names") else model.names
+boxes_out = []
+if result.boxes is not None and len(result.boxes) > 0:
+    boxes = result.boxes.xyxy.detach().cpu().numpy().tolist()
+    scores = result.boxes.conf.detach().cpu().numpy().tolist()
+    clss = result.boxes.cls.detach().cpu().numpy().astype(int).tolist()
+    for box, score, cls_id in zip(boxes, scores, clss):
+        boxes_out.append({
+            "box": box,
+            "score": float(score),
+            "class_id": int(cls_id),
+            "label": names[int(cls_id)] if isinstance(names, dict) else names[int(cls_id)]
+        })
+
+RESULT = {"detections": boxes_out, "num_detections": len(boxes_out), "image_size": list(image.size), "config": config}

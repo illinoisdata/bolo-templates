@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("Habana/whisper") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set task = task | default('transcribe') %}
+{% set model_id = model_id | default('openai/whisper-small') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+task = "{{ task }}"
+model_id = "{{ model_id }}"
+
+import torch
+import librosa
+from transformers import AutoProcessor, WhisperForConditionalGeneration
+from huggingface_hub import hf_hub_download
+from pathlib import Path
+from urllib.parse import urlparse
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gaudi_config.json")
+config_dir = str(Path(config_path).parent)
+
+processor = AutoProcessor.from_pretrained(model_id)
+model = WhisperForConditionalGeneration.from_pretrained(model_id)
+model.to(device)
+model.eval()
+
+if audio_path.startswith(("http://", "https://")):
+    import requests
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    import tempfile
+    with tempfile.NamedTemporaryFile(suffix=Path(urlparse(audio_path).path).suffix or ".wav", delete=False) as f:
+        f.write(audio_bytes)
+        audio_local_path = f.name
+else:
+    audio_local_path = audio_path
+
+audio_array, sampling_rate = librosa.load(audio_local_path, sr=16000, mono=True)
+inputs = processor(audio_array, sampling_rate=sampling_rate, return_tensors="pt")
+input_features = inputs.input_features.to(device)
+
+forced_decoder_ids = processor.get_decoder_prompt_ids(language="en", task=task)
+with torch.no_grad():
+    generated_ids = model.generate(input_features=input_features, forced_decoder_ids=forced_decoder_ids)
+transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+
+RESULT = {"text": transcription}

@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("UCSC-VLAA/ViT-bigG-14-CLIPA-336-datacomp1B") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set texts = texts | default(['a diagram', 'a dog', 'a cat', 'a beignet']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+texts = {{ texts }}
+
+import torch
+import torch.nn.functional as F
+from PIL import Image
+from urllib.request import urlopen
+from huggingface_hub import hf_hub_download
+from open_clip import create_model_from_pretrained, get_tokenizer
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+def load_image(path_or_url):
+    if isinstance(path_or_url, str) and path_or_url.startswith(("http://", "https://")):
+        return Image.open(urlopen(path_or_url)).convert("RGB")
+    return Image.open(path_or_url).convert("RGB")
+
+image = load_image(image_path)
+model, preprocess = create_model_from_pretrained(
+    f"hf-hub:{repo_id}",
+    pretrained=weights_path,
+)
+model = model.to(device)
+model.eval()
+
+tokenizer = get_tokenizer(f"hf-hub:{repo_id}")
+image_tensor = preprocess(image).unsqueeze(0).to(device)
+text_tokens = tokenizer(texts, context_length=model.context_length).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_tensor)
+    text_features = model.encode_text(text_tokens)
+    image_features = F.normalize(image_features, dim=-1)
+    text_features = F.normalize(text_features, dim=-1)
+    text_probs = (100.0 * image_features @ text_features.T).softmax(dim=-1)
+
+RESULT = {"text_probs": text_probs.detach().cpu().tolist(), "texts": texts}

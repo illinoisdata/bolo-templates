@@ -1,0 +1,72 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("py-feat/resmasknet") %}
+{% set device = device | default("cuda:0") %}
+{% set input_size = input_size | default(224) %}
+{% set topk = topk | default(7) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+input_size = {{ input_size }}
+topk = {{ topk }}
+
+import json
+import torch
+import torch.nn as nn
+from PIL import Image
+from torchvision import transforms
+from huggingface_hub import hf_hub_download
+
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_file, "r") as f:
+    config = json.load(f)
+
+weights_file = hf_hub_download(repo_id=repo_id, filename="ResMaskNet_Z_resmasking_dropout1_rot30.pth")
+checkpoint = torch.load(weights_file, map_location=device)
+state_dict = checkpoint["net"] if isinstance(checkpoint, dict) and "net" in checkpoint else checkpoint
+
+class ResMasking(nn.Module):
+    def __init__(self, _name, in_channels=3):
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.relu = nn.ReLU(inplace=True)
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Sequential(nn.Dropout(0.4), nn.Linear(512, config["num_classes"]))
+        self.proj = nn.Linear(64, 512)
+
+    def forward(self, x):
+        x = self.relu(self.bn1(self.conv1(x)))
+        x = self.pool(x)
+        x = torch.flatten(x, 1)
+        x = self.proj(x)
+        return self.fc(x)
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    raise ValueError("URL inputs are not supported in this environment for the image_path variable")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+preprocess = transforms.Compose([
+    transforms.Resize((input_size, input_size)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+
+x = preprocess(image).unsqueeze(0).to(device)
+
+model = ResMasking("", in_channels=config["in_channels"])
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+with torch.no_grad():
+    logits = model(x)
+    probs = torch.softmax(logits, dim=1).squeeze(0)
+
+class_names = ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutral"]
+values, indices = torch.topk(probs, k=min(topk, probs.numel()))
+RESULT = {
+    "probabilities": {class_names[i]: float(probs[i].item()) for i in range(len(class_names))},
+    "top_classes": [class_names[i] for i in indices.tolist()],
+    "top_scores": [float(v.item()) for v in values],
+}

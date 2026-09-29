@@ -1,0 +1,56 @@
+{% set repo_id = repo_id | default("smp-hub/mobilenet_v2.imagenet") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set topk = topk | default(5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+topk = {{ topk }}
+
+import json
+from io import BytesIO
+
+import requests
+import torch
+import torch.nn.functional as F
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from torchvision import models, transforms
+from safetensors.torch import load_file
+
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_file, "r") as f:
+    cfg = json.load(f)
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert(cfg.get("input_space", "RGB"))
+else:
+    image = Image.open(image_path).convert(cfg.get("input_space", "RGB"))
+
+preprocess = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=cfg["mean"], std=cfg["std"]),
+])
+
+x = preprocess(image).unsqueeze(0).to(device)
+
+model = models.mobilenet_v2(weights=None)
+state_dict = load_file(weights_file)
+model.load_state_dict(state_dict)
+model.eval().to(device)
+
+with torch.no_grad():
+    logits = model(x)
+    probs = F.softmax(logits, dim=-1)
+    values, indices = torch.topk(probs, k=topk, dim=-1)
+
+RESULT = {
+    "logits": logits.squeeze(0).detach().cpu(),
+    "probabilities": probs.squeeze(0).detach().cpu(),
+    "topk_indices": indices.squeeze(0).detach().cpu(),
+    "topk_probabilities": values.squeeze(0).detach().cpu(),
+}

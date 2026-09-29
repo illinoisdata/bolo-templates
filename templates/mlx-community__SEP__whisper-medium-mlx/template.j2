@@ -1,0 +1,52 @@
+{% set repo_id = repo_id | default("mlx-community/whisper-medium-mlx") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set prompt = prompt | default('Transcribe the following speech accurately.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+prompt = "{{ prompt }}"
+
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from scipy.io import wavfile
+import whisper
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="weights.npz")
+
+model = whisper.load_model("medium", device=device)
+state = np.load(weights_path)
+converted = {}
+for k, v in state.items():
+    t = torch.from_numpy(v)
+    if k in ["encoder.conv1.weight", "encoder.conv2.weight"]:
+        t = t.permute(0, 2, 1).contiguous()
+    converted[k] = t
+model.load_state_dict(converted, strict=False)
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    audio_bytes = requests.get(audio_path).content
+    sr, audio = wavfile.read(BytesIO(audio_bytes))
+else:
+    sr, audio = wavfile.read(audio_path)
+
+if audio.dtype != np.float32:
+    if np.issubdtype(audio.dtype, np.integer):
+        max_val = np.iinfo(audio.dtype).max
+        audio = audio.astype(np.float32) / max_val
+    else:
+        audio = audio.astype(np.float32)
+
+if audio.ndim > 1:
+    audio = audio.mean(axis=1)
+
+if sr != 16000:
+    import librosa
+    audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
+
+output = whisper.transcribe(model, audio, initial_prompt=prompt)
+
+RESULT = {"output": output}

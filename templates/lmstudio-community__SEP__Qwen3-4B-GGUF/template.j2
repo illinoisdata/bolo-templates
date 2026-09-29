@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("lmstudio-community/Qwen3-4B-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('Qwen3-4B-Q4_K_M.gguf') %}
+{% set prompt = prompt | default('Write a short haiku about machine learning.') %}
+{% set max_tokens = max_tokens | default(64) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.9) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+max_tokens = {{ max_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+model_dir = os.path.dirname(model_path)
+
+llm = Llama(
+    model_path=model_path,
+    n_ctx=4096,
+    n_threads=max(1, os.cpu_count() or 1),
+    n_gpu_layers=-1 if str(device).startswith('cuda') else 0,
+    verbose=False,
+)
+
+result = llm(
+    prompt,
+    max_tokens=max_tokens,
+    temperature=temperature,
+    top_p=top_p,
+    stop=[]
+)
+
+output_text = result["choices"][0]["text"]
+RESULT = {"generated_text": output_text}

@@ -1,25 +1,44 @@
 {% set repo_id = repo_id | default("allenai/unifiedqa-t5-3b") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("What is the capital of France?") %}
-{% set max_length = max_length | default(50) %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
 {% set num_beams = num_beams | default(4) %}
+{% set question = question | default('What is the capital of France?') %}
+{% set context = context | default('Paris is the capital and most populous city of France.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-max_length = {{ max_length }}
+max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
+question = "{{ question }}"
+context = "{{ context }}"
 
-import torch
+from huggingface_hub import hf_hub_download
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-from pathlib import Path
+import torch
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+prompt = f"question: {question} context: {context}"
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float16 if device.startswith('cuda') and torch.cuda.is_available() else None)
+model = model.to(device)
+model.eval()
 
-inputs = tokenizer(input_text, return_tensors="pt").to(device)
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-outputs = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+    )
 
-generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {"generated_text": generated_text}
+RESULT = {"output": output_text}

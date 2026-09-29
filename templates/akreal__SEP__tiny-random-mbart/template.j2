@@ -1,32 +1,30 @@
 {% set repo_id = repo_id | default("akreal/tiny-random-mbart") %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("Hello, world!") %}
-{% set src_lang = src_lang | default("en_XX") %}
-{% set tgt_lang = tgt_lang | default("fr_XX") %}
+{% set text = text | default('translate English to French: Hello world!') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-src_lang = "{{ src_lang }}"
-tgt_lang = "{{ tgt_lang }}"
-from pathlib import Path
+text = "{{ text }}"
+
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model onto the target device
-tokenizer = AutoTokenizer.from_pretrained(repo_id, src_lang=src_lang, tgt_lang=tgt_lang)
-tokenizer.src_lang = src_lang
-tokenizer.tgt_lang = tgt_lang
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 
-# Pre-process the input text
-encoded_inputs = tokenizer(text_input, return_tensors="pt")
-encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
-forced_bos_token_id = tokenizer.lang_code_to_id[tgt_lang]
+# Pre-process input & load model
+_tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+inputs = _tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 # Run inference
 with torch.no_grad():
-    generated_tokens = model.generate(**encoded_inputs, forced_bos_token_id=forced_bos_token_id)
+    generated_ids = model.generate(**inputs, max_new_tokens=8)
 
-# Post-process decoded translations
-translation = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
-RESULT = {"translation": translation}
+# Post-process & build RESULT dict
+output_text = _tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+RESULT = {"output_text": output_text}

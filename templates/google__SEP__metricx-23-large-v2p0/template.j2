@@ -1,6 +1,51 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("google/metricx-23-large-v2p0") %}
-from pathlib import Path
-import urllib.request
-url = "https://raw.githubusercontent.com/google-research/metricx/main/metricx23/predict.py"
-Path("metricx23_predict.py").write_text(urllib.request.urlopen(url).read().decode())
+{% set device = device | default("cuda:0") %}
+{% set source = source | default('') %}
+{% set reference = reference | default('') %}
+{% set hypothesis = hypothesis | default('') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source = "{{ source }}"
+reference = "{{ reference }}"
+hypothesis = "{{ hypothesis }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+model_dir = __import__('os').path.dirname(model_path)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir, local_files_only=True)
+model.to(device)
+model.eval()
+
+# MetricX-23 reference-based input format: "reference: ... hypothesis: ..."
+# If source is provided, append it as extra context while keeping the required fields available.
+parts = []
+if source:
+    parts.append(f"source: {source}")
+if reference:
+    parts.append(f"reference: {reference}")
+if hypothesis:
+    parts.append(f"hypothesis: {hypothesis}")
+else:
+    parts.append("hypothesis: ")
+input_text = " ".join(parts)
+
+inputs = tokenizer(input_text, return_tensors="pt", truncation=True, max_length=1024)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=8, do_sample=False)
+
+pred_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+try:
+    prediction = float(pred_text.strip().split()[0])
+except Exception:
+    prediction = float('nan')
+
+RESULT = {"prediction": prediction, "prediction_text": pred_text}

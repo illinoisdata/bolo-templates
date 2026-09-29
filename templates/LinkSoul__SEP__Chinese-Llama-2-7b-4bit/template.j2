@@ -1,0 +1,25 @@
+{% set repo_id = repo_id | default("LinkSoul/Chinese-Llama-2-7b-4bit") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") -%}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") -%}
+{% set max_new_tokens = max_new_tokens | default(128) -%}
+{% set temperature = temperature | default(0.7) -%}
+{% set top_p = top_p | default(0.9) -%}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = pipe(
+    input_prompt,
+    max_new_tokens=max_new_tokens,
+    temperature=temperature,
+    top_p=top_p,
+)

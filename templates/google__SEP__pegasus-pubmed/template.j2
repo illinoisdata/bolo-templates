@@ -1,42 +1,57 @@
 {% set repo_id = repo_id | default("google/pegasus-pubmed") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("In this paper, we introduce Pegasus, a model for abstractive summarization that uses a gap-sentences generation pre-training objective.") %}
-{% set max_length = max_length | default(256) %}
-{% set min_length = min_length | default(32) %}
-{% set num_beams = num_beams | default(8) %}
-{% set length_penalty = length_penalty | default(0.8) %}
+{% set input_text = input_text | default('PubMed abstracts often contain detailed clinical findings. Summarize the following text into a concise medical summary: This study evaluated the efficacy and safety of a new treatment in 128 patients with moderate to severe asthma. Patients were randomized to receive either the treatment or placebo for 12 weeks. The treatment group showed a significant improvement in lung function and symptom scores compared with placebo, with no serious adverse events reported.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = "{{ text }}"
-max_length = {{ max_length }}
-min_length = {{ min_length }}
-num_beams = {{ num_beams }}
-length_penalty = {{ length_penalty }}
+input_text = {{ input_text | tojson }}
 
 import os
-from pathlib import Path
+import sentencepiece as spm
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+spiece_model_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-# Pre-process input
-inputs = tokenizer(text, return_tensors="pt", truncation=True).to(device)
+sp = spm.SentencePieceProcessor()
+sp.load(spiece_model_path)
 
-# Run inference
-torch_device = device
+class PegasusTokenizer:
+    def __init__(self, sp):
+        self.sp = sp
+        self.pad_token_id = 0
+        self.eos_token_id = 1
+    def __call__(self, text, return_tensors="pt", truncation=True, max_length=1024):
+        ids = self.sp.encode(text, out_type=int)
+        if truncation:
+            ids = ids[: max_length - 1]
+        ids = ids + [self.eos_token_id]
+        input_ids = torch.tensor([ids], dtype=torch.long)
+        attention_mask = torch.ones_like(input_ids)
+        return {"input_ids": input_ids, "attention_mask": attention_mask}
+    def decode(self, ids, skip_special_tokens=True):
+        if hasattr(ids, "tolist"):
+            ids = ids.tolist()
+        return self.sp.decode([i for i in ids if not skip_special_tokens or i not in (self.pad_token_id, self.eos_token_id)])
+
+tokenizer = PegasusTokenizer(sp)
+model = AutoModelForSeq2SeqLM.from_pretrained(os.path.dirname(weights_path))
+model.to(device)
+model.eval()
+inputs = tokenizer(input_text, return_tensors="pt", truncation=True, max_length=1024)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
     generated_ids = model.generate(
         **inputs,
-        max_length=max_length,
-        min_length=min_length,
-        num_beams=num_beams,
-        length_penalty=length_penalty,
+        max_length=128,
+        min_length=32,
+        num_beams=8,
+        length_penalty=0.8,
+        early_stopping=True,
     )
+summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-# Post-process output
-summary_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
-
-RESULT = {"summary_text": summary_text}
+RESULT = {"summary": summary}

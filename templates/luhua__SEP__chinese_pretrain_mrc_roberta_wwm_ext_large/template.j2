@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("luhua/chinese_pretrain_mrc_roberta_wwm_ext_large") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('北京是哪个国家的首都？') %}
+{% set context = context | default('北京是中华人民共和国的首都，也是中国的政治、文化、国际交往和科技创新中心。') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = {{ question | tojson }}
+context = {{ context | tojson }}
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+local_files_dir = os.path.dirname(weights_path)
+
+tokenizer = AutoTokenizer.from_pretrained(local_files_dir, use_fast=True)
+model = AutoModelForQuestionAnswering.from_pretrained(local_files_dir)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits[0]
+end_logits = outputs.end_logits[0]
+start_index = int(torch.argmax(start_logits).item())
+end_index = int(torch.argmax(end_logits).item())
+if end_index < start_index:
+    end_index = start_index
+
+input_ids = inputs["input_ids"][0]
+answer_tokens = input_ids[start_index:end_index + 1]
+answer = tokenizer.decode(answer_tokens, skip_special_tokens=True).strip()
+
+RESULT = {
+    "answer": answer,
+    "start_index": start_index,
+    "end_index": end_index,
+    "start_logits": start_logits.detach().cpu().tolist(),
+    "end_logits": end_logits.detach().cpu().tolist(),
+}

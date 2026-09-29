@@ -1,0 +1,60 @@
+{% set repo_id = repo_id | default("unsloth/orpheus-3b-0.1-ft-unsloth-bnb-4bit") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Hello, please say a short greeting.') %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.9) %}
+{% set do_sample = do_sample | default(true) %}
+{% set seed = seed | default(42) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+do_sample = {{ do_sample }}
+seed = {{ seed }}
+
+import os
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_tokenizer_cfg_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_generation_cfg_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+torch.manual_seed(seed)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(seed)
+
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(_tokenizer_path), use_fast=True)
+model = AutoModelForCausalLM.from_pretrained(
+    os.path.dirname(config_path),
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=do_sample,
+        temperature=temperature,
+        top_p=top_p,
+        pad_token_id=tokenizer.pad_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+RESULT = {"text": output_text}

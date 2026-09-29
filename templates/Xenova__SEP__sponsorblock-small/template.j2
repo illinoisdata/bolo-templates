@@ -1,25 +1,40 @@
-{% set device = device | default("cuda:0") %}
+{% set text = text | default('Find sponsor segments in the following transcript and return a concise summary.') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set num_beams = num_beams | default(1) %}
 {% set repo_id = repo_id | default("Xenova/sponsorblock-small") %}
-{% set input_text = input_text | default("Describe how SponsorBlock uses the T5 backend to tag segments.") %}
-{% set max_length = max_length | default(64) %}
+{% set device = device | default("cuda:0") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-max_length = {{ max_length }}
-
-from pathlib import Path
+text = "{{ text }}"
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
 
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
 
-inputs = tokenizer(input_text, return_tensors="pt")
-for key, tensor in inputs.items():
-    inputs[key] = tensor.to(device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model.to(device)
+model.eval()
 
-generated_ids = model.generate(**inputs, max_length=max_length)
-decoded_outputs = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+        do_sample=False,
+    )
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {"generated_text": decoded_outputs[0]}
+RESULT = {"output": output_text}

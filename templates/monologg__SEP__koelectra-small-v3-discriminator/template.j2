@@ -1,31 +1,41 @@
 {% set repo_id = repo_id | default("monologg/koelectra-small-v3-discriminator") %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("이 문장은 KoELECTRA 사전학습 모델 테스트용 예시입니다.") %}
+{% set text = text | default('이 영화는 정말 재미있고 감동적이었다.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-
-import json
-import os
+text = "{{ text }}"
 
 import torch
-from transformers import AutoModelForPreTraining, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForPreTraining, ElectraConfig
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+config = ElectraConfig.from_json_file(config_path)
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    tokenizer_config_file=tokenizer_config_path,
+    vocab_file=vocab_path,
+    use_fast=False,
+)
+model = AutoModelForPreTraining.from_config(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+state_dict.pop("electra.embeddings.position_ids", None)
+model.load_state_dict(state_dict, strict=True)
 model.to(device)
+model.eval()
 
-encoded_inputs = tokenizer(text_input, return_tensors="pt")
-encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
-
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
+    outputs = model(**inputs)
 
-prediction_ids = outputs.logits.argmax(dim=-1)
-prediction_tokens = tokenizer.batch_decode(prediction_ids.detach().cpu(), skip_special_tokens=True)
-logits = outputs.logits.detach().cpu().tolist()
+logits = outputs.logits
+probabilities = torch.softmax(logits, dim=-1)
+prediction = int(torch.argmax(probabilities, dim=-1).item())
+score = float(probabilities[0, prediction].item())
 
-RESULT = {
-    "predicted_tokens": prediction_tokens,
-    "logits": logits,
-}
+RESULT = {"prediction": prediction, "score": score, "logits": logits.detach().cpu().tolist()}

@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("TransQuest/monotransquest-da-en_any") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set model = model | default(repo_id) %}
+{% set input_prompt = input_prompt | default({
+    "text": "Reducerea acestor conflicte este importantă pentru conservare.",
+    "text_pair": "Reducing these conflicts is important for preservation."
+}) %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+device = {{ device | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(input_prompt)

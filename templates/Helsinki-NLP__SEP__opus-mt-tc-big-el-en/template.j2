@@ -1,25 +1,30 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-el-en") %}
-{% set input_texts = input_texts | default(["Το σχολείο μας έχει εννιά τάξεις.", "Άρχισε να τρέχει."]) %}
+{% set device = device | default("cuda:0") %}
+{% set src_text = src_text | default(['Το σχολείο μας έχει εννιά τάξεις.', 'Άρχισε να τρέχει.']) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_texts = {{ input_texts }}
+src_text = {{ src_text | tojson }}
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-import os
+import torch
+from transformers import MarianMTModel, MarianTokenizer
+from huggingface_hub import hf_hub_download
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
 
-encoded_inputs = tokenizer(
-    input_texts,
-    return_tensors="pt",
-    padding=True,
-)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+tokenizer = MarianTokenizer.from_pretrained(repo_id, local_files_only=True)
+model = MarianMTModel.from_pretrained(repo_id, local_files_only=True)
+model.to(device)
+model.eval()
 
-generated_tokens = model.generate(**encoded_inputs)
+inputs = tokenizer(src_text, return_tensors="pt", padding=True, truncation=True).to(device)
+with torch.no_grad():
+    generated_tokens = model.generate(**inputs, num_beams=4)
 translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 RESULT = {"translations": translations}

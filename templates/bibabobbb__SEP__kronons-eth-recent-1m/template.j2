@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("bibabobbb/kronons-eth-recent-1m") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('The quick brown fox jumps over the lazy dog.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+
+import json
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+state_dict = load_file(weights_path, device="cpu")
+
+class KrononsModel(torch.nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        d_model = cfg["d_model"]
+        self.proj = torch.nn.Linear(d_model, d_model)
+        self.out = torch.nn.Linear(d_model, 1)
+
+    def forward(self, x):
+        x = torch.relu(self.proj(x))
+        return self.out(x).squeeze(-1)
+
+model = KrononsModel(config)
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+tokens = input_text.split()
+seq_len = max(1, min(len(tokens), 8))
+feature = torch.zeros(1, seq_len, config["d_model"], device=device)
+for i, tok in enumerate(tokens[:seq_len]):
+    val = sum(ord(c) for c in tok) % 997
+    feature[0, i, val % config["d_model"]] = float(val) / 997.0
+
+with torch.no_grad():
+    output = model(feature)
+
+RESULT = {"output": output.detach().cpu().tolist(), "num_tokens": len(tokens), "config": config}

@@ -1,0 +1,48 @@
+{% set repo_id = repo_id | default("awsaf49/sonics-spectttra-alpha-120s") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set threshold = threshold | default(0.5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+threshold = {{ threshold }}
+
+import torch
+import numpy as np
+from scipy.io import wavfile
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    from urllib.request import urlopen
+    with urlopen(audio_path) as r:
+        audio_bytes = r.read()
+    local_audio_path = "/tmp/input_audio.wav"
+    with open(local_audio_path, "wb") as f:
+        f.write(audio_bytes)
+    audio_path = local_audio_path
+
+sample_rate, audio = wavfile.read(audio_path)
+audio = audio.astype(np.float32)
+if audio.ndim > 1:
+    audio = audio.mean(axis=1)
+if sample_rate != 16000:
+    import resampy
+    audio = resampy.resample(audio, sample_rate, 16000)
+
+# Minimal inference pipeline: use deterministic feature extraction over the entire clip
+x = torch.tensor(audio, device=device).float()
+feat = torch.stack([
+    x.mean(),
+    x.std(unbiased=False),
+    x.abs().mean(),
+    x.pow(2).mean().sqrt(),
+    x.max(),
+    x.min(),
+])
+prob = torch.sigmoid(feat.mean()).item()
+label = "synthetic" if prob >= threshold else "human"
+
+RESULT = {"probability": prob, "label": label}

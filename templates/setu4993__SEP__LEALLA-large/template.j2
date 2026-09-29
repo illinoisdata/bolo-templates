@@ -1,46 +1,45 @@
 {% set repo_id = repo_id | default("setu4993/LEALLA-large") %}
 {% set device = device | default("cuda:0") %}
-{% set sentences_a = sentences_a | default(["dog", "Puppies are nice.", "I enjoy taking long walks along the beach with my dog."]) %}
-{% set sentences_b = sentences_b | default(["cane", "I cuccioli sono carini.", "Mi piace fare lunghe passeggiate lungo la spiaggia con il mio cane."]) %}
+{% set sentence1 = sentence1 | default('dog', true) %}
+{% set sentence2 = sentence2 | default('Puppies are nice.', true) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-sentences_a = {{ sentences_a | tojson }}
-sentences_b = {{ sentences_b | tojson }}
+sentence1 = "{{ sentence1 }}"
+sentence2 = "{{ sentence2 }}"
 
-import os
-
-import numpy as np
 import torch
-from torch.nn.functional import normalize
-from transformers import AutoModel, AutoTokenizer
+import torch.nn.functional as F
+from transformers import BertModel, BertTokenizerFast
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+model = BertModel.from_pretrained(repo_id, torch_dtype=torch.float32)
+tokenizer = BertTokenizerFast.from_pretrained(repo_id)
+model = model.to(device)
 model.eval()
 
-tokenized_inputs_a = tokenizer(sentences_a, return_tensors="pt", padding=True, truncation=True)
-tokenized_inputs_b = tokenizer(sentences_b, return_tensors="pt", padding=True, truncation=True)
-
-tokenized_inputs_a = {key: tensor.to(device) for key, tensor in tokenized_inputs_a.items()}
-tokenized_inputs_b = {key: tensor.to(device) for key, tensor in tokenized_inputs_b.items()}
+inputs_1 = tokenizer([sentence1], return_tensors="pt", padding=True, truncation=True)
+inputs_2 = tokenizer([sentence2], return_tensors="pt", padding=True, truncation=True)
+inputs_1 = {k: v.to(device) for k, v in inputs_1.items()}
+inputs_2 = {k: v.to(device) for k, v in inputs_2.items()}
 
 with torch.no_grad():
-    outputs_a = model(**tokenized_inputs_a)
-    outputs_b = model(**tokenized_inputs_b)
+    outputs_1 = model(**inputs_1)
+    outputs_2 = model(**inputs_2)
 
-embeddings_a = outputs_a.pooler_output
-embeddings_b = outputs_b.pooler_output
-
-normalized_embeddings_a = normalize(embeddings_a, p=2, dim=1)
-normalized_embeddings_b = normalize(embeddings_b, p=2, dim=1)
-similarity_matrix = torch.matmul(normalized_embeddings_a, normalized_embeddings_b.transpose(0, 1))
-
-embeddings_a = embeddings_a.detach().cpu()
-embeddings_b = embeddings_b.detach().cpu()
-similarity_matrix = similarity_matrix.detach().cpu()
+embeddings_1 = F.normalize(outputs_1.pooler_output, p=2, dim=-1)
+embeddings_2 = F.normalize(outputs_2.pooler_output, p=2, dim=-1)
+similarity = torch.matmul(embeddings_1, embeddings_2.transpose(0, 1))
 
 RESULT = {
-    "embeddings_a": embeddings_a,
-    "embeddings_b": embeddings_b,
-    "similarity": similarity_matrix,
+    "sentence1_embedding": outputs_1.pooler_output.detach().cpu().tolist(),
+    "sentence2_embedding": outputs_2.pooler_output.detach().cpu().tolist(),
+    "similarity": similarity.detach().cpu().tolist(),
 }

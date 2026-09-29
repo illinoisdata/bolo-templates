@@ -1,0 +1,96 @@
+{% set repo_id = repo_id | default("bioscan-ml/BarcodeBERT") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set input_sequence = input_sequence | default("ACGCGCTGACGCATCAGCATACGA") %}
+{% set k = k | default(4) %}
+{% set stride = stride | default(4) %}
+{% set max_len = max_len | default(660) %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+input_sequence = {{ input_sequence | tojson }}
+k = {{ k }}
+stride = {{ stride }}
+max_len = {{ max_len }}
+
+import torch
+from itertools import product
+from transformers import PreTrainedTokenizer, pipeline
+
+class KmerTokenizer(PreTrainedTokenizer):
+    def __init__(self, vocab_dict=None, k=4, stride=4, max_len=660, **kwargs):
+        self.k = k
+        self.stride = stride
+        self.max_len = max_len
+        self.special_tokens = ["[MASK]", "[UNK]"]
+        if vocab_dict is None:
+            kmers = ["".join(kmer) for kmer in product("ACGT", repeat=self.k)]
+            self.vocab = self.special_tokens + kmers
+            self.vocab_dict = {word: idx for idx, word in enumerate(self.vocab)}
+        else:
+            self.vocab = list(vocab_dict.keys())
+            self.vocab_dict = vocab_dict
+        super().__init__(
+            unk_token="[UNK]",
+            mask_token="[MASK]",
+            pad_token="[UNK]",
+            **kwargs,
+        )
+        self.model_input_names = ["input_ids", "token_type_ids", "attention_mask"]
+        self.pad_token = "[UNK]"
+
+    def tokenize(self, text, padding=False, **kwargs):
+        processed = text
+        if len(processed) > self.max_len:
+            processed = processed[: self.max_len]
+        if padding and len(processed) < self.max_len:
+            processed = processed + "N" * (self.max_len - len(processed))
+        splits = [processed[i : i + self.k] for i in range(0, max(1, len(processed) - self.k + 1), self.stride)]
+        return splits
+
+    def convert_tokens_to_ids(self, tokens):
+        unk_id = self.vocab_dict.get(self.unk_token)
+        return [self.vocab_dict[token] if token in self.vocab_dict else unk_id for token in tokens]
+
+    def encode(self, text, padding=False, **kwargs):
+        tokens = self.tokenize(text, padding=padding, **kwargs)
+        return self.convert_tokens_to_ids(tokens)
+
+    def convert_ids_to_tokens(self, ids, **kwargs):
+        single_token = False
+        if isinstance(ids, int):
+            ids = [ids]
+            single_token = True
+        id_to_token = {idx: token for token, idx in self.vocab_dict.items()}
+        tokens = [id_to_token.get(id_, self.unk_token) for id_ in ids]
+        return tokens[0] if single_token else tokens
+
+    def get_vocab(self):
+        return self.vocab_dict
+
+    def __call__(self, text, padding=False, **kwargs):
+        token_ids = self.encode(text, padding=padding, **kwargs)
+        unk_token_id = self.vocab_dict.get(self.unk_token)
+        attention_mask = [1 if id_ != unk_token_id else 0 for id_ in token_ids]
+        token_type_ids = [0] * len(token_ids)
+        if kwargs.get("return_tensors") == "pt":
+            return {
+                "input_ids": torch.tensor([token_ids], dtype=torch.long),
+                "attention_mask": torch.tensor([attention_mask], dtype=torch.long),
+                "token_type_ids": torch.tensor([token_type_ids], dtype=torch.long),
+            }
+        return {
+            "input_ids": token_ids,
+            "attention_mask": attention_mask,
+            "token_type_ids": token_type_ids,
+        }
+
+# Instantiate the tokenizer
+kmer_tokenizer = KmerTokenizer(k=k, stride=stride, max_len=max_len)
+
+# Create the feature-extraction pipeline
+pipe = pipeline(task=task, model=repo_id, tokenizer=kmer_tokenizer, device=device)
+
+# Run inference
+RESULT = pipe(input_sequence)

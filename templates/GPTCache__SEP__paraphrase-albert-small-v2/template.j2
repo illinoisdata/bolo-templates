@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("GPTCache/paraphrase-albert-small-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+
+from transformers import AutoConfig, AutoTokenizer, AlbertModel, pipeline
+
+config = AutoConfig.from_pretrained(repo_id)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AlbertModel(config)
+model = model.to(device)
+model.eval()
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+prepared_input = input_prompt
+outputs = pipe(prepared_input)
+RESULT = {"outputs": outputs}

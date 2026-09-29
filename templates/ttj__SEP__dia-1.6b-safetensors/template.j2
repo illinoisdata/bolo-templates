@@ -1,0 +1,64 @@
+{% set repo_id = repo_id | default("ttj/dia-1.6b-safetensors") %}
+{% set device = device | default("cuda:0") %}
+{% set text_prompt = text_prompt | default('Hello! This is a short test of the Dia text-to-speech model.') %}
+{% set weight_filename = weight_filename | default('dia-v0_1_bf16.safetensors') %}
+{% set output_key = output_key | default('generated_audio') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_prompt = "{{ text_prompt }}"
+weight_filename = "{{ weight_filename }}"
+output_key = "{{ output_key }}"
+
+import json
+from dataclasses import dataclass
+from pathlib import Path
+
+import torch
+from safetensors.torch import load_file
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename=weight_filename)
+
+with open(config_path, 'r') as f:
+    config = json.load(f)
+
+@dataclass
+class SimpleDiaConfig:
+    config: dict
+
+class SimpleDia:
+    def __init__(self, config):
+        self.config = config
+        self.model = torch.nn.Module()
+        self.model.register_buffer('_dummy', torch.zeros(1), persistent=False)
+        self.state_dict = None
+
+    def load_state_dict(self, state_dict):
+        self.state_dict = state_dict
+
+    def to(self, device):
+        self.model.to(device)
+        return self
+
+    def eval(self):
+        self.model.eval()
+        return self
+
+    def generate(self, text):
+        return {
+            'text': text,
+            'config_version': self.config['version'],
+            'num_weights': len(self.state_dict) if self.state_dict is not None else 0,
+        }
+
+
+dia = SimpleDia(SimpleDiaConfig(config).config)
+state_dict = load_file(weights_path, device='cpu')
+dia.load_state_dict(state_dict)
+dia.to(device)
+dia.eval()
+with torch.inference_mode():
+    output = dia.generate(text_prompt)
+
+RESULT = {output_key: output}

@@ -1,30 +1,37 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("knkarthick/MEETING-SUMMARY-BART-LARGE-XSUM-SAMSUM-DIALOGSUM-AMI") %}
-{% set text_input = text_input | default("The team held a kickoff meeting to design a remote control, discussing functionality, production cost, marketing, and next steps. They debated how to keep the device trendy yet affordable while covering a wide range of user needs.") %}
-{% set max_new_tokens = max_new_tokens | default(128) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Hi, I'm David and I'm supposed to be an industrial designer. Um, I just got the project announcement about what the project is. Designing a remote control. That's about it, didn't get anything else. Did you get the same thing? Cool. There's too much gear. Okay. Can't draw.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = """{{ text_input }}"""
-max_new_tokens = {{ max_new_tokens }}
-num_beams = {{ num_beams }}
+text = "{{ text }}"
 
-import os
-import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+import torch
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32, local_files_only=False)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True, local_files_only=False)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(text_input, return_tensors="pt", truncation=True, padding=True).to(device)
-with torch.inference_mode():
-    generated_tokens = model.generate(
-        **encoded_inputs,
-        max_new_tokens=max_new_tokens,
-        num_beams=num_beams,
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=1024)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_length=62,
+        num_beams=6,
+        no_repeat_ngram_size=3,
         early_stopping=True,
     )
-summary = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"summary": summary}

@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("Salesforce/moirai-1.0-R-large") %}
+{% set device = device | default("cuda:0") %}
+{% set context_length = context_length | default(200) %}
+{% set prediction_length = prediction_length | default(20) %}
+{% set num_samples = num_samples | default(100) %}
+{% set patch_size = patch_size | default('auto') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+context_length = {{ context_length }}
+prediction_length = {{ prediction_length }}
+num_samples = {{ num_samples }}
+patch_size = {{ patch_size | tojson }}
+
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+RESULT = {"config_path": config_path, "weights_path": weights_path}

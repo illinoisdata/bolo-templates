@@ -1,0 +1,14 @@
+{% set repo_id = repo_id | default("MCG-NJU/videomae-base-finetuned-ssv2") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("video-classification") %}
+{% set video_path = video_path | default("/u/yunqili4/projects/ML-code-generation/data/video.avi") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+video_path = "{{ video_path }}"
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = pipe(video_path)

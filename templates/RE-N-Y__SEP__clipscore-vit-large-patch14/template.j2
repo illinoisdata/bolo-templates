@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("RE-N-Y/clipscore-vit-large-patch14") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text_prompt = text_prompt | default('a photo of a cat') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text_prompt = "{{ text_prompt }}"
+
+import requests
+from PIL import Image
+from io import BytesIO
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import CLIPModel, CLIPProcessor
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
+model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+inputs = processor(text=[text_prompt], images=[image], return_tensors="pt", padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+    image_embeds = outputs.image_embeds
+    text_embeds = outputs.text_embeds
+    score = torch.cosine_similarity(image_embeds, text_embeds).item()
+
+RESULT = {"clipscore": score}

@@ -1,0 +1,31 @@
+{% set quant_filename = quant_filename | default('gemma-3-270m-it-Q8_0.gguf') %}
+{% set repo_id = repo_id | default("ggml-org/gemma-3-270m-it-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Write a short friendly greeting.') %}
+quant_filename = "{{ quant_filename }}"
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import os
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+n_gpu_layers = -1 if device.startswith('cuda') else 0
+llm = Llama(
+    model_path=model_path,
+    n_gpu_layers=n_gpu_layers,
+    verbose=False,
+)
+
+output = llm(
+    prompt,
+    max_tokens=64,
+    temperature=0.7,
+    top_p=0.95,
+    stop=["<end_of_turn>", "</s>"],
+)
+
+RESULT = {"text": output["choices"][0]["text"], "usage": output.get("usage", {})}

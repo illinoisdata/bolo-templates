@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("1-800-BAD-CODE/punct_cap_seg_47_language") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('hello friend hows it going its snowing outside right now in connecticut a large storm is moving in') %}
+{% set max_length = max_length | default(128) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_length = {{ max_length }}
+
+import os
+import yaml
+from huggingface_hub import hf_hub_download
+
+onnx_path = hf_hub_download(repo_id=repo_id, filename="punct_cap_seg_47lang.onnx")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.yaml")
+spe_path = hf_hub_download(repo_id=repo_id, filename="spe_unigram_64k_lowercase_47lang.model")
+
+config = yaml.safe_load(open(config_path, "r"))
+RESULT = {"config_keys": list(config.keys())}

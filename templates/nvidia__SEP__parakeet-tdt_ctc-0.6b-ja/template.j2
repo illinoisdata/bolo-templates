@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("nvidia/parakeet-tdt_ctc-0.6b-ja") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+import os
+import shutil
+from pathlib import Path
+
+import torch
+import librosa
+from huggingface_hub import hf_hub_download
+import nemo.collections.asr as nemo_asr
+
+model_file = hf_hub_download(repo_id=repo_id, filename="parakeet-tdt_ctc-0.6b-ja.nemo")
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    raise ValueError("audio_path must be a local file path in this task")
+
+# Load audio, resample to 16kHz mono if needed
+waveform, sr = librosa.load(audio_path, sr=16000, mono=True)
+
+# NeMo expects a list of audio file paths, so create a temporary wav file from the loaded waveform
+# while keeping preprocessing explicit and device-independent.
+import soundfile as sf
+tmp_audio_path = str(Path("/workspace") / "_tmp_input_audio.wav")
+sf.write(tmp_audio_path, waveform, 16000)
+
+asr_model = nemo_asr.models.ASRModel.restore_from(restore_path=model_file, map_location=device)
+asr_model = asr_model.to(device)
+asr_model.eval()
+
+with torch.no_grad():
+    transcription = asr_model.transcribe([tmp_audio_path])[0]
+
+output_text = transcription.text if hasattr(transcription, "text") else str(transcription)
+
+RESULT = {"text": output_text}

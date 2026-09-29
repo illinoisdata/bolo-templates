@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("potsawee/deberta-v3-large-mnli") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default('text-classification') %}
+{% set textA = textA | default('Kyle Walker has a personal issue') %}
+{% set textB = textB | default('Kyle Walker will remain Manchester City captain following reports about his private life, says boss Pep Guardiola.') %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+textA = {{ textA | tojson }}
+textB = {{ textB | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+input_kwargs = {"text": textA, "text_pair": textB}
+RESULT = pipe(input_kwargs)

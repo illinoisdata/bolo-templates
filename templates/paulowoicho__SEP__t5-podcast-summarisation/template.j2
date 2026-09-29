@@ -1,41 +1,47 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("paulowoicho/t5-podcast-summarisation") %}
-{% set input_text = input_text | default("The podcast transcript explores lessons learned from a recent engineering expedition, highlighting teamwork, unexpected challenges, and how every member contributed to solving complex problems. This summary should capture the most actionable insights.") %}
+{% set device = device | default("cuda:0") %}
+{% set podcast_transcript = podcast_transcript | default('This episode discusses how a small team built a podcast recommendation product, the challenges of noisy audio transcripts, the importance of preprocessing and chunking long conversations, and the lessons learned from deploying a summarization model in production.') %}
+{% set max_new_tokens = max_new_tokens | default(120) %}
+{% set num_beams = num_beams | default(4) %}
 {% set min_length = min_length | default(30) %}
-{% set max_length = max_length | default(200) %}
-{% set task_prefix = task_prefix | default("summarize: ") %}
+{% set length_penalty = length_penalty | default(2.0) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = """{{ input_text }}"""
+podcast_transcript = "{{ podcast_transcript }}"
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
 min_length = {{ min_length }}
-max_length = {{ max_length }}
-task_prefix = "{{ task_prefix }}"
+length_penalty = {{ length_penalty }}
 
-from pathlib import Path
-
+from huggingface_hub import hf_hub_download
+from transformers import T5Tokenizer, T5ForConditionalGeneration
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
-torch_device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+spiece_model_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(torch_device)
+tokenizer = T5Tokenizer(vocab_file=spiece_model_path)
+model = T5ForConditionalGeneration.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-prompt = f"{task_prefix}{input_text}"
-encoded_inputs = tokenizer(prompt, return_tensors="pt", truncation=True)
-encoded_inputs = {key: value.to(torch_device) for key, value in encoded_inputs.items()}
+prefix = "summarize: "
+inputs = tokenizer(prefix + podcast_transcript, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(
-    **encoded_inputs,
-    min_length=min_length,
-    max_length=max_length,
-    num_beams=4,
-    length_penalty=2.0,
-    no_repeat_ngram_size=3,
-    early_stopping=True,
-)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        min_length=min_length,
+        length_penalty=length_penalty,
+        num_beams=num_beams,
+        early_stopping=True,
+        no_repeat_ngram_size=3,
+    )
 
-summary_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+summary_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 RESULT = {"summary_text": summary_text}

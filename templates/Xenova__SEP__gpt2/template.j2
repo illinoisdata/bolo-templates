@@ -1,0 +1,34 @@
+{% set repo_id = repo_id | default("Xenova/gpt2") %}
+{% set device = device | default("cuda:0") %}
+{% set max_new_tokens = max_new_tokens | default(20) %}
+{% set prompt = prompt | default('The future of AI is') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+max_new_tokens = {{ max_new_tokens }}
+prompt = {{ prompt | tojson }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+from optimum.onnxruntime import ORTModelForCausalLM
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="onnx/decoder_model_merged.onnx")
+
+_tokenizer_dir = tokenizer_path.rsplit("/", 1)[0]
+tokenizer = AutoTokenizer.from_pretrained(_tokenizer_dir, use_fast=True)
+
+model = ORTModelForCausalLM.from_pretrained(
+    repo_id,
+    file_name="decoder_model_merged.onnx",
+    subfolder="onnx",
+    provider="CPUExecutionProvider",
+)
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to("cpu") for k, v in inputs.items()}
+output_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+decoded = tokenizer.decode(output_ids[0].tolist(), skip_special_tokens=True)
+
+RESULT = {"generated_text": decoded}

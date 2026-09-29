@@ -1,0 +1,24 @@
+{% set repo_id = repo_id | default("DeepMount00/universal_ner_ita") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Il comune di Castelrosso, con codice fiscale 80012345678, ha approvato il finanziamento di 15.000€ destinati alla ristrutturazione del parco giochi cittadino, affidando l\'incarico alla società \'Verde Vivo Società Cooperativa\', con sede legale in Corso della Libertà 45, Verona, da completarsi entro il 30/09/2024.') %}
+{% set labels = labels | default(['comune', 'codice fiscale', 'importo', 'società', 'indirizzo', 'data di completamento']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+labels = {{ labels | tojson }}
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from gliner import GLiNER
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+model = GLiNER.from_pretrained(repo_id)
+model = model.to(device)
+
+entities = model.predict_entities(text, labels)
+entities = sorted(entities, key=lambda x: (x.get("start", 0), x.get("end", 0), x.get("label", "")))
+
+RESULT = {"entities": entities}

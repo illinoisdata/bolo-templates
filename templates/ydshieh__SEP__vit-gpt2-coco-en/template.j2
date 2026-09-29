@@ -1,6 +1,6 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("ydshieh/vit-gpt2-coco-en") %}
-{% set image_path = image_path | default('/u/yli77/projects/ML-code-generation/data/image1.jpeg') %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 {% set max_length = max_length | default(16) %}
 {% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
@@ -11,15 +11,18 @@ num_beams = {{ num_beams }}
 
 import os
 import requests
-from PIL import Image
 import torch
-from transformers import ViTImageProcessor, AutoTokenizer, VisionEncoderDecoderModel
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, VisionEncoderDecoderModel, ViTImageProcessor
 
-image_processor = ViTImageProcessor.from_pretrained(repo_id)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = VisionEncoderDecoderModel.from_pretrained(repo_id)
-torch_device = torch.device(device)
-model.to(torch_device)
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+image_processor = ViTImageProcessor.from_pretrained(os.path.dirname(preprocessor_path))
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_path))
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+model = VisionEncoderDecoderModel.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
 if image_path.startswith(("http://", "https://")):
@@ -27,11 +30,10 @@ if image_path.startswith(("http://", "https://")):
 else:
     image = Image.open(image_path).convert("RGB")
 
-pixel_values = image_processor(images=image, return_tensors="pt").pixel_values.to(torch_device)
+pixel_values = image_processor(images=image, return_tensors="pt").pixel_values.to(device)
 with torch.no_grad():
-    output_ids = model.generate(pixel_values, max_length=max_length, num_beams=num_beams, return_dict_in_generate=True).sequences
+    output_ids = model.generate(pixel_values, max_length=max_length, num_beams=num_beams)
+preds = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
+preds = [pred.strip() for pred in preds]
 
-captions = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
-captions = [caption.strip() for caption in captions]
-
-RESULT = {"captions": captions}
+RESULT = {"predictions": preds}

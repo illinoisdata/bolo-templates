@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("TIGER-Lab/VLM2Vec-Full") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set max_new_tokens = max_new_tokens | default(16) %}
+{% set temperature = temperature | default(1.0) %}
+{% set do_sample = do_sample | default(False) %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+do_sample = {{ "True" if do_sample else "False" }}
+
+import json
+from huggingface_hub import hf_hub_download
+import torch
+from transformers import AutoTokenizer, pipeline
+from transformers.models.phi3 import Phi3Config, Phi3ForCausalLM
+
+config_json_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_json_path, "r", encoding="utf-8") as config_file:
+    config_dict = json.load(config_file)
+config_dict.pop("auto_map", None)
+config = Phi3Config(**config_dict)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = Phi3ForCausalLM.from_pretrained(repo_id, config=config)
+model = model.to(device)
+model.eval()
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(
+    input_prompt,
+    max_new_tokens=max_new_tokens,
+    temperature=temperature,
+    do_sample=do_sample,
+)

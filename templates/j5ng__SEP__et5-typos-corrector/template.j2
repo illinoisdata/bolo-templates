@@ -1,0 +1,29 @@
+{% set repo_id = repo_id | default("j5ng/et5-typos-corrector") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("맞춤법을 고쳐주세요: 완죤 어이업ㅅ네진쨤ㅋㅋㅋ") %}
+{% set max_length = max_length | default(128) %}
+{% set num_beams = num_beams | default(5) %}
+{% set early_stopping = early_stopping | default(true) %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+early_stopping = {{ early_stopping }}
+model = repo_id
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+
+prompt = input_prompt
+pipeline_kwargs = dict(
+    max_length=max_length,
+    num_beams=num_beams,
+    early_stopping=early_stopping,
+)
+
+RESULT = pipe(prompt, **pipeline_kwargs)[0]

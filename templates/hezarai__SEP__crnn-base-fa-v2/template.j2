@@ -1,0 +1,35 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+{% set repo_id = repo_id | default("hezarai/crnn-base-fa-v2") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import os
+import sys
+import subprocess
+import importlib.util
+
+if importlib.util.find_spec('hezar') is None:
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'hezar'])
+
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+from PIL import Image
+from hezar.models import Model
+
+weights_path = hf_hub_download(repo_id=repo_id, filename='model.pt')
+model_config_path = hf_hub_download(repo_id=repo_id, filename='model_config.yaml')
+image_processor_config_path = hf_hub_download(repo_id=repo_id, filename='preprocessor/image_processor_config.yaml')
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    import requests
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+ocr_model = Model.load(repo_id)
+texts = ocr_model.predict([image])
+
+RESULT = {"texts": texts}

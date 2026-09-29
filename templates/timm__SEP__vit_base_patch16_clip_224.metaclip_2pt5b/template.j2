@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("timm/vit_base_patch16_clip_224.metaclip_2pt5b") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set texts = texts | default(['a photo of a cat', 'a photo of two cats', 'a photo of a dog']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+texts = {{ texts }}
+
+import json
+import os
+import torch
+import timm
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from timm.data import resolve_data_config, create_transform
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+model = timm.create_model(cfg["architecture"], pretrained=False, num_classes=cfg["num_classes"], global_pool=cfg.get("global_pool", "token"))
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict)
+model.eval().to(device)
+
+if image_path.startswith(("http://", "https://")):
+    from urllib.request import urlopen
+    img = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    img = Image.open(image_path).convert("RGB")
+
+config = resolve_data_config({}, model=model)
+transform = create_transform(**config, is_training=False)
+image_tensor = transform(img).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    image_features = model.forward_features(image_tensor)
+    if image_features.ndim == 3:
+        image_features = image_features[:, 0]
+    image_features = torch.nn.functional.normalize(image_features, dim=-1)
+
+RESULT = {"image_features": image_features.detach().cpu().tolist()}

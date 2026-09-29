@@ -1,27 +1,40 @@
 {% set repo_id = repo_id | default("allenai/longformer-large-4096") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("Longformer is a transformer model for long documents.") %}
+{% set text = text | default('The quick brown fox jumps over the lazy dog.') %}
+{% set max_length = max_length | default(32) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
+max_length = {{ max_length }}
 
-import os
-import numpy as np
 import torch
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+
+# Tokenizer can load from the downloaded tokenizer.json directly.
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForMaskedLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-# Pre-process input text
-inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = tokenizer(text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Inference
 with torch.no_grad():
     outputs = model(**inputs)
+    logits = outputs.logits
+    probs = torch.softmax(logits[:, -1, :], dim=-1)
+    topk = torch.topk(probs, k=min(5, probs.shape[-1]))
 
-# Post-process outputs
-last_hidden_state = outputs.last_hidden_state.cpu().numpy()
-RESULT = {"last_hidden_state": last_hidden_state}
+RESULT = {
+    "logits_shape": tuple(logits.shape),
+    "top_token_ids": topk.indices[0].tolist(),
+    "top_token_probs": topk.values[0].tolist(),
+}

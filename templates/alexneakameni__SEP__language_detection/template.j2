@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("alexneakameni/language_detection") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hello world!') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+tokenizer = AutoTokenizer.from_pretrained(
+    tokenizer_json_path.rsplit('/', 1)[0],
+    use_fast=True,
+)
+model = AutoModelForSequenceClassification.from_pretrained(
+    tokenizer_json_path.rsplit('/', 1)[0],
+    torch_dtype=torch.float32,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    probs = torch.softmax(outputs.logits, dim=-1)[0]
+    pred_id = int(torch.argmax(probs).item())
+    pred_label = model.config.id2label[pred_id]
+    score = float(probs[pred_id].item())
+
+RESULT = {"label": pred_label, "score": score, "predicted_class_id": pred_id}

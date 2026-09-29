@@ -1,0 +1,31 @@
+{% set repo_id = repo_id | default("gagneurlab/SpeciesLM") %}
+{% set device = device | default("cuda:0") %}
+{% set model_revision = model_revision | default('downstream_species_lm') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+model_revision = "{{ model_revision }}"
+
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+import torch
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, revision=model_revision)
+model = AutoModelForMaskedLM.from_pretrained(repo_id, revision=model_revision)
+model.to(device)
+model.eval()
+
+sequence = tokenizer.mask_token if tokenizer.mask_token is not None else "[MASK]"
+inputs = tokenizer(sequence, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    mask_token_index = (inputs["input_ids"] == tokenizer.mask_token_id).nonzero(as_tuple=True)[1]
+    mask_logits = logits[0, mask_token_index[0]]
+    topk = torch.topk(mask_logits, k=5)
+    token_ids = topk.indices.tolist()
+    token_scores = topk.values.tolist()
+    predictions = tokenizer.convert_ids_to_tokens(token_ids)
+
+RESULT = {"predictions": predictions, "scores": token_scores}

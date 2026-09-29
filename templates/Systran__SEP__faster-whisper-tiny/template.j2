@@ -1,0 +1,52 @@
+{% set repo_id = repo_id | default("Systran/faster-whisper-tiny") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set prompt = prompt | default('') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+prompt = "{{ prompt }}"
+
+import os
+import tempfile
+from urllib.parse import urlparse
+
+import torch
+from huggingface_hub import hf_hub_download
+from faster_whisper import WhisperModel
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocabulary.txt")
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    import requests
+    audio_local_path = os.path.join(tempfile.gettempdir(), os.path.basename(urlparse(audio_path).path) or "audio.wav")
+    with requests.get(audio_path, stream=True) as r:
+        r.raise_for_status()
+        with open(audio_local_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+else:
+    audio_local_path = audio_path
+
+ctranslate2_device = "cuda" if str(device).startswith("cuda") else device
+compute_type = "float16" if ctranslate2_device == "cuda" and torch.cuda.is_available() else ("int8_float16" if ctranslate2_device == "cuda" else "int8")
+
+model = WhisperModel(
+    repo_id,
+    device=ctranslate2_device,
+    compute_type=compute_type,
+)
+
+segments, info = model.transcribe(audio_local_path)
+transcript = "".join(segment.text for segment in segments).strip()
+
+RESULT = {
+    "text": transcript,
+    "language": info.language,
+    "language_probability": float(info.language_probability),
+    "duration": float(info.duration),
+}

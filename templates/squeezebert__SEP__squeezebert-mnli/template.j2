@@ -1,52 +1,41 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("squeezebert/squeezebert-mnli") %}
-{% set premise = premise | default("A researcher shared the findings from the experiment.") %}
-{% set hypothesis = hypothesis | default("The experiment results were reported by the researcher.") %}
-{% set max_length = max_length | default(128) %}
+{% set device = device | default("cuda:0") %}
+{% set text1 = text1 | default('Premise: A soccer game with multiple males playing. Hypothesis: Some men are playing a sport.') %}
+{% set text3 = text3 | default('Some men are playing a sport.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-premise = "{{ premise }}"
-hypothesis = "{{ hypothesis }}"
-max_length = {{ max_length }}
-
-from pathlib import Path
-import json
+text1 = "{{ text1 }}"
+text3 = "{{ text3 }}"
 
 import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSequenceClassification.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-# Pre-process inputs
-encoded_inputs = tokenizer(
-    premise,
-    hypothesis,
-    truncation=True,
-    padding="max_length",
-    max_length=max_length,
-    return_tensors="pt",
-)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+auto_config_dir = config_path.rsplit("/", 1)[0]
+model = AutoModelForSequenceClassification.from_pretrained(auto_config_dir, local_files_only=True)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict)
 
-# Run model inference
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+
+inputs = tokenizer(text1, text3, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+model = model.to(device)
+model.eval()
+
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
+    outputs = model(**inputs)
+    probs = torch.softmax(outputs.logits, dim=-1)[0]
+    pred_id = int(torch.argmax(probs).item())
 
-logits = outputs.logits
-probabilities = torch.softmax(logits, dim=-1)[0].cpu()
-prediction_index = int(torch.argmax(logits, dim=-1).cpu().item())
-label_names = [model.config.id2label.get(i, str(i)) for i in range(probabilities.shape[-1])]
-label_scores = [
-    {"label": label, "score": float(score)}
-    for label, score in zip(label_names, probabilities.tolist())
-]
+id2label = {0: "contradiction", 1: "neutral", 2: "entailment"}
+pred_label = id2label[pred_id]
 
 RESULT = {
-    "mnli_text_classification": {
-        "label": label_names[prediction_index],
-        "score": float(probabilities[prediction_index]),
-        "label_scores": label_scores,
-    }
+    "logits": outputs.logits.detach().cpu(),
+    "probabilities": probs.detach().cpu(),
+    "predicted_label": pred_label,
 }

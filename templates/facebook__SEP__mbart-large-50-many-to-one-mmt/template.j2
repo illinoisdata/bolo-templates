@@ -1,33 +1,35 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("facebook/mbart-large-50-many-to-one-mmt") %}
-{% set source_sentence = source_sentence | default("संयुक्त राष्ट्र के प्रमुख का कहना है कि सीरिया में कोई सैन्य समाधान नहीं है") %}
-{% set source_lang = source_lang | default("hi_IN") %}
-{% set target_lang = target_lang | default("en_XX") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('संयुक्त राष्ट्र के प्रमुख का कहना है कि सीरिया में कोई सैन्य समाधान नहीं है') %}
+{% set src_lang = src_lang | default('hi_IN') %}
+{% set tgt_lang = tgt_lang | default('en_XX') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_sentence = """{{ source_sentence }}"""
-source_lang = "{{ source_lang }}"
-target_lang = "{{ target_lang }}"
+text = {{ text | tojson }}
+src_lang = {{ src_lang | tojson }}
+tgt_lang = {{ tgt_lang | tojson }}
+max_new_tokens = {{ max_new_tokens }}
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-import os
+import torch
+from transformers import MBartForConditionalGeneration, MBart50TokenizerFast
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = MBartForConditionalGeneration.from_pretrained(repo_id)
+tokenizer = MBart50TokenizerFast.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-tokenizer.src_lang = source_lang
-tokenizer.tgt_lang = target_lang
+tokenizer.src_lang = src_lang
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+forced_bos_token_id = tokenizer.lang_code_to_id[tgt_lang]
 
-encoded = tokenizer(source_sentence, return_tensors="pt")
-encoded = {key: value.to(device) for key, value in encoded.items()}
+with torch.no_grad():
+    generated_tokens = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        forced_bos_token_id=forced_bos_token_id,
+    )
+output_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
-generated_tokens = model.generate(**encoded)
-
-decoded_sentences = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-primary_translation = decoded_sentences[0] if len(decoded_sentences) == 1 else decoded_sentences
-translation = primary_translation if isinstance(primary_translation, str) else "\n".join(primary_translation)
-
-RESULT = {
-    "decoded_sentences": decoded_sentences,
-    "translation": translation,
-}
+RESULT = {"translation": output_text}

@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("Superar/pun-recognition-pt") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Ele fez uma piada sem graça, mas ainda assim riu.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+# Load tokenizer and model from the downloaded repo files
+
+tokenizer = AutoTokenizer.from_pretrained(
+    tokenizer_json_path.rsplit('/', 1)[0],
+    use_fast=True,
+)
+model = AutoModelForSequenceClassification.from_pretrained(
+    weights_path.rsplit('/', 1)[0],
+    torch_dtype=torch.float32,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probs = torch.softmax(logits, dim=-1)
+    pred_id = int(torch.argmax(probs, dim=-1).item())
+    pred_label = model.config.id2label.get(pred_id, str(pred_id))
+    score = float(probs[0, pred_id].item())
+
+RESULT = {
+    "text": text,
+    "label": pred_label,
+    "score": score,
+}

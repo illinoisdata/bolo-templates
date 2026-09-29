@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("timm/ViT-B-16-SigLIP-i18n-256") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set labels_list = labels_list | default(['a dog', 'a cat', 'a donut', 'a beignet']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+labels_list = {{ labels_list }}
+
+import torch
+import torch.nn.functional as F
+from PIL import Image
+from urllib.parse import urlparse
+from urllib.request import urlopen
+from open_clip import create_model_from_pretrained, get_tokenizer
+
+if urlparse(image_path).scheme in ("http", "https"):
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model, preprocess = create_model_from_pretrained(f"hf-hub:{repo_id}")
+model = model.to(device).eval()
+tokenizer = get_tokenizer(f"hf-hub:{repo_id}")
+
+image_input = preprocess(image).unsqueeze(0).to(device)
+text = tokenizer(labels_list, context_length=model.context_length).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_input)
+    text_features = model.encode_text(text)
+    image_features = F.normalize(image_features, dim=-1)
+    text_features = F.normalize(text_features, dim=-1)
+    text_probs = torch.sigmoid(image_features @ text_features.T * model.logit_scale.exp() + model.logit_bias)
+
+output = [(label, float(prob)) for label, prob in zip(labels_list, text_probs[0].detach().cpu().tolist())]
+
+RESULT = {"output": output}

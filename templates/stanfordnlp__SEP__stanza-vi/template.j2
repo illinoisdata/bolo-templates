@@ -1,0 +1,30 @@
+{% set repo_id = repo_id | default("stanfordnlp/stanza-vi") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Tôi yêu Hà Nội và Việt Nam.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+
+from huggingface_hub import hf_hub_download
+import stanza
+
+ner_model_path = hf_hub_download(repo_id=repo_id, filename='models/ner/vlsp.pt')
+
+nlp = stanza.Pipeline(
+    lang='vi',
+    processors='tokenize,pos,lemma,depparse,ner',
+    tokenize_model_path=hf_hub_download(repo_id=repo_id, filename='models/tokenize/vtb.pt'),
+    pos_model_path=hf_hub_download(repo_id=repo_id, filename='models/pos/vtb_phobert-large.pt'),
+    depparse_model_path=hf_hub_download(repo_id=repo_id, filename='models/depparse/vtb_phobert-large.pt'),
+    ner_model_path=ner_model_path,
+    use_gpu=(device.startswith('cuda')),
+    verbose=False,
+)
+
+doc = nlp(question)
+entities = []
+for sentence in doc.sentences:
+    for ent in sentence.ents:
+        entities.append({'text': ent.text, 'type': ent.type, 'start_char': ent.start_char, 'end_char': ent.end_char})
+
+RESULT = {'entities': entities, 'text': question}

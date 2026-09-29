@@ -1,24 +1,40 @@
 {% set repo_id = repo_id | default("google/t5-large-lm-adapt") %}
 {% set device = device | default("cuda:0") %}
-{% set prompt = prompt | default("translate English to German: Hello, how are you?") %}
-{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set prompt = prompt | default('summarize: The T5 model is a text-to-text transformer pretrained on C4 and adapted for language modeling.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = """{{ prompt }}"""
-max_new_tokens = {{ max_new_tokens }}
+prompt = "{{ prompt }}"
 
-from pathlib import Path
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+tokenizer_cfg_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+generation_cfg_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+# Load tokenizer and model
+# Use local downloaded files directly via the repo cache paths returned above.
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(prompt, return_tensors="pt").to(device)
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_tokens = model.generate(**inputs, max_new_tokens=max_new_tokens)
-decoded = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-generated_text = decoded[0].strip() if decoded else ""
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=32,
+        num_beams=4,
+        do_sample=False,
+    )
 
-RESULT = {"generated_text": generated_text}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": output_text}

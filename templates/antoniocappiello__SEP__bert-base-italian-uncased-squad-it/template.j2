@@ -1,0 +1,31 @@
+{% set repo_id = repo_id | default("antoniocappiello/bert-base-italian-uncased-squad-it") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Quando nacque D\'Annunzio?') %}
+{% set context = context | default("D\'Annunzio nacque nel 1863") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+from huggingface_hub import hf_hub_download
+import torch
+from transformers import BertTokenizer, BertForQuestionAnswering
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_tokenizer_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+tokenizer = BertTokenizer.from_pretrained(repo_id)
+model = BertForQuestionAnswering.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+start_idx = int(torch.argmax(outputs.start_logits, dim=-1).item())
+end_idx = int(torch.argmax(outputs.end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+output = tokenizer.decode(inputs["input_ids"][0, start_idx:end_idx + 1], skip_special_tokens=True)
+RESULT = {"answer": output}

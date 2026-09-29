@@ -1,39 +1,41 @@
 {% set repo_id = repo_id | default("Salesforce/codet5-small") %}
 {% set device = device | default("cuda:0") %}
-{% set prompt = prompt | default("def greet(user): print(f\"hello <extra_id_0>!\")") %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-prompt = {{ prompt | tojson }}
+{% set text = text | default('def greet(user): print(f\'hello <extra_id_0>!\')') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
 
+from huggingface_hub import hf_hub_download
+from transformers import RobertaTokenizer, T5ForConditionalGeneration
 import torch
 from pathlib import Path
-from transformers import RobertaTokenizer, AutoModelForSeq2SeqLM
-from huggingface_hub import hf_hub_download
 
-device = torch.device(device)
-
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
 vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
 merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
-tokenizer = RobertaTokenizer(
-    vocab_file=vocab_path,
-    merges_file=merges_path,
-    bos_token="<s>",
-    eos_token="</s>",
-    unk_token="<unk>",
-    pad_token="<pad>",
-    cls_token="<s>",
-    sep_token="</s>",
-    mask_token="<mask>",
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+
+_tokenizer_dir = Path(tokenizer_config_path).parent
+
+tokenizer = RobertaTokenizer(vocab_file=vocab_path, merges_file=merges_path)
+model = T5ForConditionalGeneration.from_pretrained(
+    _tokenizer_dir,
+    local_files_only=True,
+    torch_dtype=torch.float32,
 )
+model.load_state_dict(torch.load(weights_path, map_location="cpu"))
+model.to(device)
+model.eval()
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-input_tokens = tokenizer(prompt, return_tensors="pt")
-input_tokens = {key: value.to(device) for key, value in input_tokens.items()}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_length=10)
 
-generated_ids = model.generate(**input_tokens, max_new_tokens=128)
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-generated_text = generated_texts[0]
-
-RESULT = {"generated_text": generated_text}
+RESULT = {"output_text": output_text}

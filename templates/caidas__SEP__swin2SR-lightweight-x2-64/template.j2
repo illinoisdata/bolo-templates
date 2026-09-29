@@ -1,0 +1,36 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("caidas/swin2SR-lightweight-x2-64") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import os
+import requests
+import torch
+from PIL import Image
+from transformers import AutoImageProcessor, Swin2SRForImageSuperResolution
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_file = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processor = AutoImageProcessor.from_pretrained(os.path.dirname(processor_file))
+model = Swin2SRForImageSuperResolution.from_pretrained(os.path.dirname(config_file), local_files_only=True, torch_dtype=torch.float32)
+state_dict = torch.load(model_file, map_location="cpu")
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
+
+inputs = processor(image, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    output = model(**inputs).reconstruction
+
+RESULT = {"output": output}

@@ -1,35 +1,54 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-en-ar") %}
 {% set device = device | default("cuda:0") %}
-{% set source_text = source_text | default("Hello, how are you today?") %}
-{% set target_lang = target_lang | default("ara") %}
-{% set max_length = max_length | default(128) %}
+{% set text = text | default('Hello, how are you?') %}
+{% set src_lang = src_lang | default('en') %}
+{% set tgt_lang = tgt_lang | default('ar') %}
+{% set num_beams = num_beams | default(4) %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_text = """{{ source_text }}"""
-target_lang = "{{ target_lang }}"
-max_length = {{ max_length }}
+text = "{{ text }}"
+src_lang = "{{ src_lang }}"
+tgt_lang = "{{ tgt_lang }}"
+num_beams = {{ num_beams }}
+max_new_tokens = {{ max_new_tokens }}
 
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import MarianMTModel, MarianTokenizer
 
-tokenizer = MarianTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-stripped_source_text = source_text.strip()
-if target_lang:
-    prefixed_text = f">>{target_lang}<< {stripped_source_text}"
-else:
-    prefixed_text = stripped_source_text
+model_dir = os.path.dirname(model_path)
 
-encoded_inputs = tokenizer(
-    prefixed_text,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-    max_length=max_length,
-)
-encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
-generated_tokens = model.generate(**encoded_inputs, max_length=max_length)
-translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+forced_bos_token_id = None
+if tgt_lang:
+    lang_code = tgt_lang
+    if not lang_code.startswith('>>'):
+        lang_code = f'>>{lang_code}<<'
+    forced_bos_token_id = lang_code
 
-RESULT = {"translation": translation}
+tokenizer = MarianTokenizer(vocab=vocab_path, source_spm=source_spm_path, target_spm=target_spm_path, tokenizer_file=None, model_max_length=512)
+model = MarianMTModel.from_pretrained(model_dir).to(device)
+model.eval()
+
+inputs = tokenizer([text], return_tensors="pt", padding=True, truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        num_beams=num_beams,
+        max_new_tokens=max_new_tokens,
+        forced_bos_token_id=tokenizer.convert_tokens_to_ids(forced_bos_token_id) if forced_bos_token_id else None,
+    )
+
+output_text = tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
+
+RESULT = {"translation": output_text}

@@ -1,0 +1,59 @@
+{% set repo_id = repo_id | default("laion/CLIP-ViT-B-16-laion2B-s34B-b88K") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set candidate_labels = candidate_labels | default(['a photo of a cat', 'a photo of two cats', 'a photo of a dog', 'a photo of a car', 'a photo of a bicycle']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+candidate_labels = {{ candidate_labels }}
+
+import json
+import torch
+import requests
+from PIL import Image
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+import open_clip
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+with open(config_path, 'r') as f:
+    config = json.load(f)
+
+model_name = config.get('model_cfg', {}).get('vision_cfg', {}).get('timm_model_name', 'ViT-B-16')
+model, _, preprocess = open_clip.create_model_and_transforms(
+    model_name=model_name,
+    pretrained=None,
+    precision='fp32',
+    device=device,
+    jit=False,
+)
+state_dict = torch.load(weights_path, map_location='cpu', weights_only=False)
+if isinstance(state_dict, dict) and 'state_dict' in state_dict:
+    state_dict = state_dict['state_dict']
+if isinstance(state_dict, dict) and all(k.startswith('module.') for k in state_dict.keys()):
+    state_dict = {k[len('module.'):]: v for k, v in state_dict.items()}
+model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
+model.eval()
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    response = requests.get(image_path, timeout=30)
+    image = Image.open(BytesIO(response.content)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+image_input = preprocess(image).unsqueeze(0).to(device)
+text_inputs = open_clip.tokenize(candidate_labels).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_input)
+    text_features = model.encode_text(text_inputs)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logit_scale = model.logit_scale.exp()
+    logits_per_image = logit_scale * image_features @ text_features.T
+    probs = logits_per_image.softmax(dim=-1).squeeze(0)
+
+RESULT = {"candidate_labels": candidate_labels, "probabilities": probs.detach().cpu().tolist()}

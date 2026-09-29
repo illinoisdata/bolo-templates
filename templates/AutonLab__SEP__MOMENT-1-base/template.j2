@@ -1,39 +1,56 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("AutonLab/MOMENT-1-base") %}
-{% set forecast_prompt = forecast_prompt | default("series: 100.0, 102.5, 101.0, 104.8, 103.6; task: forecast the next 6 values") %}
-{% set max_new_tokens = max_new_tokens | default(64) %}
-{% set num_return_sequences = num_return_sequences | default(1) %}
-{% set transformer_backbone = transformer_backbone | default("google/flan-t5-base") %}
-{% set output_filename = output_filename | default("forecast.txt") %}
+{% set device = device | default("cuda:0") %}
+{% set task_name = task_name | default('reconstruction') %}
+{% set input_path = input_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set seq_len = seq_len | default(512) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-forecast_prompt = "{{ forecast_prompt }}"
-max_new_tokens = {{ max_new_tokens }}
-num_return_sequences = {{ num_return_sequences }}
-transformer_backbone = "{{ transformer_backbone }}"
-output_filename = "{{ output_filename }}"
+task_name = "{{ task_name }}"
+input_path = "{{ input_path }}"
+seq_len = {{ seq_len }}
 
-from pathlib import Path
-from transformers import AutoConfig, AutoTokenizer, T5ForConditionalGeneration
+import torch
+import soundfile as sf
+from momentfm import MOMENTPipeline
 
-config = AutoConfig.from_pretrained(transformer_backbone)
-if getattr(config, "decoder_start_token_id", None) is None:
-    config.decoder_start_token_id = getattr(config, "pad_token_id", 0)
-if getattr(config, "bos_token_id", None) is None:
-    config.bos_token_id = config.decoder_start_token_id
-tokenizer = AutoTokenizer.from_pretrained(transformer_backbone)
-model = T5ForConditionalGeneration.from_pretrained(repo_id, config=config).to(device)
-if getattr(model.generation_config, "decoder_start_token_id", None) is None:
-    model.generation_config.decoder_start_token_id = config.decoder_start_token_id
-if getattr(model.generation_config, "bos_token_id", None) is None:
-    model.generation_config.bos_token_id = config.bos_token_id
-encoded_prompt = tokenizer(forecast_prompt, return_tensors="pt")
-encoded_prompt = {key: value.to(device) for key, value in encoded_prompt.items()}
-generated_tokens = model.generate(
-    **encoded_prompt,
-    max_new_tokens=max_new_tokens,
-    num_return_sequences=num_return_sequences,
-)
-generated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-forecast_output = generated_texts[0] if generated_texts else ""
-RESULT = {"forecast": forecast_output}
+if isinstance(input_path, str) and input_path.startswith(("http://", "https://")):
+    import requests
+    from io import BytesIO
+    resp = requests.get(input_path, timeout=30)
+    resp.raise_for_status()
+    audio, sr = sf.read(BytesIO(resp.content), dtype='float32')
+else:
+    audio, sr = sf.read(input_path, dtype='float32')
+
+if audio.ndim > 1:
+    audio = audio.mean(axis=1)
+audio = torch.tensor(audio, dtype=torch.float32)
+if audio.numel() < seq_len:
+    audio = torch.nn.functional.pad(audio, (0, seq_len - audio.numel()))
+else:
+    audio = audio[:seq_len]
+
+x = audio.unsqueeze(0).unsqueeze(0).to(device)
+mask = torch.ones((x.shape[0], x.shape[-1]), dtype=torch.bool, device=x.device)
+
+model = MOMENTPipeline.from_pretrained(repo_id, model_kwargs={"task_name": task_name})
+model.init()
+model = model.to(device)
+model.eval()
+
+with torch.no_grad():
+    out = model.reconstruction(x_enc=x, input_mask=mask)
+
+output_value = {}
+for k in ["reconstruction", "forecast", "embedding", "logits", "scores"]:
+    if hasattr(out, k):
+        v = getattr(out, k)
+        output_value[k] = v.detach().cpu().numpy() if torch.is_tensor(v) else v
+for k, v in out.__dict__.items():
+    if k.startswith("_"):
+        continue
+    if k not in output_value:
+        output_value[k] = v.detach().cpu().numpy() if torch.is_tensor(v) else v
+
+RESULT = {"output": output_value}

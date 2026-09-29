@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("oxyapi/albert-moderation-001-ONNX") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('This is a test message.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import json
+import numpy as np
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+import onnxruntime as ort
+
+onnx_path = hf_hub_download(repo_id=repo_id, filename="onnx/model.onnx")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+id2label = {int(k): v for k, v in config["id2label"].items()}
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+providers = ["CPUExecutionProvider"]
+if device.startswith("cuda"):
+    providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+session_options = ort.SessionOptions()
+session_options.intra_op_num_threads = 1
+session_options.inter_op_num_threads = 1
+session = ort.InferenceSession(onnx_path, sess_options=session_options, providers=providers)
+
+inputs = tokenizer(text, return_tensors="np", truncation=True, padding=True, max_length=512)
+ort_inputs = {k: v.astype(np.int64) if v.dtype.kind in ("i", "u") else v for k, v in inputs.items()}
+
+outputs = session.run(None, ort_inputs)
+logits = outputs[0]
+probs = 1.0 / (1.0 + np.exp(-logits))
+label_scores = {id2label[i]: float(probs[0, i]) for i in range(probs.shape[1])}
+
+RESULT = {"text": text, "label_scores": label_scores}

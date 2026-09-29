@@ -1,0 +1,58 @@
+{% set repo_id = repo_id | default("bclavie/JaColBERT") %}
+{% set device = device | default("cuda:0") %}
+{% set query = query | default('マクドナルドのフライドポテトの少量のカロリーはいくつですか？') %}
+{% set documents = documents | default([
+  'マクドナルドの小さなフライドポテトは230カロリーです。ケチャップを追加するとさらにカロリーが増えます。',
+  '京都は日本の歴史的な都市で、多くの寺院や神社があります。',
+  'ラーメンは日本で人気のある麺料理です。'
+]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query = "{{ query }}"
+documents = {{ documents }}
+
+import os
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+from transformers import BertConfig, BertModel, BertJapaneseTokenizer
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+config = BertConfig.from_json_file(config_path)
+tokenizer = BertJapaneseTokenizer(vocab_file=vocab_path, do_lower_case=False)
+
+model = BertModel(config)
+state_dict = load_file(model_path)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+max_len = 256
+query_inputs = tokenizer(query, return_tensors="pt", truncation=True, max_length=max_len, padding=False)
+query_inputs = {k: v.to(device) for k, v in query_inputs.items()}
+with torch.no_grad():
+    q_out = model(**query_inputs).last_hidden_state
+    q_mask = query_inputs["attention_mask"].unsqueeze(-1).float()
+    q_vec = (q_out * q_mask).sum(dim=1) / q_mask.sum(dim=1).clamp(min=1.0)
+    q_vec = torch.nn.functional.normalize(q_vec, p=2, dim=-1)
+
+scores = []
+for doc in documents:
+    doc_inputs = tokenizer(doc, return_tensors="pt", truncation=True, max_length=max_len, padding=False)
+    doc_inputs = {k: v.to(device) for k, v in doc_inputs.items()}
+    with torch.no_grad():
+        d_out = model(**doc_inputs).last_hidden_state
+        d_mask = doc_inputs["attention_mask"].unsqueeze(-1).float()
+        d_vec = (d_out * d_mask).sum(dim=1) / d_mask.sum(dim=1).clamp(min=1.0)
+        d_vec = torch.nn.functional.normalize(d_vec, p=2, dim=-1)
+        score = torch.sum(q_vec * d_vec, dim=-1).item()
+    scores.append(score)
+
+best_index = int(max(range(len(scores)), key=lambda i: scores[i]))
+RESULT = {"scores": scores, "best_index": best_index, "best_document": documents[best_index]}

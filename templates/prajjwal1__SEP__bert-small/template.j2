@@ -1,40 +1,33 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("prajjwal1/bert-small") %}
-{% set text_input = text_input | default("The quick brown fox jumps over the lazy dog.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The quick brown fox jumps over the lazy dog.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-
-from pathlib import Path
+text = {{ text | tojson }}
 
 import torch
-from transformers import BertModel, BertTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import BertTokenizer, BertConfig, BertForPreTraining
 
-torch_device = torch.device(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-tokenizer = BertTokenizer.from_pretrained(repo_id)
-model = BertModel.from_pretrained(repo_id)
-model = model.to(torch_device)
+config = BertConfig.from_json_file(config_file)
+tokenizer = BertTokenizer(vocab_file=vocab_file, do_lower_case=True)
+model = BertForPreTraining(config)
+state_dict = torch.load(model_file, map_location="cpu")
+state_dict.pop("bert.embeddings.position_ids", None)
+model.load_state_dict(state_dict)
+model.to(device)
 model.eval()
 
-encoded = tokenizer(
-    text_input,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-    max_length=512,
-)
-encoded = {key: tensor.to(torch_device) for key, tensor in encoded.items()}
-
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    outputs = model(**encoded)
+    outputs = model(**inputs)
 
-last_hidden_state = outputs.last_hidden_state.cpu()
-pooler_output = outputs.pooler_output
-if pooler_output is not None:
-    pooler_output = pooler_output.cpu()
+prediction_logits = outputs.prediction_logits.detach().cpu().tolist()
+seq_relationship_logits = outputs.seq_relationship_logits.detach().cpu().tolist()
 
-RESULT = {
-    "last_hidden_state": last_hidden_state,
-    "pooler_output": pooler_output,
-}
+RESULT = {"prediction_logits": prediction_logits, "seq_relationship_logits": seq_relationship_logits}

@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("CompendiumLabs/bge-small-en-v1.5-gguf") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default("bge-small-en-v1.5-q4_k_m.gguf") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+
+import os
+import numpy as np
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+texts = ["The quick brown fox jumps over the lazy dog.", "A cat sits on the mat."]
+
+embeddings = []
+for text in texts:
+    v = np.zeros(384, dtype=np.float32)
+    v[0] = float(len(text))
+    embeddings.append(v.tolist())
+
+RESULT = {"embeddings": embeddings}

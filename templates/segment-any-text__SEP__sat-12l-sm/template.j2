@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("segment-any-text/sat-12l-sm") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("token-classification") %}
+{% set input_prompt = input_prompt | default("Hello world! Today is a great day. Let's test sentence segmentation.") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_prompt = "{{ input_prompt }}"
+
+import wtpsplit
+import wtpsplit.models
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, tokenizer="xlm-roberta-base", device=device)
+RESULT = pipe(input_prompt)

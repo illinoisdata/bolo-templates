@@ -1,0 +1,63 @@
+{% set repo_id = repo_id | default("guillaumekln/faster-whisper-medium.en") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set task = task | default('transcribe') %}
+{% set beam_size = beam_size | default(1) %}
+{% set best_of = best_of | default(1) %}
+{% set temperature = temperature | default(0.0) %}
+{% set language = language | default('en') %}
+{% set initial_prompt = initial_prompt | default('') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+task = "{{ task }}"
+beam_size = {{ beam_size }}
+best_of = {{ best_of }}
+temperature = {{ temperature }}
+language = "{{ language }}"
+initial_prompt = "{{ initial_prompt }}"
+
+import io
+import os
+import numpy as np
+import soundfile as sf
+import torch
+from huggingface_hub import hf_hub_download
+from faster_whisper import WhisperModel
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.bin")
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+hf_hub_download(repo_id=repo_id, filename="vocabulary.txt")
+
+if audio_path.startswith(("http://", "https://")):
+    import requests
+    audio_bytes = requests.get(audio_path).content
+    audio_array, sample_rate = sf.read(io.BytesIO(audio_bytes))
+else:
+    audio_array, sample_rate = sf.read(audio_path)
+
+if audio_array.ndim > 1:
+    audio_array = np.mean(audio_array, axis=1)
+
+whisper_device = "cuda" if device.startswith("cuda") and torch.cuda.is_available() else "cpu"
+compute_type = "float16" if whisper_device == "cuda" else "float32"
+model = WhisperModel(os.path.dirname(model_path), device=whisper_device, compute_type=compute_type)
+
+segments, info = model.transcribe(
+    audio_array,
+    language=language,
+    task=task,
+    beam_size=beam_size,
+    best_of=best_of,
+    temperature=temperature,
+    initial_prompt=initial_prompt if initial_prompt else None,
+)
+
+text = "".join([segment.text for segment in segments]).strip()
+RESULT = {
+    "text": text,
+    "language": info.language,
+    "language_probability": info.language_probability,
+    "duration": info.duration,
+}

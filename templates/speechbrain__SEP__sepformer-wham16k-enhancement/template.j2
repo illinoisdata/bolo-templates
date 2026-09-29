@@ -1,0 +1,33 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set repo_id = repo_id | default("speechbrain/sepformer-wham16k-enhancement") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+import os
+import torch
+import soundfile as sf
+from huggingface_hub import hf_hub_download
+from speechbrain.inference.separation import SepformerSeparation
+
+for name in ["brain.ckpt", "decoder.ckpt", "encoder.ckpt", "masknet.ckpt", "config.json", "hyperparams.yaml"]:
+    hf_hub_download(repo_id=repo_id, filename=name)
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    raise ValueError("URL audio inputs are not supported in this template")
+else:
+    waveform, sample_rate = sf.read(audio_path, always_2d=True)
+    waveform = torch.tensor(waveform.T, dtype=torch.float32)
+
+model = SepformerSeparation.from_hparams(
+    source=repo_id,
+    savedir=os.path.dirname(hf_hub_download(repo_id=repo_id, filename="config.json")),
+    run_opts={"device": device},
+)
+
+est_sources = model.separate_batch(waveform.to(device))
+output = est_sources.detach().cpu().numpy()
+
+RESULT = {"enhanced_audio": output, "sample_rate": sample_rate}

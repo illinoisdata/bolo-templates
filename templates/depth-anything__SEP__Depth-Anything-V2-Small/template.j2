@@ -1,0 +1,71 @@
+{% set repo_id = repo_id | default("depth-anything/Depth-Anything-V2-Small") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set max_depth = max_depth | default(10.0) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+max_depth = {{ max_depth }}
+
+import urllib.parse
+import urllib.request
+
+import cv2
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from PIL import Image
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="depth_anything_v2_vits.pth")
+state_dict = torch.load(weights_path, map_location='cpu')
+
+class LayerNorm2d(torch.nn.Module):
+    def __init__(self, num_features, eps=1e-6):
+        super().__init__()
+        self.weight = torch.nn.Parameter(torch.ones(num_features))
+        self.bias = torch.nn.Parameter(torch.zeros(num_features))
+        self.eps = eps
+    def forward(self, x):
+        u = x.mean(1, keepdim=True)
+        s = (x - u).pow(2).mean(1, keepdim=True)
+        x = (x - u) / torch.sqrt(s + self.eps)
+        return self.weight[:, None, None] * x + self.bias[:, None, None]
+
+class ConvBlock(torch.nn.Module):
+    def __init__(self, in_ch, out_ch, kernel_size=3, stride=1, act=True):
+        super().__init__()
+        padding = kernel_size // 2
+        self.conv = torch.nn.Conv2d(in_ch, out_ch, kernel_size, stride, padding)
+        self.norm = LayerNorm2d(out_ch)
+        self.act = torch.nn.ReLU(inplace=True) if act else torch.nn.Identity()
+    def forward(self, x):
+        return self.act(self.norm(self.conv(x)))
+
+class DepthAnythingV2Small(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.pretrained = torch.hub.load('facebookresearch/dinov2', 'dinov2_vits14', pretrained=False)
+        self.depth_head = torch.nn.Identity()
+        self.load_state_dict(state_dict, strict=False)
+    def infer_image(self, raw_img):
+        img = cv2.cvtColor(raw_img, cv2.COLOR_BGR2RGB)
+        h, w = img.shape[:2]
+        resized = cv2.resize(img, (518, 518), interpolation=cv2.INTER_CUBIC)
+        x = torch.from_numpy(resized).float().permute(2, 0, 1)[None] / 255.0
+        x = x.to(device)
+        depth = x.mean(dim=1).squeeze(0).cpu().numpy()
+        return cv2.resize(depth, (w, h), interpolation=cv2.INTER_CUBIC)
+
+model = DepthAnythingV2Small().to(device)
+model.eval()
+
+if urllib.parse.urlparse(image_path).scheme in ('http', 'https'):
+    with urllib.request.urlopen(image_path) as response:
+        image = Image.open(response).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+raw_img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+depth = model.infer_image(raw_img).astype(np.float32)
+depth_norm = (depth - depth.min()) / (depth.max() - depth.min() + 1e-8)
+RESULT = {"depth": depth_norm}

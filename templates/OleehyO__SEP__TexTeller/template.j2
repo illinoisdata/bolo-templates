@@ -1,43 +1,39 @@
-{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set num_beams = num_beams | default(1) %}
 {% set repo_id = repo_id | default("OleehyO/TexTeller") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(5) %}
+{% set device = device | default("cuda:0") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-max_length = {{ max_length }}
+max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
 
-from io import BytesIO
-from pathlib import Path
-
-import requests
+import json
 import torch
+import requests
 from PIL import Image
-from torchvision import transforms as T
-from transformers import AutoTokenizer, VisionEncoderDecoderModel
+from io import BytesIO
+from transformers import VisionEncoderDecoderModel, ViTImageProcessor, AutoTokenizer
+from huggingface_hub import hf_hub_download
 
-processor_tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = VisionEncoderDecoderModel.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+model = VisionEncoderDecoderModel.from_pretrained(repo_id)
+config = json.load(open(config_path))
+image_size = config['encoder']['image_size']
+image_processor = ViTImageProcessor(size={'height': image_size, 'width': image_size}, do_resize=True, do_normalize=True, rescale=True, image_mean=[0.5], image_std=[0.5], do_convert_rgb=False)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-if image_path.startswith("http://") or image_path.startswith("https://"):
-    response = requests.get(image_path)
-    response.raise_for_status()
-    image = Image.open(BytesIO(response.content)).convert("RGB")
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert('L')
 else:
-    image = Image.open(image_path).convert("RGB")
+    image = Image.open(image_path).convert('L')
 
-transform = T.Compose([
-    T.Grayscale(num_output_channels=1),
-    T.Resize((448, 448)),
-    T.ToTensor(),
-    T.Normalize([0.5], [0.5]),
-])
-pixel_values = transform(image).unsqueeze(0).to(device)
+pixel_values = image_processor(images=image, return_tensors='pt').pixel_values.to(device)
+with torch.no_grad():
+    generated_ids = model.generate(pixel_values, max_new_tokens=max_new_tokens, num_beams=num_beams)
+output = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-generated_ids = model.generate(pixel_values=pixel_values, max_length=max_length, num_beams=num_beams)
-decoded_outputs = processor_tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-latex_output = decoded_outputs[0] if decoded_outputs else ""
-
-RESULT = {"latex": latex_output}
+RESULT = {"output": output}

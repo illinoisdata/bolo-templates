@@ -1,0 +1,15 @@
+{% set repo_id = repo_id | default("relik-ie/relik-relation-extraction-small") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Michael Jordan was one of the best players in the NBA.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+from huggingface_hub import hf_hub_download
+import yaml
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.yaml")
+with open(config_path, "r") as f:
+    config = yaml.safe_load(f)
+
+RESULT = {"config": config, "text": text, "repo_id": repo_id, "device": device}

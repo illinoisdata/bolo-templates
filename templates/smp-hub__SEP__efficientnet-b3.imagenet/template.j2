@@ -1,0 +1,46 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("smp-hub/efficientnet-b3.imagenet") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import json
+from io import BytesIO
+
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from torchvision import transforms
+import timm
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+if image_path.startswith(("http://", "https://")):
+    import requests
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert(cfg["input_space"])
+else:
+    image = Image.open(image_path).convert(cfg["input_space"])
+
+preprocess = transforms.Compose([
+    transforms.Resize((300, 300)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=cfg["mean"], std=cfg["std"]),
+])
+
+x = preprocess(image).unsqueeze(0)
+
+model = timm.create_model("efficientnet_b3", pretrained=False, num_classes=0)
+state = torch.load(weights_path, map_location="cpu", weights_only=True)
+model.load_state_dict(state)
+model = model.to(device)
+model.eval()
+
+with torch.no_grad():
+    output = model(x.to(device)).detach().cpu()
+
+RESULT = {"output": output}

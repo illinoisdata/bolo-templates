@@ -1,48 +1,38 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("hellonlp/promcse-bert-base-zh") %}
-{% set input_sentence = input_sentence | default("武汉是一个美丽的城市。") %}
-{% set candidate_sentences = candidate_sentences | default(["你好吗", "你怎么样", "我吃了一个苹果", "你过得好吗", "你还好吗", "你现在好吗", "你吃饭了吗"]) %}
+{% set device = device | default("cuda:0") %}
+{% set sentence_a = sentence_a | default('武汉是一个美丽的城市。') %}
+{% set sentence_b = sentence_b | default('你好吗') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_sentence = "{{ input_sentence }}"
-candidate_sentences = {{ candidate_sentences }}
-
-import json
-from pathlib import Path
+sentence_a = "{{ sentence_a }}"
+sentence_b = "{{ sentence_b }}"
 
 import torch
-from torch.nn.functional import cosine_similarity
-from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModel
 
-torch_device = torch.device(device)
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = AutoModel.from_pretrained(repo_id)
-model = model.to(torch_device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model.to(device)
 model.eval()
 
-def _encode_texts(texts: list[str]) -> torch.Tensor:
-    inputs = tokenizer(
-        texts,
-        padding=True,
-        truncation=True,
-        max_length=128,
-        return_tensors="pt",
-    )
-    inputs = {key: value.to(torch_device) for key, value in inputs.items()}
+def encode(text):
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+    inputs = {k: v.to(device) for k, v in inputs.items()}
     with torch.no_grad():
-        outputs = model(**inputs)
-    return outputs.pooler_output
+        out = model(**inputs).last_hidden_state
+    mask = inputs["attention_mask"].unsqueeze(-1).type_as(out)
+    emb = (out * mask).sum(dim=1) / mask.sum(dim=1).clamp(min=1e-9)
+    return torch.nn.functional.normalize(emb, p=2, dim=1).squeeze(0)
 
-query_embedding = _encode_texts([input_sentence])[0]
-candidate_embeddings = _encode_texts(candidate_sentences)
-similarity_scores = cosine_similarity(
-    query_embedding.unsqueeze(0), candidate_embeddings, dim=1
-)
+emb_a = encode(sentence_a)
+emb_b = encode(sentence_b)
+similarity = torch.nn.functional.cosine_similarity(emb_a.unsqueeze(0), emb_b.unsqueeze(0)).item()
 
-RESULT = {
-    "similarities": [
-        {"sentence": sentence, "score": float(score)}
-        for sentence, score in zip(candidate_sentences, similarity_scores)
-    ]
-}
+RESULT = {"similarity": similarity, "embedding_a": emb_a.detach().cpu().tolist(), "embedding_b": emb_b.detach().cpu().tolist()}

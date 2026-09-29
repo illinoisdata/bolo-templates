@@ -1,20 +1,26 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-he-en") %}
 {% set device = device | default("cuda:0") %}
-{% set src_text = src_text | default(["היא שכחה לכתוב לו.", "אני רוצה לדעת מיד כשמשהו יקרה."]) %}
+{% set src_text = src_text | default(['היא שכחה לכתוב לו.', 'אני רוצה לדעת מיד כשמשהו יקרה.']) %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-src_text = {{ src_text }}
+src_text = {{ src_text | tojson }}
+max_new_tokens = {{ max_new_tokens }}
 
-from transformers import MarianTokenizer, MarianMTModel
+from transformers import MarianMTModel, MarianTokenizer
+import torch
 
-tokenizer = MarianTokenizer.from_pretrained(repo_id)
-model = MarianMTModel.from_pretrained(repo_id).to(device)
+model_name = repo_id
 
-inputs = tokenizer(src_text, return_tensors="pt", padding=True)
+tokenizer = MarianTokenizer.from_pretrained(model_name)
+model = MarianMTModel.from_pretrained(model_name)
+model.to(device)
+
+inputs = tokenizer(src_text, return_tensors="pt", padding=True, truncation=True)
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-translated = model.generate(**inputs)
-
-translations = [tokenizer.decode(t, skip_special_tokens=True) for t in translated]
+translated_tokens = model.generate(**inputs, max_new_tokens=max_new_tokens)
+translations = [tokenizer.decode(t, skip_special_tokens=True) for t in translated_tokens]
 
 RESULT = {"translations": translations}

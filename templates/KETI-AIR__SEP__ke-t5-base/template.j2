@@ -1,31 +1,28 @@
 {% set repo_id = repo_id | default("KETI-AIR/ke-t5-base") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("summarize: The quick brown fox jumps over the lazy dog and then considers the lessons it learned.") %}
-{% set max_new_tokens = max_new_tokens | default(64) %}
-{% set num_return_sequences = num_return_sequences | default(1) %}
+{% set text_input = text_input | default('아버지가 방에 들어가신다.</s>') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-max_new_tokens = {{ max_new_tokens }}
-num_return_sequences = {{ num_return_sequences }}
+text_input = "{{ text_input }}"
 
-from pathlib import Path
+import torch
+from transformers import T5Tokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+spiece_file = hf_hub_download(repo_id=repo_id, filename="spiece.model")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+tokenizer = T5Tokenizer(vocab_file=spiece_file)
+model = T5ForConditionalGeneration.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
 
-inputs = tokenizer(input_text, return_tensors="pt")
-inputs = inputs.to(device)
+inputs = tokenizer(text_input, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_tokens = model.generate(
-    **inputs,
-    max_new_tokens=max_new_tokens,
-    num_return_sequences=num_return_sequences,
-)
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=32)
 
-generated_tokens = generated_tokens.cpu()
-generated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-
-RESULT = {"generated_texts": generated_texts}
+decoded = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
+RESULT = {"generated_text": decoded[0] if decoded else ""}

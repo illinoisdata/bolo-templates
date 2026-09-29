@@ -1,37 +1,43 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("allenai/unifiedqa-v2-t5-3b-1363200") %}
-{% set prompt = prompt | default("Summarize the societal impacts of climate change mentioned in the article.") %}
-{% set generation_max_length = generation_max_length | default(256) %}
-{% set num_beams = num_beams | default(4) %}
-{% set do_sample = do_sample | default(False) %}
-{% set temperature = temperature | default(1.0) %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What is the capital of France?') %}
+{% set context = context | default('') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
-generation_max_length = {{ generation_max_length }}
-num_beams = {{ num_beams }}
-do_sample = {{ do_sample }}
-temperature = {{ temperature }}
+question = "{{ question }}"
+context = "{{ context }}"
 
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model.to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
 
-inputs = tokenizer(prompt, return_tensors="pt")
-inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
-
-generated_tokens = model.generate(
-    **inputs,
-    max_length=generation_max_length,
-    num_beams=num_beams,
-    do_sample=do_sample,
-    temperature=temperature,
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    use_fast=True,
 )
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float16 if torch.cuda.is_available() and str(device).startswith('cuda') else torch.float32,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+model.eval()
 
-decoded = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-summary = decoded[0].strip()
-RESULT = {"summary": summary}
+prompt = question if not context else (context.strip() + "\n\n" + question.strip())
+inputs = tokenizer(prompt, return_tensors="pt", truncation=True).to(device)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=32,
+        num_beams=4,
+        do_sample=False,
+    )
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output": output_text}

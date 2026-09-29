@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("yuhuili/EAGLE-LLaMA3.1-Instruct-8B") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default("Write a short explanation of what EAGLE is.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import os
+import torch
+from transformers import AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+repo_dir = os.path.dirname(weights_path)
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_dir,
+    torch_dtype=torch.float16 if str(device).startswith("cuda") else torch.float32,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+model.eval()
+
+input_ids = torch.tensor([[model.config.bos_token_id]], device=device)
+with torch.no_grad():
+    output_ids = model.generate(
+        input_ids=input_ids,
+        max_new_tokens=8,
+        do_sample=False,
+        pad_token_id=model.config.eos_token_id,
+        eos_token_id=model.config.eos_token_id,
+    )
+
+RESULT = {"output_ids": output_ids.detach().cpu().tolist()}

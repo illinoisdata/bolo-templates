@@ -1,24 +1,30 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("rahular/varta-t5") %}
-{% set text_input = text_input | default("summarize: Generate a concise summary in English for this Indic languages news article.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('translate English to Hindi: The news article discusses economic growth and infrastructure development.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = """{{ text_input }}"""
+text = "{{ text }}"
 
-import os
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+dir_path = hf_hub_download(repo_id=repo_id, filename="config.json").rsplit('/', 1)[0]
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+tokenizer = AutoTokenizer.from_pretrained(dir_path)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    weights_path.rsplit('/', 1)[0],
+    torch_dtype=torch.float32,
+)
 model.to(device)
+model.eval()
 
-inputs = tokenizer(text_input, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
-
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    generated_ids = model.generate(**inputs)
+    generated_ids = model.generate(**inputs, max_new_tokens=32)
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-decoded_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
-
-RESULT = {"generated_text": decoded_text}
+RESULT = {"output_text": output_text}

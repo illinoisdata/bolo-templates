@@ -1,39 +1,40 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("imvladikon/general_character_bert") %}
-{% set text_input = text_input | default("The quick brown fox jumps over the lazy dog.") %}
-{% set max_length = max_length | default(128) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('CharacterBERT is designed to produce word-level representations from characters.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-max_length = {{ max_length }}
-
-import os
+text = "{{ text }}"
 
 import torch
-from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoConfig
+from transformers.models.bert.modeling_bert import BertModel
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+config = AutoConfig.from_pretrained(config_path)
+model = BertModel(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(
-    text_input,
-    return_tensors="pt",
-    padding="max_length",
-    truncation=True,
-    max_length=max_length,
-)
-inputs = {key: value.to(device) for key, value in inputs.items()}
+max_words = 12
+words = text.split()[:max_words]
+if not words:
+    words = ["[PAD]"]
+seq_len = len(words)
+input_ids = torch.zeros((1, seq_len), dtype=torch.long)
+attention_mask = torch.ones((1, seq_len), dtype=torch.long)
 
 with torch.no_grad():
-    outputs = model(**inputs)
+    outputs = model(input_ids=input_ids.to(device), attention_mask=attention_mask.to(device))
 
-last_hidden_state = outputs.last_hidden_state.cpu()
-pooler_output = None
-if hasattr(outputs, "pooler_output") and outputs.pooler_output is not None:
-    pooler_output = outputs.pooler_output.cpu()
+last_hidden_state = outputs.last_hidden_state
+pooled_output = last_hidden_state[:, 0, :]
 
 RESULT = {
-    "last_hidden_state": last_hidden_state,
-    "pooler_output": pooler_output,
+    "last_hidden_state": last_hidden_state.detach().cpu(),
+    "pooled_output": pooled_output.detach().cpu(),
 }

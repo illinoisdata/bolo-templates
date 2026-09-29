@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("joeddav/xlm-roberta-large-xnli") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("zero-shot-classification") %}
+{% set input_prompt = input_prompt | default("I have a problem with my iphone that needs to be resolved asap!") %}
+{% set candidate_labels = candidate_labels | default(["urgent", "not urgent", "phone", "tablet", "computer"]) %}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+candidate_labels = {{ candidate_labels | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(input_prompt, candidate_labels=candidate_labels)

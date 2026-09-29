@@ -1,0 +1,56 @@
+{% set repo_id = repo_id | default("avisena/bart-base-job-info-summarizer") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("""About Four Seasons
+Four Seasons is powered by our people. We are a collective of individuals who crave to become better, to push ourselves to new heights and to treat each other as we wish to be treated in return. Our team members around the world create amazing experiences for our guests, residents, and partners through a commitment to luxury with genuine heart. We know that the best way to enable our people to deliver these exceptional guest experiences is through a world-class employee experience and company culture.
+At Four Seasons, we believe in recognizing a familiar face, welcoming a new one and treating everyone we meet the way we would want to be treated ourselves. Whether you work with us, stay with us, live with us or discover with us, we believe our purpose is to create impressions that will stay with you for a lifetime. It comes from our belief that life is richer when we truly connect to the people and the world around us.
+About the location:
+Four Seasons Hotels and Resorts is a global, luxury hotel management company. We manage over 120 hotels and resorts and 50 private residences in 47 countries around the world and growing. Central to Four Seasons employee experience and social impact programming is the company’s commitment to supporting cancer research, and the advancement of diversity, inclusion, equality and belonging at Four Seasons corporate offices and properties worldwide. At Four Seasons, we are powered by people and our culture enables everything we do.
+Staff Accountant
+The Staff Accountant is responsible for transaction processing, accounting analysis, reporting, balance sheet reconciliations and other administrative duties in the Corporate Finance Department. The Staff Accountant is also involved with continuous process improvements and department projects.
+The Staff Accountant may be assigned to various functions, including Accounts Payable, Accounts Receivable, General Ledger/Reconciliation, Global Programs, Payroll or Global Entities. As development opportunities arise, the Staff Accountant may rotate through one or more Corporate Finance functions listed above.
+""") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set num_beams = num_beams | default(4) %}
+{% set min_new_tokens = min_new_tokens | default(12) %}
+{% set length_penalty = length_penalty | default(1.0) %}
+{% set do_sample = do_sample | default(false) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = {{ input_text | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
+min_new_tokens = {{ min_new_tokens }}
+length_penalty = {{ length_penalty }}
+do_sample = {{ do_sample }}
+
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(input_text, return_tensors="pt", truncation=True, max_length=1024)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    summary_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+        min_new_tokens=min_new_tokens,
+        length_penalty=length_penalty,
+        do_sample=do_sample,
+        early_stopping=True,
+    )
+summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+
+RESULT = {"summary": summary}

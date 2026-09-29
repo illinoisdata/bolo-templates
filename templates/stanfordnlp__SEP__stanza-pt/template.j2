@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("stanfordnlp/stanza-pt") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Portugal é um país bonito. A Maria gosta de ler livros.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+from huggingface_hub import hf_hub_download
+import stanza
+
+# Download the README-backed default Portuguese package set.
+# The stanza repo stores model files under models/<processor>/<package>.pt
+lang = 'pt'
+model_root = hf_hub_download(repo_id=repo_id, filename='models/tokenize/gsd.pt')
+model_dir = os.path.dirname(os.path.dirname(model_root))
+
+stanza.download(lang=lang, package=None, processors='tokenize,pos,lemma,depparse', model_dir=model_dir, verbose=False)
+nlp = stanza.Pipeline(lang=lang, processors='tokenize,pos,lemma,depparse', use_gpu=(device.startswith('cuda')), model_dir=model_dir, verbose=False)
+doc = nlp(text)
+
+sentences = []
+for sent in doc.sentences:
+    words = []
+    for word in sent.words:
+        words.append({
+            'id': word.id,
+            'text': word.text,
+            'lemma': word.lemma,
+            'upos': word.upos,
+            'xpos': word.xpos,
+            'head': word.head,
+            'deprel': word.deprel,
+        })
+    sentences.append(words)
+
+RESULT = {'sentences': sentences}

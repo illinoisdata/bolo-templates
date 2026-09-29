@@ -1,0 +1,36 @@
+{% set repo_id = repo_id | default("numind/NuExtract-1.5") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('We introduce Mistral 7B, a 7-billion-parameter language model engineered for superior performance and efficiency. Mistral 7B outperforms the best open 13B model (Llama 2) across all evaluated benchmarks, and the best released 34B model (Llama 1) in reasoning, mathematics, and code generation. Our model leverages grouped-query attention (GQA) for faster inference, coupled with sliding window attention (SWA) to effectively handle sequences of arbitrary length with a reduced inference cost. We also provide a model fine-tuned to follow instructions, Mistral 7B – Instruct, that surpasses Llama 2 13B – chat model both on human and automated benchmarks. Our models are released under the Apache 2.0 license. Code: <https://github.com/mistralai/mistral-src> Webpage: <https://mistral.ai/news/announcing-mistral-7b/>') %}
+{% set template = template | default('{\n    "Model": {\n        "Name": "",\n        "Number of parameters": "",\n        "Number of max token": "",\n        "Architecture": []\n    },\n    "Usage": {\n        "Use case": [],\n        "Licence": ""\n    }\n}') %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set max_length = max_length | default(8192) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+template = {{ template | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+max_length = {{ max_length }}
+
+import json
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    trust_remote_code=True,
+    attn_implementation="eager",
+).to(device).eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True)
+formatted_template = json.dumps(json.loads(template), indent=4)
+prompt = f"<|input|>\n### Template:\n{formatted_template}\n### Text:\n{text}\n\n<|output|>"
+inputs = tokenizer(prompt, return_tensors="pt", truncation=True, padding=False, max_length=max_length).to(device)
+with torch.no_grad():
+    pred_ids = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False, use_cache=False)
+output = tokenizer.decode(pred_ids[0], skip_special_tokens=True)
+result_text = output.split("<|output|>", 1)[1].strip() if "<|output|>" in output else output.strip()
+
+RESULT = {"output": result_text}

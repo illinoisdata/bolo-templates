@@ -1,12 +1,12 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("microsoft/GODEL-v1_1-base-seq2seq") %}
-{% set instruction = instruction | default("Instruction: given a dialog context, you need to response empathically.") %}
-{% set knowledge = knowledge | default("") %}
-{% set dialog = dialog | default(["Does money buy happiness?", "It is a question. Money buys you a lot of things, but not enough to buy happiness.", "What is the best way to buy happiness ?"]) %}
+{% set device = device | default("cuda:0") %}
+{% set instruction = instruction | default('Instruction: given a dialog context, you need to response empathically.') %}
+{% set knowledge = knowledge | default('') %}
+{% set dialog = dialog | default(['Does money buy happiness?', 'It is a question. Money buys you a lot of things, but not enough to buy happiness.', 'What is the best way to buy happiness ?']) %}
 {% set max_length = max_length | default(128) %}
 {% set min_length = min_length | default(8) %}
 {% set top_p = top_p | default(0.9) %}
-{% set do_sample = do_sample | default(true) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 instruction = "{{ instruction }}"
@@ -15,35 +15,40 @@ dialog = {{ dialog }}
 max_length = {{ max_length }}
 min_length = {{ min_length }}
 top_p = {{ top_p }}
-do_sample = {{ do_sample }}
 
 import torch
-from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
 
-if hasattr(model, "eval"):
+def generate(instruction, knowledge, dialog):
+    tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+    model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+    model.to(device)
     model.eval()
+    if knowledge != '':
+        knowledge = '[KNOWLEDGE] ' + knowledge
+    dialog_text = ' EOS '.join(dialog)
+    query = f"{instruction} [CONTEXT] {dialog_text} {knowledge}"
+    inputs = tokenizer(query, return_tensors='pt')
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_length=max_length,
+            min_length=min_length,
+            top_p=top_p,
+            do_sample=True,
+        )
+    return tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-dialog_context = " EOS ".join(dialog)
-knowledge_segment = f"[KNOWLEDGE] {knowledge}" if knowledge else ""
-segments = [instruction, f"[CONTEXT] {dialog_context}"]
-if knowledge_segment:
-    segments.append(knowledge_segment)
-query = " ".join(segment for segment in segments if segment)
-input_ids = tokenizer(query, return_tensors="pt").input_ids.to(device)
+output_text = generate(instruction, knowledge, dialog)
 
-with torch.inference_mode():
-    generated = model.generate(
-        input_ids,
-        max_length=max_length,
-        min_length=min_length,
-        top_p=top_p,
-        do_sample=do_sample,
-    )
-response = tokenizer.decode(generated[0], skip_special_tokens=True)
-
-RESULT = {"response": response}
+RESULT = {"output": output_text}

@@ -1,35 +1,52 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("digit82/kobart-summarization") %}
-{% set input_text = input_text | default("A concise summary of the following text is requested.") %}
-{% set extra_generation_kwargs = extra_generation_kwargs | default({}) %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('한국어 뉴스 기사 요약을 생성하세요. 오늘은 인공지능과 로봇 기술이 산업 전반에 빠르게 확산되고 있으며, 기업들은 생산성 향상과 비용 절감을 위해 생성형 AI 도입을 확대하고 있다. 전문가들은 향후 몇 년 안에 AI가 업무 방식과 고객 서비스, 소프트웨어 개발 전반을 크게 바꿀 것이라고 전망한다.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-extra_generation_kwargs = {{ extra_generation_kwargs }}
 
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import torch
+from transformers import AutoTokenizer, BartConfig, BartForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+_tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    tokenizer_file=tokenizer_json_path,
+    tokenizer_config_file=tokenizer_config_path,
+    special_tokens_map_file=special_tokens_map_path,
+)
+config = BartConfig.from_json_file(config_path)
+model = BartForConditionalGeneration(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+state_dict.pop("final_logits_bias", None)
+model.load_state_dict(state_dict, strict=False)
 model.to(device)
+model.eval()
 
-tokenizer_inputs = tokenizer(
+inputs = _tokenizer(
     input_text,
     return_tensors="pt",
     truncation=True,
     max_length=1024,
 )
-tokenizer_inputs = {key: tensor.to(device) for key, tensor in tokenizer_inputs.items()}
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(
-    **tokenizer_inputs,
-    num_beams=4,
-    max_length=128,
-    early_stopping=True,
-    **extra_generation_kwargs,
-)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        num_beams=4,
+        max_length=128,
+        min_length=20,
+        length_penalty=1.0,
+        early_stopping=True,
+    )
 
-generated_summary = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+summary = _tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {"summary": generated_summary}
+RESULT = {"summary": summary}

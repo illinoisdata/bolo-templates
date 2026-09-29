@@ -1,45 +1,55 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("KETI-AIR-Downstream/long-ke-t5-base-summarization") %}
-{% set input_text = input_text | default("""현대자동차는 18일(현지 시간) 이탈리아 레이크 코모에서 개최된 '현대 리유니온' 행사에서 '포니 쿠페 콘셉트' 복원 모델을 세계에 첫 공개했습니다. 이 프로젝트는 현대차의 창업자인 정주영 선대 회장의 수출보국 정신과 포니 쿠페를 통한 글로벌 브랜드 정립에 대한 끊임없는 열정과 도전 정신을 재조명하기 위한 것입니다. 현대차에 따르면, 이번 현대 리유니온 행사는 회사의 역사를 다시 돌아보며 변하지 않는 미래 지향적인 비전과 방향성을 공유하는 브랜드 유산 행사입니다.""") %}
-{% set max_length = max_length | default(256) %}
-{% set min_length = min_length | default(32) %}
+{% set device = device | default("cuda:0") %}
+{% set max_input_length = max_input_length | default(4096) %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
 {% set num_beams = num_beams | default(4) %}
+{% set text = text | default("summarization-num_lines-1: 현대자동차는 18일(현지 시간) 이탈리아 레이크 코모에서 개최된 '현대 리유니온' 행사에서 '포니 쿠페 콘셉트' 복원 모델을 세계에 첫 공개했습니다. 이 프로젝트는 현대차의 창업자인 정주영 선대 회장의 수출보국 정신과 포니 쿠페를 통한 글로벌 브랜드 정립에 대한 끊임없는 열정과 도전 정신을 재조명하기 위한 것입니다. 현대차에 따르면, 이번 현대 리유니온 행사는 회사의 역사를 다시 돌아보며 변하지 않는 미래 지향적인 비전과 방향성을 공유하는 브랜드 유산 행사입니다.") %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = """{{ input_text }}"""
-max_length = {{ max_length }}
-min_length = {{ min_length }}
+max_input_length = {{ max_input_length }}
+max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
-
-from pathlib import Path
+text = "{{ text }}"
 
 import torch
+from huggingface_hub import hf_hub_download
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-torch_device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+import os
+from pathlib import Path
+
+model_dir = str(Path(weights_path).parent)
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
 inputs = tokenizer(
-    input_text,
+    text,
     return_tensors="pt",
     truncation=True,
-    padding="longest",
+    max_length=max_input_length,
 )
-inputs = {key: value.to(torch_device) for key, value in inputs.items()}
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(
-    **inputs,
-    max_length=max_length,
-    min_length=min_length,
-    num_beams=num_beams,
-)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+        length_penalty=1.0,
+        early_stopping=True,
+    )
 
-generated_summary = tokenizer.batch_decode(
-    generated_ids,
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-)[0]
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {"summary": generated_summary}
+RESULT = {"summary": output_text}

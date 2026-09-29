@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("MilaNLProc/feel-it-italian-emotion") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set model = model | default(repo_id) %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+{% set top_k = top_k | default(2) %}
+{% set tokenizer_filename = tokenizer_filename | default("tokenizer.json") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+top_k = {{ top_k | tojson }}
+tokenizer_filename = {{ tokenizer_filename | tojson }}
+
+from huggingface_hub import hf_hub_download
+from transformers import PreTrainedTokenizerFast, pipeline
+
+tokenizer_file = hf_hub_download(repo_id=model, filename=tokenizer_filename)
+tokenizer = PreTrainedTokenizerFast.from_pretrained(model, tokenizer_file=tokenizer_file)
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt, top_k=top_k)

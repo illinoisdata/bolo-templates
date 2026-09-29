@@ -1,0 +1,21 @@
+{% set repo_id = repo_id | default("tokyotech-llm/Swallow-7b-NVE-instruct-hf") %}
+{% set device = device | default("cuda:0") %}
+{%- set task = task | default("text-generation") -%}
+{%- set model = model | default(repo_id) -%}
+{%- set input_prompt = input_prompt | default("Provide a concise Japanese and English bilingual summary explaining the mission and capabilities of TokyoTech-LLM Swallow models.") -%}
+{%- set max_new_tokens = max_new_tokens | default(256) -%}
+{%- set temperature = temperature | default(0.7) -%}
+{%- set top_p = top_p | default(0.95) -%}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens | tojson }}
+temperature = {{ temperature | tojson }}
+top_p = {{ top_p | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(input_prompt, max_new_tokens=max_new_tokens, temperature=temperature, top_p=top_p)

@@ -1,16 +1,35 @@
-{% set device = device | default("cuda:0") %}
+{% set image = image | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 {% set repo_id = repo_id | default("CompVis/stable-diffusion-safety-checker") %}
-import pathlib
-import transformers
+{% set device = device | default("cuda:0") %}
 
-root = pathlib.Path(transformers.__file__).resolve().parent
-matches = []
-for candidate in root.rglob("*.py"):
-    try:
-        content = candidate.read_text()
-    except Exception:
-        continue
-    if "SafetyChecker" in content:
-        matches.append(candidate)
-for match in matches[:20]:
-    print(match)
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image = "{{ image }}"
+
+import requests
+import torch
+from PIL import Image
+from transformers import AutoProcessor
+from huggingface_hub import hf_hub_download
+from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+if image.startswith("http://") or image.startswith("https://"):
+    pil_image = Image.open(requests.get(image, stream=True).raw).convert("RGB")
+else:
+    pil_image = Image.open(image).convert("RGB")
+
+processor = AutoProcessor.from_pretrained(repo_id)
+safety_checker = StableDiffusionSafetyChecker.from_pretrained(repo_id, local_files_only=True).to(device)
+
+inputs = processor(images=pil_image, return_tensors="pt")
+clip_input = inputs["pixel_values"].to(device)
+images = inputs["pixel_values"].to(device)
+
+with torch.no_grad():
+    checked_images, has_nsfw_concepts = safety_checker(images=images, clip_input=clip_input)
+
+RESULT = {"has_nsfw_concepts": has_nsfw_concepts, "checked_images": checked_images}

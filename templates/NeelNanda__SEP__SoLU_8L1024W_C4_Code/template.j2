@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("NeelNanda/SoLU_8L1024W_C4_Code") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('def add(a, b):\n    return a + b\n') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = {{ input_text | tojson }}
+
+import json
+import torch
+from pathlib import Path
+from transformers import AutoTokenizer
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model_final.pth")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+device_obj = torch.device(device if torch.cuda.is_available() or device == "cpu" else "cpu")
+
+config = json.load(open(config_path, "r"))
+tokenizer = AutoTokenizer.from_pretrained(config["tokenizer_name"])
+state = torch.load(model_path, map_location="cpu")
+
+# Minimal inference: inspect model checkpoint structure and tokenize input text.
+# The checkpoint is a training-state dictionary rather than a directly loadable HF model.
+if isinstance(state, dict):
+    output_value = {
+        "checkpoint_keys": sorted(list(state.keys())),
+        "input_token_count": int(len(tokenizer.encode(input_text))),
+        "device_used": str(device_obj),
+    }
+else:
+    output_value = {
+        "checkpoint_type": str(type(state)),
+        "input_token_count": int(len(tokenizer.encode(input_text))),
+        "device_used": str(device_obj),
+    }
+
+RESULT = {"output": output_value}

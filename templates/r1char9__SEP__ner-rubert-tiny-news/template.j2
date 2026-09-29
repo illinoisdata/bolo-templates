@@ -1,0 +1,26 @@
+{% set repo_id = repo_id | default("r1char9/ner-rubert-tiny-news") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Генеральный директор Сбербанка Герман Греф на конференции в Москве заявил, что сотрудничество с Яндексом в области искусственного интеллекта выходит на новый уровень. Он также отметил, что правительство Российской Федерации поддерживает развитие цифровой экономики, особенно в рамках Евразийского экономического союза.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForTokenClassification.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+ner_pipeline = pipeline(
+    "token-classification",
+    model=model,
+    tokenizer=tokenizer,
+    aggregation_strategy="simple",
+    device=0 if str(device).startswith("cuda") else -1,
+)
+
+output = ner_pipeline(text)
+
+RESULT = {"output": output}

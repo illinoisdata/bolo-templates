@@ -1,0 +1,62 @@
+{% set repo_id = repo_id | default("dongfangxu/SentenceSegmenter-MIMIC") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Patient presents with fever cough. He denies chest pain. Plan is to continue antibiotics.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import json
+import os
+import torch
+from safetensors.torch import load_file
+from transformers import AutoTokenizer, AutoConfig, AutoModelForTokenClassification
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+local_dir = os.path.dirname(hf_hub_download(repo_id=repo_id, filename="tokenizer.json"))
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+auto_config = AutoConfig.from_pretrained(local_dir)
+tokenizer = AutoTokenizer.from_pretrained(local_dir, use_fast=True)
+model = AutoModelForTokenClassification.from_config(auto_config)
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    logits = model(**inputs).logits
+    pred_ids = logits.argmax(dim=-1)[0].tolist()
+
+id2label = config["id2label"]
+tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0].tolist())
+labels = [id2label[str(i)] for i in pred_ids]
+
+sentences = []
+current_tokens = []
+for tok, label, input_id in zip(tokens, labels, inputs["input_ids"][0].tolist()):
+    if input_id in {tokenizer.cls_token_id, tokenizer.sep_token_id, tokenizer.pad_token_id}:
+        continue
+    if label == "B-Sent":
+        if current_tokens:
+            sentences.append(tokenizer.convert_tokens_to_string(current_tokens).strip())
+        current_tokens = [tok]
+    elif label == "I-Sent":
+        current_tokens.append(tok)
+    else:
+        if current_tokens:
+            sentences.append(tokenizer.convert_tokens_to_string(current_tokens).strip())
+            current_tokens = []
+        sentences.append(tokenizer.convert_tokens_to_string([tok]).strip())
+if current_tokens:
+    sentences.append(tokenizer.convert_tokens_to_string(current_tokens).strip())
+
+RESULT = {"predicted_labels": labels, "sentences": [s for s in sentences if s]}

@@ -1,37 +1,44 @@
 {% set repo_id = repo_id | default("google/pegasus-x-base") %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("The quick brown fox jumps over the lazy dog.") %}
-{% set input_max_length = input_max_length | default(1024) %}
-{% set generation_max_length = generation_max_length | default(256) %}
-{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set num_beams = num_beams | default(4) %}
+{% set text = text | default('Summarize the following text in one concise paragraph: Pegasus-X is a long-document abstractive summarization model designed to handle very long inputs efficiently using global tokens and sparse attention patterns.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-input_max_length = {{ input_max_length }}
-generation_max_length = {{ generation_max_length }}
 max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
+text = {{ text | tojson }}
 
-from pathlib import Path
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+# Use the local repository snapshot directory derived from a downloaded file path.
+model_dir = __import__('os').path.dirname(weights_path)
 
-inputs = tokenizer(
-    text_input,
-    return_tensors="pt",
-    truncation=True,
-    max_length=input_max_length,
-)
-inputs = {key: value.to(device) for key, value in inputs.items()}
+tokenizer = AutoTokenizer.from_pretrained(model_dir)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-generated_tokens = model.generate(
-    **inputs,
-    max_length=generation_max_length,
-    max_new_tokens=max_new_tokens,
-)
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=4096)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+    )
 
-RESULT = {"generated_text": generated_text}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

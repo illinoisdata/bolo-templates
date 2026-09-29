@@ -1,37 +1,31 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("google/bert_uncased_L-4_H-768_A-12") %}
-{% set text_input = text_input | default("The quick brown fox jumps over the lazy dog.") %}
-{% set max_length = max_length | default(64) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The quick brown fox jumps over the lazy dog.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-max_length = {{ max_length }}
+text = "{{ text }}"
 
-import os
-
-import numpy as np
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
-encoded_inputs = tokenizer(
-    text_input,
-    return_tensors="pt",
-    truncation=True,
-    max_length=max_length,
-    padding="max_length",
-)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+local_dir = "/".join(vocab_path.split("/")[:-1])
+tokenizer = AutoTokenizer.from_pretrained(local_dir, use_fast=False)
+model = AutoModel.from_pretrained(local_dir, local_files_only=True)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
-last_hidden_state = outputs.last_hidden_state.cpu()
-pooler_output = outputs.pooler_output
-if pooler_output is not None:
-    pooler_output = pooler_output.cpu()
+    outputs = model(**inputs)
 
 RESULT = {
-    "last_hidden_state": last_hidden_state,
-    "pooler_output": pooler_output,
+    "last_hidden_state": outputs.last_hidden_state,
+    "pooler_output": outputs.pooler_output,
 }

@@ -1,26 +1,35 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("prithivida/grammar_error_correcter_v1") %}
-{% set text_input = text_input | default("This sentence has a error in grammar.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('He go to school every day and she do not like it.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+text = "{{ text }}"
 
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_file = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
 
 model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
 
-inputs = tokenizer(text_input, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(
-    **inputs,
-    num_beams=4,
-    max_new_tokens=128,
-    no_repeat_ngram_size=3,
-)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=64,
+        num_beams=4,
+        early_stopping=True,
+    )
 
-corrected_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {"corrected_text": corrected_text}
+RESULT = {"corrected_text": output_text}

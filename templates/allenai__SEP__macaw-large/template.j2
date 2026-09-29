@@ -1,25 +1,41 @@
 {% set repo_id = repo_id | default("allenai/macaw-large") %}
 {% set device = device | default("cuda:0") %}
-{% set prompt_text = prompt_text | default("What is the color of a cloudy sky?") %}
-{% set max_length = max_length | default(64) %}
-{% set num_beams = num_beams | default(4) %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-prompt_text = {{ prompt_text | tojson }}
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+{% set question = question | default('What is the color of a cloudy sky?') %}
+{% set answer_prefix = answer_prefix | default('$answer$') %}
+{% set mcoptions = mcoptions | default('$mcoptions$') %}
+{% set context = context | default('') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = {{ question | tojson }}
+answer_prefix = {{ answer_prefix | tojson }}
+mcoptions = {{ mcoptions | tojson }}
+context = {{ context | tojson }}
 
-import os
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+_ = config_path, tokenizer_config_path, special_tokens_map_path, generation_config_path
+
 tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float16 if device.startswith('cuda') else torch.float32)
+model.to(device)
+model.eval()
 
-inputs = tokenizer(prompt_text, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+if context:
+    prompt = f"{answer_prefix} ; {mcoptions} ; {question} ; {context}"
+else:
+    prompt = f"{answer_prefix} ; {mcoptions} ; {question}"
+inputs = tokenizer(prompt, return_tensors="pt").to(device)
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=32, num_beams=4)
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-generated_ids = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
-answer = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-
-RESULT = {"answer": answer}
+RESULT = {"output": output_text}

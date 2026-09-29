@@ -1,38 +1,32 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("microsoft/deberta-xlarge-v2") %}
-{% set text_input = text_input | default("The quick brown fox jumps over the lazy dog.") %}
-{% set max_length = max_length | default(128) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The quick brown fox jumps over the lazy dog.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-max_length = {{ max_length }}
+text = "{{ text }}"
 
-from pathlib import Path
-
-import numpy as np
 import torch
-from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import DebertaV2Tokenizer, DebertaV2ForMaskedLM, DebertaV2Config
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
-model = AutoModel.from_pretrained(repo_id)
-model = model.to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+spm_path = hf_hub_download(repo_id=repo_id, filename="spm.model")
+
+tokenizer = DebertaV2Tokenizer(vocab_file=spm_path)
+config = DebertaV2Config.from_pretrained(config_path)
+model = DebertaV2ForMaskedLM(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+if "deberta.embeddings.position_embeddings.weight" in state_dict:
+    state_dict["deberta.embeddings.position_embeddings.weight"] = state_dict.pop("deberta.embeddings.position_embeddings.weight")
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(
-    text_input,
-    return_tensors="pt",
-    padding="max_length",
-    truncation=True,
-    max_length=max_length,
-)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    model_outputs = model(**encoded_inputs)
-last_hidden_state = model_outputs.last_hidden_state.cpu()
-cls_embedding = last_hidden_state[:, 0, :]
+    outputs = model(**inputs)
 
-RESULT = {
-    "last_hidden_state": last_hidden_state,
-    "cls_embedding": cls_embedding,
-}
+RESULT = {"logits": outputs.logits}

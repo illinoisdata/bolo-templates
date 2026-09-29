@@ -1,44 +1,41 @@
 {% set repo_id = repo_id | default("Falconsai/medical_summarization") %}
 {% set device = device | default("cuda:0") %}
-{% set text_to_summarize = text_to_summarize | default("Medical text to summarize.") %}
-{% set prefix = prefix | default("summarize: ") %}
-{% set max_length = max_length | default(200) %}
-{% set min_length = min_length | default(30) %}
-{% set num_beams = num_beams | default(4) %}
-{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
-{% set length_penalty = length_penalty | default(2.0) %}
-{% set early_stopping = early_stopping | default(true) %}
+{% set text = text | default('summarize: Duplications of the alimentary tract are rare congenital malformations. This report describes a child with an intrathoracic cystic lesion initially treated as hydatid disease, later found to be an oesophageal duplication cyst.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_to_summarize = "{{ text_to_summarize }}"
-prefix = "{{ prefix }}"
-max_length = {{ max_length }}
-min_length = {{ min_length }}
-num_beams = {{ num_beams }}
-no_repeat_ngram_size = {{ no_repeat_ngram_size }}
-length_penalty = {{ length_penalty }}
-early_stopping = {{ early_stopping }}
+text = "{{ text }}"
 
-import os
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_model_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32, device_map=None)
+model.to(device)
+model.eval()
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
 
-encoded_input = tokenizer(prefix + text_to_summarize, return_tensors="pt")
-encoded_input = {k: v.to(device) for k, v in encoded_input.items()}
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-output_ids = model.generate(
-    **encoded_input,
-    max_length=max_length,
-    min_length=min_length,
-    num_beams=num_beams,
-    no_repeat_ngram_size=no_repeat_ngram_size,
-    length_penalty=length_penalty,
-    early_stopping=early_stopping,
-)
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_length=200,
+        min_length=30,
+        num_beams=4,
+        early_stopping=True,
+        length_penalty=2.0,
+        no_repeat_ngram_size=3,
+    )
 
 summary = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-RESULT = {"summary_text": summary}
+RESULT = {"summary": summary}

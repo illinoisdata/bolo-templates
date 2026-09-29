@@ -1,0 +1,36 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set repo_id = repo_id | default("speechbrain/asr-transformer-transformerlm-librispeech") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from speechbrain.inference.ASR import EncoderDecoderASR
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    import tempfile
+    import urllib.request
+    fd, local_audio_path = tempfile.mkstemp(suffix=os.path.splitext(audio_path)[1] or ".wav")
+    os.close(fd)
+    urllib.request.urlretrieve(audio_path, local_audio_path)
+    audio_input = local_audio_path
+else:
+    audio_input = audio_path
+
+hyperparams_path = hf_hub_download(repo_id=repo_id, filename="hyperparams.yaml")
+run_device = device if device.startswith("cuda") and torch.cuda.is_available() else "cpu"
+
+asr_model = EncoderDecoderASR.from_hparams(
+    source=repo_id,
+    savedir="/workspace/speechbrain_asr_transformer_transformerlm_librispeech",
+    hparams_file=hyperparams_path,
+    run_opts={"device": run_device},
+)
+
+output = asr_model.transcribe_file(audio_input)
+
+RESULT = {"text": output}

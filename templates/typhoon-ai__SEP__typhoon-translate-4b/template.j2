@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("typhoon-ai/typhoon-translate-4b") %}
+{% set device = device | default("cuda:0") %}
+{% set system_prompt = system_prompt | default('Translate the following text into English.') %}
+{% set text_to_translate = text_to_translate | default('เมื่อสิ้นปี 2022 การเปิดตัว ChatGPT ของ OpenAI ถือเป็นจุดเปลี่ยนสำคัญ—โลกได้รู้จักกับ Generative AI (Gen AI) และทุกอย่างก็เปลี่ยนไป สิ่งที่เคยรู้สึกเหมือน frontier ไกลๆ กลายเป็นพลังในปัจจุบัน AI ถูกฝังตัวอย่างรวดเร็วทั้งในกิจวัตรส่วนตัวและกลยุทธ์องค์กร กลายเป็นตัวเปลี่ยนเกมอันทรงพลัง—ช่วยยกระดับชีวิต ปลดล็อกประสิทธิภาพใหม่ๆ และเปลี่ยนวิธีที่องค์กรดำเนินงาน ในการแสวงหาความได้เปรียบเชิงแข่งขัน ธุรกิจในหลากหลายภาคส่วนต่างเร่งทำความเข้าใจ นำไปใช้ และสร้างนวัตกรรมด้วย AI') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+system_prompt = "{{ system_prompt }}"
+text_to_translate = "{{ text_to_translate }}"
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="model-00001-of-00002.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="model-00002-of-00002.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.model")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+
+from pathlib import Path
+model_dir = Path(config_path).parent
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+if tokenizer.pad_token_id is None:
+    tokenizer.pad_token = tokenizer.eos_token
+model = AutoModelForCausalLM.from_pretrained(
+    model_dir,
+    torch_dtype=torch.bfloat16,
+).to(device)
+model.eval()
+
+prompt = f"{system_prompt}\n\n{text_to_translate}"
+input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+
+with torch.inference_mode():
+    outputs = model.generate(
+        input_ids=input_ids,
+        max_new_tokens=1024,
+        temperature=0.2,
+        do_sample=False,
+    )
+
+response = outputs[0][input_ids.shape[-1]:]
+output_text = tokenizer.decode(response, skip_special_tokens=True)
+
+RESULT = {"translation": output_text}

@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("pierreguillou/bert-base-cased-squad-v1.1-portuguese") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default("Quando começou a pandemia de Covid-19 no mundo?") %}
+{% set context = context | default("A pandemia de COVID-19, também conhecida como pandemia de coronavírus, é uma pandemia em curso de COVID-19, uma doença respiratória aguda causada pelo coronavírus da síndrome respiratória aguda grave 2 (SARS-CoV-2). A doença foi identificada pela primeira vez em Wuhan, na província de Hubei, República Popular da China, em 1 de dezembro de 2019, mas o primeiro caso foi reportado em 31 de dezembro do mesmo ano.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(vocab_path), local_files_only=True)
+model = AutoModelForQuestionAnswering.from_pretrained(os.path.dirname(weights_path), local_files_only=True)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits
+end_logits = outputs.end_logits
+start_idx = int(torch.argmax(start_logits, dim=-1).item())
+end_idx = int(torch.argmax(end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+
+answer_tokens = inputs["input_ids"][0, start_idx:end_idx + 1]
+answer = tokenizer.decode(answer_tokens, skip_special_tokens=True).strip()
+score = float((torch.softmax(start_logits, dim=-1)[0, start_idx] * torch.softmax(end_logits, dim=-1)[0, end_idx]).item())
+
+RESULT = {"answer": answer, "score": score, "start_index": start_idx, "end_index": end_idx}

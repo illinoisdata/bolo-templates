@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("SCUT-DLVCLab/lilt-roberta-en-base") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set input_words = input_words | default([["I", "love", "the", "Hong", "Kong", "University", "of", "Science", "and", "Technology", "community"]]) %}
+{% set input_boxes = input_boxes | default([[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]) %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_words = {{ input_words | tojson }}
+input_boxes = {{ input_boxes | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = pipe(input_words, tokenize_kwargs={"boxes": input_boxes})
+RESULT = {"outputs": RESULT}

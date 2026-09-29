@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("mozilla-ai/rocket-3B-llamafile") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('rocket-3b.Q4_K_M.llamafile') %}
+{% set prompt = prompt | default('Write a short, friendly greeting.') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.95) %}
+{% set system_message = system_message | default('You are a helpful assistant.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+system_message = "{{ system_message }}"
+
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+tokenizer = AutoTokenizer.from_pretrained('pansophic/rocket-3B', trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained('pansophic/rocket-3B', trust_remote_code=True, torch_dtype=torch.float16).to(device)
+
+prompt_text = f"<|im_start|>system\n{system_message}<|im_end|>\n<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n"
+inputs = tokenizer(prompt_text, return_tensors='pt').to(device)
+outputs = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=True, temperature=temperature, top_p=top_p)
+output_text = tokenizer.decode(outputs[0], skip_special_tokens=False)
+
+RESULT = {"generated_text": output_text}

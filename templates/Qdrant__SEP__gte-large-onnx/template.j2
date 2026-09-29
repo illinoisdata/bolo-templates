@@ -1,53 +1,48 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Qdrant/gte-large-onnx") %}
-{% set text_a = text_a | default("A sentence describing how generative embeddings capture semantic similarity.") %}
-{% set text_b = text_b | default("Another sentence that shares the same semantic topic as the first one.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Query: What is the capital of France?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_a = """{{ text_a }}"""
-text_b = """{{ text_b }}"""
+text = "{{ text }}"
 
-import json
 import os
-
 import numpy as np
 import onnxruntime as ort
 from huggingface_hub import hf_hub_download
 from transformers import AutoTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-onnx_path = hf_hub_download(repo_id=repo_id, filename="model.onnx")
+model_file = hf_hub_download(repo_id=repo_id, filename="model.onnx")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-available_providers = ort.get_available_providers()
-if device.startswith("cuda") and "CUDAExecutionProvider" in available_providers:
-    providers = ["CUDAExecutionProvider"]
-else:
-    providers = ["CPUExecutionProvider"]
-session = ort.InferenceSession(onnx_path, providers=providers)
+_tokenizer_dir = os.path.dirname(tokenizer_file)
+tokenizer = AutoTokenizer.from_pretrained(_tokenizer_dir, use_fast=True)
 
-encoded_inputs = tokenizer([text_a, text_b], padding=True, truncation=True, return_tensors="np")
-onnx_inputs = {
-    key: value.astype(np.int64) if value.dtype != np.int64 else value
-    for key, value in encoded_inputs.items()
-}
+providers = ["CPUExecutionProvider"]
+session_options = ort.SessionOptions()
+session_options.intra_op_num_threads = 1
+session_options.inter_op_num_threads = 1
+if device.startswith("cuda"):
+    providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
 
+session = ort.InferenceSession(model_file, sess_options=session_options, providers=providers)
+
+inputs = tokenizer(text, return_tensors="np", padding=True, truncation=True, max_length=512)
+input_names = {i.name for i in session.get_inputs()}
+onnx_inputs = {k: v.astype(np.int64) for k, v in inputs.items() if k in input_names}
 outputs = session.run(None, onnx_inputs)
+
 last_hidden_state = outputs[0]
-attention_mask = onnx_inputs["attention_mask"]
+attention_mask = inputs.get("attention_mask")
+if attention_mask is None:
+    pooled = last_hidden_state[:, 0]
+else:
+    mask = attention_mask[..., None].astype(np.float32)
+    summed = (last_hidden_state * mask).sum(axis=1)
+    counts = np.clip(mask.sum(axis=1), 1e-9, None)
+    pooled = summed / counts
 
-mask = attention_mask[..., None]
-masked_embeddings = last_hidden_state * mask
-sum_embeddings = masked_embeddings.sum(axis=1)
-mask_sums = np.maximum(mask.sum(axis=1), 1e-9)
-sentence_embeddings = sum_embeddings / mask_sums
-
-norms = np.linalg.norm(sentence_embeddings, axis=1)
-similarity = float(
-    np.dot(sentence_embeddings[0], sentence_embeddings[1])
-    / (norms[0] * norms[1] + 1e-9)
-)
-
-RESULT = {
-    "embeddings": sentence_embeddings.tolist(),
-    "similarity": similarity,
-}
+pooled = pooled / np.linalg.norm(pooled, axis=1, keepdims=True)
+RESULT = {"embedding": pooled}

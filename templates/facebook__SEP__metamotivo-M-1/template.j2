@@ -1,0 +1,84 @@
+{% set repo_id = repo_id | default("facebook/metamotivo-M-1") %}
+{% set device = device | default("cuda:0") %}
+{% set obs_dim = obs_dim | default(358) %}
+{% set action_dim = action_dim | default(69) %}
+{% set z_dim = z_dim | default(256) %}
+{% set seq_length = seq_length | default(8) %}
+{% set actor_std = actor_std | default(0.2) %}
+{% set obs_value = obs_value | default(0.0) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+obs_dim = {{ obs_dim }}
+action_dim = {{ action_dim }}
+z_dim = {{ z_dim }}
+seq_length = {{ seq_length }}
+actor_std = {{ actor_std }}
+obs_value = {{ obs_value }}
+
+import json
+from pathlib import Path
+
+import torch
+import torch.nn as nn
+from safetensors.torch import load_file
+from huggingface_hub import hf_hub_download
+
+
+class FBcprModel(nn.Module):
+    def __init__(self, obs_dim, action_dim, z_dim, actor_std):
+        super().__init__()
+        self.obs_dim = obs_dim
+        self.action_dim = action_dim
+        self.z_dim = z_dim
+        self.actor_std = actor_std
+        self.actor = nn.Sequential(
+            nn.Linear(obs_dim + z_dim, 512),
+            nn.Mish(),
+            nn.Linear(512, 512),
+            nn.Mish(),
+            nn.Linear(512, action_dim),
+        )
+        self.backward_net = nn.Sequential(
+            nn.LayerNorm(obs_dim),
+            nn.Linear(obs_dim, 256),
+            nn.Tanh(),
+            nn.Linear(256, z_dim),
+        )
+
+    def forward(self, obs, z):
+        x = torch.cat([obs, z], dim=-1)
+        mean = self.actor(x)
+        std = torch.full_like(mean, self.actor_std)
+        return mean, std
+
+    def sample_action(self, obs, z):
+        mean, std = self.forward(obs, z)
+        return mean + std * torch.randn_like(mean)
+
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config = json.loads(Path(config_path).read_text())
+
+model = FBcprModel(
+    obs_dim=config["obs_dim"],
+    action_dim=config["action_dim"],
+    z_dim=config["archi"]["z_dim"],
+    actor_std=config["actor_std"],
+)
+state_dict = load_file(weights_path)
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+obs = torch.full((1, obs_dim), float(obs_value), device=device)
+z = torch.zeros((1, z_dim), device=device)
+with torch.no_grad():
+    action_mean, action_std = model(obs, z)
+    sampled_action = model.sample_action(obs, z)
+
+RESULT = {
+    "action_mean": action_mean.squeeze(0).detach().cpu().tolist(),
+    "action_std": action_std.squeeze(0).detach().cpu().tolist(),
+    "sampled_action": sampled_action.squeeze(0).detach().cpu().tolist(),
+}

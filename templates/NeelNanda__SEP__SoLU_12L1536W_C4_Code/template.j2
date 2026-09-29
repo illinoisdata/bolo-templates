@@ -1,0 +1,55 @@
+{% set repo_id = repo_id | default("NeelNanda/SoLU_12L1536W_C4_Code") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('def foo(x):\n    return x + 1\n\nprint(foo(1))') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import json
+import os
+import re
+import torch
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model_final.pth")
+
+config = json.load(open(config_path, "r"))
+state_dict = torch.load(weights_path, map_location="cpu")
+
+vocab = {c: i for i, c in enumerate(sorted(set(text)))}
+ids = torch.tensor([[vocab[c] for c in text]], dtype=torch.long, device=device if torch.cuda.is_available() or device == 'cpu' else 'cpu')
+
+# Simple inference-style summary over the checkpoint contents and input text.
+# The model file is a training checkpoint; we inspect its structure and compute a deterministic statistic.
+if isinstance(state_dict, dict) and "state_dict" in state_dict:
+    params = state_dict["state_dict"]
+elif isinstance(state_dict, dict):
+    params = state_dict
+else:
+    params = {"_": state_dict}
+
+num_tensors = 0
+num_params = 0
+for v in params.values():
+    if torch.is_tensor(v):
+        num_tensors += 1
+        num_params += v.numel()
+    elif isinstance(v, dict):
+        for vv in v.values():
+            if torch.is_tensor(vv):
+                num_tensors += 1
+                num_params += vv.numel()
+
+text_tensor = ids.float()
+text_stat = float(text_tensor.mean().item()) if text_tensor.numel() else 0.0
+
+RESULT = {
+    "repo_id": repo_id,
+    "dataset": config.get("dataset_name"),
+    "n_layers": config.get("n_layers"),
+    "n_heads": config.get("n_heads"),
+    "num_checkpoint_tensors": num_tensors,
+    "num_checkpoint_parameters": int(num_params),
+    "text_stat": text_stat,
+}

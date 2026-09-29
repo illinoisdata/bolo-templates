@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("timm/cspresnext50.ra_in1k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set input_image = input_image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+repo_id = {{ repo_id | tojson }}
+task = {{ task | tojson }}
+device = {{ device | tojson }}
+input_image = {{ input_image | tojson }}
+
+from transformers import pipeline
+from PIL import Image
+import torch
+
+device = torch.device(device)
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+image = Image.open(input_image).convert("RGB")
+RESULT = pipe(image)

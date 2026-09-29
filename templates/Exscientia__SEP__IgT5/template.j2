@@ -1,37 +1,47 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Exscientia/IgT5") %}
-{% set input_sequences = input_sequences | default(["V Q L A Q S G S E L R K P G A S V K V S C D T S G H S F T S N A I H W V R Q A P G Q G L E W M G W I N T D T G T P T Y A Q G F T G R F V F S L D T S A R T A Y L Q I S S L K A D D T A V F Y C A R E R D Y S Y F F D Y W G Q G T L V T V S S </s> E V V M T Q S P A S L S V S P G E R A T L S C R A R A S L G I S T D L A W Y Q Q R P G Q A P R L L I Y G A S T R A T G I P A R F S G S G S G T E F T L T I S S L Q S E D S A V Y Y C Q Q Y S N W P L T F G G G T K V E I K", "Q V Q L V E S G G G V V Q P G R S L R L S C A A S G F T F S N Y A M Y W V R Q A P G K G L E W V A V I S Y D G S N K Y Y A D S V K G R F T I S R D N S K N T L Y L Q M N S L R T E D T A V Y Y C A S G S D Y G D Y L L V Y W G Q G T L V T V S S </s> A L T Q P A S V S G S P G Q S I T I S C T G T S S D V G G Y N Y V S W Y Q Q H P G K A P K L M I Y D V S K R P S G V S N R F S G S K S G N T A S L T I S G L Q S E D E A D Y Y C N S L T S I S T W V F G G G T K L T V L"]) %}
-{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set device = device | default("cuda:0") %}
+{% set heavy_sequences = heavy_sequences | default([
+  "VQLAQSGSELRKPGASVKVSCDTSGHSFTSNAIHWVRQAPGQGLEWMGWINTDTGTPTYAQGFTGRFVFSLDTSARTAYLQISSLKADDTAVFYCARERDYSDYFFDYWGQGTLVTVSS",
+  "QVQLVESGGGVVQPGRSLRLSCAASGFTFSNYAMYWVRQAPGKGLEWVAVISYDGSNKYYADSVKGRFTISRDNSKNTLYLQMNSLRTEDTAVYYCASGSDYGDYLLVYWGQGTLVTVSS"
+]) %}
+{% set light_sequences = light_sequences | default([
+  "EVVMTQSPASLSVSPGERATLSCRARASLGISTDLAWYQQRPGQAPRLLIYGASTRATGIPARFSGSGSGTEFTLTISSLQSEDSAVYYCQQYSNWPLTFGGGTKVEIK",
+  "ALTQPASVSGSPGQSITISCTGTSSDVGGYNYVSWYQQHPGKAPKLMIYDVSKRPSGVSNRFSGSKSGNTASLTISGLQSEDEADYYCNSLTSISTWVFGGGTKLTVL"
+]) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_sequences = {{ input_sequences }}
-max_new_tokens = {{ max_new_tokens }}
+heavy_sequences = {{ heavy_sequences }}
+light_sequences = {{ light_sequences }}
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-import os
+import torch
+from transformers import T5EncoderModel, T5Tokenizer
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+tokenizer = T5Tokenizer.from_pretrained(repo_id, do_lower_case=False)
+model = T5EncoderModel.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
 
-tokenized_inputs = tokenizer(
-    input_sequences,
-    padding="longest",
-    truncation=True,
+paired_sequences = []
+for sequence_heavy, sequence_light in zip(heavy_sequences, light_sequences):
+    paired_sequences.append(" ".join(sequence_heavy) + " </s> " + " ".join(sequence_light))
+
+tokens = tokenizer(
+    paired_sequences,
+    add_special_tokens=True,
+    padding=True,
     return_tensors="pt",
+    return_special_tokens_mask=True,
 )
 
-encoded_inputs = {
-    key: value.to(device)
-    for key, value in tokenized_inputs.items()
-}
+tokens = {k: v.to(device) for k, v in tokens.items()}
+with torch.no_grad():
+    output = model(input_ids=tokens["input_ids"], attention_mask=tokens["attention_mask"])
 
-generated_tokens = model.generate(
-    **encoded_inputs,
-    max_new_tokens=max_new_tokens,
-)
-generated_sequences = tokenizer.batch_decode(
-    generated_tokens,
-    skip_special_tokens=True,
-)
+residue_embeddings = output.last_hidden_state.clone()
+residue_embeddings[tokens["special_tokens_mask"] == 1] = 0
+sequence_embeddings_sum = residue_embeddings.sum(1)
+sequence_lengths = torch.sum(tokens["special_tokens_mask"] == 0, dim=1)
+sequence_embeddings = sequence_embeddings_sum / sequence_lengths.unsqueeze(1)
 
-RESULT = {"generated_sequences": generated_sequences}
+RESULT = {"sequence_embeddings": sequence_embeddings.cpu(), "residue_embeddings": residue_embeddings.cpu()}

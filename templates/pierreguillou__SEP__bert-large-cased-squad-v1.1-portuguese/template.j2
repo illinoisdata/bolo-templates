@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("pierreguillou/bert-large-cased-squad-v1.1-portuguese") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Quando começou a pandemia de Covid-19 no mundo?') %}
+{% set context = context | default('A pandemia de COVID-19, também conhecida como pandemia de coronavírus, é uma pandemia em curso de COVID-19, uma doença respiratória causada pelo coronavírus da síndrome respiratória aguda grave 2 (SARS-CoV-2). O vírus tem origem zoonótica e o primeiro caso conhecido da doença remonta a dezembro de 2019 em Wuhan, na China.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+
+model = AutoModelForQuestionAnswering.from_pretrained(repo_id)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_idx = int(torch.argmax(outputs.start_logits, dim=-1).item())
+end_idx = int(torch.argmax(outputs.end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+
+input_ids = inputs["input_ids"][0]
+answer_ids = input_ids[start_idx : end_idx + 1]
+answer = tokenizer.decode(answer_ids, skip_special_tokens=True).strip()
+score = float(torch.softmax(outputs.start_logits, dim=-1)[0, start_idx] * torch.softmax(outputs.end_logits, dim=-1)[0, end_idx])
+
+RESULT = {
+    "answer": answer,
+    "start_index": start_idx,
+    "end_index": end_idx,
+    "score": score,
+}

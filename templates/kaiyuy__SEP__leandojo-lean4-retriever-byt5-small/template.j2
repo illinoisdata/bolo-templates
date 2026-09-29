@@ -1,33 +1,33 @@
 {% set repo_id = repo_id | default("kaiyuy/leandojo-lean4-retriever-byt5-small") %}
 {% set device = device | default("cuda:0") %}
-{% set texts = texts | default(['Example sentence to embed.', 'Another example.']) %}
-repo_id = '{{ repo_id }}'
-device = '{{ device }}'
-texts = {{ texts }}
+{% set input_text = input_text | default('theorem') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = {{ input_text | tojson }}
 
-import os
-import numpy as np
 import torch
-from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, T5EncoderModel
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = T5EncoderModel.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
 model.eval()
 
-encoded = tokenizer(texts, return_tensors='pt', padding=True, truncation=True)
-encoded = {k: v.to(device) for k, v in encoded.items()}
-
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    encoder_outputs = model.encoder(**encoded)
-    last_hidden_state = encoder_outputs.last_hidden_state
+    outputs = model(**inputs)
 
-attention_mask = encoded.get('attention_mask', None)
-if attention_mask is not None:
-    mask = attention_mask.unsqueeze(-1)
-    sum_embeddings = (last_hidden_state * mask).sum(1)
-    embeddings = sum_embeddings / mask.sum(1)
-else:
-    embeddings = last_hidden_state.mean(1)
-embeddings = embeddings.cpu().numpy()
-
-RESULT = {'embeddings': embeddings}
+sequence_embedding = outputs.last_hidden_state.mean(dim=1).detach().cpu()
+RESULT = {"sequence_embedding": sequence_embedding}

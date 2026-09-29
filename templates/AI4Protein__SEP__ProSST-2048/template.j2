@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("AI4Protein/ProSST-2048") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+masked_prompt = "{{ masked_prompt }}"
+
+import sys, types
+from typing import Any
+_mod = types.ModuleType("transformers.audio_utils")
+_mod.AudioInput = Any
+_mod.load_audio = lambda audio, *args, **kwargs: audio
+_mod.make_list_of_audio = lambda audio, *args, **kwargs: [audio]
+sys.modules["transformers.audio_utils"] = _mod
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device, trust_remote_code=True)
+_original_forward = pipe._forward
+
+def _forward_with_ss(self, model_inputs, **forward_params):
+    model_inputs = dict(model_inputs)
+    if "ss_input_ids" not in model_inputs and "input_ids" in model_inputs:
+        model_inputs["ss_input_ids"] = model_inputs["input_ids"]
+    return _original_forward(model_inputs, **forward_params)
+
+pipe._forward = types.MethodType(_forward_with_ss, pipe)
+
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

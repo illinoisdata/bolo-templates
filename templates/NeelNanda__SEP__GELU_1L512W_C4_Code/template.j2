@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("NeelNanda/GELU_1L512W_C4_Code") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('def add(a, b):\n    return a + b\n\nprint(add(2, 3))') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = """{{ text }}"""
+
+import torch
+import torch.nn as nn
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="checkpoints/tokens_021120417792.pth")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+class TinyTransformer(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.embed = nn.Embedding(48262, 512)
+        self.unembed = nn.Linear(512, 48262, bias=False)
+        self.ln = nn.LayerNorm(512, eps=1e-5)
+        self.mlp = nn.Sequential(
+            nn.Linear(512, 2048),
+            nn.GELU(),
+            nn.Linear(2048, 512),
+        )
+
+    def forward(self, tokens):
+        x = self.embed(tokens)
+        x = self.ln(x)
+        x = x + self.mlp(x)
+        return self.unembed(x)
+
+model = TinyTransformer().to(device)
+model.eval()
+
+state_dict = torch.load(weights_path, map_location="cpu", weights_only=False)
+if isinstance(state_dict, dict) and "state_dict" in state_dict:
+    state_dict = state_dict["state_dict"]
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+
+with torch.no_grad():
+    token_ids = torch.tensor([[ord(c) % 48262 for c in text[:32]]], device=device, dtype=torch.long)
+    logits = model(token_ids)
+    output_value = logits.detach().cpu().numpy()
+
+RESULT = {"output": output_value}

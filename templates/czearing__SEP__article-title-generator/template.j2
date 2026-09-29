@@ -1,27 +1,38 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("czearing/article-title-generator") %}
-{% set article_text = article_text | default("Summarize the latest sustainable energy article for urban planners.") %}
-{% set prefix = prefix | default("write an article title for: ") %}
-{% set max_length = max_length | default(40) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('A new study reveals surprising insights into the effects of intermittent fasting on brain health and cognitive performance.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-article_text = """{{ article_text }}"""
-prefix = "{{ prefix }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text = "{{ text }}"
 
-import os
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+# Load tokenizer and model
+_tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
 model.eval()
 
-prompt = prefix + article_text
-inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512).to(device)
+prefix = "generate article title: "
+inputs = _tokenizer(prefix + text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
 with torch.no_grad():
-    generated_ids = model.generate(**inputs, max_length=max_length, num_beams=num_beams, early_stopping=True)
-title = tokenizer.decode(generated_ids[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
+    generated_ids = model.generate(
+        **inputs,
+        max_length=32,
+        num_beams=4,
+        early_stopping=True,
+    )
+
+title = _tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
 RESULT = {"title": title}

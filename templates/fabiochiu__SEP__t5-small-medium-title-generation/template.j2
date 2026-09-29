@@ -1,34 +1,38 @@
 {% set repo_id = repo_id | default("fabiochiu/t5-small-medium-title-generation") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("Many financial institutions started building conversational AI, prior to the Covid19 pandemic, as part of a digital transformation initiative.") %}
+{% set input_text = input_text | default("Many financial institutions started building conversational AI, prior to the Covid19 pandemic, as part of a digital transformation initiative. These initial solutions were high profile, highly personalized virtual assistants — like the Erica chatbot from Bank of America. As the pandemic hit, the need changed as contact centers were under increased pressures. As Cathal McGloin of ServisBOT explains in 'how it started, and how it is going', financial institutions were looking for ways to automate solutions to help get back to 'normal' levels of customer service. This resulted in a change from the 'future of conversational AI' to a real tactical assistant that can help in customer service. Haritha Dev of Wells Fargo, saw a similar trend. Banks were originally looking to conversational AI as part of digital transformation to keep up with the times. However, with the pandemic, it has been more about customer retention and customer satisfaction. In addition, new use cases came about as a result of Covid-19 that accelerated adoption of conversational AI. As Vinita Kumar of Deloitte points out, banks were dealing with an influx of calls about new concerns, like questions around the Paycheck Protection Program (PPP) loans. This resulted in an increase in volume, without enough agents to assist customers, and tipped the scale to incorporate conversational AI. When choosing initial use cases to support, financial institutions often start with high volume, low complexity tasks. For example, password resets, checking account balances, or checking the status of a transaction, as Vinita points out. From there, the use cases can evolve as the banks get more mature in developing conversational AI, and as the customers become more engaged with the solutions. Cathal indicates another good way for banks to start is looking at use cases that are a pain point, and also do not require a lot of IT support. Some financial institutions may have a multi-year technology roadmap, which can make it harder to get a new service started. A simple chatbot for document collection in an onboarding process can result in high engagement, and a high return on investment. For example, Cathal has a banking customer that implemented a chatbot to capture a driver’s license to be used in the verification process of adding an additional user to an account — it has over 85% engagement with high satisfaction. An interesting use case Haritha discovered involved educating customers on financial matters. People feel more comfortable asking a chatbot what might be considered a 'dumb' question, as the chatbot is less judgmental. Users can be more ambiguous with their questions as well, not knowing the right words to use, as chatbot can help narrow things down.") %}
 {% set max_input_length = max_input_length | default(512) %}
-{% set num_beams = num_beams | default(8) %}
-{% set do_sample = do_sample | default(True) %}
-{% set min_length = min_length | default(10) %}
-{% set max_length = max_length | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 max_input_length = {{ max_input_length }}
-num_beams = {{ num_beams }}
-do_sample = {{ do_sample }}
-min_length = {{ min_length }}
-max_length = {{ max_length }}
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import torch
 import os
+from urllib.parse import urlparse
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-prefix = model.config.task_specific_params.get("summarization", {}).get("prefix", "")
-input_str = prefix + input_text
-inputs = tokenizer([input_str], max_length=max_input_length, truncation=True, return_tensors="pt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+model_dir = os.path.dirname(weights_path)
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(["summarize: " + input_text], max_length=max_input_length, truncation=True, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    output_ids = model.generate(**inputs, num_beams=8, do_sample=True, min_length=10, max_length=64)
 
-output_ids = model.generate(**inputs, num_beams=num_beams, do_sample=do_sample, min_length=min_length, max_length=max_length)
-decoded_output = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
-predicted_title = decoded_output.strip().split(".")[0]
+decoded_output = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
+output_title = decoded_output.split(".")[0].strip()
 
-RESULT = {"predicted_title": predicted_title}
+RESULT = {"title": output_title, "decoded_output": decoded_output}

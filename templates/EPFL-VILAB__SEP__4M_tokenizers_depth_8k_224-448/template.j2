@@ -1,0 +1,32 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("EPFL-VILAB/4M_tokenizers_depth_8k_224-448") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import json
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("L")
+else:
+    image = Image.open(image_path).convert("L")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+state = torch.load(weights_path, map_location="cpu") if weights_path.endswith(".bin") else None
+image_arr = torch.tensor(list(image.getdata()), dtype=torch.float32).view(1, 1, image.size[1], image.size[0]) / 255.0
+image_arr = image_arr.to(device)
+output = {"image_size": list(image.size), "config_image_size": config.get("image_size"), "mean_pixel_value": float(image_arr.mean().item())}
+
+RESULT = {"output": output}

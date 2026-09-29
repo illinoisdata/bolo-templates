@@ -1,0 +1,42 @@
+{% set repo_id = repo_id | default("AutonLab/MOMENT-1-large") %}
+{% set device = device | default("cuda:0") %}
+{% set task_name = task_name | default('reconstruction') %}
+{% set input_path = input_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task_name = "{{ task_name }}"
+input_path = "{{ input_path }}"
+
+import numpy as np
+import torch
+from scipy.io import wavfile
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+if input_path.startswith("http://") or input_path.startswith("https://"):
+    raise ValueError("URL inputs are not supported for this template")
+
+sr, audio = wavfile.read(input_path)
+if audio.ndim > 1:
+    audio = audio.mean(axis=1)
+audio = audio.astype(np.float32)
+if np.issubdtype(audio.dtype, np.integer):
+    audio = audio / max(1.0, float(np.iinfo(audio.dtype).max))
+
+seq_len = 512
+if audio.shape[0] < seq_len:
+    audio = np.pad(audio, (0, seq_len - audio.shape[0]))
+else:
+    audio = audio[:seq_len]
+
+series = torch.tensor(audio, dtype=torch.float32, device=device).view(1, 1, -1)
+output_value = {
+    "task_name": task_name,
+    "series_shape": tuple(series.shape),
+    "mean": float(series.mean().item()),
+    "std": float(series.std().item()),
+}
+
+RESULT = {"output": output_value}

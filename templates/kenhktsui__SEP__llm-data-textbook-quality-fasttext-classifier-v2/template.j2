@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("kenhktsui/llm-data-textbook-quality-fasttext-classifier-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Logic is the study of correct reasoning. It includes formal and informal logic.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+from huggingface_hub import hf_hub_download
+import fasttext
+import re
+
+weights_path = hf_hub_download(repo_id, "model_quantized.bin")
+model = fasttext.load_model(weights_path)
+
+clean_text = re.sub("\\n+", " ", text)
+pred_labels, pred_probs = model.predict([clean_text], k=-1)
+score_dict = {"__label__": 0, "__label__Low": 0, "__label__Mid": 1, "__label__High": 2}
+score = 0.0
+for label, prob in zip(pred_labels[0], pred_probs[0]):
+    score += score_dict.get(label, 0) * prob
+
+RESULT = {"score": float(score), "labels": pred_labels[0], "probabilities": [float(p) for p in pred_probs[0]]}

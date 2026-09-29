@@ -1,23 +1,38 @@
 {% set repo_id = repo_id | default("prajjwal1/bert-mini") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("The quick brown fox jumps over the lazy dog.") %}
+{% set text = text | default('The quick brown fox jumps over the lazy dog.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
 import os
 import torch
-from transformers import BertModel, BertTokenizer
+from transformers import BertTokenizer, BertForMaskedLM, BertConfig
+from huggingface_hub import hf_hub_download
 
-tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-model = BertModel.from_pretrained(repo_id).to(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+tokenizer = BertTokenizer(vocab_file=vocab_path)
+config = BertConfig.from_json_file(config_path)
+model = BertForMaskedLM(config)
+state_dict = torch.load(model_path, map_location="cpu")
+state_dict = {k: v for k, v in state_dict.items() if not k.startswith("bert.pooler.") and not k.startswith("cls.seq_relationship.") and k != "bert.embeddings.position_ids"}
+model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
 model.eval()
 
-inputs = tokenizer(text, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
-
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
     outputs = model(**inputs)
+    logits = outputs.logits
+    token_id = int(torch.argmax(logits[0, -1], dim=-1).item())
+    token = tokenizer.convert_ids_to_tokens([token_id])[0]
 
-last_hidden_state = outputs.last_hidden_state.detach().cpu()
-RESULT = {"last_hidden_state": last_hidden_state}
+RESULT = {
+    "logits_shape": list(logits.shape),
+    "token_id": token_id,
+    "token": token,
+}

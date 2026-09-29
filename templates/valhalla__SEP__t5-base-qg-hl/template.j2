@@ -1,36 +1,42 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("valhalla/t5-base-qg-hl") %}
-{% set input_text = input_text | default("<hl> 42 <hl> is the answer to life, the universe and everything. </s>") %}
-{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set device = device | default("cuda:0") %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
 {% set num_beams = num_beams | default(4) %}
+{% set input_text = input_text | default('<hl> 42 <hl> is the answer to life, the universe and everything. </s>') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
 max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
+input_text = {{ input_text | tojson }}
 
-from pathlib import Path
-
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-tokenized_inputs = tokenizer(
-    input_text,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-)
-inputs = {k: v.to(device) for k, v in tokenized_inputs.items()}
+# Load tokenizer/model from the repo snapshot directory obtained via hf_hub_download.
+repo_dir = tokenizer_config_path.rsplit("/", 1)[0]
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_dir, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-generated_tokens = model.generate(
-    **inputs,
-    max_new_tokens=max_new_tokens,
-    num_beams=num_beams,
-)
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_questions = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+    )
 
-RESULT = {"generated_questions": generated_questions}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

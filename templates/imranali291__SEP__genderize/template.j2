@@ -1,0 +1,52 @@
+{% set repo_id = repo_id | default("imranali291/genderize") %}
+{% set device = device | default("cuda:0") %}
+{% set name = name | default('Alex') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+name = "{{ name }}"
+
+import os
+import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+tokenizer_dir = os.path.dirname(tokenizer_json_path)
+
+if device.startswith("cuda") and not torch.cuda.is_available():
+    device = "cpu"
+
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir, use_fast=True)
+model = AutoModelForSequenceClassification.from_pretrained(
+    repo_id,
+    local_files_only=True,
+    torch_dtype=torch.float32,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(name, return_tensors="pt", padding=True, truncation=True, max_length=32)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    pred_id = int(torch.argmax(logits, dim=-1).item())
+
+id2label = model.config.id2label if getattr(model.config, "id2label", None) else {0: "LABEL_0", 1: "LABEL_1"}
+pred_label = id2label.get(pred_id, str(pred_id))
+probabilities = torch.softmax(logits, dim=-1).detach().cpu().tolist()[0]
+
+RESULT = {
+    "name": name,
+    "predicted_class_id": pred_id,
+    "predicted_label": pred_label,
+    "probabilities": probabilities,
+}

@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("microsoft/deberta-v3-large") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set model = model | default(repo_id) %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("deepset/deberta-v3-large-squad2") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What is the model trained for?') %}
+{% set context = context | default('This model is fine-tuned using the SQuAD 2.0 dataset for extractive question answering.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = {{ question | tojson }}
+context = {{ context | tojson }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoModelForQuestionAnswering, AutoTokenizer
+
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+_ = hf_hub_download(repo_id=repo_id, filename="spm.model")
+
+model = AutoModelForQuestionAnswering.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits[0]
+end_logits = outputs.end_logits[0]
+start_idx = int(torch.argmax(start_logits).item())
+end_idx = int(torch.argmax(end_logits).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+
+input_ids = inputs["input_ids"][0]
+answer = tokenizer.decode(input_ids[start_idx:end_idx+1], skip_special_tokens=True)
+score = float((start_logits[start_idx] + end_logits[end_idx]).item())
+
+RESULT = {"answer": answer, "score": score, "start_index": start_idx, "end_index": end_idx}

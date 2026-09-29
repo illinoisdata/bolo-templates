@@ -1,71 +1,52 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("microsoft/unispeech-large-1500h-cv") %}
-{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
-{% set target_sample_rate = target_sample_rate | default(16000) %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
-target_sample_rate = {{ target_sample_rate }}
 
-import io
-from pathlib import Path
-
-import requests
-import soundfile as sf
+import os
+import numpy as np
 import torch
-import torchaudio.functional as F
-from transformers import AutoFeatureExtractor, AutoModelForPreTraining
+import soundfile as sf
+import requests
+from transformers import AutoConfig, AutoFeatureExtractor, AutoModelForPreTraining
+from huggingface_hub import hf_hub_download
 
-feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+feature_extractor_file = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+config_dir = os.path.dirname(config_file)
+model_dir = os.path.dirname(model_file)
+fe_dir = os.path.dirname(feature_extractor_file)
+
+config = AutoConfig.from_pretrained(config_dir)
+feature_extractor = AutoFeatureExtractor.from_pretrained(fe_dir)
+model = AutoModelForPreTraining.from_pretrained(model_dir, config=config)
+model.to(device)
 model.eval()
 
-def _is_url(source: str) -> bool:
-    lowered = str(source).lower()
-    return lowered.startswith("http://") or lowered.startswith("https://")
+if str(audio_path).startswith(("http://", "https://")):
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    import io
+    speech, sampling_rate = sf.read(io.BytesIO(audio_bytes))
+else:
+    speech, sampling_rate = sf.read(audio_path)
 
-def _load_audio(source: str):
-    if _is_url(source):
-        response = requests.get(source)
-        response.raise_for_status()
-        file_like = io.BytesIO(response.content)
-        waveform, sampling_rate = sf.read(file_like, dtype="float32")
-    else:
-        waveform, sampling_rate = sf.read(source, dtype="float32")
-    if waveform.ndim > 1:
-        waveform = waveform.mean(axis=1)
-    return waveform, sampling_rate
+if speech.ndim > 1:
+    speech = np.mean(speech, axis=1)
+if sampling_rate != 16000:
+    import librosa
+    speech = librosa.resample(speech.astype(np.float32), orig_sr=sampling_rate, target_sr=16000)
+    sampling_rate = 16000
 
-def _resample_audio(waveform, current_rate):
-    if current_rate == target_sample_rate:
-        return waveform
-    tensor_waveform = torch.from_numpy(waveform)
-    resampled_waveform = F.resample(tensor_waveform, current_rate, target_sample_rate)
-    return resampled_waveform.numpy()
-
-waveform, sampling_rate = _load_audio(audio_path)
-waveform = _resample_audio(waveform, sampling_rate)
-sampling_rate = target_sample_rate
-
-inputs = feature_extractor(
-    waveform,
-    sampling_rate=sampling_rate,
-    return_tensors="pt"
-)
-inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs = feature_extractor(speech, sampling_rate=sampling_rate, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
     outputs = model(**inputs)
 
-def _move_to_cpu(obj):
-    if isinstance(obj, torch.Tensor):
-        return obj.detach().cpu()
-    if isinstance(obj, dict):
-        return {key: _move_to_cpu(value) for key, value in obj.items()}
-    if isinstance(obj, list):
-        return [_move_to_cpu(value) for value in obj]
-    if isinstance(obj, tuple):
-        return tuple(_move_to_cpu(value) for value in obj)
-    return obj
-
-RESULT = {key: _move_to_cpu(value) for key, value in outputs.items()}
+RESULT = {
+    "output": outputs
+}

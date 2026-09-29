@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("yiyanghkust/finbert-tone") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set input_prompt = input_prompt | default(["there is a shortage of capital, and we need extra financing", "growth is strong and we have plenty of liquidity", "there are doubts about our finances", "profits are flat"]) %}
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import BertTokenizer, BertForSequenceClassification, pipeline
+
+tokenizer = BertTokenizer.from_pretrained(repo_id)
+model = BertForSequenceClassification.from_pretrained(repo_id)
+model.to(device)
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt)

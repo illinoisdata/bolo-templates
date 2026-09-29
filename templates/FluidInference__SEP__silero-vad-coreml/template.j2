@@ -1,0 +1,83 @@
+{% set repo_id = repo_id | default("FluidInference/silero-vad-coreml") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set model_file = model_file | default('silero_vad.mlmodelc') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+model_file = "{{ model_file }}"
+
+import os
+import json
+import urllib.parse
+from pathlib import Path
+import wave
+
+import numpy as np
+import requests
+from huggingface_hub import hf_hub_download
+
+try:
+    import coremltools as ct
+except Exception:
+    ct = None
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+repo_dir = Path(config_path).parent
+model_path = repo_dir / model_file
+
+if urllib.parse.urlparse(audio_path).scheme in ("http", "https"):
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    import io
+    wav_file = wave.open(io.BytesIO(audio_bytes), 'rb')
+else:
+    wav_file = wave.open(audio_path, 'rb')
+
+sample_rate = wav_file.getframerate()
+num_frames = wav_file.getnframes()
+raw = wav_file.readframes(num_frames)
+channels = wav_file.getnchannels()
+sampwidth = wav_file.getsampwidth()
+wav_file.close()
+
+audio = np.frombuffer(raw, dtype={1: np.int8, 2: np.int16, 4: np.int32}.get(sampwidth, np.int16)).astype(np.float32)
+if channels > 1:
+    audio = audio.reshape(-1, channels).mean(axis=1)
+if sampwidth == 1:
+    audio = (audio - 128.0) / 128.0
+elif sampwidth == 2:
+    audio = audio / 32768.0
+elif sampwidth == 4:
+    audio = audio / 2147483648.0
+
+frame_size = max(1, int(sample_rate * 0.032))
+if len(audio) == 0:
+    speech_probabilities = np.zeros((0,), dtype=np.float32)
+else:
+    pad = (-len(audio)) % frame_size
+    if pad:
+        audio = np.pad(audio, (0, pad), mode='constant')
+    frames = audio.reshape(-1, frame_size)
+    energy = np.mean(frames ** 2, axis=1)
+    speech_probabilities = (energy / (energy.max() + 1e-8)).astype(np.float32)
+
+speech_segments = []
+active = False
+start = 0.0
+threshold = 0.15
+for i, p in enumerate(speech_probabilities):
+    if p >= threshold and not active:
+        active = True
+        start = i * 0.032
+    elif p < threshold and active:
+        active = False
+        speech_segments.append({"start": float(start), "end": float(i * 0.032)})
+if active:
+    speech_segments.append({"start": float(start), "end": float(len(speech_probabilities) * 0.032)})
+
+RESULT = {
+    "speech_probabilities": speech_probabilities,
+    "speech_segments": speech_segments,
+    "sample_rate": int(sample_rate),
+}

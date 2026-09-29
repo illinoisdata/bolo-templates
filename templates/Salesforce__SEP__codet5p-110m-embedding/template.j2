@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("Salesforce/codet5p-110m-embedding") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('def print_hello_world():\tprint(\'Hello World!\')') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoConfig, AutoModel
+from huggingface_hub import hf_hub_download
+
+modeling_file = hf_hub_download(repo_id=repo_id, filename="modeling_codet5p_embedding.py")
+configuration_file = hf_hub_download(repo_id=repo_id, filename="configuration_codet5p_embedding.py")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+config = AutoConfig.from_pretrained(repo_id, trust_remote_code=True)
+config.is_decoder = False
+config.use_cache = False
+config.is_encoder_decoder = False
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True)
+model = AutoModel.from_pretrained(repo_id, config=config, trust_remote_code=True).to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt").to(device)
+with torch.no_grad():
+    outputs = model(**inputs)
+    embedding = outputs[0]
+
+RESULT = {"embedding": embedding.squeeze(0).detach().cpu().tolist(), "norm": float(embedding.norm().detach().cpu().item())}

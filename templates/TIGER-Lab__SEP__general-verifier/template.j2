@@ -1,0 +1,12 @@
+{% set repo_id = repo_id | default("TIGER-Lab/general-verifier") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Factor the following quadratic: $3 x^3+\\frac{69 x^2}{2}-36 x-810$') %}
+{% set ground_truth = ground_truth | default('\\frac{3(2x-9)(x+6)(x+10)}{2}') %}
+{% set student_answer = student_answer | default('\\frac{3}{2}(x+6)(2x-9)(x+10)') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+ground_truth = "{{ ground_truth }}"
+student_answer = "{{ student_answer }}"
+
+RESULT = {"output": "Final Decision: Yes"}

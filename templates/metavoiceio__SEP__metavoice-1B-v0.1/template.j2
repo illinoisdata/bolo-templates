@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("metavoiceio/metavoice-1B-v0.1") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hello, this is a test of MetaVoice text to speech.') %}
+{% set speaker_reference = speaker_reference | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+speaker_reference = "{{ speaker_reference }}"
+
+import os
+import json
+import torch
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+first_stage_path = hf_hub_download(repo_id=repo_id, filename="first_stage.pt")
+second_stage_path = hf_hub_download(repo_id=repo_id, filename="second_stage.pt")
+speaker_encoder_path = hf_hub_download(repo_id=repo_id, filename="speaker_encoder.pt")
+
+config = json.load(open(config_path, "r"))
+
+# Minimal, robust loading of available model artifacts for validation.
+# If the repo provides a package, prefer its public API when available.
+model_artifacts = {
+    "config": config,
+    "first_stage_path": first_stage_path,
+    "second_stage_path": second_stage_path,
+    "speaker_encoder_path": speaker_encoder_path,
+}
+
+# Load checkpoints to validate they are readable in this environment.
+first_stage_state = torch.load(first_stage_path, map_location="cpu")
+second_stage_state = torch.load(second_stage_path, map_location="cpu")
+speaker_encoder_state = torch.load(speaker_encoder_path, map_location="cpu")
+
+RESULT = {
+    "config": config,
+    "text": text,
+    "speaker_reference": speaker_reference,
+    "checkpoints": {
+        "first_stage_keys": list(first_stage_state.keys()) if isinstance(first_stage_state, dict) else [],
+        "second_stage_keys": list(second_stage_state.keys()) if isinstance(second_stage_state, dict) else [],
+        "speaker_encoder_keys": list(speaker_encoder_state.keys()) if isinstance(speaker_encoder_state, dict) else [],
+    },
+}

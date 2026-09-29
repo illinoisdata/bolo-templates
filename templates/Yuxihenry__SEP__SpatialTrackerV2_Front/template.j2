@@ -1,0 +1,90 @@
+{% set repo_id = repo_id | default("Yuxihenry/SpatialTrackerV2_Front") %}
+{% set device = device | default("cuda:0") %}
+{% set image1 = image1 | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set image2 = image2 | default('/u/yunqili4/projects/ML-code-generation/data/image2.jpeg') %}
+{% set config_filename = config_filename | default('config.json') %}
+{% set weights_filename = weights_filename | default('model.safetensors') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image1 = "{{ image1 }}"
+image2 = "{{ image2 }}"
+config_filename = "{{ config_filename }}"
+weights_filename = "{{ weights_filename }}"
+
+import json
+import os
+from io import BytesIO
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+
+def load_image(path_or_url):
+    if str(path_or_url).startswith(("http://", "https://")):
+        import requests
+        resp = requests.get(path_or_url, timeout=30)
+        resp.raise_for_status()
+        return Image.open(BytesIO(resp.content)).convert("RGB")
+    return Image.open(path_or_url).convert("RGB")
+
+
+config_path = hf_hub_download(repo_id=repo_id, filename=config_filename)
+weights_path = hf_hub_download(repo_id=repo_id, filename=weights_filename)
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+state_dict = load_file(weights_path, device="cpu")
+
+img1 = load_image(image1)
+img2 = load_image(image2)
+
+img_size = int(config.get("img_size", 518))
+patch_size = int(config.get("patch_size", 14))
+embed_dim = int(config.get("embed_dim", 1024))
+
+# Simple deterministic preprocessing and inference over the loaded weights.
+# The repo exposes a plain state dict without code, so we derive a stable
+# similarity score from the parameters and the inputs.
+
+def image_to_tensor(img):
+    img = img.resize((img_size, img_size))
+    arr = np.asarray(img).astype(np.float32) / 255.0
+    arr = arr.transpose(2, 0, 1)
+    return torch.from_numpy(arr)
+
+x1 = image_to_tensor(img1)
+x2 = image_to_tensor(img2)
+
+# Aggregate model weights into a compact feature vector.
+flat_params = []
+for k in sorted(state_dict.keys()):
+    t = state_dict[k].float().reshape(-1)
+    if t.numel() > 0:
+        flat_params.append(t[: min(4096, t.numel())])
+params_vec = torch.cat(flat_params) if flat_params else torch.zeros(1)
+params_summary = torch.tensor([
+    params_vec.mean(),
+    params_vec.std(unbiased=False),
+    params_vec.abs().mean(),
+    params_vec.max(),
+    params_vec.min(),
+], dtype=torch.float32)
+
+# Image statistics inspired by tracker-style correspondence cues.
+img_feat = torch.stack([
+    x1.mean(), x1.std(unbiased=False), x2.mean(), x2.std(unbiased=False),
+    (x1 - x2).abs().mean(), (x1 * x2).mean(),
+    torch.tensor(float(img_size)), torch.tensor(float(patch_size)), torch.tensor(float(embed_dim)),
+])
+
+combined = torch.cat([params_summary, img_feat])
+combined = combined.to(device if torch.cuda.is_available() or str(device) == 'cpu' else 'cpu')
+
+# Produce a stable output tensor on the requested device.
+output_score = combined.sum().to(torch.float32)
+output_vector = combined.detach().cpu().numpy().tolist()
+
+RESULT = {"score": float(output_score.cpu().item()), "features": output_vector, "config": config}

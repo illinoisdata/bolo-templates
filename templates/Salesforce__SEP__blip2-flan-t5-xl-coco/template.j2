@@ -1,7 +1,56 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Salesforce/blip2-flan-t5-xl-coco") %}
-from transformers.models.blip_2 import modeling_blip_2
-import inspect
-from textwrap import shorten
-inspector = inspect.getsource(modeling_blip_2.Blip2ForConditionalGeneration.generate)
-print(inspector)
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set prompt = prompt | default('Question: what is in the image? Answer:') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+
+import os
+from io import BytesIO
+from PIL import Image
+import torch
+from transformers import Blip2Processor, Blip2ForConditionalGeneration
+from huggingface_hub import hf_hub_download
+from requests import get
+
+processor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+processor = Blip2Processor.from_pretrained(os.path.dirname(processor_config_path))
+model = Blip2ForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float16 if str(device).startswith('cuda') else torch.float32)
+model = model.to(device)
+model.eval()
+
+if str(image_path).startswith('http://') or str(image_path).startswith('https://'):
+    image = Image.open(BytesIO(get(image_path).content)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+inputs = processor(images=image, text=prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+if 'input_ids' in inputs:
+    inputs['input_ids'] = inputs['input_ids'].long()
+vision_outputs = model.vision_model(pixel_values=inputs['pixel_values'])
+image_embeds = vision_outputs[0].to(model.language_projection.weight.dtype)
+image_attention_mask = torch.ones(image_embeds.size()[:-1], dtype=torch.long, device=device)
+query_tokens = model.query_tokens.expand(image_embeds.shape[0], -1, -1)
+qformer_outputs = model.qformer(
+    query_embeds=query_tokens,
+    encoder_hidden_states=image_embeds,
+    encoder_attention_mask=image_attention_mask,
+    return_dict=True,
+)
+query_output = qformer_outputs.last_hidden_state.to(model.language_projection.weight.dtype)
+language_model_inputs = model.language_projection(query_output)
+prompt_ids = inputs['input_ids']
+text_embeds = model.language_model.get_input_embeddings()(prompt_ids)
+inputs_embeds = torch.cat([language_model_inputs, text_embeds], dim=1)
+attention_mask = torch.cat([
+    torch.ones(language_model_inputs.size()[:-1], dtype=torch.long, device=device),
+    inputs['attention_mask'],
+], dim=1)
+outputs = model.language_model.generate(inputs_embeds=inputs_embeds, attention_mask=attention_mask, max_new_tokens=30)
+output_text = processor.batch_decode(outputs, skip_special_tokens=True)[0]
+RESULT = {"text": output_text}

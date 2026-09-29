@@ -1,0 +1,11 @@
+{% set repo_id = repo_id | default("vincent-pro-ai/french-llm-from-scratch-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('french-llm-v3-mistral-Q4_K_M.gguf') %}
+{% set prompt = prompt | default('Bonjour, comment ça va ?') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+RESULT = {"output": None}

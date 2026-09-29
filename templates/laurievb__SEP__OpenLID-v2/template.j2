@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("laurievb/OpenLID-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('Hello, world!') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+
+import os
+import re
+import numpy as np
+import fasttext
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.bin")
+model = fasttext.load_model(model_path)
+
+# Normalize text similarly to openlid_normer.clean_line from the model card.
+text = input_text.strip()
+text = re.sub(r"\s+", " ", text)
+
+labels, scores = model.predict(text, k=5)
+RESULT = {"labels": list(labels), "scores": scores.tolist()}

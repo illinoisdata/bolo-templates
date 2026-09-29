@@ -1,0 +1,24 @@
+{% set repo_id = repo_id | default("Qwen/Qwen3-4B-Thinking-2507-FP8") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import AutoConfig, pipeline
+from transformers.integrations.finegrained_fp8 import FP8Experts
+
+config = AutoConfig.from_pretrained(model)
+if hasattr(config, "quantization_config"):
+    config.quantization_config = None
+if hasattr(config, "get_text_config"):
+    text_config = config.get_text_config(decoder=True)
+    if hasattr(text_config, "quantization_config"):
+        text_config.quantization_config = None
+FP8Experts._impl_tp_layer_overrides.setdefault(None, {})
+
+pipe = pipeline(task=task, model=model, config=config, device=device)
+RESULT = pipe(input_prompt)

@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("PaddlePaddle/PP-DocLayoutV2") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+{% set layout_nms = layout_nms | default(true) %}
+{% set model_name = model_name | default('PP-DocLayoutV2') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+layout_nms = {{ layout_nms }}
+model_name = "{{ model_name }}"
+
+import numpy as np
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from paddleocr import LayoutDetection
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="inference.pdiparams")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="inference.yml")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    image = np.array(Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB"))
+else:
+    image = np.array(Image.open(image_path).convert("RGB"))
+
+model = LayoutDetection(model_name=model_name)
+output = model.predict(image, batch_size=1, layout_nms=layout_nms)
+results = []
+for res in output:
+    if hasattr(res, "to_dict"):
+        results.append(res.to_dict())
+    else:
+        results.append(str(res))
+
+RESULT = {"output": results}

@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("rungalileo/xlm-roberta-base-misogyny-sexism-tweets-quantized-traced") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+{% set model_file = model_file | default("model.pth") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+model_file = {{ model_file | tojson }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoConfig, AutoModelForSequenceClassification, AutoTokenizer, pipeline
+
+config = AutoConfig.from_pretrained(repo_id)
+model = AutoModelForSequenceClassification.from_config(config)
+weights_path = hf_hub_download(repo_id=repo_id, filename=model_file)
+raw_weights = torch.load(weights_path, map_location="cpu", weights_only=False)
+state_dict = raw_weights
+if isinstance(raw_weights, torch.nn.Module):
+    state_dict = raw_weights.state_dict()
+elif isinstance(raw_weights, dict):
+    for key in ("model_state_dict", "state_dict", "module", "model"):
+        candidate = raw_weights.get(key)
+        if isinstance(candidate, dict):
+            state_dict = candidate
+            break
+model.load_state_dict(state_dict, strict=False)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt)

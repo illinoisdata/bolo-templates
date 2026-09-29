@@ -1,26 +1,37 @@
-{% set question = question | default("What is 42?") %}
-{% set context = context | default("42 is the answer to life, the universe and everything") %}
 {% set repo_id = repo_id | default("MaRiOrOsSi/t5-base-finetuned-question-answering") %}
 {% set device = device | default("cuda:0") %}
-question = "{{ question }}"
-context = "{{ context }}"
+{% set question = question | default('What is 42?') %}
+{% set context = context | default('42 is the answer to life, the universe and everything') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
 
-import os
-from pathlib import Path
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
+
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
 input_text = f"question: {question} context: {context}"
-inputs = tokenizer(input_text, return_tensors="pt", truncation=True, max_length=512)
-input_ids = inputs.input_ids.to(device)
-attention_mask = inputs.attention_mask.to(device)
+encoded_input = tokenizer(
+    input_text,
+    return_tensors="pt",
+    max_length=512,
+    truncation=True,
+)
+encoded_input = {k: v.to(device) for k, v in encoded_input.items()}
 
-outputs = model.generate(input_ids=input_ids, attention_mask=attention_mask)
-answer = tokenizer.decode(outputs[0], skip_special_tokens=True)
+with torch.no_grad():
+    output_ids = model.generate(
+        input_ids=encoded_input["input_ids"],
+        attention_mask=encoded_input["attention_mask"],
+        max_new_tokens=32,
+    )
 
-RESULT = {"answer": answer}
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"output": output_text}

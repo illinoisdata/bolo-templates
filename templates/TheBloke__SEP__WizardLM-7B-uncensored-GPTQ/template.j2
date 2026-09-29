@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("TheBloke/WizardLM-7B-uncensored-GPTQ") %}
+{% set task = task | default("text-generation") %}
+{% set model = model | default(repo_id) %}
+{% set device = device | default("cuda:0") %}
+{% set input_prompt = input_prompt | default("Please provide a brief introduction to the capabilities of this assistant.") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.95) %}
+{% set top_k = top_k | default(40) %}
+{% set repetition_penalty = repetition_penalty | default(1.1) %}
+
+# Python assignment section
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens | tojson }}
+temperature = {{ temperature | tojson }}
+top_p = {{ top_p | tojson }}
+top_k = {{ top_k | tojson }}
+repetition_penalty = {{ repetition_penalty | tojson }}
+
+from transformers import pipeline
+
+pipeline_kwargs = {
+    "task": task,
+    "model": model,
+    "max_new_tokens": max_new_tokens,
+    "temperature": temperature,
+    "top_p": top_p,
+    "top_k": top_k,
+    "repetition_penalty": repetition_penalty,
+}
+if device == "cpu":
+    pipeline_kwargs["device"] = device
+
+pipe = pipeline(**pipeline_kwargs)
+RESULT = pipe(input_prompt)

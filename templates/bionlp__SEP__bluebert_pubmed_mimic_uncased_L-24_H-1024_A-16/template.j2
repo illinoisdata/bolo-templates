@@ -1,26 +1,39 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("bionlp/bluebert_pubmed_mimic_uncased_L-24_H-1024_A-16") %}
-{% set text_inputs = text_inputs | default(["The patient has a history of asthma and is currently stable."]) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The patient was admitted for chest pain and shortness of breath.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_inputs = {{ text_inputs | tojson }}
+text = "{{ text }}"
 
-import os
-
-import numpy as np
+import re
 import torch
-from transformers import BertModel, BertTokenizer
+from transformers import BertTokenizer, BertForMaskedLM
+from huggingface_hub import hf_hub_download
 
-# Using the slow BERT tokenizer to avoid fast-tokenizer dependencies
-tokenizer = BertTokenizer.from_pretrained(repo_id)
-model = BertModel.from_pretrained(repo_id).to(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+def preprocess(value):
+    value = value.lower()
+    value = re.sub(r'[\r\n]+', ' ', value)
+    value = re.sub(r'[^\x00-\x7F]+', ' ', value)
+    value = re.sub(r"\s+'s\b", "'s", value)
+    return value
+
+normalized_text = preprocess(text)
+
+tokenizer = BertTokenizer(vocab_file=vocab_path, do_lower_case=True)
+inputs = tokenizer(normalized_text, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+model = BertForMaskedLM.from_pretrained(repo_id)
+state_dict = torch.load(model_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(text_inputs, return_tensors="pt", padding=True, truncation=True)
-encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
-
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
+    outputs = model(**inputs)
+    logits = outputs.logits
 
-last_hidden_state = outputs.last_hidden_state.detach().cpu()
-RESULT = {"last_hidden_state": last_hidden_state}
+RESULT = {"logits": logits}

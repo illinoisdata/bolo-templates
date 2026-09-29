@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("LukeJacob2023/nsfw-image-detector") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set base_model = base_model | default("google/vit-base-patch16-224-in21k") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+# Jinja2 variable assignments
+task = "{{ task }}"
+base_model = "{{ base_model }}"
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+from transformers import pipeline
+
+# Initialize the classification pipeline with explicit image_processor override
+pipe = pipeline(task=task, model=repo_id, image_processor=base_model, device=device)
+# Run inference
+RESULT = pipe(image_path)

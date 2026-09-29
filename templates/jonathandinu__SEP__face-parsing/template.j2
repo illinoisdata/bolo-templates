@@ -1,0 +1,23 @@
+{% set repo_id = repo_id | default("jonathandinu/face-parsing") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-segmentation") %}
+{% set input_image = input_image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_image = {{ input_image | tojson }}
+
+from PIL import Image
+from transformers import SegformerImageProcessor, pipeline
+
+image_processor = SegformerImageProcessor.from_pretrained(repo_id)
+pipe = pipeline(
+    task=task,
+    model=repo_id,
+    image_processor=image_processor,
+    device=device,
+)
+
+image = Image.open(input_image).convert("RGB")
+RESULT = pipe(image)

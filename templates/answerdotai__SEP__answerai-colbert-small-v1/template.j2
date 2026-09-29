@@ -1,0 +1,57 @@
+{% set repo_id = repo_id | default("answerdotai/answerai-colbert-small-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set query_text = query_text | default('Who directed Spirited Away?') %}
+{% set docs = docs | default(['Hayao Miyazaki is a Japanese director, born on January 5, 1941. He directed Spirited Away.', 'Walt Disney was an American animator, film producer, and entrepreneur.']) %}
+{% set k = k | default(2) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query_text = "{{ query_text }}"
+docs = {{ docs | tojson }}
+k = {{ k }}
+
+import os
+import json
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoConfig, AutoModel
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+config = AutoConfig.from_pretrained(os.path.dirname(config_path), local_files_only=True)
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_path), local_files_only=True, use_fast=True)
+model = AutoModel.from_pretrained(os.path.dirname(weights_path), local_files_only=True, trust_remote_code=False)
+model = model.to(device)
+model.eval()
+
+query_inputs = tokenizer([query_text], padding=True, truncation=True, max_length=32, return_tensors="pt")
+doc_inputs = tokenizer(docs, padding=True, truncation=True, max_length=512, return_tensors="pt")
+query_inputs = {k: v.to(device) for k, v in query_inputs.items()}
+doc_inputs = {k: v.to(device) for k, v in doc_inputs.items()}
+
+with torch.no_grad():
+    q_out = model(**query_inputs)
+    d_out = model(**doc_inputs)
+
+q_emb = q_out.last_hidden_state
+# Mean-pool token embeddings excluding padding for a simple vector score.
+q_mask = query_inputs["attention_mask"].unsqueeze(-1).float()
+q_vec = (q_emb * q_mask).sum(dim=1) / q_mask.sum(dim=1).clamp(min=1.0)
+
+d_emb = d_out.last_hidden_state
+d_mask = doc_inputs["attention_mask"].unsqueeze(-1).float()
+d_vecs = (d_emb * d_mask).sum(dim=1) / d_mask.sum(dim=1).clamp(min=1.0)
+
+scores = torch.matmul(d_vecs, q_vec[0].unsqueeze(-1)).squeeze(-1)
+values, indices = torch.topk(scores, k=min(k, len(docs)))
+results = [
+    {"doc": docs[i], "score": float(values[j].item()), "rank": int(j)}
+    for j, i in enumerate(indices.tolist())
+]
+
+RESULT = {"query": query_text, "results": results}

@@ -1,43 +1,29 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("google/bert_uncased_L-6_H-512_A-8") %}
-{% set masked_text = masked_text | default("The capital of France is [MASK].") %}
-{% set top_k = top_k | default(5) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The quick brown fox jumps over the lazy dog.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-masked_text = "{{ masked_text }}"
-top_k = {{ top_k }}
-
-import json
-import os
+text = "{{ text }}"
 
 import torch
-from transformers import AutoModelForMaskedLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModel
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForMaskedLM.from_pretrained(repo_id)
-model.to(device)
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-encoded_inputs = tokenizer(masked_text, return_tensors="pt")
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModel.from_pretrained(repo_id).to(device)
+model.eval()
 
-with torch.inference_mode():
-    outputs = model(**encoded_inputs)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-logits = outputs.logits
-input_ids = encoded_inputs["input_ids"]
-mask_token_positions = (input_ids == tokenizer.mask_token_id).nonzero(as_tuple=False).cpu().tolist()
+with torch.no_grad():
+    outputs = model(**inputs)
 
-predictions = []
-for batch_index, sequence_index in mask_token_positions:
-    token_logits = logits[batch_index, sequence_index]
-    topk = token_logits.topk(top_k, dim=-1)
-    token_ids = topk.indices.tolist()
-    scores = [float(score) for score in topk.values.tolist()]
-    tokens = tokenizer.convert_ids_to_tokens(token_ids)
-    predictions.append({
-        "mask_position": sequence_index,
-        "tokens": tokens,
-        "scores": scores,
-    })
-
-RESULT = {"predictions": predictions}
+RESULT = {
+    "last_hidden_state": outputs.last_hidden_state,
+    "pooler_output": outputs.pooler_output,
+}

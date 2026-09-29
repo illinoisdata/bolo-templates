@@ -1,58 +1,43 @@
 {% set repo_id = repo_id | default("csebuetnlp/mT5_m2m_crossSum_enhanced") %}
 {% set device = device | default("cuda:0") %}
-{% set article_text = article_text | default("This article describes how videos claiming vaccines are dangerous are being removed. The policy includes terminating accounts that spread misinformation, and tech giants have been criticized for not doing more to counter false health information on their sites.") %}
-{% set target_language = target_language | default("english") %}
-{% set max_input_length = max_input_length | default(512) %}
-{% set max_summary_length = max_summary_length | default(84) %}
-{% set beam_size = beam_size | default(4) %}
+{% set article_text = article_text | default("Videos that say approved vaccines are dangerous and cause autism, cancer or infertility are among those that will be taken down, the company said. The policy includes the termination of accounts of anti-vaccine influencers. Tech giants have been criticised for not doing more to counter false health information on their sites. In July, US President Joe Biden said social media platforms were largely responsible for people\'s scepticism in getting vaccinated by spreading misinformation, and appealed for them to address the issue. YouTube, which is owned by Google, said 130,000 videos were removed from its platform since last year, when it implemented a ban on content spreading misinformation about Covid vaccines. In a blog post, the company said it had seen false claims about Covid jabs \"spill over into misinformation about vaccines in general\". The new policy covers long-approved vaccines, such as those against measles or hepatitis B. \"We\'re expanding our medical misinformation policies on YouTube with new guidelines on currently administered vaccines that are approved and confirmed to be safe and effective by local health authorities and the WHO,\" the post said, referring to the World Health Organization.") %}
+{% set target_lang = target_lang | default("english") %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-article_text = "{{ article_text }}"
-target_language = "{{ target_language }}"
-max_input_length = {{ max_input_length }}
-max_summary_length = {{ max_summary_length }}
-beam_size = {{ beam_size }}
+article_text = {{ article_text | tojson }}
+target_lang = {{ target_lang | tojson }}
 
-import os
 import re
-
+import torch
+from huggingface_hub import hf_hub_download
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+repo_dir = config_path.rsplit("/", 1)[0]
 
-WHITESPACE_HANDLER = lambda text: re.sub(r"\s+", " ", re.sub(r"\n+", " ", text.strip()))
-processed_article = WHITESPACE_HANDLER(article_text)
+WHITESPACE_HANDLER = lambda k: re.sub(r"\s+", " ", re.sub(r"\n+", " ", k.strip()))
 
-tokenized_inputs = tokenizer(
-    processed_article,
-    return_tensors="pt",
-    padding="max_length",
-    truncation=True,
-    max_length=max_input_length,
-)
-input_ids = tokenized_inputs["input_ids"].to(device)
-attention_mask = tokenized_inputs["attention_mask"].to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, use_fast=False, legacy=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_dir).to(device)
+model.eval()
 
-def get_lang_id(lang: str) -> int:
-    lang_token = model.config.task_specific_params["langid_map"][lang][1]
-    return tokenizer.convert_tokens_to_ids(lang_token)
+get_lang_id = lambda lang: tokenizer.convert_tokens_to_ids(model.config.task_specific_params["langid_map"][lang][1])
+input_ids = tokenizer([WHITESPACE_HANDLER(article_text)], return_tensors="pt", padding="max_length", truncation=True, max_length=512)["input_ids"].to(device)
 
-decoder_start_token_id = get_lang_id(target_language)
-output_ids = model.generate(
-    input_ids=input_ids,
-    attention_mask=attention_mask,
-    decoder_start_token_id=decoder_start_token_id,
-    max_length=max_summary_length,
-    no_repeat_ngram_size=2,
-    num_beams=beam_size,
-)[0]
+with torch.no_grad():
+    output_ids = model.generate(
+        input_ids=input_ids,
+        decoder_start_token_id=get_lang_id(target_lang),
+        max_length=84,
+        no_repeat_ngram_size=2,
+        num_beams=4,
+    )[0]
 
-summary = tokenizer.decode(
-    output_ids,
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=False,
-)
+summary = tokenizer.decode(output_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
 
 RESULT = {"summary": summary}

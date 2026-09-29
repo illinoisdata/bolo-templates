@@ -1,31 +1,40 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-en-ro") %}
 {% set device = device | default("cuda:0") %}
-{% set source_sentences = source_sentences | default([">>ron<< A bad writer's prose is full of hackneyed phrases.", ">>ron<< Zero is a special number."]) %}
+{% set src_text = src_text | default('>>ron<< A bad writer\'s prose is full of hackneyed phrases.') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_sentences = {{ source_sentences | tojson }}
+src_text = {{ src_text | tojson }}
+max_new_tokens = {{ max_new_tokens }}
 
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import MarianMTModel, MarianTokenizer
+from huggingface_hub import hf_hub_download
 
-device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+tokenizer = MarianTokenizer.from_pretrained(
+    repo_id,
+    tokenizer_file=None,
+    use_fast=False,
+)
+model = MarianMTModel.from_pretrained(repo_id, torch_dtype=torch.float16 if torch.cuda.is_available() and str(device).startswith("cuda") else None)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(
-    source_sentences,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+if isinstance(src_text, str):
+    inputs = [src_text]
+else:
+    inputs = src_text
 
-with torch.no_grad():
-    generated_tokens = model.generate(**encoded_inputs)
-
-translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+encoded = tokenizer(inputs, return_tensors="pt", padding=True, truncation=True).to(device)
+output_tokens = model.generate(**encoded, max_new_tokens=max_new_tokens)
+translations = [tokenizer.decode(t, skip_special_tokens=True) for t in output_tokens]
 
 RESULT = {"translations": translations}

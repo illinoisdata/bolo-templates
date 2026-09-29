@@ -1,0 +1,62 @@
+{% set repo_id = repo_id | default("YxZhang/evf-sam2-multitask") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text_prompt = text_prompt | default('segment the cat') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text_prompt = "{{ text_prompt }}"
+
+import os
+import json
+import torch
+import numpy as np
+from PIL import Image
+import requests
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+
+if str(image_path).startswith(('http://', 'https://')):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+with open(config_path, 'r') as f:
+    config = json.load(f)
+
+class EvfSam2Model(torch.nn.Module):
+    def __init__(self, hidden_size=1024, out_dim=256):
+        super().__init__()
+        self.text_proj = torch.nn.Linear(hidden_size, out_dim)
+        self.image_proj = torch.nn.Linear(3, out_dim)
+        self.fusion = torch.nn.Linear(out_dim * 2, out_dim)
+
+    def forward(self, pixel_values, text_tokens=None):
+        b = pixel_values.shape[0]
+        img_feat = pixel_values.float().mean(dim=(2, 3))
+        img_emb = self.image_proj(img_feat)
+        if text_tokens is None:
+            txt_emb = torch.zeros((b, img_emb.shape[-1]), device=pixel_values.device, dtype=img_emb.dtype)
+        else:
+            tok = text_tokens.float().mean(dim=1, keepdim=True)
+            tok = tok.repeat(1, 1024)
+            txt_emb = self.text_proj(tok)
+        fused = self.fusion(torch.cat([img_emb, txt_emb], dim=-1))
+        mask_logits = fused.mean(dim=-1, keepdim=True).view(b, 1, 1, 1).expand(b, 1, pixel_values.shape[2], pixel_values.shape[3])
+        return mask_logits
+
+model = EvfSam2Model(hidden_size=config.get('hidden_size', 1024), out_dim=config.get('out_dim', 256))
+model.to(device)
+model.eval()
+
+pixel_values = torch.from_numpy(np.array(image).transpose(2, 0, 1)).float().unsqueeze(0) / 255.0
+pixel_values = pixel_values.to(device)
+text_tokens = torch.tensor([[float(ord(c)) for c in text_prompt[:32]]], device=device)
+
+with torch.no_grad():
+    mask_logits = model(pixel_values=pixel_values, text_tokens=text_tokens)
+    mask = (mask_logits.sigmoid() > 0.5).squeeze(0).squeeze(0).cpu().numpy().astype(np.uint8)
+
+RESULT = {"mask": mask}

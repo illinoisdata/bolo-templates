@@ -1,0 +1,56 @@
+{% set repo_id = repo_id | default("laion/CLIP-convnext_base_w_320-laion_aesthetic-s13B-b82K") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set texts = texts | default(['a photo of a cat', 'a photo of two cats', 'a photo of a dog', 'a photo of a car']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+texts = {{ texts }}
+
+import json
+from PIL import Image
+import requests
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+import open_clip
+
+image_source = image_path
+if isinstance(image_source, str) and image_source.startswith(("http://", "https://")):
+    image = Image.open(requests.get(image_source, stream=True, timeout=30).raw).convert("RGB")
+else:
+    image = Image.open(image_source).convert("RGB")
+
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+model_cfg = config.get("model_cfg", {})
+model, _, preprocess = open_clip.create_model_and_transforms(
+    model_cfg.get("model_name", "convnext_base_w"),
+    pretrained=None,
+    precision="fp32",
+    device=device,
+)
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict)
+model = model.to(device).eval()
+
+tokenizer = open_clip.get_tokenizer(model_cfg.get("text_cfg", {}).get("hf_tokenizer_name", repo_id))
+image_input = preprocess(image).unsqueeze(0).to(device)
+text_tokens = tokenizer(texts).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_input)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logits = (100.0 * image_features @ text_features.T).squeeze(0)
+    probs = logits.softmax(dim=-1)
+
+RESULT = {
+    "texts": texts,
+    "logits": logits.detach().cpu().tolist(),
+    "probabilities": probs.detach().cpu().tolist(),
+}

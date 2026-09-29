@@ -1,1 +1,0 @@
-For more information, check [doc2query.ai](http://doc2query.ai)

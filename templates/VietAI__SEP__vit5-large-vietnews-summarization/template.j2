@@ -1,52 +1,39 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("VietAI/vit5-large-vietnews-summarization") %}
-{% set input_text = input_text | default("vietnews: VietAI là tổ chức phi lợi nhuận với sứ mệnh ươm mầm tài năng về trí tuệ nhân tạo và xây dựng một cộng đồng các chuyên gia trong lĩnh vực trí tuệ nhân tạo đẳng cấp quốc tế tại Việt Nam.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('VietAI là tổ chức phi lợi nhuận với sứ mệnh ươm mầm tài năng về trí tuệ nhân tạo và xây dựng một cộng đồng các chuyên gia trong lĩnh vực trí tuệ nhân tạo đẳng cấp quốc tế tại Việt Nam.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
+text = "{{ text }}"
 
-from pathlib import Path
-
-import tokenizers.models as _models
-_orig_unigram = _models.Unigram
-
-def _fix_unigram(vocab, unk_id=0, byte_fallback=False):
-    if isinstance(vocab, dict):
-        vocab_items = list(vocab.items())
-    else:
-        vocab_items = vocab
-    return _orig_unigram(vocab_items, unk_id=unk_id, byte_fallback=byte_fallback)
-
-_models.Unigram = _fix_unigram
-
+import os
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, T5Tokenizer
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-torch_device = torch.device(device)
-model = model.to(torch_device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+model_dir = os.path.dirname(weights_path)
 
-inputs = tokenizer(
-    input_text,
-    return_tensors="pt",
-    truncation=True,
-)
-inputs = {name: tensor.to(torch_device) for name, tensor in inputs.items()}
+tokenizer = T5Tokenizer(vocab_file=spiece_path)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
+model.to(device)
+model.eval()
 
-generated_tokens = model.generate(
-    input_ids=inputs["input_ids"],
-    attention_mask=inputs["attention_mask"],
-    max_length=256,
-    num_beams=4,
-    early_stopping=True,
-    no_repeat_ngram_size=3,
-    length_penalty=2.0,
-)
-summaries = tokenizer.batch_decode(
-    generated_tokens,
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-)
+input_text = "summarization: " + text
+encoding = tokenizer(input_text, return_tensors="pt")
+encoding = {k: v.to(device) for k, v in encoding.items()}
 
-RESULT = {"summaries": summaries}
+with torch.no_grad():
+    output_ids = model.generate(
+        **encoding,
+        max_length=256,
+        early_stopping=True,
+        num_beams=4,
+        length_penalty=2.0,
+        no_repeat_ngram_size=3,
+    )
+
+summary = tokenizer.decode(output_ids[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
+
+RESULT = {"summary": summary}

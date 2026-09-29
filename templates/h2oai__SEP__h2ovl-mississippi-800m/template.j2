@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("h2oai/h2ovl-mississippi-800m") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set img_context_token = img_context_token | default("<IMG_CONTEXT>") %}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+img_context_token = {{ img_context_token | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device, trust_remote_code=True)
+img_context_token_id = pipe.tokenizer.convert_tokens_to_ids(img_context_token)
+assert img_context_token_id is not None, "IMG_CONTEXT token not found in tokenizer"
+pipe.model.img_context_token_id = img_context_token_id
+
+RESULT = pipe(input_prompt)

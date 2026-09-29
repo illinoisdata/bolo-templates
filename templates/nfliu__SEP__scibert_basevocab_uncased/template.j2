@@ -1,21 +1,37 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("nfliu/scibert_basevocab_uncased") %}
-{% set text = text | default('Hello, world!') %}
-repo_id = '{{ repo_id }}'
-device = '{{ device }}'
-text = '{{ text }}'
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('This is a scientific paper abstract about gene expression and protein interactions.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
 
 import torch
-from transformers import AutoTokenizer, AutoModel
+from transformers import BertTokenizer, BertModel, BertConfig
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+vocab_dir = vocab_path.rsplit('/', 1)[0]
+tokenizer = BertTokenizer.from_pretrained(vocab_dir, do_lower_case=True)
+config = BertConfig.from_json_file(config_path)
+model = BertModel(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict)
 model.to(device)
+model.eval()
 
-inputs = tokenizer(text, return_tensors='pt')
+inputs = tokenizer(text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-outputs = model(**inputs)
-last_hidden_state = outputs.last_hidden_state.detach().cpu().numpy()
+with torch.no_grad():
+    outputs = model(**inputs)
+    last_hidden_state = outputs.last_hidden_state
+    pooled_output = outputs.pooler_output
+    token_ids = inputs["input_ids"][0].detach().cpu().tolist()
+    result_tokens = tokenizer.convert_ids_to_tokens(token_ids[:10])
+    output_shape = list(last_hidden_state.shape)
+    pooled_vector = pooled_output[0].detach().cpu().tolist()
 
-RESULT = {'last_hidden_state': last_hidden_state}
+RESULT = {"input_tokens": result_tokens, "last_hidden_state_shape": output_shape, "pooled_output": pooled_vector}

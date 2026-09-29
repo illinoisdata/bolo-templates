@@ -1,36 +1,36 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("ml6team/mt5-small-german-query-generation") %}
-{% set article_text = article_text | default("Das Lama (Lama glama) ist eine Art der Kamele. Es ist in den südamerikanischen Anden verbreitet und eine vom Guanako abstammende Haustierform.") %}
-{% set max_length = max_length | default(64) %}
-{% set num_beams = num_beams | default(4) %}
-{% set num_return_sequences = num_return_sequences | default(4) %}
-{% set output_filename = output_filename | default("generated_queries.txt") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Das Lama (Lama glama) ist eine Art der Kamele. Es ist in den südamerikanischen Anden verbreitet und eine vom Guanako abstammende Haustierform.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-article_text = """{{ article_text }}"""
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-num_return_sequences = {{ num_return_sequences }}
-output_filename = "{{ output_filename }}"
+question = "{{ question }}"
 
-from pathlib import Path
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+# Load tokenizer/model
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False, local_files_only=True)
+model = AutoModelForSeq2SeqLM.from_config(__import__("transformers").MT5Config.from_json_file(config_file))
+state_dict = torch.load(model_file, map_location="cpu")
+model.load_state_dict(state_dict)
+model.to(device)
 model.eval()
 
-tokenized_inputs = tokenizer(article_text, return_tensors="pt", padding="longest", truncation=True)
-tokenized_inputs = {key: value.to(device) for key, value in tokenized_inputs.items()}
+inputs = tokenizer(question, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(
-    **tokenized_inputs,
-    max_length=max_length,
-    num_beams=num_beams,
-    num_return_sequences=num_return_sequences,
-)
-generated_queries = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=32, num_beams=4)
 
-RESULT = {"generated_queries": generated_queries}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_queries": output_text}

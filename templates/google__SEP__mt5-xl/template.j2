@@ -1,22 +1,33 @@
 {% set repo_id = repo_id | default("google/mt5-xl") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("Hello, how are you?") %}
+{% set text = text | default('summarize: The Eiffel Tower is one of the most famous landmarks in Paris, France. It was completed in 1889 and attracts millions of visitors each year.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import T5Tokenizer, MT5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
 
-encoded = tokenizer(text, return_tensors="pt")
-encoded = {k: v.to(device) for k, v in encoded.items()}
+# Load tokenizer and model on the requested device
+_tokenizer = T5Tokenizer.from_pretrained(repo_id)
+_model = MT5ForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
+_model.to(device)
+_model.eval()
 
-outputs = model.generate(**encoded)
+inputs = _tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-generated_text = generated[0]
+with torch.no_grad():
+    generated_ids = _model.generate(**inputs, max_new_tokens=32, num_beams=4)
 
-RESULT = {"generated_text": generated_text}
+action = _tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": action}

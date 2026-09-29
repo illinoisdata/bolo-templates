@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("timm/convnext_tiny.fb_in22k_ft_in1k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+repo_id = "{{ repo_id }}"
+task = "{{ task }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import torch
+from transformers import pipeline
+from PIL import Image
+
+device = torch.device(device)
+pipe = pipeline(task=task, model=repo_id, device=device)
+image = Image.open(image_path)
+predictions = pipe(image)
+RESULT = {"predictions": predictions}

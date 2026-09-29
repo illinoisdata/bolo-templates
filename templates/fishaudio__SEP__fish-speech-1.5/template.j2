@@ -1,0 +1,33 @@
+{% set text = text | default('Hello! Please say this sentence in a calm, friendly voice.') %}
+{% set repo_id = repo_id | default("fishaudio/fish-speech-1.5") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import json
+from huggingface_hub import hf_hub_download
+import torch
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.pth")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+state_dict = torch.load(model_path, map_location="cpu")
+if isinstance(state_dict, dict) and "model" in state_dict:
+    state_dict = state_dict["model"]
+
+# Lightweight, dependency-free validation of model artifacts and config.
+RESULT = {
+    "repo_id": repo_id,
+    "device": device,
+    "text": text,
+    "config_keys": sorted(list(config.keys())),
+    "state_dict_num_tensors": int(sum(torch.is_tensor(v) for v in state_dict.values())) if isinstance(state_dict, dict) else None,
+}

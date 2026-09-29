@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("airesearch/bert-base-multilingual-cased-finetune-qa") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question|default('สวนกุหลาบเป็นโรงเรียนอะไร') %}
+{% set context = context|default('โรงเรียนสวนกุหลาบวิทยาลัย (Suankularb Wittayalai School) (อักษรย่อ : ส.ก. / S.K.) เป็นโรงเรียนชายล้วน ระดับชั้นมัธยมศึกษาขนาดใหญ่พิเศษ สังกัดสำนักงานเขตพื้นที่การศึกษามัธยมศึกษาเขต 1 สำนักงานคณะกรรมการการศึกษาขั้นพื้นฐาน (ชื่อเดิม: กรมสามัญศึกษา) กระทรวงศึกษาธิการ ก่อตั้งโดย พระบาทสมเด็จพระจุลจอมเกล้าเจ้าอยู่หัว ได้รับการสถาปนาขึ้นในวันที่ 8 มีนาคม พ.ศ. 2424 (ขณะนั้นนับวันที่ 1 เมษายน เป็นวันขึ้นปีใหม่ เมื่อนับอย่างสากลถือเป็น พ.ศ. 2425) โดยเป็นโรงเรียนรัฐบาลแห่งแรกของประเทศไทย') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+# tokenizer/model load
+_tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+_model = AutoModelForQuestionAnswering.from_pretrained(repo_id, local_files_only=True)
+_model.to(device)
+_model.eval()
+
+inputs = _tokenizer(question, context, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = _model(**inputs)
+    start_logits = outputs.start_logits
+    end_logits = outputs.end_logits
+
+start_idx = int(torch.argmax(start_logits, dim=-1).item())
+end_idx = int(torch.argmax(end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+
+input_ids = inputs["input_ids"][0]
+answer_tokens = input_ids[start_idx:end_idx + 1]
+answer = _tokenizer.decode(answer_tokens, skip_special_tokens=True).strip()
+
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx}

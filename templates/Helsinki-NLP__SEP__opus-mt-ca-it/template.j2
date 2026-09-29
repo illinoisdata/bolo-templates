@@ -1,23 +1,24 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-ca-it") %}
-{% set input_text = input_text | default("Bon dia! Com estàs avui?") %}
-{% set num_beams = num_beams | default(4) %}
-{% set max_length = max_length | default(128) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hola, com estàs?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-num_beams = {{ num_beams }}
-max_length = {{ max_length }}
+text = "{{ text }}"
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+run_device = device if torch.cuda.is_available() and str(device).startswith('cuda') else 'cpu'
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(run_device)
+model.eval()
 
-encoding = tokenizer(input_text, return_tensors="pt")
-encoding = {k: v.to(device) for k, v in encoding.items()}
-generated_tokens = model.generate(**encoding, num_beams=num_beams, max_length=max_length)
-translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(run_device) for k, v in inputs.items()}
 
-RESULT = {"translation": translation}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, num_beams=4, max_length=128)
+output_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"translation": output_text}

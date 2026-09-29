@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Oncology-Medium-209M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Mutations in KRAS gene drive oncogenic transformation.") %}
+{% set labels = labels | default(["Amino_acid", "Anatomical_system", "Cancer", "Cell", "Cellular_component", "Developing_anatomical_structure", "Gene_or_gene_product", "Immaterial_anatomical_entity", "Multi-tissue_structure", "Organ", "Organism", "Organism_subdivision", "Organism_substance", "Pathological_formation", "Simple_chemical", "Tissue"]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+labels = {{ labels }}
+
+import json
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from gliner import GLiNER
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spm_path = hf_hub_download(repo_id=repo_id, filename="spm.model")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+
+# The repo ships a GLiNER checkpoint; load with GLiNER when available, but keep it lightweight.
+model = GLiNER.from_pretrained(repo_id)
+model = model.to(device)
+
+entities = model.predict_entities(text, labels, flat_ner=True, threshold=0.5)
+output = entities
+
+RESULT = {"output": output}

@@ -1,39 +1,73 @@
 {% set repo_id = repo_id | default("microsoft/layoutlm-large-uncased") %}
 {% set device = device | default("cuda:0") %}
-{% set words = words | default(["Invoice", "Date", "Amount", "Total", "."]) %}
-{% set bounding_boxes = bounding_boxes | default([[0, 0, 50, 50], [60, 0, 110, 50], [0, 60, 80, 110], [90, 60, 140, 110], [150, 60, 170, 80]]) %}
+{% set text = text | default('Invoice number 12345 total 42.50 due tomorrow') %}
+{% set image = image | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
 {% set max_length = max_length | default(128) %}
+{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-words = {{ words | tojson }}
-bounding_boxes = {{ bounding_boxes | tojson }}
+text = "{{ text }}"
+image = "{{ image }}"
 max_length = {{ max_length }}
+top_k = {{ top_k }}
 
-from transformers import AutoTokenizer, AutoModel
-import numpy as np
 import os
 import torch
+import requests
+from PIL import Image
+from transformers import LayoutLMTokenizer, LayoutLMModel
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id)
-model = model.to(torch_device)
+tokenizer = LayoutLMTokenizer(vocab_file=vocab_path)
+model = LayoutLMModel.from_pretrained(
+    os.path.dirname(weights_path),
+    config=config_path,
+    local_files_only=True,
+)
+model.to(device)
 model.eval()
 
-encoding = tokenizer(
+if isinstance(image, str) and image.startswith(("http://", "https://")):
+    pil_image = Image.open(requests.get(image, stream=True).raw).convert("RGB")
+else:
+    pil_image = Image.open(image).convert("RGB")
+
+width, height = pil_image.size
+words = text.split()
+if len(words) == 0:
+    words = [""]
+boxes = []
+step = max(1, width // len(words))
+for i, _ in enumerate(words):
+    x0 = min(width - 1, i * step)
+    x1 = min(width, (i + 1) * step)
+    boxes.append([x0, 0, x1, height])
+
+encoded = tokenizer(
     words,
-    boxes=bounding_boxes,
-    padding="max_length",
-    truncation=True,
-    max_length=max_length,
+    boxes=boxes,
     return_tensors="pt",
-    is_split_into_words=True,
+    truncation=True,
+    padding="max_length",
+    max_length=max_length,
 )
-inputs = {key: value.to(torch_device) for key, value in encoding.items()}
+encoded = {k: v.to(device) for k, v in encoded.items()}
 
 with torch.no_grad():
-    model_output = model(**inputs)
+    outputs = model(**encoded)
+    last_hidden_state = outputs.last_hidden_state
+    pooled = last_hidden_state[:, 0, :]
+    norm = torch.linalg.norm(pooled, dim=-1)
+    topk_vals, topk_idx = torch.topk(pooled, k=min(top_k, pooled.shape[-1]), dim=-1)
 
-last_hidden_state = model_output.last_hidden_state.detach().cpu()
-RESULT = {"last_hidden_state": last_hidden_state}
+RESULT = {
+    "last_hidden_state": last_hidden_state.detach().cpu().tolist(),
+    "pooled_output": pooled.detach().cpu().tolist(),
+    "pooled_norm": norm.detach().cpu().tolist(),
+    "topk_indices": topk_idx.detach().cpu().tolist(),
+    "topk_values": topk_vals.detach().cpu().tolist(),
+}

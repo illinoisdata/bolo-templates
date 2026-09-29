@@ -1,30 +1,39 @@
 {% set repo_id = repo_id | default("google/pegasus-multi_news") %}
 {% set device = device | default("cuda:0") %}
-{% set document = document | default("Google's Pegasus model is designed for abstractive summarization. This example document explains how to use the model for multi-document summarization. It can condense long inputs into concise summaries while preserving the main ideas.") %}
-{% set summary_min_length = summary_min_length | default(60) %}
-{% set summary_max_length = summary_max_length | default(200) %}
-{% set num_beams = num_beams | default(4) %}
+{% set input_text = input_text | default('The Senate passed a bill after hours of debate. Meanwhile, markets reacted cautiously to inflation data. Analysts said the decision could shape policy in the coming months.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-document = """{{ document }}"""
-summary_min_length = {{ summary_min_length }}
-summary_max_length = {{ summary_max_length }}
-num_beams = {{ num_beams }}
+input_text = "{{ input_text }}"
 
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import torch
+from transformers import PegasusTokenizer, PegasusForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
-inputs = tokenizer(document, truncation=True, max_length=1024, return_tensors="pt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+model = PegasusForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+tokenizer = PegasusTokenizer.from_pretrained(repo_id, use_fast=False)
+
+inputs = tokenizer(input_text, return_tensors="pt", truncation=True, max_length=1024)
 inputs = {k: v.to(device) for k, v in inputs.items()}
-generated_ids = model.generate(
-    **inputs,
-    min_length=summary_min_length,
-    max_length=summary_max_length,
-    num_beams=num_beams,
-)
-summary = tokenizer.batch_decode(
-    generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True
-)[0]
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_length=256,
+        min_length=32,
+        num_beams=8,
+        length_penalty=0.8,
+        early_stopping=True,
+    )
+
+summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
 RESULT = {"summary": summary}

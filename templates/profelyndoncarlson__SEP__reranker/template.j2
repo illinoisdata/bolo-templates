@@ -1,0 +1,48 @@
+{% set prompt = prompt | default('¿Cómo implementar un sistema solar en una escuela primaria?') %}
+{% set content = content | default('Este documento describe las partes del sistema solar, actividades didácticas para primaria y estrategias para enseñar conceptos científicos básicos de forma clara y práctica.') %}
+{% set repo_id = repo_id | default("profelyndoncarlson/reranker") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+content = {{ content | tojson }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+model = AutoModelForSequenceClassification.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+    local_files_only=True,
+)
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    local_files_only=True,
+)
+
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(
+    prompt,
+    content,
+    max_length=512,
+    truncation="only_second",
+    padding="max_length",
+    return_tensors="pt",
+)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+score = outputs.logits.squeeze().item()
+
+RESULT = {"score": score}

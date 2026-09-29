@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("krinal214/zero_shot") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What is the model trained on?') %}
+{% set context = context | default('This model is a fine-tuned version of bert-base-multilingual-cased on the squad dataset.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_dir = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+# derive repo directory from downloaded file path
+repo_dir = tokenizer_dir.rsplit('/', 1)[0]
+
+# ensure all relevant files are present locally
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, use_fast=True)
+model = AutoModelForQuestionAnswering.from_pretrained(repo_dir, local_files_only=True)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_idx = int(torch.argmax(outputs.start_logits, dim=-1).item())
+end_idx = int(torch.argmax(outputs.end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+answer = tokenizer.decode(inputs["input_ids"][0, start_idx:end_idx + 1], skip_special_tokens=True)
+
+RESULT = {"answer": answer}

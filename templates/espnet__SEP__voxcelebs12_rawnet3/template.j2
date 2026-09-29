@@ -1,0 +1,67 @@
+{% set repo_id = repo_id | default("espnet/voxcelebs12_rawnet3") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set chunk_length = chunk_length | default(3.0) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+chunk_length = {{ chunk_length }}
+
+import os
+import tempfile
+from pathlib import Path
+from urllib.parse import urlparse
+
+import numpy as np
+import torch
+import soundfile as sf
+import setuptools._distutils as _distutils
+import sys
+sys.modules['distutils'] = _distutils
+from huggingface_hub import hf_hub_download
+from espnet2.bin.spk_inference import Speech2Embedding
+
+config_path = hf_hub_download(repo_id=repo_id, filename="save_exp/spk_train_rawnet3_best_trnVox12_emb192_amp_subcentertopk_raw_sp/config.yaml")
+model_path = hf_hub_download(repo_id=repo_id, filename="save_exp/spk_train_rawnet3_best_trnVox12_emb192_amp_subcentertopk_raw_sp/40epoch.pth")
+
+def load_audio(path_or_url):
+    if isinstance(path_or_url, str) and urlparse(path_or_url).scheme in ("http", "https"):
+        import requests
+        r = requests.get(path_or_url, timeout=30)
+        r.raise_for_status()
+        tmp = tempfile.NamedTemporaryFile(suffix=Path(urlparse(path_or_url).path).suffix or ".wav", delete=False)
+        tmp.write(r.content)
+        tmp.close()
+        path = tmp.name
+    else:
+        path = path_or_url
+    wav, sr = sf.read(path, dtype="float32")
+    if wav.ndim > 1:
+        wav = wav.mean(axis=1)
+    return wav, sr
+
+waveform, sr = load_audio(audio_path)
+
+speech2spk_embed = Speech2Embedding(model_file=model_path, train_config=config_path)
+if hasattr(speech2spk_embed, 'to'):
+    speech2spk_embed.to(device)
+if hasattr(speech2spk_embed, "eval"):
+    speech2spk_embed.eval()
+
+if sr != 16000:
+    import torchaudio
+    waveform_t = torch.tensor(waveform).float().unsqueeze(0)
+    waveform = torchaudio.functional.resample(waveform_t, sr, 16000).squeeze(0).numpy()
+
+if waveform.shape[0] < int(16000 * chunk_length):
+    pad = int(16000 * chunk_length) - waveform.shape[0]
+    waveform = np.pad(waveform, (0, pad))
+else:
+    waveform = waveform[: int(16000 * chunk_length)]
+
+embedding = speech2spk_embed(waveform)
+if isinstance(embedding, torch.Tensor):
+    embedding = embedding.detach().cpu().numpy()
+
+RESULT = {"embedding": embedding}

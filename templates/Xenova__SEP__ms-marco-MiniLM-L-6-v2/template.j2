@@ -1,0 +1,36 @@
+{% set repo_id = repo_id | default("Xenova/ms-marco-MiniLM-L-6-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set query = query | default('What is the capital of France?') %}
+{% set passage = passage | default('Paris is the capital and most populous city of France.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query = "{{ query }}"
+passage = "{{ passage }}"
+
+import os
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoConfig
+from transformers.models.bert.modeling_bert import BertForSequenceClassification
+
+model_path = hf_hub_download(repo_id=repo_id, filename="onnx/model.onnx")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+repo_dir = os.path.dirname(config_path)
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, use_fast=True)
+config = AutoConfig.from_pretrained(repo_dir)
+model = BertForSequenceClassification(config)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(query, passage, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    score = torch.sigmoid(logits).detach().cpu().numpy().tolist()
+
+RESULT = {"score": score, "logits": logits.detach().cpu().numpy().tolist()}

@@ -1,36 +1,32 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("hfl/chinese-electra-180g-large-discriminator") %}
-{% set input_text = input_text | default("今天天气晴朗，我们一起学习自然语言处理。") %}
-{% set max_length = max_length | default(128) %}
-
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('今天天气很好，适合出去散步。') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = """{{ input_text }}"""
-max_length = {{ max_length }}
+text = "{{ text }}"
 
-from pathlib import Path
-
-import numpy as np
+import os
 import torch
-from transformers import AutoModelForPreTraining, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForPreTraining
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id)
-model = model.to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+repo_dir = os.path.dirname(config_path)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, use_fast=True)
+model = AutoModelForPreTraining.from_pretrained(repo_dir)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(
-    input_text,
-    return_tensors="pt",
-    truncation=True,
-    padding="max_length",
-    max_length=max_length,
-)
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
     outputs = model(**inputs)
+    logits = outputs.logits
+    probs = torch.softmax(logits, dim=-1)
+    pred_id = int(torch.argmax(probs, dim=-1).item())
 
-logits = outputs.logits.detach().cpu()
-
-RESULT = {"logits": logits}
+RESULT = {"logits": logits.detach().cpu().numpy(), "probabilities": probs.detach().cpu().numpy(), "predicted_class": pred_id}

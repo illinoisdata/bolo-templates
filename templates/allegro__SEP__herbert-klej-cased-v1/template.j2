@@ -1,39 +1,29 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("allegro/herbert-klej-cased-v1") %}
-{% set text_input = text_input | default("To przykładowe zdanie w języku polskim do analizy.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Kto ma lepszą sztukę, ma lepszy rząd – to jasne.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+text = {{ text | tojson }}
 
-import os
-from pathlib import Path
-
-import numpy as np
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer = AutoTokenizer.from_pretrained("allegro/herbert-klej-cased-tokenizer-v1", use_fast=False)
+model = AutoModel.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-encoded_inputs = tokenizer(
-    text_input,
-    return_tensors="pt",
-    truncation=True,
-    padding=True,
-    max_length=512,
-)
-encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
-
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
+    outputs = model(**inputs)
 
 last_hidden_state = outputs.last_hidden_state
-cls_embedding = last_hidden_state[:, 0, :]
-
-result_last_hidden_state = last_hidden_state.detach().cpu().numpy()
-result_cls_embedding = cls_embedding.detach().cpu().numpy()
-
+pooler_output = getattr(outputs, "pooler_output", None)
 RESULT = {
-    "last_hidden_state": result_last_hidden_state,
-    "cls_embedding": result_cls_embedding,
+    "last_hidden_state": last_hidden_state,
+    "pooler_output": pooler_output,
 }

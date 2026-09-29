@@ -1,0 +1,52 @@
+{% set repo_id = repo_id | default("vjosap/moralBERT-predict-subversion-in-text") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('This policy proposal is framed as a moral obligation to protect the community.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import json
+from pathlib import Path
+
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+from transformers import BertConfig, BertForSequenceClassification, BertTokenizerFast
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+num_labels = int(cfg.get("moral_label", 2)) + 1
+config = BertConfig(
+    vocab_size=30522,
+    num_labels=num_labels,
+)
+model = BertForSequenceClassification(config)
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+tokenizer = BertTokenizerFast(vocab_file=vocab_path, tokenizer_file=tokenizer_json_path)
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probs = torch.softmax(logits, dim=-1)
+    predicted_class = int(torch.argmax(probs, dim=-1).item())
+
+RESULT = {
+    "text": text,
+    "logits": logits.detach().cpu().tolist(),
+    "probabilities": probs.detach().cpu().tolist(),
+    "predicted_class": predicted_class,
+}

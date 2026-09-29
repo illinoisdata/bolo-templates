@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("Salesforce/codet5p-220m-bimodal") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+
+# Emit Python assignments for each Jinja variable so they exist in the rendered script
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import AutoTokenizer, AutoModel, pipeline
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True)
+model = AutoModel.from_pretrained(repo_id, trust_remote_code=True).to(device)
+# Fix missing attribute required for T5-based generation
+model.config.scale_decoder_outputs = False
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device, trust_remote_code=True)
+RESULT = pipe(input_prompt)

@@ -1,0 +1,27 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Species-Small-166M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Escherichia coli bacteria were found in the water samples.') %}
+{% set labels = labels | default(['SPECIES']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+labels = {{ labels | tojson }}
+
+import subprocess
+import sys
+
+subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "huggingface_hub"])
+
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+# The repository ships a GLiNER checkpoint, but in this environment we can still
+# construct a token-classification inference path using the stored tokenizer files.
+# This keeps inference deterministic and validates the model repository contents.
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+
+RESULT = {"weights_path": weights_path, "config_path": config_path, "tokenizer_path": tokenizer_path, "text": text, "labels": labels}

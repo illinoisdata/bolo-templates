@@ -1,0 +1,68 @@
+{% set repo_id = repo_id | default("helper2424/resnet10") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-feature-extraction") %}
+{% set image_input_path = image_input_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+image_input_path = {{ image_input_path | tojson }}
+
+import importlib.util
+import sys
+import types
+from pathlib import Path
+
+from huggingface_hub import snapshot_download
+from transformers import AutoImageProcessor, pipeline
+
+repo_snapshot_path = Path(snapshot_download(repo_id=repo_id))
+package_name = f"hf_{repo_id.replace('/', '_').replace('-', '_')}"
+package = types.ModuleType(package_name)
+package.__path__ = [str(repo_snapshot_path)]
+sys.modules[package_name] = package
+
+config_spec = importlib.util.spec_from_file_location(
+    f"{package_name}.configuration_resnet",
+    repo_snapshot_path / "configuration_resnet.py",
+    submodule_search_locations=[str(repo_snapshot_path)],
+)
+config_module = importlib.util.module_from_spec(config_spec)
+sys.modules[config_spec.name] = config_module
+config_spec.loader.exec_module(config_module)
+
+model_spec = importlib.util.spec_from_file_location(
+    f"{package_name}.modeling_resnet",
+    repo_snapshot_path / "modeling_resnet.py",
+    submodule_search_locations=[str(repo_snapshot_path)],
+)
+model_module = importlib.util.module_from_spec(model_spec)
+sys.modules[model_spec.name] = model_module
+model_spec.loader.exec_module(model_module)
+
+ResNet10 = model_module.ResNet10
+ResNet10Config = config_module.ResNet10Config
+
+class PipelineResNet10(ResNet10):
+    config_class = ResNet10Config
+
+    def forward(self, pixel_values=None, **kwargs):
+        if pixel_values is None:
+            raise ValueError("pixel_values must be provided for inference")
+        return super().forward(pixel_values, **kwargs)
+
+feature_extractor = AutoImageProcessor.from_pretrained(
+    repo_snapshot_path,
+    local_files_only=True,
+)
+model = PipelineResNet10.from_pretrained(repo_snapshot_path, local_files_only=True)
+model = model.to(device)
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    feature_extractor=feature_extractor,
+    device=device,
+)
+
+RESULT = pipe(image_input_path)

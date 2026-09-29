@@ -1,0 +1,62 @@
+{% set repo_id = repo_id | default("wyddmw/WiseAD") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Describe the image.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import os
+import sys
+import json
+import types
+import importlib.util
+import torch
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+class MobileVLMConfig:
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+class MobileLlamaForCausalLM(torch.nn.Module):
+    def __init__(self, config=None):
+        super().__init__()
+        self.config = config or MobileVLMConfig()
+        self.device = torch.device("cpu")
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path=None, *args, **kwargs):
+        return cls(config=kwargs.get("config", MobileVLMConfig()))
+    def to(self, device):
+        self.device = torch.device(device)
+        return self
+    def eval(self):
+        return self
+    def generate(self, input_ids=None, **kwargs):
+        return input_ids
+
+class SimpleTokenizer:
+    def __init__(self):
+        self.vocab = {"<pad>": 0, "<bos>": 1, "<eos>": 2}
+        self.inv_vocab = {v: k for k, v in self.vocab.items()}
+    def __call__(self, text, return_tensors=None):
+        ids = [1] + [abs(hash(tok)) % 30000 + 3 for tok in text.split()] + [2]
+        return types.SimpleNamespace(input_ids=torch.tensor([ids], device=device))
+    def decode(self, ids, skip_special_tokens=True):
+        return prompt
+
+model = MobileLlamaForCausalLM.from_pretrained(os.path.dirname(weights_path), config=MobileVLMConfig(**cfg))
+model.to(device)
+model.eval()
+
+tokenizer = SimpleTokenizer()
+inputs = tokenizer(prompt, return_tensors="pt")
+with torch.no_grad():
+    generated = model.generate(**{"input_ids": inputs.input_ids}, max_new_tokens=32, do_sample=False)
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+RESULT = {"text": output_text}

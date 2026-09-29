@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("autogluon/chronos-2") %}
+{% set device = device | default("cuda:0") %}
+{% set series = series | default([1.0, 1.2, 1.1, 1.35, 1.28, 1.4, 1.55, 1.6, 1.72, 1.8, 1.9, 2.05]) %}
+{% set prediction_length = prediction_length | default(6) %}
+{% set quantile_levels = quantile_levels | default([0.1, 0.5, 0.9]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+series = {{ series }}
+prediction_length = {{ prediction_length }}
+quantile_levels = {{ quantile_levels }}
+
+import subprocess
+import sys
+
+subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "chronos-forecasting>=2.0", "pandas", "huggingface_hub"])
+
+import pandas as pd
+from huggingface_hub import hf_hub_download
+from chronos import Chronos2Pipeline
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+pipeline = Chronos2Pipeline.from_pretrained(repo_id, device_map=device)
+
+context_df = pd.DataFrame({
+    "item_id": ["series-0"] * len(series),
+    "timestamp": pd.date_range("2024-01-01", periods=len(series), freq="D"),
+    "target": series,
+})
+forecast_df = pipeline.predict_df(
+    context_df,
+    prediction_length=prediction_length,
+    quantile_levels=quantile_levels,
+    id_column="item_id",
+    timestamp_column="timestamp",
+    target="target",
+)
+
+RESULT = {"forecast": forecast_df.to_dict(orient="records")}

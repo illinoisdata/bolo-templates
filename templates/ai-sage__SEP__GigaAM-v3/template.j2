@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("ai-sage/GigaAM-v3") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set revision = revision | default('e2e_rnnt') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+revision = "{{ revision }}"
+
+import os
+import sys
+import tempfile
+from urllib.request import urlopen
+import torch
+import torchaudio
+from huggingface_hub import hf_hub_download
+from transformers import AutoConfig, AutoModel
+
+config_file = hf_hub_download(repo_id=repo_id, filename='config.json')
+modeling_file = hf_hub_download(repo_id=repo_id, filename='modeling_gigaam.py')
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename='tokenizer.model')
+weight_file = hf_hub_download(repo_id=repo_id, filename='pytorch_model.bin')
+repo_dir = os.path.dirname(config_file)
+if repo_dir not in sys.path:
+    sys.path.insert(0, repo_dir)
+
+config = AutoConfig.from_pretrained(repo_id, trust_remote_code=True, revision=revision)
+model = AutoModel.from_config(config, trust_remote_code=True).to(device)
+state_dict = torch.load(weight_file, map_location='cpu')
+model.load_state_dict(state_dict, strict=False)
+model.eval()
+
+if audio_path.startswith('http://') or audio_path.startswith('https://'):
+    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
+        f.write(urlopen(audio_path).read())
+        local_audio_path = f.name
+else:
+    local_audio_path = audio_path
+
+output = model.transcribe(local_audio_path)
+RESULT = {"transcription": output}

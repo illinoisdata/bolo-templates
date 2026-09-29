@@ -1,21 +1,27 @@
 {% set repo_id = repo_id | default("google/t5-v1_1-small") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("The quick brown fox jumps over the lazy dog.") %}
+{% set text = text | default('summarize: The quick brown fox jumps over the lazy dog. The fox is quick and the dog is lazy.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
+text = "{{ text }}"
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
-import os
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-inputs = tokenizer(input_text, return_tensors="pt")
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=16)
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-generated_ids = model.generate(**inputs)
-generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
-
-RESULT = {"generated_text": generated_text}
+RESULT = {"generated_text": output_text}

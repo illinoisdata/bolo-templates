@@ -1,30 +1,33 @@
 {% set repo_id = repo_id | default("hallisky/bart-base-toxic-antiexpert") %}
 {% set device = device | default("cuda:0") %}
-{% set prompt = prompt | default("The discussion reinforced how essential accountability and transparency are when confronting toxic behavior.") %}
-{% set max_new_tokens = max_new_tokens | default(64) %}
-{% set num_beams = num_beams | default(4) %}
+{% set text = text | default('The movie was surprisingly good, with strong acting and a thoughtful plot.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
-max_new_tokens = {{ max_new_tokens }}
-num_beams = {{ num_beams }}
+text = "{{ text }}"
 
-from pathlib import Path
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+from transformers import AutoTokenizer, BartForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
-
-tokenized_inputs = tokenizer(prompt, return_tensors="pt", truncation=True, padding=False)
-tokenized_inputs = {key: value.to(device) for key, value in tokenized_inputs.items()}
-
-generated_tokens = model.generate(
-    **tokenized_inputs,
-    max_new_tokens=max_new_tokens,
-    num_beams=num_beams,
-    early_stopping=True,
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = BartForConditionalGeneration.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
 )
+model.to(device)
+model.eval()
 
-generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=32,
+        num_beams=4,
+        early_stopping=True,
+    )
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {"generated_text": generated_text}
+RESULT = {"generated_text": output_text}

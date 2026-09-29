@@ -1,27 +1,32 @@
 {% set repo_id = repo_id | default("google/switch-base-8") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("The <extra_id_0> walks in <extra_id_1> park") %}
+{% set input_text = input_text | default("A <extra_id_0> walks into a bar a orders a <extra_id_1> with <extra_id_2> pinch of <extra_id_3>.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
 
-import torch
 from pathlib import Path
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, SwitchTransformersForConditionalGeneration
 
-# Load model and tokenizer
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-# Pre-process input
+tokenizer_dir = str(Path(tokenizer_path).parent)
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir)
+model = SwitchTransformersForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
 inputs = tokenizer(input_text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=20)
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=False)
 
-# Run inference
-output_ids = model.generate(**inputs)
-
-# Post-process outputs
-generated_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
-
-# Build result dict
-RESULT = {"generated_text": generated_text}
+RESULT = {"generated_text": output_text}

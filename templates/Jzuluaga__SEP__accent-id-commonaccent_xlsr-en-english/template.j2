@@ -1,0 +1,54 @@
+{% set repo_id = repo_id | default("Jzuluaga/accent-id-commonaccent_xlsr-en-english") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set sample_rate = sample_rate | default(16000) %}
+{% set repo_file = repo_file | default('custom_interface.py') %}
+{% set ckpt_file = ckpt_file | default('model.ckpt') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+sample_rate = {{ sample_rate }}
+repo_file = "{{ repo_file }}"
+ckpt_file = "{{ ckpt_file }}"
+
+import os
+import importlib.util
+import torch
+import torchaudio
+from huggingface_hub import hf_hub_download
+from speechbrain.pretrained import Pretrained
+
+repo_py = hf_hub_download(repo_id=repo_id, filename=repo_file)
+ckpt_path = hf_hub_download(repo_id=repo_id, filename=ckpt_file)
+
+spec = importlib.util.spec_from_file_location("custom_interface", repo_py)
+custom_interface = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(custom_interface)
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    raise ValueError("URL audio paths are not supported in this inference script")
+waveform, sr = torchaudio.load(audio_path)
+if waveform.ndim == 1:
+    waveform = waveform.unsqueeze(0)
+if sr != sample_rate:
+    waveform = torchaudio.functional.resample(waveform, sr, sample_rate)
+if waveform.shape[0] > 1:
+    waveform = waveform.mean(dim=0, keepdim=True)
+
+classifier = custom_interface.CustomEncoderWav2vec2Classifier.from_hparams(
+    source=repo_id,
+    savedir=os.path.dirname(ckpt_path),
+    run_opts={"device": device},
+)
+
+out_prob, score, index, text_lab = classifier.classify_batch(waveform.to(device))
+if isinstance(text_lab, (list, tuple)):
+    text_lab = text_lab[0]
+if hasattr(score, "detach"):
+    score = score.detach().cpu().item() if score.numel() == 1 else score.detach().cpu().numpy()
+if hasattr(out_prob, "detach"):
+    out_prob = out_prob.detach().cpu().numpy()
+if hasattr(index, "detach"):
+    index = int(index.detach().cpu().item())
+
+RESULT = {"label": text_lab, "score": score, "index": index, "probabilities": out_prob}

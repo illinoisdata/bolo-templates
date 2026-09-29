@@ -1,0 +1,62 @@
+{% set repo_id = repo_id | default("ltg/gpt-bert-babylm-small") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('The quick brown fox') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import os
+import sys
+import types
+import importlib.util
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+configuration_path = hf_hub_download(repo_id=repo_id, filename='configuration_ltgbert.py')
+modeling_path = hf_hub_download(repo_id=repo_id, filename='modeling_ltgbert.py')
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename='tokenizer.json')
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename='tokenizer_config.json')
+weights_path = hf_hub_download(repo_id=repo_id, filename='pytorch_model.bin')
+repo_dir = os.path.dirname(config_path)
+parent_dir = os.path.dirname(repo_dir)
+sys.path.insert(0, parent_dir)
+package_name = 'ltg_gpt_bert_babylm_small_pkg'
+package = types.ModuleType(package_name)
+package.__path__ = [repo_dir]
+sys.modules[package_name] = package
+
+config_spec = importlib.util.spec_from_file_location(package_name + '.configuration_ltgbert', configuration_path)
+configuration_ltgbert = importlib.util.module_from_spec(config_spec)
+sys.modules[config_spec.name] = configuration_ltgbert
+config_spec.loader.exec_module(configuration_ltgbert)
+model_spec = importlib.util.spec_from_file_location(package_name + '.modeling_ltgbert', modeling_path)
+modeling_ltgbert = importlib.util.module_from_spec(model_spec)
+sys.modules[model_spec.name] = modeling_ltgbert
+model_spec.loader.exec_module(modeling_ltgbert)
+if not hasattr(modeling_ltgbert.LtgbertForCausalLM, 'all_tied_weights_keys'):
+    modeling_ltgbert.LtgbertForCausalLM.all_tied_weights_keys = {}
+if isinstance(getattr(modeling_ltgbert.LtgbertForCausalLM, '_keys_to_ignore_on_load_unexpected', None), list):
+    modeling_ltgbert.LtgbertForCausalLM._keys_to_ignore_on_load_unexpected = set(modeling_ltgbert.LtgbertForCausalLM._keys_to_ignore_on_load_unexpected)
+if isinstance(getattr(modeling_ltgbert.LtgbertForCausalLM, '_keys_to_ignore_on_load_missing', None), list):
+    modeling_ltgbert.LtgbertForCausalLM._keys_to_ignore_on_load_missing = set(modeling_ltgbert.LtgbertForCausalLM._keys_to_ignore_on_load_missing)
+
+config = configuration_ltgbert.LtgbertConfig.from_pretrained(repo_dir)
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, trust_remote_code=True)
+model = modeling_ltgbert.LtgbertForCausalLM.from_pretrained(
+    repo_dir,
+    config=config,
+    torch_dtype=torch.float32,
+    low_cpu_mem_usage=False,
+)
+model.to(device)
+model.eval()
+inputs = tokenizer(prompt, return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+logits = outputs[0]
+next_token_id = int(torch.argmax(logits[0, -1]).item())
+text = tokenizer.decode([next_token_id], skip_special_tokens=True)
+RESULT = {"output": text, "logits": logits.detach().cpu().numpy()}

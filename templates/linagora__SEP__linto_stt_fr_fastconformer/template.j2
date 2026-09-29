@@ -1,0 +1,36 @@
+{% set repo_id = repo_id | default("linagora/linto_stt_fr_fastconformer") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set decoder_type = decoder_type | default('transducer') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+decoder_type = "{{ decoder_type }}"
+
+import os
+import json
+import torch
+import nemo.collections.asr as nemo_asr
+from huggingface_hub import hf_hub_download
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    import urllib.request
+    from tempfile import NamedTemporaryFile
+    with NamedTemporaryFile(suffix=os.path.splitext(audio_path)[1] or ".wav", delete=False) as tmp:
+        urllib.request.urlretrieve(audio_path, tmp.name)
+        audio_input = tmp.name
+else:
+    audio_input = audio_path
+
+nemo_file = hf_hub_download(repo_id=repo_id, filename="linto_stt_fr_fastconformer.nemo")
+
+asr_model = nemo_asr.models.ASRModel.restore_from(restore_path=nemo_file, map_location=device)
+asr_model = asr_model.to(device)
+asr_model.eval()
+
+if decoder_type.lower() == "ctc":
+    asr_model.change_decoding_strategy(decoder_type="ctc")
+
+output = asr_model.transcribe([audio_input])[0]
+
+RESULT = {"text": output}

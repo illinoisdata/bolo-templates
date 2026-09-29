@@ -1,34 +1,37 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("maya-research/Veena") %}
-{% set text_input = text_input | default("Today I learned about a new technology that uses artificial intelligence to generate human-like voices.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("आज मैंने एक नई तकनीक के बारे में सीखा जो कृत्रिम बुद्धिमत्ता का उपयोग करके मानव जैसी आवाज़ उत्पन्न कर सकती है।") %}
 {% set speaker = speaker | default("kavya") %}
-{% set temperature = temperature | default(0.4) %}
-{% set top_p = top_p | default(0.9) %}
-{% set output_filename = output_filename | default("veena_output.wav") %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = """{{ text_input }}"""
+text = "{{ text }}"
 speaker = "{{ speaker }}"
-temperature = {{ temperature }}
-top_p = {{ top_p }}
-output_filename = "{{ output_filename }}"
-
-from pathlib import Path
+max_new_tokens = {{ max_new_tokens }}
 
 import torch
-from snac import SNAC
-import soundfile as sf
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
-model = AutoModelForCausalLM.from_pretrained(repo_id)
-model = model.to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+index_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+with open(index_path, "r", encoding="utf-8") as f:
+    import json
+    weight_map = json.load(f)["weight_map"]
+first_weight_file = sorted(set(weight_map.values()))[0]
+model_weight_path = hf_hub_download(repo_id=repo_id, filename=first_weight_file)
+tokenizer_dir = hf_hub_download(repo_id=repo_id, filename="tokenizer.json").rsplit("/", 1)[0]
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir, use_fast=True, local_files_only=True)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+)
+model.to(device)
 model.eval()
-
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-
-snac_model = SNAC.from_pretrained("hubertsiuzdak/snac_24khz")
-snac_model = snac_model.to(device)
-snac_model.eval()
 
 START_OF_SPEECH_TOKEN = 128257
 END_OF_SPEECH_TOKEN = 128258
@@ -38,71 +41,19 @@ START_OF_AI_TOKEN = 128261
 END_OF_AI_TOKEN = 128262
 AUDIO_CODE_BASE_OFFSET = 128266
 
-pad_token_id = tokenizer.pad_token_id
-if pad_token_id is None:
-    pad_token_id = tokenizer.eos_token_id if tokenizer.eos_token_id is not None else tokenizer.bos_token_id
-
-def decode_snac_tokens(snac_tokens, snac_model):
-    if not snac_tokens or len(snac_tokens) % 7 != 0:
-        raise ValueError("SNAC token sequence must contain whole code frames")
-
-    snac_device = next(snac_model.parameters()).device
-    codes_lvl = [[] for _ in range(3)]
-    llm_codebook_offsets = [AUDIO_CODE_BASE_OFFSET + i * 4096 for i in range(7)]
-
-    for i in range(0, len(snac_tokens), 7):
-        codes_lvl[0].append(snac_tokens[i] - llm_codebook_offsets[0])
-        codes_lvl[1].append(snac_tokens[i + 1] - llm_codebook_offsets[1])
-        codes_lvl[1].append(snac_tokens[i + 4] - llm_codebook_offsets[4])
-        codes_lvl[2].append(snac_tokens[i + 2] - llm_codebook_offsets[2])
-        codes_lvl[2].append(snac_tokens[i + 3] - llm_codebook_offsets[3])
-        codes_lvl[2].append(snac_tokens[i + 5] - llm_codebook_offsets[5])
-        codes_lvl[2].append(snac_tokens[i + 6] - llm_codebook_offsets[6])
-
-    hierarchical_codes = []
-    for lvl_codes in codes_lvl:
-        tensor = torch.tensor(lvl_codes, dtype=torch.int32, device=snac_device).unsqueeze(0)
-        if torch.any((tensor < 0) | (tensor > 4095)):
-            raise ValueError("SNAC tokens must be between 0 and 4095 after offset removal")
-        hierarchical_codes.append(tensor)
-
-    with torch.no_grad():
-        audio_hat = snac_model.decode(hierarchical_codes)
-
-    return audio_hat.squeeze().clamp(-1, 1).cpu().numpy()
-
-prompt_tokens = tokenizer.encode(f"<spk_{speaker}> {text_input}", add_special_tokens=False)
-input_tokens = [
-    START_OF_HUMAN_TOKEN,
-    *prompt_tokens,
-    END_OF_HUMAN_TOKEN,
-    START_OF_AI_TOKEN,
-    START_OF_SPEECH_TOKEN,
-]
+prompt = f"<spk_{speaker}> {text}"
+prompt_tokens = tokenizer.encode(prompt, add_special_tokens=False)
+input_tokens = [START_OF_HUMAN_TOKEN, *prompt_tokens, END_OF_HUMAN_TOKEN, START_OF_AI_TOKEN, START_OF_SPEECH_TOKEN]
 input_ids = torch.tensor([input_tokens], device=device)
-max_new_tokens = min(int(len(text_input) * 1.3) * 7 + 21, 700)
 
 with torch.no_grad():
-    generated = model.generate(
+    output = model.generate(
         input_ids,
         max_new_tokens=max_new_tokens,
-        do_sample=True,
-        temperature=temperature,
-        top_p=top_p,
-        repetition_penalty=1.05,
-        pad_token_id=pad_token_id,
+        do_sample=False,
+        pad_token_id=tokenizer.eos_token_id,
         eos_token_id=[END_OF_SPEECH_TOKEN, END_OF_AI_TOKEN],
     )
 
-generated_ids = generated[0][len(input_tokens):].tolist()
-snac_tokens = [
-    token_id
-    for token_id in generated_ids
-    if AUDIO_CODE_BASE_OFFSET <= token_id < (AUDIO_CODE_BASE_OFFSET + 7 * 4096)
-]
-if not snac_tokens:
-    raise ValueError("Model did not produce SNAC audio tokens")
-
-audio = decode_snac_tokens(snac_tokens, snac_model)
-
-RESULT = {"audio": audio}
+generated_ids = output[0][len(input_tokens):].tolist()
+RESULT = {"generated_token_ids": generated_ids, "input_token_count": len(input_tokens)}

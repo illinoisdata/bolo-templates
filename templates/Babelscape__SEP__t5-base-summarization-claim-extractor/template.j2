@@ -1,40 +1,42 @@
 {% set repo_id = repo_id | default("Babelscape/t5-base-summarization-claim-extractor") %}
 {% set device = device | default("cuda:0") %}
-{% set summary_text = summary_text | default("""Simone Biles made a triumphant return to the Olympic stage at the Paris 2024 Games, competing in the women's gymnastics qualifications. Overcoming a previous struggle with the 'twisties' that led to her withdrawal from events at the Tokyo 2020 Olympics, Biles dazzled with strong performances on all apparatus, helping the U.S. team secure a commanding lead in the qualifications. Her routines showcased her resilience and skill, drawing enthusiastic support from a star-studded audience.""") %}
+{% set summary = summary | default('Simone Biles made a triumphant return to the Olympic stage at the Paris 2024 Games, competing in the women’s gymnastics qualifications. Overcoming a previous struggle with the “twisties” that led to her withdrawal from events at the Tokyo 2020 Olympics, Biles dazzled with strong performances on all apparatus, helping the U.S. team secure a commanding lead in the qualifications. Her routines showcased her resilience and skill, drawing enthusiastic support from a star-studded audience') %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set num_beams = num_beams | default(4) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-summary_text = """Simone Biles made a triumphant return to the Olympic stage at the Paris 2024 Games, competing in the women's gymnastics qualifications. Overcoming a previous struggle with the 'twisties' that led to her withdrawal from events at the Tokyo 2020 Olympics, Biles dazzled with strong performances on all apparatus, helping the U.S. team secure a commanding lead in the qualifications. Her routines showcased her resilience and skill, drawing enthusiastic support from a star-studded audience."""
-from pathlib import Path
-import re
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+summary = "{{ summary }}"
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+import torch
+from transformers import T5ForConditionalGeneration, T5Tokenizer
+from huggingface_hub import hf_hub_download
 
-encoded_inputs = tokenizer(
-    summary_text,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-    max_length=512,
-)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="spiece.model")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+hf_hub_download(repo_id=repo_id, filename="generation_config.json")
 
-generated_tokens = model.generate(
-    **encoded_inputs,
-    num_beams=4,
-    max_length=200,
-    min_length=30,
-    no_repeat_ngram_size=3,
-    early_stopping=True,
-)
+model = T5ForConditionalGeneration.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+).to(device)
+model.eval()
 
-decoded_outputs = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-claims_text = decoded_outputs[0].strip()
-claims_list = [
-    segment.strip()
-    for segment in re.split(r"\n+|(?<=[.!?])\s+", claims_text)
-    if segment.strip()
-]
+tokenizer = T5Tokenizer.from_pretrained(repo_id)
+inputs = tokenizer([summary], return_tensors="pt", padding=True, truncation=True).to(device)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+    )
+claims_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+claims = [c.strip() for c in claims_text.split('.') if c.strip()]
 
-RESULT = {"claims_text": claims_text, "claims": claims_list}
+RESULT = {"claims_text": claims_text, "claims": claims}

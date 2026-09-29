@@ -1,0 +1,23 @@
+{% set repo_id = repo_id | default("dphn/Dolphin3.0-Llama3.2-1B") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Write a short haiku about the ocean.') %}
+{% set system_prompt = system_prompt | default('You are Dolphin, a helpful AI assistant.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+system_prompt = "{{ system_prompt }}"
+
+import json
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+messages = [
+    {"role": "system", "content": system_prompt},
+    {"role": "user", "content": prompt},
+]
+input_text = "<|im_start|>system\n" + system_prompt + "<|im_end|>\n<|im_start|>user\n" + prompt + "<|im_end|>\n<|im_start|>assistant\n"
+
+RESULT = {"input_text": input_text, "config": config}

@@ -1,0 +1,69 @@
+{% set repo_id = repo_id | default("ahotrod/electra_large_discriminator_squad2_512") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What is the model fine-tuned on?') %}
+{% set context = context | default('ELECTRA_large_discriminator language model fine-tuned on SQuAD2.0.') %}
+{% set max_length = max_length | default(384) %}
+{% set doc_stride = doc_stride | default(128) %}
+{% set max_query_length = max_query_length | default(64) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+max_length = {{ max_length }}
+doc_stride = {{ doc_stride }}
+max_query_length = {{ max_query_length }}
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+model_dir = os.path.dirname(weights_path)
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = AutoModelForQuestionAnswering.from_pretrained(model_dir)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(
+    question,
+    context,
+    max_length=max_length,
+    truncation="only_second",
+    stride=doc_stride,
+    return_overflowing_tokens=False,
+    return_offsets_mapping=True,
+    padding="max_length",
+    return_tensors="pt",
+)
+
+offset_mapping = inputs.pop("offset_mapping")[0]
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits[0]
+end_logits = outputs.end_logits[0]
+start_index = int(torch.argmax(start_logits).item())
+end_index = int(torch.argmax(end_logits).item())
+if end_index < start_index:
+    end_index = start_index
+
+answer_tokens = inputs["input_ids"][0][start_index:end_index + 1].tolist()
+answer = tokenizer.decode(answer_tokens, skip_special_tokens=True).strip()
+
+if start_index < len(offset_mapping) and end_index < len(offset_mapping):
+    start_char, _ = offset_mapping[start_index].tolist()
+    _, end_char = offset_mapping[end_index].tolist()
+    if end_char > start_char:
+        answer = context[start_char:end_char].strip()
+
+RESULT = {"answer": answer, "start_index": start_index, "end_index": end_index}

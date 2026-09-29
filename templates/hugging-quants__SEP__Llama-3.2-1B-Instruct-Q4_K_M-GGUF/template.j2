@@ -1,0 +1,27 @@
+{% set repo_id = repo_id | default("hugging-quants/Llama-3.2-1B-Instruct-Q4_K_M-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Explain in one short paragraph what a GGUF model is.') %}
+{% set quant_filename = quant_filename | default('llama-3.2-1b-instruct-q4_k_m.gguf') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+quant_filename = "{{ quant_filename }}"
+
+import os
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+llm = Llama(
+    model_path=model_path,
+    n_ctx=512,
+    n_threads=max(1, (os.cpu_count() or 1) // 2),
+    n_gpu_layers=-1 if str(device).startswith('cuda') else 0,
+    verbose=False,
+)
+
+output = llm(prompt, max_tokens=128, temperature=0.2, top_p=0.95, stop=["</s>"])
+text = output["choices"][0]["text"].strip()
+
+RESULT = {"text": text}

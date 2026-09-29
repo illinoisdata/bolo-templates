@@ -1,0 +1,68 @@
+{% set repo_id = repo_id | default("microsoft/renderformer-v1-base") %}
+{% set device = device | default("cuda:0") %}
+{% set model_max_length = model_max_length | default(128) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+model_max_length = {{ model_max_length }}
+
+import os
+import json
+import torch
+import torch.nn.functional as F
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file as load_safetensors
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+state_dict = load_safetensors(weights_path)
+
+class RenderFormer(torch.nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        latent_dim = config["latent_dim"]
+        patch_size = config["patch_size"]
+        out_ch = 3
+        self.patch_size = patch_size
+        self.patch_embed = torch.nn.Conv2d(3, latent_dim, kernel_size=patch_size, stride=patch_size)
+        self.blocks = torch.nn.Sequential(
+            torch.nn.LayerNorm(latent_dim),
+            torch.nn.Linear(latent_dim, latent_dim),
+            torch.nn.GELU(),
+            torch.nn.Linear(latent_dim, latent_dim),
+        )
+        self.head = torch.nn.ConvTranspose2d(latent_dim, out_ch, kernel_size=patch_size, stride=patch_size)
+
+    def forward(self, x):
+        z = self.patch_embed(x)
+        b, c, h, w = z.shape
+        z = z.permute(0, 2, 3, 1).contiguous().view(b, h * w, c)
+        z = self.blocks(z)
+        z = z.view(b, h, w, c).permute(0, 3, 1, 2).contiguous()
+        y = self.head(z)
+        return torch.sigmoid(y)
+
+model = RenderFormer(config)
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model = model.to(device).eval()
+
+image_path = "/u/yunqili4/projects/ML-code-generation/data/image1.jpeg"
+if isinstance(image_path, str) and image_path.startswith(("http://", "https://")):
+    from urllib.request import urlopen
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+side = max(image.size)
+image = image.resize((side, side))
+image = image.resize((224, 224))
+image_tensor = torch.from_numpy(__import__("numpy").array(image)).float() / 255.0
+image_tensor = image_tensor.permute(2, 0, 1).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    output = model(image_tensor)[0].permute(1, 2, 0).detach().cpu().numpy()
+
+RESULT = {"output_image": output}

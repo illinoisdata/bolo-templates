@@ -1,68 +1,54 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("ClueAI/ChatYuan-large-v1") %}
-{% set prompt = prompt | default("用户：帮我写一个请假条，我因为新冠不舒服，需要请假3天，请领导批准\\n小元：") %}
-{% set max_input_length = max_input_length | default(768) %}
-{% set max_new_tokens = max_new_tokens | default(512) %}
-{% set sample_generation = sample_generation | default(true) %}
+{% set device = device | default("cuda:0") %}
+{% set max_length = max_length | default(250) %}
 {% set temperature = temperature | default(0.7) %}
 {% set top_p = top_p | default(1.0) %}
+{% set input_text = input_text | default('帮我写个请假条，我因为新冠不舒服，需要请假3天，请领导批准') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
-max_input_length = {{ max_input_length }}
-max_new_tokens = {{ max_new_tokens }}
-sample_generation = {{ "True" if sample_generation else "False" }}
+max_length = {{ max_length }}
 temperature = {{ temperature }}
 top_p = {{ top_p }}
+input_text = {{ input_text | tojson }}
 
+import os
 import torch
-from pathlib import Path
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import T5Tokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+spiece_model_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+spiece_vocab_path = hf_hub_download(repo_id=repo_id, filename="spiece.vocab")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+model_dir = os.path.dirname(weights_path)
+tokenizer = T5Tokenizer.from_pretrained(model_dir)
+model = T5ForConditionalGeneration.from_pretrained(model_dir)
+model.to(device)
 model.eval()
 
-def preprocess(text: str) -> str:
+def preprocess(text):
     return text.replace("\n", "\\n").replace("\t", "\\t")
 
-def postprocess(text: str) -> str:
+def postprocess(text):
     return text.replace("\\n", "\n").replace("\\t", "\t")
 
-preprocessed_prompt = preprocess(prompt)
-encoding = tokenizer(
-    preprocessed_prompt,
-    truncation=True,
-    padding=True,
-    max_length=max_input_length,
-    return_tensors="pt",
+prompt = "用户：" + preprocess(input_text) + "\n小元："
+encoding = tokenizer(text=[prompt], truncation=True, padding=True, max_length=768, return_tensors="pt")
+encoding = {k: v.to(device) for k, v in encoding.items()}
+
+out = model.generate(
+    **encoding,
+    return_dict_in_generate=True,
+    output_scores=False,
+    max_new_tokens=max_length,
+    do_sample=True,
+    top_p=top_p,
+    temperature=temperature,
+    no_repeat_ngram_size=3,
 )
-encoding = {key: tensor.to(torch_device) for key, tensor in encoding.items()}
+output_text = tokenizer.batch_decode(out["sequences"], skip_special_tokens=True)[0]
+output_text = postprocess(output_text)
 
-generate_kwargs = {
-    "return_dict_in_generate": True,
-    "output_scores": False,
-    "max_new_tokens": max_new_tokens,
-}
-if sample_generation:
-    generate_kwargs.update(
-        {
-            "do_sample": True,
-            "top_p": top_p,
-            "temperature": temperature,
-            "no_repeat_ngram_size": 3,
-        }
-    )
-else:
-    generate_kwargs.update(
-        {"do_sample": False, "num_beams": 1, "length_penalty": 0.6}
-    )
-
-output_sequences = model.generate(**encoding, **generate_kwargs)
-sequences = output_sequences.sequences if hasattr(output_sequences, "sequences") else output_sequences
-decoded_sequences = tokenizer.batch_decode(sequences, skip_special_tokens=True)
-generated_text = postprocess(decoded_sequences[0])
-
-RESULT = {"generated_text": generated_text}
+RESULT = {"output": output_text}

@@ -1,0 +1,51 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("dima806/fairface_gender_image_detection") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import os
+import requests
+from io import BytesIO
+from PIL import Image
+import torch
+import numpy as np
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+from transformers import AutoModelForImageClassification
+
+weights_path = hf_hub_download(repo_id=repo_id, filename='model.safetensors')
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename='preprocessor_config.json')
+repo_dir = os.path.dirname(weights_path)
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+from transformers import ViTConfig, ViTForImageClassification
+config = ViTConfig.from_pretrained(os.path.dirname(config_path), local_files_only=True)
+model = ViTForImageClassification(config)
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+img = image.resize((224, 224))
+arr = np.asarray(img).astype('float32') / 255.0
+arr = (arr - np.array([0.5, 0.5, 0.5], dtype='float32')) / np.array([0.5, 0.5, 0.5], dtype='float32')
+inputs = torch.from_numpy(arr).permute(2, 0, 1).unsqueeze(0).to(device)
+with torch.no_grad():
+    outputs = model(pixel_values=inputs)
+    probs = torch.softmax(outputs.logits, dim=-1)[0]
+
+id2label = model.config.id2label
+pred_idx = int(torch.argmax(probs).item())
+RESULT = {
+    'label': id2label[pred_idx],
+    'score': float(probs[pred_idx].item()),
+    'scores': {id2label[int(i)]: float(probs[i].item()) for i in range(probs.shape[0])},
+}

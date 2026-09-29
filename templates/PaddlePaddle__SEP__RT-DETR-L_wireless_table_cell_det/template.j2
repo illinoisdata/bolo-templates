@@ -1,0 +1,43 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set threshold = threshold | default(0.3) %}
+{% set repo_id = repo_id | default("PaddlePaddle/RT-DETR-L_wireless_table_cell_det") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+threshold = {{ threshold }}
+
+import os
+import json
+import numpy as np
+from PIL import Image
+from urllib.parse import urlparse
+import paddle
+from huggingface_hub import hf_hub_download
+from paddleocr import TableCellsDetection
+
+model_file = hf_hub_download(repo_id=repo_id, filename='inference.pdiparams')
+config_file = hf_hub_download(repo_id=repo_id, filename='config.json')
+_ = hf_hub_download(repo_id=repo_id, filename='inference.yml')
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    input_image = image_path
+else:
+    input_image = image_path
+
+if device.startswith('cuda') and not paddle.is_compiled_with_cuda():
+    device = 'cpu'
+
+model = TableCellsDetection(model_name='RT-DETR-L_wireless_table_cell_det', device=device)
+output = model.predict(input_image, threshold=threshold, batch_size=1)
+
+predictions = []
+for res in output:
+    if hasattr(res, 'json'):
+        predictions.append(res.json)
+    elif hasattr(res, '__dict__'):
+        predictions.append(res.__dict__)
+    else:
+        predictions.append(str(res))
+
+RESULT = {'predictions': predictions}

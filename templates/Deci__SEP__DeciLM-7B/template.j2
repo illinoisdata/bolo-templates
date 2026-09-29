@@ -1,0 +1,63 @@
+{% set repo_id = repo_id | default("Deci/DeciLM-7B") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set revision = revision | default("main") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set use_fast_tokenizer = use_fast_tokenizer | default(false) %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+revision = {{ revision | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+use_fast_tokenizer = {{ "True" if use_fast_tokenizer else "False" }}
+
+import importlib.util
+import os
+import sys
+import types
+
+import torch
+from huggingface_hub import snapshot_download
+from transformers import AutoTokenizer, pipeline
+
+repo_cache_path = snapshot_download(repo_id=repo_id, repo_type="model", revision=revision)
+
+if "deci" not in sys.modules:
+    deci_pkg = types.ModuleType("deci")
+    deci_pkg.__path__ = [repo_cache_path]
+    sys.modules["deci"] = deci_pkg
+
+
+def _load_repo_module(module_name, filename):
+    module_path = os.path.join(repo_cache_path, filename)
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+_load_repo_module("deci.version_check", "version_check.py")
+config_module = _load_repo_module("deci.configuration_decilm", "configuration_decilm.py")
+model_module = _load_repo_module("deci.modeling_decilm", "modeling_decilm.py")
+
+DeciLMConfig = config_module.DeciLMConfig
+DeciLMForCausalLM = model_module.DeciLMForCausalLM
+
+tokenizer = AutoTokenizer.from_pretrained(repo_cache_path, revision=revision, use_fast=use_fast_tokenizer)
+config = DeciLMConfig.from_pretrained(repo_cache_path, revision=revision)
+model = DeciLMForCausalLM.from_pretrained(repo_cache_path, config=config, revision=revision)
+
+torch_device = torch.device(device)
+model = model.to(torch_device)
+if torch_device.type == "cuda":
+    pipeline_device = torch_device.index if torch_device.index is not None else 0
+else:
+    pipeline_device = -1
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=pipeline_device)
+
+generation = pipe(input_prompt, max_new_tokens=max_new_tokens)
+RESULT = {"generated_text": generation}

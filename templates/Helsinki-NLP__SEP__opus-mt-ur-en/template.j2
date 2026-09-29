@@ -1,30 +1,23 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-ur-en") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("یہ ایک چھوٹا جملہ ہے۔") %}
+{% set text = text | default('یہ ایک مثال جملہ ہے۔') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
+text = {{ text | tojson }}
 
-from pathlib import Path
+import torch
+from transformers import MarianMTModel, MarianTokenizer
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = MarianMTModel.from_pretrained(repo_id)
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
 model.to(device)
+model.eval()
 
-input_strings = [input_text]
-encoded_inputs = tokenizer(
-    input_strings,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-)
-encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
+inputs = tokenizer([text], return_tensors="pt", padding=True, truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_tokens = model.generate(**encoded_inputs)
+with torch.no_grad():
+    generated_ids = model.generate(**inputs)
+translation = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-decoded_translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-decoded_translations = [translation.strip() for translation in decoded_translations]
-
-RESULT = {"translations": decoded_translations}
+RESULT = {"translation": translation}

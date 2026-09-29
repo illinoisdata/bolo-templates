@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("Habana/bert-large-uncased-whole-word-masking") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The capital of France is [MASK].') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gaudi_config.json")
+
+model_name = "bert-large-uncased-whole-word-masking"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForMaskedLM.from_pretrained(model_name)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+mask_token_index = (inputs["input_ids"] == tokenizer.mask_token_id).nonzero(as_tuple=False)
+mask_positions = mask_token_index[:, 1].tolist() if mask_token_index.numel() else []
+
+predictions = []
+for pos in mask_positions:
+    token_id = int(logits[0, pos].argmax().item())
+    predictions.append(tokenizer.decode([token_id]).strip())
+
+RESULT = {
+    "config_path": config_path,
+    "text": text,
+    "predictions": predictions,
+}

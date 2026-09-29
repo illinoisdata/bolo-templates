@@ -1,0 +1,34 @@
+{% set repo_id = repo_id | default("cl-nagoya/ruri-base") %}
+{% set device = device | default("cuda:0") %}
+{% set question1 = question1 | default('クエリ: 瑠璃色はどんな色？') %}
+{% set passage1 = passage1 | default('文章: 瑠璃色（るりいろ）は、紫みを帯びた濃い青。名は、半貴石の瑠璃（ラピスラズリ、英: lapis lazuli）による。') %}
+{% set question2 = question2 | default('クエリ: ワシやタカのように、鋭いくちばしと爪を持った大型の鳥類を総称して「何類」というでしょう?') %}
+{% set passage2 = passage2 | default('文章: ワシ、タカ、ハゲワシ、ハヤブサ、コンドル、フクロウが代表的である。') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question1 = "{{ question1 }}"
+passage1 = "{{ passage1 }}"
+question2 = "{{ question2 }}"
+passage2 = "{{ passage2 }}"
+
+import os
+import torch
+import torch.nn.functional as F
+from huggingface_hub import hf_hub_download
+from sentence_transformers import SentenceTransformer
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+model_dir = os.path.dirname(config_path)
+model = SentenceTransformer(model_dir, device=device)
+
+sentences = [question1, passage1, question2, passage2]
+embeddings = model.encode(sentences, convert_to_tensor=True, device=device)
+similarities = F.cosine_similarity(embeddings.unsqueeze(0), embeddings.unsqueeze(1), dim=2)
+
+RESULT = {
+    "embeddings": embeddings,
+    "similarities": similarities,
+}

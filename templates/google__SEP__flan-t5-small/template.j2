@@ -1,20 +1,35 @@
 {% set repo_id = repo_id | default("google/flan-t5-small") %}
 {% set device = device | default("cuda:0") %}
-{% set text_prompt = text_prompt | default("translate English to German: How old are you?") %}
+{% set text_input = text_input | default('translate English to German: How old are you?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_prompt = "{{ text_prompt }}"
-
-from pathlib import Path
+text_input = {{ text_input | tojson }}
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-inputs = tokenizer(text_prompt, return_tensors="pt").to(device)
-outputs = model.generate(**inputs)
-generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+tokenizer = AutoTokenizer.from_pretrained(
+    tokenizer_json_path.rsplit("/", 1)[0],
+    use_fast=True,
+)
+model = AutoModelForSeq2SeqLM.from_pretrained(weights_path.rsplit("/", 1)[0], torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-RESULT = {"generated_text": generated_text}
+inputs = tokenizer(text_input, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=32, num_beams=4)
+
+decoded = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": decoded}

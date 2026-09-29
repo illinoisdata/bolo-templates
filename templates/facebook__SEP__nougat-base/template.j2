@@ -1,34 +1,55 @@
 {% set repo_id = repo_id | default("facebook/nougat-base") %}
 {% set device = device | default("cuda:0") %}
-{% set document_image_path = document_image_path | default('/u/yli77/projects/ML-code-generation/data/doc.jpeg') %}
-{% set max_new_tokens = max_new_tokens | default(1024) %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+{% set max_new_tokens = max_new_tokens | default(768) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-document_image_path = "{{ document_image_path }}"
+image_path = "{{ image_path }}"
 max_new_tokens = {{ max_new_tokens }}
-from io import BytesIO
-from pathlib import Path
 
-import requests
+import os
+import torch
 from PIL import Image
-from transformers import AutoProcessor, VisionEncoderDecoderModel
+from transformers import VisionEncoderDecoderModel, NougatProcessor
+from huggingface_hub import hf_hub_download
+from urllib.parse import urlparse
+import requests
+from io import BytesIO
 
-processor = AutoProcessor.from_pretrained(repo_id)
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processor = NougatProcessor.from_pretrained(repo_id)
 model = VisionEncoderDecoderModel.from_pretrained(repo_id).to(device)
 model.eval()
 
-def _load_image(image_path: str) -> Image.Image:
-    if image_path.startswith("http://") or image_path.startswith("https://"):
-        response = requests.get(image_path, stream=True)
-        response.raise_for_status()
-        return Image.open(BytesIO(response.content)).convert("RGB")
-    return Image.open(image_path).convert("RGB")
+pixel_values = processor(image, return_tensors="pt").pixel_values.to(device)
 
-image = _load_image(document_image_path)
-vision_inputs = processor.image_processor(images=image, return_tensors="pt", data_format="channels_first", input_channel_dim="channels_last")
-pixel_values = vision_inputs.pixel_values.to(device)
+if processor.tokenizer is not None and processor.tokenizer.bos_token_id is not None:
+    decoder_input_ids = torch.tensor([[processor.tokenizer.bos_token_id]], device=device)
+else:
+    decoder_input_ids = None
 
-generated_ids = model.generate(pixel_values, max_new_tokens=max_new_tokens)
-transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+with torch.inference_mode():
+    generated_ids = model.generate(
+        pixel_values,
+        decoder_input_ids=decoder_input_ids,
+        max_new_tokens=max_new_tokens,
+        pad_token_id=processor.tokenizer.pad_token_id if processor.tokenizer is not None else None,
+        eos_token_id=processor.tokenizer.eos_token_id if processor.tokenizer is not None else None,
+    )
 
-RESULT = {"transcription": transcription}
+generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"text": generated_text}

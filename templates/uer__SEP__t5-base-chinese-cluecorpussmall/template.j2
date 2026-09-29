@@ -1,30 +1,35 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("uer/t5-base-chinese-cluecorpussmall") %}
-{% set text_input = text_input | default("作为电子extra0的平台，京东绝对是领先者。") %}
-{% set max_length = max_length | default(128) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("作为电子extra0的平台，京东绝对是领先者。如今的刘强extra1已经是身价过extra2的老板。") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-max_length = {{ max_length }}
-
-import os
-from pathlib import Path
+text = "{{ text }}"
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import BertTokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer = BertTokenizer.from_pretrained(repo_id)
+model = T5ForConditionalGeneration.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+    low_cpu_mem_usage=True,
+)
 model.to(device)
+model.eval()
 
-tokenized_inputs = tokenizer(text_input, return_tensors="pt")
-inputs = {
-    name: tensor.to(device)
-    for name, tensor in tokenized_inputs.items()
-    if name != "token_type_ids"
-}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items() if k != "token_type_ids"}
 
-generated_tokens = model.generate(**inputs, max_length=max_length)
-generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_length=50,
+        do_sample=False,
+    )
+
+generated_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
 RESULT = {"generated_text": generated_text}

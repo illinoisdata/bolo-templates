@@ -1,0 +1,70 @@
+{% set repo_id = repo_id | default("stanfordnlp/stanza-nl") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Ik houd van natuurlijke taalverwerking.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import os
+import stanza
+
+# Download the Dutch package from the Hub-local repository snapshot.
+from huggingface_hub import hf_hub_download
+
+# Ensure Stanza uses a local model directory derived from a downloaded repo file.
+repo_file = hf_hub_download(repo_id=repo_id, filename='README.md')
+model_dir = os.path.join(os.path.dirname(repo_file), 'stanza_resources')
+os.makedirs(model_dir, exist_ok=True)
+
+# Download required model files from the repo snapshot into the local model_dir.
+model_files = [
+    'models/tokenize/alpino.pt',
+    'models/mwt/alpino.pt',
+    'models/pos/alpino_charlm.pt',
+    'models/lemma/alpino_charlm.pt',
+    'models/depparse/alpino_charlm.pt',
+    'models/ner/conll02.pt',
+]
+for fname in model_files:
+    hf_hub_download(repo_id=repo_id, filename=fname)
+
+# Configure stanza pipeline to use the downloaded package resources.
+stanza.download('nl', model_dir=model_dir, package='alpino', processors='tokenize,mwt,pos,lemma,depparse,ner', verbose=False)
+
+nlp = stanza.Pipeline(
+    'nl',
+    dir=model_dir,
+    package='alpino',
+    processors='tokenize,mwt,pos,lemma,depparse,ner',
+    use_gpu=(device.startswith('cuda')),
+    verbose=False,
+)
+
+doc = nlp(text)
+
+sentences = []
+for sent in doc.sentences:
+    tokens = []
+    for word in sent.words:
+        tokens.append({
+            'text': word.text,
+            'lemma': word.lemma,
+            'upos': word.upos,
+            'feats': word.feats,
+            'head': word.head,
+            'deprel': word.deprel,
+        })
+    ents = []
+    for ent in sent.ents:
+        ents.append({
+            'text': ent.text,
+            'type': ent.type,
+            'start_char': ent.start_char,
+            'end_char': ent.end_char,
+        })
+    sentences.append({'tokens': tokens, 'entities': ents})
+
+RESULT = {
+    'text': text,
+    'sentences': sentences,
+}

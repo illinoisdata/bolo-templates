@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("timm/ViT-SO400M-14-SigLIP-384") %}
+{% set device = device | default("cuda:0") %}
+{% set labels_list = labels_list | default(["a dog", "a cat", "a donut", "a beignet"]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+labels_list = {{ labels_list }}
+
+import torch
+import torch.nn.functional as F
+from PIL import Image
+from urllib.request import urlopen
+from huggingface_hub import hf_hub_download
+from open_clip import create_model_from_pretrained, get_tokenizer
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+model, preprocess = create_model_from_pretrained("hf-hub:" + repo_id)
+model = model.to(device).eval()
+tokenizer = get_tokenizer("hf-hub:" + repo_id)
+
+image_url = "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/beignets-task-guide.png"
+if image_url.startswith(("http://", "https://")):
+    image = Image.open(urlopen(image_url)).convert("RGB")
+else:
+    image = Image.open(image_url).convert("RGB")
+
+image_input = preprocess(image).unsqueeze(0).to(device)
+text = tokenizer(labels_list, context_length=model.context_length).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_input)
+    text_features = model.encode_text(text)
+    image_features = F.normalize(image_features, dim=-1)
+    text_features = F.normalize(text_features, dim=-1)
+    logits = image_features @ text_features.T * model.logit_scale.exp() + model.logit_bias
+    text_probs = torch.sigmoid(logits)[0]
+
+RESULT = {
+    "labels": labels_list,
+    "probabilities": [float(p.item()) for p in text_probs],
+}

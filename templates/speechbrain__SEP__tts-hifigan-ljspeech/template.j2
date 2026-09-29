@@ -1,0 +1,62 @@
+{% set repo_id = repo_id | default("speechbrain/tts-hifigan-ljspeech") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set sample_rate = sample_rate | default(22050) %}
+{% set hop_length = hop_length | default(256) %}
+{% set win_length = win_length | default(None) %}
+{% set n_mels = n_mels | default(80) %}
+{% set n_fft = n_fft | default(1024) %}
+{% set f_min = f_min | default(0.0) %}
+{% set f_max = f_max | default(8000.0) %}
+{% set power = power | default(1) %}
+{% set normalized = normalized | default(False) %}
+{% set min_max_energy_norm = min_max_energy_norm | default(True) %}
+{% set norm = norm | default('slaney') %}
+{% set mel_scale = mel_scale | default('slaney') %}
+{% set compression = compression | default(True) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+sample_rate = {{ sample_rate }}
+hop_length = {{ hop_length }}
+win_length = {{ win_length }}
+n_mels = {{ n_mels }}
+n_fft = {{ n_fft }}
+f_min = {{ f_min }}
+f_max = {{ f_max }}
+power = {{ power }}
+normalized = {{ normalized }}
+min_max_energy_norm = {{ min_max_energy_norm }}
+norm = "{{ norm }}"
+mel_scale = "{{ mel_scale }}"
+compression = {{ compression }}
+
+import os
+import torch
+import soundfile as sf
+import torchaudio
+from huggingface_hub import hf_hub_download
+from speechbrain.inference.vocoders import HIFIGAN
+import torchaudio.transforms as T
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="generator.ckpt")
+hparams_path = hf_hub_download(repo_id=repo_id, filename="hyperparams.yaml")
+
+waveform_np, sr = sf.read(audio_path)
+waveform = torch.from_numpy(waveform_np).float()
+if waveform.ndim == 1:
+    waveform = waveform.unsqueeze(0)
+else:
+    waveform = waveform.transpose(0, 1)
+
+if sr != sample_rate:
+    waveform = torchaudio.transforms.Resample(orig_freq=sr, new_freq=sample_rate)(waveform)
+
+vocoder = HIFIGAN.from_hparams(source=repo_id, savedir=os.path.dirname(weights_path), run_opts={"device": device})
+
+mel_transform = T.MelSpectrogram(sample_rate=sample_rate, n_fft=n_fft, win_length=win_length, hop_length=hop_length, f_min=f_min, f_max=f_max, n_mels=n_mels, power=power, normalized=normalized, norm=norm, mel_scale=mel_scale)
+spectrogram = mel_transform(waveform.squeeze()).to(device)
+waveforms = vocoder.decode_batch(spectrogram)
+output_waveform = waveforms.squeeze(1).detach().cpu()
+
+RESULT = {"waveform": output_waveform, "sample_rate": sample_rate}

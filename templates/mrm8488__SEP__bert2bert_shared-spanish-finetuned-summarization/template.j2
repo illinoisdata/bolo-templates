@@ -1,47 +1,42 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("mrm8488/bert2bert_shared-spanish-finetuned-summarization") %}
-{% set text_input = text_input | default("Al filo de las 22.00 horas del jueves, la Asamblea de Madrid vive un momento sorprendente: Vox decide no apoyar una propuesta del PP en favor del blindaje fiscal de la Comunidad.") %}
-{% set max_new_tokens = max_new_tokens | default(60) %}
-{% set num_beams = num_beams | default(4) %}
-{% set max_input_length = max_input_length | default(512) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Al filo de las 22.00 horas del jueves, la Asamblea de Madrid vive un momento sorprendente: Vox decide no apoyar una propuesta del PP en favor del blindaje fiscal de la Comunidad. Se ha roto la unidad de los tres partidos de derechas.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = {{ text_input | tojson }}
-max_new_tokens = {{ max_new_tokens }}
-num_beams = {{ num_beams }}
-max_input_length = {{ max_input_length }}
+text = {{ text | tojson }}
 
+import os
 import torch
-from pathlib import Path
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import BertTokenizerFast, EncoderDecoderModel
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+local_device = torch.device(device if torch.cuda.is_available() or device == "cpu" else "cpu")
+
+tokenizer_dir = os.path.dirname(vocab_file)
+tokenizer = BertTokenizerFast.from_pretrained(tokenizer_dir)
+model = EncoderDecoderModel.from_pretrained(os.path.dirname(model_file), local_files_only=True).to(local_device)
 model.eval()
 
-inputs = tokenizer(
-    text_input,
-    return_tensors="pt",
-    padding="max_length",
-    truncation=True,
-    max_length=max_input_length,
-)
-model_inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs = tokenizer([text], padding="max_length", truncation=True, max_length=512, return_tensors="pt")
+input_ids = inputs.input_ids.to(local_device)
+attention_mask = inputs.attention_mask.to(local_device)
 
 with torch.no_grad():
-    generated_tokens = model.generate(
-        **model_inputs,
-        max_new_tokens=max_new_tokens,
-        num_beams=num_beams,
+    output_ids = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        max_length=64,
+        min_length=8,
+        num_beams=4,
         no_repeat_ngram_size=3,
-        length_penalty=2.0,
         early_stopping=True,
     )
-
-summary = tokenizer.decode(
-    generated_tokens[0],
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-)
+summary = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
 RESULT = {"summary": summary}

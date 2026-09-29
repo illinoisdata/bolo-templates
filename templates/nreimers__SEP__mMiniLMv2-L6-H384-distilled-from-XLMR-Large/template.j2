@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+import torch
+from transformers import pipeline
+
+if isinstance(device, str) and device.startswith("cuda") and not torch.cuda.is_available():
+    device = "cpu"
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

@@ -1,0 +1,107 @@
+{% set repo_id = repo_id | default("yucornetto/tokenizer_titok_l32_imagenet") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set num_tokens = num_tokens | default(32) %}
+{% set crop_size = crop_size | default(256) %}
+{% set topk = topk | default(8) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+num_tokens = {{ num_tokens }}
+crop_size = {{ crop_size }}
+topk = {{ topk }}
+
+import json
+import os
+from pathlib import Path
+
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from PIL import Image
+from safetensors.torch import load_file
+from transformers import ViTConfig, ViTModel
+from huggingface_hub import hf_hub_download
+
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+vq_cfg = cfg["model"]["vq_model"]
+codebook_size = int(vq_cfg["codebook_size"])
+latent_tokens = int(vq_cfg["num_latent_tokens"])
+image_size = int(cfg["dataset"]["preprocessing"]["crop_size"])
+
+
+class TiTokTokenizer(nn.Module):
+    def __init__(self, codebook_size: int, latent_tokens: int):
+        super().__init__()
+        enc_cfg = ViTConfig(
+            image_size=image_size,
+            patch_size=16,
+            num_channels=3,
+            hidden_size=768,
+            num_hidden_layers=12,
+            num_attention_heads=12,
+            intermediate_size=3072,
+        )
+        dec_cfg = ViTConfig(
+            image_size=image_size,
+            patch_size=16,
+            num_channels=3,
+            hidden_size=768,
+            num_hidden_layers=12,
+            num_attention_heads=12,
+            intermediate_size=3072,
+        )
+        self.encoder = ViTModel(enc_cfg)
+        self.decoder = ViTModel(dec_cfg)
+        self.pool = nn.AdaptiveAvgPool1d(latent_tokens)
+        self.latent_proj = nn.Linear(768, 768)
+        self.codebook = nn.Embedding(codebook_size, 768)
+        self.classifier = nn.Linear(768, codebook_size)
+        self.recon = nn.Conv2d(768, 3, kernel_size=1)
+
+    def forward(self, pixel_values):
+        enc = self.encoder(pixel_values=pixel_values).last_hidden_state[:, 1:, :]
+        enc = self.pool(enc.transpose(1, 2)).transpose(1, 2)
+        enc = self.latent_proj(enc)
+        logits = self.classifier(enc)
+        tokens = logits.argmax(dim=-1)
+        z = self.codebook(tokens)
+        z_img = z.transpose(1, 2).reshape(z.shape[0], z.shape[2], 4, 8)
+        z_img = F.interpolate(z_img, size=(image_size, image_size), mode="bilinear", align_corners=False)
+        decoded = torch.sigmoid(self.recon(z_img))
+        return tokens, decoded
+
+
+model = TiTokTokenizer(codebook_size=codebook_size, latent_tokens=latent_tokens)
+state_dict = load_file(weights_path)
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
+model.eval()
+
+if str(image_path).startswith(("http://", "https://")):
+    import requests
+    from io import BytesIO
+    img = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    img = Image.open(image_path).convert("RGB")
+
+img = img.resize((image_size, image_size))
+pixel_values = torch.tensor(np.array(img), dtype=torch.float32).permute(2, 0, 1) / 255.0
+pixel_values = pixel_values.unsqueeze(0).to(device)
+
+with torch.no_grad():
+    tokens, reconstructed = model(pixel_values)
+
+recon_img = reconstructed[0].detach().cpu().clamp(0, 1)
+recon_img = (recon_img.permute(1, 2, 0).numpy() * 255).astype(np.uint8)
+recon_img = Image.fromarray(recon_img)
+
+output_tokens = tokens[0].detach().cpu().tolist()
+RESULT = {"tokens": output_tokens, "reconstruction": recon_img}

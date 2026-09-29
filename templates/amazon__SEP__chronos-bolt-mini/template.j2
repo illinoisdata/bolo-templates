@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("amazon/chronos-bolt-mini") %}
+{% set device = device | default("cuda:0") %}
+{% set prediction_length = prediction_length | default(12) %}
+{% set context = context | default([1.0, 2.0, 3.0, 2.5, 2.0, 3.5, 4.0, 4.5, 5.0, 4.8, 5.2, 5.5, 5.8, 6.0, 6.2, 6.5, 6.8, 7.0, 7.2, 7.5, 7.8, 8.0, 8.2, 8.5]) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prediction_length = {{ prediction_length }}
+context = {{ context }}
+
+import torch
+from chronos.chronos_bolt import ChronosBoltPipeline, ChronosBoltModelForForecasting
+
+model = ChronosBoltModelForForecasting.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+pipeline = ChronosBoltPipeline(model)
+context_tensor = torch.tensor(context, dtype=torch.float32, device=device)
+forecast = pipeline.predict(inputs=context_tensor, prediction_length=prediction_length)
+
+RESULT = {"forecast": forecast.detach().cpu().tolist() if hasattr(forecast, "detach") else forecast}

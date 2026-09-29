@@ -1,39 +1,39 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("ufal/eleczech-lc-small") %}
-{% set text_input = text_input | default("Toto je [MASK] věta.") %}
-{% set top_k = top_k | default(5) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Příliš žluťoučký kůň úpěl ďábelské ódy.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-top_k = {{ top_k }}
+text = "{{ text }}"
 
-# 3. Imports
-from pathlib import Path
-import json
+import torch
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoTokenizer, AutoModelForMaskedLM, pipeline
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
 
-# 4. Load tokenizer/processor & model
+model = AutoModel.from_pretrained(repo_id)
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
-if device.startswith("cuda"):
-    pipeline_device = int(device.split(":", 1)[1]) if ":" in device else 0
-else:
-    pipeline_device = -1
-fill_mask_pipeline = pipeline(
-    "fill-mask",
-    model=model,
-    tokenizer=tokenizer,
-    device=pipeline_device,
-)
+model.to(device)
+model.eval()
 
-# 5. Pre-process input
-input_text = text_input
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# 6. Run inference
-fill_mask_output = fill_mask_pipeline(input_text, top_k=top_k)
+with torch.no_grad():
+    outputs = model(**inputs)
 
-# 7. Post-process & build RESULT dict
-RESULT = {"fill_mask": fill_mask_output}
+last_hidden_state = outputs.last_hidden_state
+pooler_output = getattr(outputs, "pooler_output", None)
+if pooler_output is None:
+    attention_mask = inputs.get("attention_mask")
+    if attention_mask is not None:
+        mask = attention_mask.unsqueeze(-1).type_as(last_hidden_state)
+        pooler_output = (last_hidden_state * mask).sum(dim=1) / mask.sum(dim=1).clamp(min=1e-9)
+    else:
+        pooler_output = last_hidden_state[:, 0]
 
-# 8. if __name__ == "__main__": guard
+RESULT = {
+    "last_hidden_state": last_hidden_state.detach().cpu(),
+    "pooler_output": pooler_output.detach().cpu(),
+}

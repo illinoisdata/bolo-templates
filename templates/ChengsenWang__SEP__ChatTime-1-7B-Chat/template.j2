@@ -1,35 +1,66 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("ChengsenWang/ChatTime-1-7B-Chat") %}
-{% set prompt = prompt | default("Forecast the next 24 steps of the time series based on historical context and describe the expected trend.") %}
-{% set max_new_tokens = max_new_tokens | default(256) %}
-{% set temperature = temperature | default(0.2) %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What is the likely next value in the series?') %}
+{% set series = series | default([1.0, 1.2, 1.1, 1.35, 1.5, 1.45, 1.6, 1.75, 1.8, 1.95, 2.1, 2.05, 2.2, 2.35, 2.5, 2.45]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
-max_new_tokens = {{ max_new_tokens }}
-temperature = {{ temperature }}
+question = "{{ question }}"
+series = {{ series }}
 
-from pathlib import Path
-
+import json
+import os
+import re
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
-model_kwargs = {"torch_dtype": torch.bfloat16} if "cuda" in device else {}
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
-model = AutoModelForCausalLM.from_pretrained(repo_id, **model_kwargs)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_index_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.model")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16 if torch.cuda.is_available() and "cuda" in device else torch.float32,
+    device_map=None,
+    low_cpu_mem_usage=True,
+)
 model.to(device)
+model.eval()
 
-tokenized = tokenizer(prompt, return_tensors="pt")
-input_ids = tokenized["input_ids"].to(device)
-attention_mask = tokenized["attention_mask"].to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
 
-generated_tokens = model.generate(
-    input_ids=input_ids,
-    attention_mask=attention_mask,
-    max_new_tokens=int(max_new_tokens),
-    temperature=float(temperature),
+series_text = ", ".join(str(float(x)) for x in series)
+prompt = (
+    "You are a time series forecasting assistant. "
+    "Given the historical series, predict the next value.\n"
+    f"Question: {question}\n"
+    f"History: {series_text}\n"
+    "Answer with only the next numeric value."
 )
 
-generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-RESULT = {"generated_text": generated_text}
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_new_tokens=16,
+        do_sample=False,
+        temperature=0.0,
+        pad_token_id=tokenizer.eos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+match = re.findall(r"[-+]?(?:\d+\.\d+|\d+|\.\d+)(?:[eE][-+]?\d+)?", text)
+output_value = float(match[-1]) if match else text.strip()
+
+RESULT = {"output": output_value}

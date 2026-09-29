@@ -1,43 +1,30 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("OpenMOSS-Team/bart-large-chinese") %}
-{% set text_input = text_input | default("北京是[MASK]的首都") %}
-{% set max_length = max_length | default(50) %}
-{% set num_beams = num_beams | default(4) %}
-{% set do_sample = do_sample | default(false) %}
-{% set output_filename = output_filename | default("generated_text.txt") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("北京是[MASK]的首都") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-do_sample = {{ "True" if do_sample else "False" }}
-output_filename = "{{ output_filename }}"
+text = "{{ text }}"
 
+import os
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import BertTokenizer, BartForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-encoded_inputs = tokenizer(
-    text_input,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-)
-# Only input_ids and attention_mask are supported for generation
-encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items() if k in ["input_ids", "attention_mask"]}
+_tokenizer = BertTokenizer.from_pretrained(os.path.dirname(vocab_path), local_files_only=True)
+_model = BartForConditionalGeneration.from_pretrained(os.path.dirname(weights_path), local_files_only=True)
+_model = _model.to(device)
+_model.eval()
 
+inputs = _tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items() if k != "token_type_ids"}
 with torch.no_grad():
-    generated_ids = model.generate(
-        **encoded_inputs,
-        max_length=max_length,
-        num_beams=num_beams,
-        do_sample=do_sample,
-    )
+    generated = _model.generate(**inputs, max_length=50, do_sample=False)
+output = _tokenizer.batch_decode(generated, skip_special_tokens=True)
 
-generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-primary_generated_text = generated_texts[0] if generated_texts else ""
-
-RESULT = {"generated_text": primary_generated_text}
+RESULT = {"output": output}

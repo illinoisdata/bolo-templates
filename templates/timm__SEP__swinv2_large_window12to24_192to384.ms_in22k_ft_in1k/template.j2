@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("timm/swinv2_large_window12to24_192to384.ms_in22k_ft_in1k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+image_path = {{ image_path | tojson }}
+
+from transformers import pipeline
+from PIL import Image
+
+if device.lower().startswith("cuda"):
+    pipeline_device = int(device.split(":", 1)[1]) if ":" in device else 0
+else:
+    pipeline_device = -1
+
+pipe = pipeline(task=task, model=repo_id, device=pipeline_device)
+
+input_image = Image.open(image_path).convert("RGB")
+RESULT = pipe(input_image)

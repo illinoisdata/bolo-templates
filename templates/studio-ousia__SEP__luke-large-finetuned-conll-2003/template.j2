@@ -1,57 +1,40 @@
 {% set repo_id = repo_id | default("studio-ousia/luke-large-finetuned-conll-2003") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("Hugging Face is based in New York City.") %}
-{% set entity_spans = entity_spans | default([(0, 12), (25, 38)]) %}
+{% set text = text | default('Paris is the capital of France.') %}
+{% set entity_spans = entity_spans | default([(0, 5), (24, 30)]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = "{{ text }}"
-entity_spans = {{ entity_spans }}
+text = {{ text | tojson }}
+entity_spans = {{ entity_spans | tojson }}
 
-import json
 import os
-
 import torch
+from huggingface_hub import hf_hub_download
 from transformers import AutoTokenizer, LukeForEntitySpanClassification
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = LukeForEntitySpanClassification.from_pretrained(repo_id)
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="entity_vocab.json")
+_ = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+_ = hf_hub_download(repo_id=repo_id, filename="merges.txt")
 
-device = torch.device(device)
-model = model.to(device)
+model = LukeForEntitySpanClassification.from_pretrained(repo_id)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+model.to(device)
 model.eval()
 
-entity_spans_input = [tuple(span) for span in entity_spans]
-encoding = tokenizer(
-    text,
-    entity_spans=entity_spans_input,
-    return_tensors="pt",
-    truncation=True,
-)
-encoding = {key: value.to(device) for key, value in encoding.items()}
+encoding = tokenizer(text, entity_spans=[tuple(span) for span in entity_spans], return_tensors="pt")
+encoding = {k: v.to(device) for k, v in encoding.items()}
 
 with torch.no_grad():
     outputs = model(**encoding)
+
 logits = outputs.logits
+pred_ids = torch.argmax(logits, dim=-1).tolist()
+labels = [model.config.id2label[int(i)] if isinstance(i, int) or (isinstance(i, str) and str(i).isdigit()) else i for i in pred_ids]
 
-scores = torch.softmax(logits, dim=-1)
-predictions = torch.argmax(scores, dim=-1)
-
-scores = scores[0].cpu()
-predictions = predictions[0].cpu()
-
-id2label = {int(key): value for key, value in model.config.id2label.items()}
-
-entity_predictions = []
-for index, span in enumerate(entity_spans):
-    if index >= predictions.shape[0]:
-        break
-    label_id = int(predictions[index].item())
-    label = id2label.get(label_id, str(label_id))
-    score = float(scores[index, label_id].item())
-    entity_predictions.append({
-        "span": tuple(span),
-        "label": label,
-        "score": score,
-    })
-
-RESULT = {"entity_predictions": entity_predictions}
+RESULT = {"labels": labels, "predicted_ids": pred_ids, "logits": logits.detach().cpu().tolist()}

@@ -1,0 +1,53 @@
+{% set repo_id = repo_id | default("axolotl-ai-co/DeepSeek-V3-11M") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Hello, how are you?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import os
+import sys
+import torch
+import transformers.utils.import_utils as import_utils
+from huggingface_hub import hf_hub_download
+
+if not hasattr(import_utils, "is_torch_fx_available"):
+    import_utils.is_torch_fx_available = lambda: False
+
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+generation_config_file = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+custom_config_file = hf_hub_download(repo_id=repo_id, filename="configuration_deepseek.py")
+custom_model_file = hf_hub_download(repo_id=repo_id, filename="modeling_deepseek.py")
+
+local_dir = os.path.dirname(config_file)
+sys.path.insert(0, local_dir)
+
+from transformers import AutoConfig, AutoTokenizer, AutoModelForCausalLM
+
+config = AutoConfig.from_pretrained(local_dir, trust_remote_code=True, local_files_only=True)
+tokenizer = AutoTokenizer.from_pretrained(local_dir, use_fast=True, local_files_only=True)
+model = AutoModelForCausalLM.from_pretrained(
+    local_dir,
+    config=config,
+    trust_remote_code=True,
+    local_files_only=True,
+    torch_dtype=torch.float32,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs, use_cache=False)
+    next_token_logits = outputs.logits[:, -1, :]
+    next_token_id = torch.argmax(next_token_logits, dim=-1, keepdim=True)
+    generated = torch.cat([inputs["input_ids"], next_token_id], dim=-1)
+
+decoded = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": decoded}

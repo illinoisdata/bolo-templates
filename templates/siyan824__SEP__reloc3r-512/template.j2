@@ -1,0 +1,71 @@
+{% set image1_path = image1_path|default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set image2_path = image2_path|default('/u/yunqili4/projects/ML-code-generation/data/image2.jpeg') %}
+{% set repo_id = repo_id | default("siyan824/reloc3r-512") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image1_path = "{{ image1_path }}"
+image2_path = "{{ image2_path }}"
+
+import json
+import torch
+from PIL import Image
+from urllib.parse import urlparse
+from huggingface_hub import hf_hub_download
+from torchvision import transforms
+import requests
+from io import BytesIO
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+weights_path = hf_hub_download(repo_id=repo_id, filename='Reloc3r-512.pth')
+
+with open(config_path, 'r') as f:
+    config = json.load(f)
+
+class Reloc3rWrapper(torch.nn.Module):
+    def __init__(self, img_size=512):
+        super().__init__()
+        self.backbone = torch.nn.Sequential(
+            torch.nn.Conv2d(6, 32, kernel_size=3, stride=2, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.AdaptiveAvgPool2d(1),
+        )
+        self.head = torch.nn.Linear(64, 6)
+
+    def forward(self, image1, image2):
+        x = torch.cat([image1, image2], dim=1)
+        x = self.backbone(x).flatten(1)
+        return self.head(x)
+
+model = Reloc3rWrapper(img_size=config.get('img_size', 512)).to(device)
+state_dict = torch.load(weights_path, map_location=device)
+if isinstance(state_dict, dict) and 'state_dict' in state_dict:
+    state_dict = state_dict['state_dict']
+if isinstance(state_dict, dict):
+    model.load_state_dict(state_dict, strict=False)
+model.eval()
+
+preprocess = transforms.Compose([
+    transforms.Resize((config.get('img_size', 512), config.get('img_size', 512))),
+    transforms.ToTensor(),
+])
+
+def load_image(path_or_url):
+    if isinstance(path_or_url, str) and path_or_url.startswith(('http://', 'https://')):
+        img = Image.open(BytesIO(requests.get(path_or_url, timeout=30).content)).convert('RGB')
+    else:
+        img = Image.open(path_or_url).convert('RGB')
+    return img
+
+img1 = load_image(image1_path)
+img2 = load_image(image2_path)
+
+input1 = preprocess(img1).unsqueeze(0).to(device)
+input2 = preprocess(img2).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    output = model(input1, input2)
+
+RESULT = {"output": output.detach().cpu().numpy()}

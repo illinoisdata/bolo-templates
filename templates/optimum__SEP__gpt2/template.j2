@@ -1,0 +1,29 @@
+{% set repo_id = repo_id | default("optimum/gpt2") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+
+from transformers import AutoTokenizer, pipeline
+from optimum.onnxruntime import ORTModelForCausalLM
+from onnxruntime import get_available_providers
+
+providers = get_available_providers()
+if device == "cpu" or not (device.startswith("cuda") and "CUDAExecutionProvider" in providers):
+    provider = "CPUExecutionProvider"
+    pipeline_device = -1
+else:
+    provider = "CUDAExecutionProvider"
+    pipeline_device = int(device.split(":")[-1])
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = ORTModelForCausalLM.from_pretrained(repo_id, provider=provider)
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=pipeline_device)
+RESULT = pipe(input_prompt, max_new_tokens=max_new_tokens)

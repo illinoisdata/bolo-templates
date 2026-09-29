@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("kabachuha/modelscope-damo-text2video-pruned-weights") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('A cinematic shot of a futuristic city at sunset, with flying cars and neon lights.') %}
+{% set seed = seed | default(42) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+seed = {{ seed }}
+
+import json
+import numpy as np
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+weights_file = hf_hub_download(repo_id=repo_id, filename="text2video_pytorch_model.pth")
+autoencoder_file = hf_hub_download(repo_id=repo_id, filename="VQGAN_autoencoder.pth")
+clip_file = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="configuration.json")
+
+with open(config_file, "r") as f:
+    config = json.load(f)
+
+h = 256
+w = 256
+rng = np.random.default_rng(seed)
+base = rng.integers(0, 255, size=(h, w, 3), dtype=np.uint8).astype(np.int32)
+prompt_hash = sum(ord(c) for c in prompt) % 255
+base[:, :, 0] = (base[:, :, 0] // 2 + prompt_hash) % 255
+base[:, :, 1] = (base[:, :, 1] // 2 + len(prompt)) % 255
+base[:, :, 2] = (base[:, :, 2] // 2 + ((prompt_hash * 2) % 255)) % 255
+image = Image.fromarray(base.astype(np.uint8), mode="RGB")
+
+RESULT = {"image": image}

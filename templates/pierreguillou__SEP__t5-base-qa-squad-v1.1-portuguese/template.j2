@@ -1,10 +1,11 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("pierreguillou/t5-base-qa-squad-v1.1-portuguese") %}
-{% set question = question | default("Quando foi descoberta a Covid-19?") %}
-{% set context = context | default("A pandemia de COVID-19, também conhecida como pandemia de coronavírus, é uma pandemia em curso de COVID-19, uma doença respiratória aguda causada pelo coronavírus da síndrome respiratória aguda grave 2 (SARS-CoV-2). A doença foi identificada pela primeira vez em Wuhan, na província de Hubei, República Popular da China, em 1 de dezembro de 2019, mas o primeiro caso foi reportado em 31 de dezembro do mesmo ano.") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Quando começou a pandemia de Covid-19 no mundo?') %}
+{% set context = context | default('A pandemia de COVID-19, também conhecida como pandemia de coronavírus, é uma pandemia em curso de COVID-19, uma doença respiratória aguda causada pelo coronavírus da síndrome respiratória aguda grave 2 (SARS-CoV-2). A doença foi identificada pela primeira vez em Wuhan, na província de Hubei, República Popular da China, em 1 de dezembro de 2019, mas o primeiro caso foi reportado em 31 de dezembro do mesmo ano.') %}
 {% set max_target_length = max_target_length | default(32) %}
 {% set num_beams = num_beams | default(1) %}
 {% set early_stopping = early_stopping | default(true) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 question = "{{ question }}"
@@ -14,28 +15,34 @@ num_beams = {{ num_beams }}
 early_stopping = {{ early_stopping }}
 
 import torch
-from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-runtime_device = torch.device(device)
-model = model.to(runtime_device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_model_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+model_dir = __import__('os').path.dirname(weights_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
+model.to(device)
+model.eval()
 
 input_text = f"question: {question} context: {context}"
-encoded_inputs = tokenizer(input_text, return_tensors="pt")
-encoded_inputs = {key: value.to(runtime_device) for key, value in encoded_inputs.items()}
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_tokens = model.generate(
-    **encoded_inputs,
-    max_length=max_target_length,
-    num_beams=num_beams,
-    early_stopping=early_stopping,
-)
-predicted_answer = tokenizer.decode(
-    generated_tokens[0],
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-).strip()
+with torch.no_grad():
+    outputs = model.generate(
+        inputs["input_ids"],
+        attention_mask=inputs.get("attention_mask"),
+        max_length=max_target_length,
+        num_beams=num_beams,
+        early_stopping=early_stopping,
+    )
 
-RESULT = {"answer": predicted_answer}
+answer = tokenizer.decode(outputs[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
+RESULT = {"answer": answer}

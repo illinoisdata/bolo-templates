@@ -1,0 +1,35 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("ohayonguy/PMRF_blind_face_image_restoration") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import json
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from torchvision import transforms
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    from io import BytesIO
+    import requests
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+input_tensor = transforms.ToTensor()(image).unsqueeze(0).to(device)
+
+RESULT = {
+    "input_image": image,
+    "input_tensor": input_tensor.detach().cpu(),
+    "config": config,
+    "weights_path": weights_path,
+}

@@ -1,0 +1,96 @@
+{% set repo_id = repo_id | default("nvidia/prompt-task-and-complexity-classifier") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Prompt: Write a Python script that uses a for loop.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import json
+import torch
+import torch.nn as nn
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+class MeanPooling(nn.Module):
+    def forward(self, last_hidden_state, attention_mask):
+        input_mask_expanded = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
+        sum_embeddings = torch.sum(last_hidden_state * input_mask_expanded, 1)
+        sum_mask = input_mask_expanded.sum(1)
+        sum_mask = torch.clamp(sum_mask, min=1e-9)
+        return sum_embeddings / sum_mask
+
+class MulticlassHead(nn.Module):
+    def __init__(self, input_size, num_classes):
+        super().__init__()
+        self.fc = nn.Linear(input_size, num_classes)
+    def forward(self, x):
+        return self.fc(x)
+
+class CustomModel(nn.Module):
+    def __init__(self, target_sizes, task_type_map, weights_map, divisor_map):
+        super().__init__()
+        self.backbone = AutoModel.from_pretrained("microsoft/DeBERTa-v3-base")
+        self.target_sizes = list(target_sizes.values())
+        self.task_type_map = task_type_map
+        self.weights_map = weights_map
+        self.divisor_map = divisor_map
+        self.heads = nn.ModuleList([MulticlassHead(self.backbone.config.hidden_size, sz) for sz in self.target_sizes])
+        self.pool = MeanPooling()
+
+    def compute_results(self, preds, target, decimal=4):
+        if target == "task_type":
+            top2_indices = torch.topk(preds, k=2, dim=1).indices
+            softmax_probs = torch.softmax(preds, dim=1)
+            top2_probs = softmax_probs.gather(1, top2_indices)
+            top2 = top2_indices.detach().cpu().tolist()
+            top2_prob = top2_probs.detach().cpu().tolist()
+            top2_strings = [[self.task_type_map[str(idx)] for idx in sample] for sample in top2]
+            top2_prob_rounded = [[round(v, 3) for v in sub] for sub in top2_prob]
+            for i, sublist in enumerate(top2_prob_rounded):
+                if sublist[1] < 0.1:
+                    top2_strings[i][1] = "NA"
+            return ([s[0] for s in top2_strings], [s[1] for s in top2_strings], [s[0] for s in top2_prob_rounded])
+        preds = torch.softmax(preds, dim=1)
+        weights = torch.tensor(self.weights_map[target], dtype=preds.dtype, device=preds.device)
+        weighted_sum = torch.sum(preds * weights, dim=1)
+        scores = weighted_sum / self.divisor_map[target]
+        scores = [round(float(v), decimal) for v in scores.detach().cpu().tolist()]
+        if target == "number_of_few_shots":
+            scores = [x if x >= 0.05 else 0 for x in scores]
+        return scores
+
+    def process_logits(self, logits):
+        result = {}
+        result["task_type_1"], result["task_type_2"], result["task_type_prob"] = self.compute_results(logits[0], "task_type")
+        result["creativity_scope"] = self.compute_results(logits[1], "creativity_scope")
+        result["reasoning"] = self.compute_results(logits[2], "reasoning")
+        result["contextual_knowledge"] = self.compute_results(logits[3], "contextual_knowledge")
+        result["number_of_few_shots"] = self.compute_results(logits[4], "number_of_few_shots")
+        result["domain_knowledge"] = self.compute_results(logits[5], "domain_knowledge")
+        result["no_label_reason"] = self.compute_results(logits[6], "no_label_reason")
+        result["constraint_ct"] = self.compute_results(logits[7], "constraint_ct")
+        result["prompt_complexity_score"] = [round(0.35*c + 0.25*r + 0.15*con + 0.15*d + 0.05*ctx + 0.05*f, 5) for c, r, con, d, ctx, f in zip(result["creativity_scope"], result["reasoning"], result["constraint_ct"], result["domain_knowledge"], result["contextual_knowledge"], result["number_of_few_shots"])]
+        return result
+
+    def forward(self, batch):
+        outputs = self.backbone(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"])
+        pooled = self.pool(outputs.last_hidden_state, batch["attention_mask"])
+        logits = [head(pooled) for head in self.heads]
+        return self.process_logits(logits)
+
+cfg = json.load(open(config_path))
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = CustomModel(cfg["target_sizes"], cfg["task_type_map"], cfg["weights_map"], cfg["divisor_map"])
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+encoded_texts = tokenizer([prompt], return_tensors="pt", add_special_tokens=True, max_length=512, padding="max_length", truncation=True)
+encoded_texts = {k: v.to(device) for k, v in encoded_texts.items()}
+with torch.no_grad():
+    RESULT = model(encoded_texts)

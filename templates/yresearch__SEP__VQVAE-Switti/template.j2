@@ -1,0 +1,99 @@
+{% set repo_id = repo_id | default("yresearch/VQVAE-Switti") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set patch_nums = patch_nums | default([1, 2, 3, 4, 6, 9, 13, 18, 24, 32]) %}
+{% set sample_patch_num = sample_patch_num | default(32) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+patch_nums = {{ patch_nums }}
+sample_patch_num = {{ sample_patch_num }}
+
+import os
+import requests
+import numpy as np
+from PIL import Image
+import torch
+import torch.nn as nn
+from safetensors.torch import load_file
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+import json
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+class VQVAE(nn.Module):
+    def __init__(self, ch, z_channels, vocab_size, share_quant_resi, v_patch_nums, test_mode=True):
+        super().__init__()
+        self.ch = ch
+        self.z_channels = z_channels
+        self.vocab_size = vocab_size
+        self.share_quant_resi = share_quant_resi
+        self.v_patch_nums = v_patch_nums
+        self.test_mode = test_mode
+        self.encoder = nn.Sequential(
+            nn.Conv2d(3, ch, 4, 2, 1), nn.ReLU(inplace=True),
+            nn.Conv2d(ch, ch, 4, 2, 1), nn.ReLU(inplace=True),
+            nn.Conv2d(ch, z_channels, 3, 1, 1),
+        )
+        self.codebook = nn.Embedding(vocab_size, z_channels)
+        self.decoder = nn.Sequential(
+            nn.ConvTranspose2d(z_channels, ch, 4, 2, 1), nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(ch, ch, 4, 2, 1), nn.ReLU(inplace=True),
+            nn.Conv2d(ch, 3, 3, 1, 1), nn.Sigmoid(),
+        )
+
+    def encode(self, x):
+        z = self.encoder(x)
+        b, c, h, w = z.shape
+        flat = z.permute(0, 2, 3, 1).reshape(-1, c)
+        codebook = self.codebook.weight
+        dist = (flat.pow(2).sum(1, keepdim=True) - 2 * flat @ codebook.t() + codebook.pow(2).sum(1))
+        idx = dist.argmin(dim=1)
+        quant = self.codebook(idx).view(b, h, w, c).permute(0, 3, 1, 2).contiguous()
+        return quant, idx.view(b, h, w)
+
+    def decode(self, quant):
+        return self.decoder(quant)
+
+    def forward(self, x):
+        quant, idx = self.encode(x)
+        recon = self.decode(quant)
+        return recon, idx
+
+model = VQVAE(
+    ch=cfg["ch"],
+    z_channels=cfg["z_channels"],
+    vocab_size=cfg["vocab_size"],
+    share_quant_resi=cfg["share_quant_resi"],
+    v_patch_nums=cfg["v_patch_nums"],
+    test_mode=cfg.get("test_mode", True),
+)
+state_dict = load_file(weights_path)
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
+model.eval()
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    img = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    img = Image.open(image_path).convert("RGB")
+
+img = img.resize((256, 256))
+arr = np.array(img).astype(np.float32) / 255.0
+x = torch.from_numpy(arr).permute(2, 0, 1).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    recon, indices = model(x)
+
+recon_img = recon[0].detach().cpu().permute(1, 2, 0).clamp(0, 1).numpy()
+recon_img = (recon_img * 255.0).round().astype(np.uint8)
+recon_img = Image.fromarray(recon_img)
+
+RESULT = {
+    "reconstruction": recon_img,
+    "codes": indices[0].detach().cpu().numpy(),
+}

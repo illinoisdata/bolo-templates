@@ -1,48 +1,56 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("allenai/cosmo-xl") %}
-{% set situation_narrative = situation_narrative | default("Cosmo had a really fun time participating in the EMNLP conference at Abu Dhabi.") %}
-{% set role_instruction = role_instruction | default("You are Cosmo and you are talking to a friend.") %}
-{% set conversation_history = conversation_history | default(["Hey, how was your trip to Abu Dhabi?"]) %}
+{% set device = device | default("cuda:0") %}
 {% set max_new_tokens = max_new_tokens | default(128) %}
+{% set do_sample = do_sample | default(true) %}
 {% set temperature = temperature | default(1.0) %}
 {% set top_p = top_p | default(0.95) %}
-{% set do_sample = do_sample | default(true) %}
+{% set situation = situation | default("Cosmo had a really fun time participating in the EMNLP conference at Abu Dhabi.") %}
+{% set instruction = instruction | default("You are Cosmo and you are talking to a friend.") %}
+{% set conversation = conversation | default(["Hey, how was your trip to Abu Dhabi?"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-situation_narrative = "{{ situation_narrative }}"
-role_instruction = "{{ role_instruction }}"
-conversation_history = {{ conversation_history | tojson }}
 max_new_tokens = {{ max_new_tokens }}
+do_sample = {{ do_sample }}
 temperature = {{ temperature }}
 top_p = {{ top_p }}
-do_sample = {{ do_sample }}
+situation = {{ situation | tojson }}
+instruction = {{ instruction | tojson }}
+conversation = {{ conversation | tojson }}
 
-from pathlib import Path
+import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_1 = hf_hub_download(repo_id=repo_id, filename="pytorch_model-00001-of-00002.bin")
+weights_2 = hf_hub_download(repo_id=repo_id, filename="pytorch_model-00002-of-00002.bin")
+index_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin.index.json")
+
+def set_input(situation_narrative, role_instruction, conversation_history):
+    input_text = " <turn> ".join(conversation_history)
+    if role_instruction != "":
+        input_text = "{} <sep> {}".format(role_instruction, input_text)
+    if situation_narrative != "":
+        input_text = "{} <sep> {}".format(situation_narrative, input_text)
+    return input_text
+
+input_text = set_input(situation, instruction, conversation)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
 model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.eval()
+inputs = tokenizer([input_text], return_tensors="pt").to(device)
+with torch.no_grad():
+    outputs = model.generate(
+        inputs["input_ids"],
+        max_new_tokens=max_new_tokens,
+        temperature=temperature,
+        top_p=top_p,
+        do_sample=do_sample,
+    )
+response = tokenizer.decode(outputs[0], skip_special_tokens=True, clean_up_tokenization_spaces=False)
 
-turn_delimiter = " <turn> "
-input_text = turn_delimiter.join(conversation_history)
-if role_instruction != "":
-    input_text = f"{role_instruction} <sep> {input_text}"
-if situation_narrative != "":
-    input_text = f"{situation_narrative} <sep> {input_text}"
-
-inputs = tokenizer(input_text, return_tensors="pt")
-inputs = {k: v.to(device) for k, v in inputs.items()}
-outputs = model.generate(
-    **inputs,
-    max_new_tokens=max_new_tokens,
-    temperature=temperature,
-    top_p=top_p,
-    do_sample=do_sample,
-)
-response = tokenizer.decode(
-    outputs[0],
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=False,
-)
-
-RESULT = {"response": response}
+RESULT = {"response": response, "input_text": input_text}

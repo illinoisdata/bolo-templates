@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("lareaulab/Trias") %}
+{% set device = device | default("cuda:0") %}
+{% set species = species | default('Homo sapiens') %}
+{% set protein_sequence = protein_sequence | default('MTEITAAMVKELRESTGAGMMDCKNALSETQ*') %}
+{% set max_length = max_length | default(256) %}
+{% set num_beams = num_beams | default(1) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+species = "{{ species }}"
+protein_sequence = "{{ protein_sequence }}"
+max_length = {{ max_length }}
+num_beams = {{ num_beams }}
+
+import json
+import torch
+from tokenizers import Tokenizer
+from tokenizers.models import WordLevel
+from tokenizers.pre_tokenizers import Whitespace
+from transformers import BartForConditionalGeneration, PreTrainedTokenizerFast
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+with open(vocab_path, "r") as f:
+    vocab = json.load(f)
+backend = Tokenizer(WordLevel(vocab=vocab, unk_token="<unk>"))
+backend.pre_tokenizer = Whitespace()
+tokenizer = PreTrainedTokenizerFast(tokenizer_object=backend, unk_token="<unk>", eos_token="</s>", pad_token="<pad>", mask_token="<mask>")
+tokenizer.model_max_length = 2048
+
+model = BartForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
+model = model.to(device)
+model.eval()
+
+input_seq = f">>{species}<< {protein_sequence}"
+input_ids = tokenizer.encode(input_seq, return_tensors="pt").to(device)
+
+with torch.no_grad():
+    generate_kwargs = {"max_length": max_length}
+    if num_beams and num_beams > 1:
+        generate_kwargs.update({"num_beams": num_beams, "early_stopping": True})
+    outputs = model.generate(input_ids, **generate_kwargs)
+    codon_sequence = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+RESULT = {"codon_sequence": codon_sequence}

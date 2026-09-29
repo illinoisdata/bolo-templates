@@ -1,47 +1,51 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("haining/scientific_abstract_simplification") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default("The COVID-19 pandemic presented enormous data challenges in the United States. Policy makers, epidemiological modelers, and health researchers all require up-to-date data on the pandemic and relevant public behavior, ideally at fine spatial and temporal resolution. The COVIDcast API is our attempt to fill this need: Operational since April 2020, it provides open access to both traditional public health surveillance signals (cases, deaths, and hospitalizations) and many auxiliary indicators of COVID-19 activity, such as signals extracted from deidentified medical claims data, massive online surveys, cell phone mobility data, and internet search trends. These are available at a fine geographic resolution (mostly at the county level) and are updated daily. The COVIDcast API also tracks all revisions to historical data, allowing modelers to account for the frequent revisions and backfill that are common for many public health data sources. All of the data are available in a common format through the API and accompanying R and Python software packages. This paper describes the data sources and signals, and provides examples demonstrating that the auxiliary signals in the COVIDcast API present information relevant to tracking COVID activity, augmenting traditional public health reporting and empowering research and decision-making.") %}
 {% set instruction = instruction | default("summarize, simplify, and contextualize: ") %}
-{% set text_input = text_input | default("The COVID-19 pandemic presented enormous data challenges in the United States. Policy makers, epidemiological modelers, and health researchers all require up-to-date data on the pandemic and relevant public behavior, ideally at fine spatial and temporal resolution. The COVIDcast API is our attempt to fill this need: Operational since April 2020, it provides open access to both traditional public health surveillance signals (cases, deaths, and hospitalizations) and many auxiliary indicators of COVID-19 activity, such as signals extracted from deidentified medical claims data, massive online surveys, cell phone mobility data, and internet search trends. These are available at a fine geographic resolution (mostly at the county level) and are updated daily. The COVIDcast API also tracks all revisions to historical data, allowing modelers to account for the frequent revisions and backfill that are common for many public health data sources. All of the data are available in a common format through the API and accompanying R and Python software packages. This paper describes the data sources and signals, and provides examples demonstrating that the auxiliary signals in the COVIDcast API present information relevant to tracking COVID activity, augmenting traditional public health reporting and empowering research and decision-making.") %}
 {% set max_length = max_length | default(512) %}
+{% set do_sample = do_sample | default(true) %}
 {% set top_p = top_p | default(0.9) %}
-{% set do_sample = do_sample | default(True) %}
-{% set repetition_penalty = repetition_penalty | default(1.0) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
+input_text = "{{ input_text }}"
 instruction = "{{ instruction }}"
-text_input = """{{ text_input }}"""
 max_length = {{ max_length }}
-top_p = {{ top_p }}
 do_sample = {{ do_sample }}
-repetition_penalty = {{ repetition_penalty }}
+top_p = {{ top_p }}
 
 import torch
-from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+model_dir = __import__("os").path.dirname(model_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir).to(device)
 model.eval()
 
-prompt = instruction + text_input
 encoding = tokenizer(
-    prompt,
+    instruction + input_text,
     padding="max_length",
     truncation=True,
     max_length=max_length,
     return_tensors="pt",
 )
-inputs = {key: value.to(device) for key, value in encoding.items()}
+encoding = {k: v.to(device) for k, v in encoding.items()}
 
-generated_ids = model.generate(
-    **inputs,
-    max_length=max_length,
-    do_sample=do_sample,
-    top_p=top_p,
-    repetition_penalty=repetition_penalty,
-)
-decoded_outputs = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-simplified_text = decoded_outputs[0]
+with torch.no_grad():
+    decoded_ids = model.generate(
+        input_ids=encoding["input_ids"],
+        attention_mask=encoding["attention_mask"],
+        do_sample=do_sample,
+        top_p=top_p,
+    )
 
-RESULT = {"simplified_abstract": simplified_text}
+output_text = tokenizer.decode(decoded_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

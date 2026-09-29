@@ -1,0 +1,102 @@
+{% set repo_id = repo_id | default("RedHatAI/bge-small-en-v1.5-quant") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set input_prompt = input_prompt | default(["RedHatAI is building quantized ONNX embeddings for fast inference."]) %}
+{% set onnx_filename = onnx_filename | default("model.onnx") -%}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+inputs = {{ input_prompt | tojson }}
+onnx_filename = {{ onnx_filename | tojson }}
+
+from typing import Any, Dict, List
+
+import numpy as np
+import onnxruntime
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoConfig, AutoTokenizer, pipeline
+from transformers.modeling_outputs import BaseModelOutput
+
+
+def _resolve_torch_device(value: Any) -> torch.device:
+    if isinstance(value, torch.device):
+        return value
+    if isinstance(value, str):
+        lowered = value.lower()
+        if lowered == "cpu":
+            return torch.device("cpu")
+        if lowered.startswith("cuda"):
+            parts = lowered.split(":")
+            index = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
+            return torch.device(f"cuda:{index}")
+        if lowered.startswith("mps"):
+            return torch.device(value)
+    if isinstance(value, int):
+        if value < 0:
+            return torch.device("cpu")
+        return torch.device(f"cuda:{value}") if torch.cuda.is_available() else torch.device("cpu")
+    raise ValueError(f"Unsupported device format: {value}")
+
+
+def _normalize_input(value: Any) -> List[str]:
+    if isinstance(value, str):
+        return [value]
+    return list(value)
+
+
+def _to_numpy_array(tensor: Any) -> np.ndarray:
+    if isinstance(tensor, torch.Tensor):
+        return tensor.detach().cpu().numpy()
+    return np.asarray(tensor)
+
+
+class OnnxModelWrapper:
+    def __init__(self, session: onnxruntime.InferenceSession, config: Any, device_obj: torch.device) -> None:
+        self.session = session
+        self.config = config
+        self.device = device_obj
+        self.input_names = {inp.name for inp in session.get_inputs()}
+
+    def to(self, device_value: Any) -> "OnnxModelWrapper":
+        self.device = _resolve_torch_device(device_value)
+        return self
+
+    def __call__(self, **inputs: Any) -> BaseModelOutput:
+        ort_inputs: Dict[str, np.ndarray] = {}
+        for name in ("input_ids", "attention_mask", "token_type_ids", "position_ids"):
+            if name in self.input_names and inputs.get(name) is not None:
+                array = _to_numpy_array(inputs[name])
+                if array.dtype != np.int64:
+                    array = array.astype(np.int64)
+                ort_inputs[name] = array
+        ort_outputs = self.session.run(None, ort_inputs)
+        last_hidden_state = torch.from_numpy(ort_outputs[0]).to(self.device)
+        return BaseModelOutput(last_hidden_state=last_hidden_state)
+
+
+model_device = _resolve_torch_device(device)
+if model_device.type == "cuda":
+    providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    provider_options = [
+        {"device_id": model_device.index if model_device.index is not None else 0},
+        {},
+    ]
+else:
+    providers = ["CPUExecutionProvider"]
+    provider_options = None
+onnx_path = hf_hub_download(repo_id=model, filename=onnx_filename)
+session = onnxruntime.InferenceSession(
+    onnx_path,
+    providers=providers,
+    provider_options=provider_options,
+)
+config = AutoConfig.from_pretrained(model)
+tokenizer = AutoTokenizer.from_pretrained(model)
+model_wrapper = OnnxModelWrapper(session=session, config=config, device_obj=model_device)
+pipe = pipeline(task=task, model=model_wrapper, tokenizer=tokenizer, device=model_device)
+
+prepared_inputs = _normalize_input(inputs)
+raw_output = pipe(prepared_inputs)
+RESULT = {"feature_vectors": raw_output}

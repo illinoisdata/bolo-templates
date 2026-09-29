@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("Qwen/Qwen2-1.5B-Instruct-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('qwen2-1_5b-instruct-q5_k_m.gguf') %}
+{% set prompt = prompt | default('Write a short, helpful response about the benefits of open-source language models.') %}
+{% set max_tokens = max_tokens | default(128) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.9) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+max_tokens = {{ max_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+
+import os
+import urllib.request
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+llm = Llama(
+    model_path=model_path,
+    n_ctx=2048,
+    n_threads=max(1, os.cpu_count() or 1),
+    n_gpu_layers=-1 if device.startswith('cuda') else 0,
+    verbose=False,
+)
+
+messages = [
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user", "content": prompt},
+]
+
+response = llm.create_chat_completion(
+    messages=messages,
+    max_tokens=max_tokens,
+    temperature=temperature,
+    top_p=top_p,
+)
+
+output_text = response["choices"][0]["message"]["content"]
+
+RESULT = {"text": output_text}

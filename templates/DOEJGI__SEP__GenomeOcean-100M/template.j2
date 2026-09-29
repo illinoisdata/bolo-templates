@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("DOEJGI/GenomeOcean-100M") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt_text = prompt_text | default('ACGTACGTACGT') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt_text = "{{ prompt_text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+# Use repo id directly; hf_hub_download is not necessary for loading local snapshot through HF APIs here.
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    trust_remote_code=True,
+    padding_side="left",
+)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    trust_remote_code=True,
+    torch_dtype=torch.bfloat16,
+    low_cpu_mem_usage=True,
+).to(device)
+model.eval()
+
+inputs = tokenizer(prompt_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=32,
+        do_sample=False,
+        pad_token_id=tokenizer.pad_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

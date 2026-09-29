@@ -1,27 +1,31 @@
 {% set repo_id = repo_id | default("mrm8488/t5-base-finetuned-sarcasm-twitter") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("As everybody knows Trump is by far the best USA president... XD") %}
+{% set text = text | default('As everybody knows Trump is by far the best USA president... XD') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
-import os
 import torch
+from huggingface_hub import hf_hub_download
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-# Pre-process input
-inputs = tokenizer(text + tokenizer.eos_token, return_tensors="pt")
-input_ids = inputs["input_ids"].to(device)
-attention_mask = inputs["attention_mask"].to(device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-# Run inference
-outputs = model.generate(input_ids=input_ids, attention_mask=attention_mask)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
 
-# Post-process & build RESULT dict
-decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-label = decoded[0]
+inputs = tokenizer(text + "</s>", return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-RESULT = {"label": label}
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_length=3)
+
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+RESULT = {"output": output_text}

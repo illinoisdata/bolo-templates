@@ -1,0 +1,31 @@
+{% set repo_id = repo_id | default("keremberke/yolov8m-shoe-classification") %}
+{% set device = device | default("cuda:0") %}
+{% set image = image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+{% set conf = conf | default(0.25) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image = "{{ image }}"
+conf = {{ conf }}
+
+import requests
+from io import BytesIO
+from PIL import Image
+import torch
+from ultralytics import YOLO
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="best.pt")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+if str(image).startswith(("http://", "https://")):
+    image = Image.open(BytesIO(requests.get(image, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image).convert("RGB")
+
+model = YOLO(weights_path)
+model.to(device)
+results = model.predict(image, conf=conf, device=device, verbose=False)
+probs = results[0].probs
+names = results[0].names
+predictions = {names[i]: float(probs.data[i]) for i in range(len(probs.data))}
+RESULT = {"predictions": predictions, "top1": names[int(probs.top1)], "top1_confidence": float(probs.top1conf)}

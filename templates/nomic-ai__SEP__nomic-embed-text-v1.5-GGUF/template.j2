@@ -1,0 +1,25 @@
+{% set repo_id = repo_id | default("nomic-ai/nomic-embed-text-v1.5-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default("nomic-embed-text-v1.5.Q4_K_M.gguf") %}
+{% set texts = texts | default(["search_query: What is TSNE?", "search_query: Who is Laurens Van der Maaten?"]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+texts = {{ texts | tojson }}
+
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+llm = Llama(
+    model_path=model_path,
+    embedding=True,
+    n_ctx=2048,
+    n_threads=4,
+    n_batch=max(1, len(texts)),
+    verbose=False,
+)
+
+embeddings = llm.embed(texts)
+RESULT = {"embeddings": embeddings}

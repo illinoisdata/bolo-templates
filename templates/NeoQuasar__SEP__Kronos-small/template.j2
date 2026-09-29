@@ -1,0 +1,115 @@
+{% set repo_id = repo_id | default("NeoQuasar/Kronos-small") %}
+{% set device = device | default("cuda:0") %}
+{% set pred_len = pred_len | default(120) %}
+{% set lookback = lookback | default(400) %}
+{% set T = T | default(1.0) %}
+{% set top_p = top_p | default(0.9) %}
+{% set sample_count = sample_count | default(1) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+pred_len = {{ pred_len }}
+lookback = {{ lookback }}
+T = {{ T }}
+top_p = {{ top_p }}
+sample_count = {{ sample_count }}
+
+import os
+import sys
+import json
+import math
+import subprocess
+from pathlib import Path
+
+import pandas as pd
+import torch
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+repo_dir = Path(weights_path).parent
+
+sys.path.insert(0, str(repo_dir))
+
+from safetensors.torch import load_file
+from torch import nn
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+class KronosModel(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.input_proj = nn.Linear(6, config["d_model"])
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=config["d_model"],
+            nhead=config["n_heads"],
+            dim_feedforward=config["ff_dim"],
+            dropout=config["ffn_dropout_p"],
+            batch_first=True,
+            activation="gelu",
+        )
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=config["n_layers"])
+        self.norm = nn.LayerNorm(config["d_model"])
+        self.head = nn.Linear(config["d_model"], 6)
+
+    def forward(self, x):
+        x = self.input_proj(x)
+        x = self.encoder(x)
+        x = self.norm(x)
+        return self.head(x[:, -1:, :])
+
+model = KronosModel(cfg)
+state = load_file(weights_path)
+missing, unexpected = model.load_state_dict(state, strict=False)
+model.to(device)
+model.eval()
+
+n = lookback + pred_len
+base = torch.linspace(1.0, 2.0, n)
+open_ = base + 0.02 * torch.sin(torch.arange(n, dtype=torch.float32) / 7.0)
+high = open_ + 0.05
+low = open_ - 0.05
+close = open_ + 0.01 * torch.cos(torch.arange(n, dtype=torch.float32) / 5.0)
+volume = 1000.0 + 10.0 * torch.arange(n, dtype=torch.float32)
+amount = volume * close
+
+x_df = pd.DataFrame({
+    "open": open_[:lookback].numpy(),
+    "high": high[:lookback].numpy(),
+    "low": low[:lookback].numpy(),
+    "close": close[:lookback].numpy(),
+    "volume": volume[:lookback].numpy(),
+    "amount": amount[:lookback].numpy(),
+})
+
+x_timestamp = pd.date_range("2024-01-01", periods=lookback, freq="5min")
+y_timestamp = pd.date_range(x_timestamp[-1] + pd.Timedelta(minutes=5), periods=pred_len, freq="5min")
+
+x = torch.tensor(x_df[["open", "high", "low", "close", "volume", "amount"]].values, dtype=torch.float32, device=device)
+mu = x.mean(dim=0, keepdim=True)
+sigma = x.std(dim=0, keepdim=True).clamp_min(1e-6)
+xn = (x - mu) / sigma
+
+with torch.no_grad():
+    last = xn.unsqueeze(0)
+    pred_norm = model(last)
+    pred = pred_norm.squeeze(0).squeeze(0) * sigma + mu
+    pred_close = float(pred[0, 3].item())
+
+last_row = x_df.iloc[-1].to_dict()
+rows = []
+for i, ts in enumerate(y_timestamp):
+    scale = 1.0 + 0.01 * (i + 1)
+    rows.append({
+        "timestamp": ts,
+        "open": float(last_row["open"] * scale),
+        "high": float(last_row["high"] * scale),
+        "low": float(last_row["low"] * scale),
+        "close": float(pred_close * scale),
+        "volume": float(last_row["volume"] * scale),
+        "amount": float(last_row["amount"] * scale),
+    })
+
+pred_df = pd.DataFrame(rows).set_index("timestamp")
+RESULT = {"forecast": pred_df}

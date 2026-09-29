@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("rinna/japanese-gpt2-small") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("生命、宇宙、そして万物についての究極の疑問の答えは") %}
+
+task = "{{ task }}"
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_prompt = "{{ input_prompt }}"
+
+from transformers import AutoTokenizer, pipeline
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+tokenizer.do_lower_case = True
+
+pipe = pipeline(task=task, model=repo_id, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt)

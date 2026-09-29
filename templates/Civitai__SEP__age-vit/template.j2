@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("Civitai/age-vit") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text_input = text_input | default('A portrait photo of a person.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text_input = "{{ text_input }}"
+
+import os
+import requests
+from io import BytesIO
+from PIL import Image
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import ViTImageProcessor, ViTForImageClassification
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processor = ViTImageProcessor.from_pretrained(os.path.dirname(preprocessor_path))
+model = ViTForImageClassification.from_pretrained(os.path.dirname(weights_path)).to(device)
+model.eval()
+
+inputs = processor(images=image, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    probs = outputs.logits.softmax(dim=-1)
+    pred_idx = probs.argmax(dim=-1).item()
+    pred_label = model.config.id2label[pred_idx]
+    confidence = probs[0, pred_idx].item()
+
+RESULT = {"label": pred_label, "confidence": confidence, "probabilities": probs[0].detach().cpu().tolist()}

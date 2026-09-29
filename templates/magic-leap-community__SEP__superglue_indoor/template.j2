@@ -1,45 +1,53 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("magic-leap-community/superglue_indoor") %}
-{% set image1_path = image1_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set image2_path = image2_path | default("/u/yli77/projects/ML-code-generation/data/image2.jpeg") %}
-{% set matching_threshold = matching_threshold | default(0.2) %}
+{% set device = device | default("cuda:0") %}
+{% set image1 = image1 | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set image2 = image2 | default('/u/yunqili4/projects/ML-code-generation/data/image2.jpeg') %}
+{% set threshold = threshold | default(0.2) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-image1_path = "{{ image1_path }}"
-image2_path = "{{ image2_path }}"
-matching_threshold = {{ matching_threshold }}
+image1 = "{{ image1 }}"
+image2 = "{{ image2 }}"
+threshold = {{ threshold }}
 
-from transformers import AutoImageProcessor, AutoModelForKeypointMatching
+import os
+import requests
 import torch
 from PIL import Image
-import requests
-import os
-import json
+from transformers import SuperGlueForKeypointMatching
+from huggingface_hub import hf_hub_download
+from transformers.models.superglue import SuperGlueImageProcessor
 
-# Load processor and model
-processor = AutoImageProcessor.from_pretrained(repo_id)
-model = AutoModelForKeypointMatching.from_pretrained(repo_id).to(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_file = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
 
-# Load input images (handle local paths and URLs)
-if image1_path.startswith("http"):  # URL
-    image1 = Image.open(requests.get(image1_path, stream=True).raw)
+if image1.startswith("http://") or image1.startswith("https://"):
+    image1 = Image.open(requests.get(image1, stream=True).raw).convert("RGB")
 else:
-    image1 = Image.open(image1_path)
-if image2_path.startswith("http"):  # URL
-    image2 = Image.open(requests.get(image2_path, stream=True).raw)
+    image1 = Image.open(image1).convert("RGB")
+
+if image2.startswith("http://") or image2.startswith("https://"):
+    image2 = Image.open(requests.get(image2, stream=True).raw).convert("RGB")
 else:
-    image2 = Image.open(image2_path)
+    image2 = Image.open(image2).convert("RGB")
 
 images = [image1, image2]
+processor = SuperGlueImageProcessor.from_pretrained(os.path.dirname(preprocessor_file))
+model = SuperGlueForKeypointMatching.from_pretrained(repo_id, local_files_only=True)
+model = SuperGlueForKeypointMatching.from_pretrained(repo_id, local_files_only=True)
+model.to(device)
+model.eval()
+
 inputs = processor(images, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
-
-# Run inference
 with torch.no_grad():
     outputs = model(**inputs)
 
-# Post-process keypoint matches
 image_sizes = [[(im.height, im.width) for im in images]]
-matches = processor.post_process_keypoint_matching(outputs, image_sizes, threshold=matching_threshold)
-
-RESULT = {"matches": matches}
+processed = processor.post_process_keypoint_matching(outputs, image_sizes, threshold=threshold)
+result = processed[0]
+RESULT = {
+    "keypoints0": result["keypoints0"],
+    "keypoints1": result["keypoints1"],
+    "matching_scores": result["matching_scores"],
+}

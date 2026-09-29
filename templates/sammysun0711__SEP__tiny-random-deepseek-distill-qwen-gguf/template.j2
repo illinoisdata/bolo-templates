@@ -1,0 +1,29 @@
+{% set repo_id = repo_id | default("sammysun0711/tiny-random-deepseek-distill-qwen-gguf") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('tiny-random-deepseek-distill-qwen_q8_0.gguf') %}
+{% set prompt = prompt | default('Write a short limerick about a tiny deepseek model.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+import os
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+n_gpu_layers = -1 if str(device).startswith("cuda") else 0
+llm = Llama(
+    model_path=model_path,
+    n_ctx=256,
+    n_batch=64,
+    n_threads=max(1, os.cpu_count() or 1),
+    n_gpu_layers=n_gpu_layers,
+    verbose=False,
+)
+
+result_text = llm(prompt, max_tokens=64, temperature=0.7, top_p=0.95)
+output_text = result_text["choices"][0]["text"]
+
+RESULT = {"generated_text": output_text}

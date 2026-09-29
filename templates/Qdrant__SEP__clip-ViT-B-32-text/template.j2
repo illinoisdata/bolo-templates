@@ -1,63 +1,50 @@
 {% set repo_id = repo_id | default("Qdrant/clip-ViT-B-32-text") %}
 {% set device = device | default("cuda:0") %}
-{% set text_inputs = text_inputs | default(["A photo of a cat.", "A dog in the park."]) %}
+{% set question = question | default('A photo of a cat and a dog sitting together.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_inputs = {{ text_inputs | tojson }}
+question = "{{ question }}"
 
 import json
-import os
+from pathlib import Path
 
 import numpy as np
-import onnxruntime
 from huggingface_hub import hf_hub_download
-from transformers import AutoTokenizer
+from tokenizers import Tokenizer
+from onnxruntime import InferenceSession, SessionOptions, get_available_providers
 
-prepared_texts: list[str]
-if isinstance(text_inputs, str):
-    prepared_texts = [text_inputs]
-else:
-    prepared_texts = list(text_inputs)
+model_path = hf_hub_download(repo_id=repo_id, filename="model.onnx")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
 
-onnx_path = hf_hub_download(repo_id=repo_id, filename="model.onnx")
+with open(config_path, "r") as f:
+    config = json.load(f)
 
-available_providers = onnxruntime.get_available_providers()
-providers = ["CPUExecutionProvider"]
-if device.lower().startswith("cuda") and "CUDAExecutionProvider" in available_providers:
-    providers = ["CUDAExecutionProvider"]
-session = onnxruntime.InferenceSession(onnx_path, providers=providers)
+tokenizer = Tokenizer.from_file(tokenizer_json_path)
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-encoded_inputs = tokenizer(
-    prepared_texts,
-    padding=True,
-    truncation=True,
-    return_tensors="np",
-)
+providers = []
+if device.startswith("cuda") and "CUDAExecutionProvider" in get_available_providers():
+    providers.append("CUDAExecutionProvider")
+providers.append("CPUExecutionProvider")
+sess_options = SessionOptions()
+sess_options.intra_op_num_threads = 1
+sess_options.inter_op_num_threads = 1
+session = InferenceSession(model_path, sess_options=sess_options, providers=providers)
 
-input_feed = {}
-for ort_input in session.get_inputs():
-    name = ort_input.name
-    if name in encoded_inputs:
-        array = encoded_inputs[name]
-        if array.dtype != np.int64 and array.dtype.kind == "i":
-            array = array.astype(np.int64)
-        input_feed[name] = array
+enc = tokenizer.encode(question)
+input_ids = np.array([enc.ids], dtype=np.int64)
+attention_mask = np.array([enc.attention_mask], dtype=np.int64)
 
-outputs = session.run(None, input_feed)
-if outputs:
-    logits = outputs[0]
-else:
-    logits = np.empty((len(prepared_texts), 0))
+ort_inputs = {}
+for inp in session.get_inputs():
+    if inp.name == "input_ids":
+        ort_inputs[inp.name] = input_ids
+    elif inp.name in ("attention_mask", "input_mask"):
+        ort_inputs[inp.name] = attention_mask
+    elif inp.name == "token_type_ids":
+        ort_inputs[inp.name] = np.zeros_like(input_ids, dtype=np.int64)
+    else:
+        ort_inputs[inp.name] = input_ids
 
-if logits.ndim == 3:
-    text_embeddings = logits[:, 0, :]
-elif logits.ndim == 2:
-    text_embeddings = logits
-else:
-    text_embeddings = logits.reshape(len(prepared_texts), -1)
-norms = np.linalg.norm(text_embeddings, axis=-1, keepdims=True)
-norms = np.where(norms == 0, 1e-12, norms)
-normalized_embeddings = (text_embeddings / norms).tolist()
-
-RESULT = {"sentence_embeddings": normalized_embeddings}
+outputs = session.run(None, ort_inputs)
+RESULT = {"output": {out.name: val.tolist() for out, val in zip(session.get_outputs(), outputs)}}

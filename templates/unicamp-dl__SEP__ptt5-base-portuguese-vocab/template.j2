@@ -1,0 +1,21 @@
+{% set repo_id = repo_id | default("unicamp-dl/ptt5-base-portuguese-vocab") %}
+{% set device = device | default("cuda:0") %}
+{%- set task = task | default("text-generation") -%}
+{%- set model_name = model_name | default(repo_id) -%}
+{%- set input_prompt = input_prompt | default("Resuma em português: A tecnologia avança rapidamente e influencia todos os setores.") -%}
+
+task = {{ task | tojson }}
+model_name = {{ model_name | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, pipeline
+
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+seq2seq_model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
+
+pipeline_inputs = input_prompt
+
+pipe = pipeline(task=task, model=seq2seq_model, tokenizer=tokenizer, device=device)
+raw_output = pipe(pipeline_inputs)
+RESULT = {"outputs": raw_output}

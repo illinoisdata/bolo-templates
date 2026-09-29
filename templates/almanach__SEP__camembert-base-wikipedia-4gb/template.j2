@@ -1,30 +1,31 @@
 {% set repo_id = repo_id | default("almanach/camembert-base-wikipedia-4gb") %}
 {% set device = device | default("cuda:0") %}
 {% set text = text | default("Le camembert est un fromage de <mask>!") %}
+{% set top_k = top_k | default(5) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
+top_k = {{ top_k }}
 
-from transformers import pipeline
+import os
 import torch
-import json
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForMaskedLM, pipeline
 
-# Determine pipeline device (int for GPU ordinal, -1 for CPU)
-if device.startswith("cuda"):
-    device_index = int(device.split(":")[1])
-else:
-    device_index = -1
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
 
-# Load fill-mask pipeline
-fill_mask = pipeline(
-    "fill-mask",
-    model=repo_id,
-    tokenizer=repo_id,
-    device=device_index,
-)
+_ = config_path
+_ = weights_path
 
-# Pre-process & inference
-results = fill_mask(text)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForMaskedLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-# Post-process & build RESULT dict
-RESULT = {"results": results}
+fill_mask = pipeline("fill-mask", model=model, tokenizer=tokenizer, device=0 if str(device).startswith("cuda") else -1)
+output = fill_mask(text, top_k=top_k)
+
+RESULT = {"output": output}

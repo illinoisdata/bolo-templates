@@ -1,0 +1,29 @@
+{% set repo_id = repo_id | default("mlx-community/Devstral-Small-2-24B-Instruct-2512-4bit") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Describe this image.') %}
+{% set image = image | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+image = "{{ image }}"
+
+from urllib.parse import urlparse
+import requests
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from transformers import AutoProcessor
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_config_path = hf_hub_download(repo_id=repo_id, filename="processor_config.json")
+model_index_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+_ = (config_path, processor_config_path, model_index_path)
+
+if urlparse(image).scheme in ("http", "https"):
+    image = Image.open(requests.get(image, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image).convert("RGB")
+
+processor = AutoProcessor.from_pretrained(repo_id, trust_remote_code=True, fix_mistral_regex=True)
+inputs = processor(images=image, text=prompt, return_tensors="np")
+output = {"keys": sorted(list(inputs.keys())), "prompt": prompt}
+RESULT = {"output": output}

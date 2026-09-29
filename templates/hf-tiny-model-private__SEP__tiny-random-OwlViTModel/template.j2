@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("hf-tiny-model-private/tiny-random-OwlViTModel") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("zero-shot-object-detection") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+{% set candidate_labels = candidate_labels | default(["LABEL_0", "LABEL_1"]) %}
+
+repo_id = "{{ repo_id }}"
+model = repo_id
+device = "{{ device }}"
+task = "{{ task }}"
+image_path = "{{ image_path }}"
+candidate_labels = {{ candidate_labels | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(image_path, candidate_labels=candidate_labels)

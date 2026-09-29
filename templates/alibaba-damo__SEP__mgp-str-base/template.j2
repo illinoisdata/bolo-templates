@@ -1,0 +1,38 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("alibaba-damo/mgp-str-base") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import torch
+from PIL import Image
+from transformers import MgpstrProcessor, MgpstrForSceneTextRecognition
+from huggingface_hub import hf_hub_download
+from urllib.parse import urlparse
+import requests
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processor = MgpstrProcessor.from_pretrained(repo_id)
+model = MgpstrForSceneTextRecognition.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = processor(images=image, return_tensors="pt")
+pixel_values = inputs.pixel_values.to(device)
+with torch.no_grad():
+    outputs = model(pixel_values=pixel_values)
+
+generated_text = processor.batch_decode(outputs.logits)["generated_text"]
+
+RESULT = {"generated_text": generated_text}

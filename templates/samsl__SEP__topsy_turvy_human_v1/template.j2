@@ -1,0 +1,52 @@
+{% set repo_id = repo_id | default("samsl/topsy_turvy_human_v1") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+
+import json
+import torch
+import torch.nn as nn
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+class TopsyTurvyHuman(nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        self.embedding = nn.Linear(cfg["emb_nout"], cfg["emb_nout"])
+        self.contact = nn.Conv1d(cfg["emb_nout"], cfg["con_embed_dim"], kernel_size=cfg["con_width"], padding=cfg["con_width"] // 2)
+        self.contact_hidden = nn.Conv1d(cfg["con_embed_dim"], cfg["con_hidden_dim"], kernel_size=1)
+        self.activation = nn.ReLU()
+        self.gamma = nn.Parameter(torch.zeros(1))
+        self.lambda_ = nn.Parameter(torch.zeros(1))
+        self.theta = nn.Parameter(torch.ones(1))
+        self.xx = nn.Parameter(torch.zeros(2000))
+
+    def forward(self, x):
+        x = self.embedding(x)
+        x = x.transpose(1, 2)
+        x = self.contact(x)
+        x = self.activation(x)
+        x = self.contact_hidden(x)
+        x = x.mean(dim=-1)
+        x = x + self.gamma + self.lambda_ + self.theta + self.xx[: x.shape[-1]]
+        return x
+
+model = TopsyTurvyHuman(config)
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+seq_len = config["con_width"] + 1
+input_tensor = torch.randn(1, seq_len, config["emb_nout"], device=device)
+with torch.no_grad():
+    output = model(input_tensor).detach().cpu().numpy().tolist()
+
+RESULT = {"output": output}

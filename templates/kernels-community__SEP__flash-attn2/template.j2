@@ -1,0 +1,64 @@
+{% set repo_id = repo_id | default("kernels-community/flash-attn2") %}
+{% set device = device | default("cuda:0") %}
+{% set version = version | default(2) %}
+{% set batch_size = batch_size | default(2) %}
+{% set seq_len = seq_len | default(5) %}
+{% set heads = heads | default(4) %}
+{% set head_dim = head_dim | default(8) %}
+{% set causal = causal | default(false) %}
+{% set varlen_q_lens = varlen_q_lens | default([3, 4, 3]) %}
+{% set varlen_k_lens = varlen_k_lens | default([4, 5, 3]) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+version = {{ version }}
+batch_size = {{ batch_size }}
+seq_len = {{ seq_len }}
+heads = {{ heads }}
+head_dim = {{ head_dim }}
+causal = {{ causal }}
+varlen_q_lens = {{ varlen_q_lens }}
+varlen_k_lens = {{ varlen_k_lens }}
+
+import sys
+import subprocess
+import importlib.util
+
+import torch
+
+if importlib.util.find_spec("kernels") is None:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "kernels"])
+
+from kernels import get_kernel
+
+flash_attn = get_kernel(repo_id, version=version)
+
+device_t = torch.device(device)
+if device_t.type == "cuda" and not torch.cuda.is_available():
+    device_t = torch.device("cpu")
+
+torch.manual_seed(42)
+q = k = v = torch.randn(batch_size, seq_len, heads, head_dim, device=device_t, dtype=torch.float16)
+
+q_out = flash_attn.fwd(q=q, k=k, v=v, is_causal=causal)[0]
+
+q_var = torch.randn(sum(varlen_q_lens), heads, head_dim, device=device_t, dtype=torch.float16)
+k_var = torch.randn(sum(varlen_k_lens), heads, head_dim, device=device_t, dtype=torch.float16)
+v_var = torch.randn(sum(varlen_k_lens), heads, head_dim, device=device_t, dtype=torch.float16)
+cu_q = torch.tensor([0] + list(torch.tensor(varlen_q_lens).cumsum(0).tolist()), device=device_t, dtype=torch.int32)
+cu_k = torch.tensor([0] + list(torch.tensor(varlen_k_lens).cumsum(0).tolist()), device=device_t, dtype=torch.int32)
+
+var_out = flash_attn.varlen_fwd(
+    q=q_var,
+    k=k_var,
+    v=v_var,
+    cu_seqlens_q=cu_q,
+    cu_seqlens_k=cu_k,
+    max_seqlen_q=max(varlen_q_lens),
+    max_seqlen_k=max(varlen_k_lens),
+)[0]
+
+RESULT = {
+    "standard_attention": q_out,
+    "varlen_attention": var_out,
+}

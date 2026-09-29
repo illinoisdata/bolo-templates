@@ -1,51 +1,43 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Mike0307/text2vec-base-chinese-rag") %}
-{% set input_texts = [
-  "福井舞所屬哪家唱片公司？",
-  "23歲時出道、血型A型的福井舞是出身於京都的日本女創作歌手，所屬唱片公司為J-more。2004年，與WADAGAKI、SHINO組合地下音樂隊Poplar，發表了兩張專輯，天照和夢死物語。在2006年時退出，2007年10月加入了Avex獨立發展。"
-] %}
-{% set max_length = max_length | default(512) %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('福井舞所屬哪家唱片公司？') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_texts = {{ input_texts }}
-max_length = {{ max_length }}
+question = "{{ question }}"
 
-from transformers import AutoModel, AutoTokenizer
-import json
-import os
 import torch
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-inference_device = torch.device(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+
+def mean_pooling(model_output, attention_mask):
+    token_embeddings = model_output.last_hidden_state
+    input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+    return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(inference_device)
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
 model.eval()
 
-def mean_pooling(last_hidden_state: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
-    mask = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
-    pooled = torch.sum(last_hidden_state * mask, dim=1) / torch.clamp(mask.sum(dim=1), min=1e-9)
-    return pooled
+sentences = [
+    question,
+    "23歲時出道、血型A型的福井舞是出身於京都的日本女創作歌手，所屬唱片公司為J-more。2004年，與WADAGAKI、SHINO組合地下音樂隊Poplar，發表了兩張專輯，天照和夢死物語。在2006年時退出，2007年10月加入了Avex獨立發展。",
+]
 
-encoded_inputs = tokenizer(
-    input_texts,
-    padding=True,
-    truncation=True,
-    return_tensors="pt",
-    max_length=max_length,
-)
-encoded_inputs = {key: value.to(inference_device) for key, value in encoded_inputs.items()}
-
+encode_output = tokenizer(sentences, padding=True, truncation=True, return_tensors="pt", max_length=512)
+encode_output = {k: v.to(device) for k, v in encode_output.items()}
 with torch.no_grad():
-    model_output = model(**encoded_inputs)
+    model_output = model(**encode_output)
+    embeddings = mean_pooling(model_output, encode_output["attention_mask"])
+    similarity = torch.cosine_similarity(embeddings[0], embeddings[1], dim=0)
 
-last_hidden_state = model_output.last_hidden_state
-attention_mask = encoded_inputs["attention_mask"]
-embeddings = mean_pooling(last_hidden_state, attention_mask)
-
-cosine_similarity = torch.cosine_similarity(embeddings[0], embeddings[1], dim=0).item()
-embedding_vectors = embeddings.cpu().tolist()
-
-RESULT = {
-    "embedding_vectors": embedding_vectors,
-    "cosine_similarity": cosine_similarity,
-}
+RESULT = {"similarity": similarity.item(), "embeddings": embeddings.detach().cpu().tolist()}

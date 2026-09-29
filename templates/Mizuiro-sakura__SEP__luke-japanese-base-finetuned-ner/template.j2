@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("Mizuiro-sakura/luke-japanese-base-finetuned-ner") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("token-classification") %}
+{% set input_prompt = input_prompt | default("昨日は東京で買い物をした。") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+import torch
+from transformers import LukeTokenizer, LukeForTokenClassification, pipeline
+
+torch_device = torch.device(device)
+tokenizer = LukeTokenizer.from_pretrained(repo_id)
+model = LukeForTokenClassification.from_pretrained(repo_id).to(torch_device)
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=torch_device)
+RESULT = pipe(input_prompt)

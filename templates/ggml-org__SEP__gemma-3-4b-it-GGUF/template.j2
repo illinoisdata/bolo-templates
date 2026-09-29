@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("ggml-org/gemma-3-4b-it-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('gemma-3-4b-it-Q4_K_M.gguf') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set prompt = prompt | default('Describe this image in a concise paragraph.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+
+import os
+import urllib.parse
+import requests
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+if urllib.parse.urlparse(image_path).scheme in ("http", "https"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+mmproj_path = hf_hub_download(repo_id=repo_id, filename="mmproj-model-f16.gguf")
+
+n_gpu_layers = -1 if device.startswith("cuda") else 0
+llm = Llama(
+    model_path=model_path,
+    mmproj_path=mmproj_path,
+    n_ctx=4096,
+    n_gpu_layers=n_gpu_layers,
+    verbose=False,
+)
+
+messages = [
+    {
+        "role": "user",
+        "content": [
+            {"type": "image_url", "image_url": {"url": image_path}},
+            {"type": "text", "text": prompt},
+        ],
+    }
+]
+
+response = llm.create_chat_completion(messages=messages, temperature=0.2, max_tokens=128)
+output_text = response["choices"][0]["message"]["content"]
+
+RESULT = {"generated_text": output_text}

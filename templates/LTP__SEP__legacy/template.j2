@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("LTP/legacy") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("他叫汤姆去拿外衣。") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+from huggingface_hub import hf_hub_download
+from ltp.legacy import LTP
+
+cws_path = hf_hub_download(repo_id=repo_id, filename="cws_model.bin")
+pos_path = hf_hub_download(repo_id=repo_id, filename="pos_model.bin")
+ner_path = hf_hub_download(repo_id=repo_id, filename="ner_model.bin")
+
+ltp = LTP(cws=cws_path, pos=pos_path, ner=ner_path)
+output = ltp.pipeline([text], tasks=["cws", "pos", "ner"])
+cws, pos, ner = output.to_tuple()
+
+RESULT = {"cws": cws, "pos": pos, "ner": ner}

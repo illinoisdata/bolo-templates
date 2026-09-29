@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("asapp/sew-d-tiny-100k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("automatic-speech-recognition") %}
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+{% set tokenizer_id = tokenizer_id | default("facebook/wav2vec2-base-960h") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+model = repo_id
+tokenizer = {{ tokenizer_id | tojson }}
+input_audio = {{ audio_path | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_audio)

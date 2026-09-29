@@ -1,24 +1,30 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("liam168/trans-opus-mt-zh-en") %}
-{% set input_text = input_text | default("我喜欢学习数据科学和机器学习。") %}
-{% set max_length = max_length | default(400) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('我喜欢学习数据科学和机器学习。') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text = {{ text | tojson }}
 
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, MarianMTModel
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import os
 
-device_obj = torch.device(device)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device_obj)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-inputs = tokenizer(input_text, return_tensors="pt", truncation=True, padding=True)
-inputs = {key: value.to(device_obj) for key, value in inputs.items()}
-generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
-translation_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+weights_path = hf_hub_download(repo_id=repo_id, filename='pytorch_model.bin')
+source_spm_path = hf_hub_download(repo_id=repo_id, filename='source.spm')
+target_spm_path = hf_hub_download(repo_id=repo_id, filename='target.spm')
+repo_dir = os.path.dirname(weights_path)
 
-RESULT = {"translation": translation_text}
+model = MarianMTModel.from_pretrained(repo_dir)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+inputs = tokenizer(text, return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_length=400, num_beams=6)
+output_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"translation_text": output_text}

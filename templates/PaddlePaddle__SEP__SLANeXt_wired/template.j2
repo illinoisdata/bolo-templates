@@ -1,0 +1,28 @@
+{% set repo_id = repo_id | default("PaddlePaddle/SLANeXt_wired") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text_input = text_input | default('Extract the table structure from the image.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text_input = "{{ text_input }}"
+
+from paddleocr import TableStructureRecognition
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="inference.pdiparams")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+yml_path = hf_hub_download(repo_id=repo_id, filename="inference.yml")
+
+model_device = "cpu" if str(device).startswith("cuda") else device
+model = TableStructureRecognition(model_name="SLANeXt_wired", device=model_device)
+output = model.predict(input=image_path, batch_size=1)
+
+results = []
+for res in output:
+    if hasattr(res, "to_dict"):
+        results.append(res.to_dict())
+    else:
+        results.append(str(res))
+
+RESULT = {"output": results}

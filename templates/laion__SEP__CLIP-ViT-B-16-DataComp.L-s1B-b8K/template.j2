@@ -1,0 +1,55 @@
+{% set repo_id = repo_id | default("laion/CLIP-ViT-B-16-DataComp.L-s1B-b8K") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text_prompts = text_prompts | default(['a photo of a cat', 'a photo of a dog', 'a photo of a bird']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text_prompts = {{ text_prompts }}
+
+import json
+import os
+from PIL import Image
+import torch
+import open_clip
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+model_name = config.get("model_cfg", {}).get("vision_cfg", {}).get("name", "ViT-B-16")
+pretrained = None
+model, _, preprocess = open_clip.create_model_and_transforms(model_name, pretrained=pretrained)
+state_dict = torch.load(weights_path, map_location="cpu")
+if isinstance(state_dict, dict) and "state_dict" in state_dict:
+    state_dict = state_dict["state_dict"]
+if any(k.startswith("module.") for k in state_dict.keys()):
+    state_dict = {k[len("module."):]: v for k, v in state_dict.items()}
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+after_image = image_path
+if isinstance(after_image, str) and after_image.startswith(("http://", "https://")):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(after_image, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(after_image).convert("RGB")
+
+image_input = preprocess(image).unsqueeze(0).to(device)
+text_tokens = open_clip.tokenize(text_prompts).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_input)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logit_scale = model.logit_scale.exp()
+    logits = logit_scale * image_features @ text_features.T
+    probs = logits.softmax(dim=-1).squeeze(0)
+
+RESULT = {"text_prompts": text_prompts, "probabilities": probs.detach().cpu().tolist()}

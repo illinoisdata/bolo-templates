@@ -1,40 +1,43 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("ai-forever/FRED-T5-1.7B") %}
-{% set prompt = prompt | default("<LM>Принялся Кутузов рассказывать свою историю как он сюда попал. Началось") %}
-{% set max_length = max_length | default(256) %}
-{% set num_return_sequences = num_return_sequences | default(1) %}
-{% set do_sample = do_sample | default(False) %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('<LM>Принялся Кутузов рассказывать свою историю как он сюда попал. Началось') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = """{{ prompt }}"""
-max_length = {{ max_length }}
-num_return_sequences = {{ num_return_sequences }}
-do_sample = {{ do_sample }}
-
-import os
-from pathlib import Path
+prompt = "{{ prompt }}"
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_file = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+added_tokens_file = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model.to(torch_device)
-
-encoded_inputs = tokenizer(prompt, return_tensors="pt")
-input_ids = encoded_inputs["input_ids"].to(torch_device)
-attention_mask = encoded_inputs["attention_mask"].to(torch_device)
-
-generated_tokens = model.generate(
-    input_ids=input_ids,
-    attention_mask=attention_mask,
-    max_length=max_length,
-    num_return_sequences=num_return_sequences,
-    do_sample=do_sample,
+tokenizer = AutoTokenizer.from_pretrained(
+    tokenizer_config_file.rsplit('/', 1)[0],
+    use_fast=False,
 )
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    model_file.rsplit('/', 1)[0],
+    torch_dtype=torch.float32,
+)
+model.to(device)
+model.eval()
 
-generated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_new_tokens=32,
+        do_sample=False,
+        eos_token_id=tokenizer.eos_token_id,
+        pad_token_id=tokenizer.pad_token_id,
+    )
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=False)
 
-RESULT = {"generated_texts": generated_texts}
+RESULT = {"output_text": output_text}

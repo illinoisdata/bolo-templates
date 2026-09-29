@@ -1,30 +1,31 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("facebook/mms-tts-eng") %}
-{% set text = text | default("The quick brown fox jumps over the lazy dog.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("some example text in the English language") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
-from pathlib import Path
-
 import torch
-from scipy.io import wavfile
 from transformers import AutoTokenizer, VitsModel
+from huggingface_hub import hf_hub_download
 
-model = VitsModel.from_pretrained(repo_id)
-model = model.to(device)
-model.eval()
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.json")
 
-encoded_inputs = tokenizer(text, return_tensors="pt")
-encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
+model = VitsModel.from_pretrained(
+    repo_id,
+    local_files_only=True,
+    torch_dtype=torch.float32,
+).to(device)
 
-with torch.inference_mode():
-    model_output = model(**encoded_inputs)
-waveform_tensor = model_output.waveform
-waveform = waveform_tensor.squeeze(0).cpu().float().numpy()
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-RESULT = {
-    "waveform": waveform,
-    "sampling_rate": model.config.sampling_rate,
-}
+with torch.no_grad():
+    waveform = model(**inputs).waveform
+
+RESULT = {"waveform": waveform.detach().cpu(), "sampling_rate": model.config.sampling_rate}

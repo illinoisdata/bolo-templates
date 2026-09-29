@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("koboldcpp/tts") %}
+{% set device = device | default("cuda:0") %}
+{% set gguf_filename = gguf_filename | default("qwen3-tts-0.6b-f16.gguf") %}
+{% set text = text | default("Hello, this is a test of text to speech inference.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+gguf_filename = "{{ gguf_filename }}"
+text = "{{ text }}"
+
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename=gguf_filename)
+
+RESULT = {
+    "model_path": model_path,
+    "text": text,
+}

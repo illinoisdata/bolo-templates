@@ -1,25 +1,29 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("nboost/pt-tinybert-msmarco") %}
-{% set text_input = text_input | default("Encode a sample Portuguese query with pt-tinybert-msmarco.") %}
+{% set device = device | default("cuda:0") %}
+{% set text1 = text1 | default('query: what is bert? document: bert is a transformer model.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+text1 = "{{ text1 }}"
 
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-inputs = tokenizer(
-    text_input,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-    max_length=512,
-).to(device)
+device = torch.device(device if (str(device).startswith('cuda') and torch.cuda.is_available()) or str(device) == 'cpu' else 'cpu')
 
-outputs = model(**inputs)
-cls_embedding = outputs.last_hidden_state[:, 0, :].squeeze(0).detach().cpu().tolist()
+tokenizer = AutoTokenizer.from_pretrained(repo_id, vocab_file=vocab_path)
+model = AutoModel.from_pretrained(repo_id, local_files_only=True)
+state_dict = torch.load(weights_path, map_location='cpu')
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
 
-RESULT = {"cls_embedding": cls_embedding}
+inputs = tokenizer(text1, return_tensors='pt', truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+last_hidden_state = outputs.last_hidden_state.detach().cpu().numpy()
+RESULT = {"last_hidden_state": last_hidden_state}

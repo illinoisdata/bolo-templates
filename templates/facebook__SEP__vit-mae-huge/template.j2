@@ -1,53 +1,40 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("facebook/vit-mae-huge") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set device = device | default("cuda:0") %}
+{% set image = image | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set mask_ratio = mask_ratio | default(0.75) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-image_path = "{{ image_path }}"
+image = "{{ image }}"
+mask_ratio = {{ mask_ratio }}
 
 import os
-from pathlib import Path
-from urllib.parse import urlparse
-
-import numpy as np
 import requests
-import torch
 from PIL import Image
-from transformers import AutoImageProcessor, AutoModelForPreTraining
+import torch
+from transformers import AutoImageProcessor, ViTMAEForPreTraining
+from huggingface_hub import hf_hub_download
 
-processor = AutoImageProcessor.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id)
-model.to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+if image.startswith("http://") or image.startswith("https://"):
+    image_obj = Image.open(requests.get(image, stream=True).raw).convert("RGB")
+else:
+    image_obj = Image.open(image).convert("RGB")
+
+processor = AutoImageProcessor.from_pretrained(os.path.dirname(preprocessor_path))
+model = ViTMAEForPreTraining.from_pretrained(os.path.dirname(weights_path))
+model = model.to(device)
 model.eval()
 
-def _is_url(path: str) -> bool:
-    parsed = urlparse(path)
-    return parsed.scheme in {"http", "https"}
-
-def _load_image(path: str) -> Image.Image:
-    if _is_url(path):
-        response = requests.get(path, stream=True)
-        response.raise_for_status()
-        image = Image.open(response.raw)
-    else:
-        image = Image.open(path)
-    return image.convert("RGB")
-
-image = _load_image(image_path)
-inputs = processor(images=image, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
-
+inputs = processor(images=image_obj, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    outputs = model(**inputs)
-
-reconstructed_pixels = outputs.logits.detach().cpu()
-mask_tensor = outputs.mask.detach().cpu()
-ids_restore_tensor = outputs.ids_restore.detach().cpu()
-loss_tensor = outputs.loss.detach().cpu() if outputs.loss is not None else None
+    outputs = model(**inputs, mask_ratio=mask_ratio)
 
 RESULT = {
-    "reconstructed_pixels": reconstructed_pixels,
-    "mask": mask_tensor,
-    "ids_restore": ids_restore_tensor,
-    "loss": loss_tensor,
+    "loss": outputs.loss,
+    "mask": outputs.mask,
+    "ids_restore": outputs.ids_restore,
 }

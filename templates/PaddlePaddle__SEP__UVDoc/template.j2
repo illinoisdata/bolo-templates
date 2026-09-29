@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("PaddlePaddle/UVDoc") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+{% set batch_size = batch_size | default(1) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+batch_size = {{ batch_size }}
+
+import os
+import json
+from urllib.parse import urlparse
+from pathlib import Path
+import numpy as np
+from PIL import Image
+import requests
+import paddle
+import cv2
+from huggingface_hub import hf_hub_download
+from paddleocr import TextImageUnwarping
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="inference.pdiparams")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_inference_yml_path = hf_hub_download(repo_id=repo_id, filename="inference.yml")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    img_bytes = requests.get(image_path, timeout=30).content
+    img = Image.open(__import__('io').BytesIO(img_bytes)).convert("RGB")
+else:
+    img = Image.open(image_path).convert("RGB")
+
+model = TextImageUnwarping(model_name="UVDoc")
+output = model.predict(image_path, batch_size=batch_size)
+
+result_items = []
+for res in output:
+    item = {}
+    for attr in ["print", "save_to_img", "save_to_json", "save_to_markdown"]:
+        if hasattr(res, attr):
+            continue
+    if hasattr(res, "__dict__"):
+        for k, v in res.__dict__.items():
+            if isinstance(v, (str, int, float, bool, type(None), list, dict)):
+                item[k] = v
+            elif hasattr(v, "tolist"):
+                item[k] = v.tolist()
+    result_items.append(item)
+
+RESULT = {"results": result_items}

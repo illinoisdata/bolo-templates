@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("Systran/faster-whisper-base") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set language = language | default('en') %}
+{% set task = task | default('transcribe') %}
+{% set beam_size = beam_size | default(1) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+language = "{{ language }}"
+task = "{{ task }}"
+beam_size = {{ beam_size }}
+
+import os
+from urllib.parse import urlparse
+
+import librosa
+from huggingface_hub import hf_hub_download
+from faster_whisper import WhisperModel
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.bin")
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+hf_hub_download(repo_id=repo_id, filename="vocabulary.txt")
+model_dir = os.path.dirname(model_file)
+
+if urlparse(audio_path).scheme in ("http", "https"):
+    raise ValueError("URL audio inputs are not supported in this validation script")
+
+audio, sample_rate = librosa.load(audio_path, sr=16000, mono=True)
+
+model = WhisperModel(model_dir, device="cpu", compute_type="int8")
+segments, info = model.transcribe(audio, language=language, task=task, beam_size=beam_size)
+
+output_segments = [
+    {"start": float(segment.start), "end": float(segment.end), "text": segment.text}
+    for segment in segments
+]
+
+RESULT = {
+    "language": info.language,
+    "language_probability": float(info.language_probability),
+    "duration": float(info.duration),
+    "segments": output_segments,
+}

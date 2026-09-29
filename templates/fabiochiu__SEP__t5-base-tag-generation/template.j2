@@ -1,25 +1,39 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("fabiochiu/t5-base-tag-generation") %}
+{% set device = device | default("cuda:0") %}
 {% set text = text | default("Python is a high-level, interpreted, general-purpose programming language. Its design philosophy emphasizes code readability with the use of significant indentation. Python is dynamically-typed and garbage-collected.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = """{{ text }}"""
+text = "{{ text }}"
 
-from pathlib import Path
-import json
-
+import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+from huggingface_hub import hf_hub_download
 
-inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
-inputs = {key: value.to(device) for key, value in inputs.items()}
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-generated_ids = model.generate(**inputs, num_beams=8, do_sample=True, min_length=10, max_length=64)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-raw_tags = [tag.strip() for tag in decoded.strip().split(",") if tag.strip()]
-unique_tags = list(dict.fromkeys(raw_tags))
+inputs = tokenizer([text], max_length=512, truncation=True, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-RESULT = {"tags": unique_tags}
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        num_beams=8,
+        do_sample=True,
+        min_length=10,
+        max_length=64,
+    )
+
+decoded_output = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
+tags = list(set(decoded_output.strip().split(", ")))
+
+RESULT = {"tags": tags, "decoded_output": decoded_output}

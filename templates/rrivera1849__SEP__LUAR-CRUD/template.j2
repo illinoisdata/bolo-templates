@@ -1,0 +1,56 @@
+{% set repo_id = repo_id | default("rrivera1849/LUAR-CRUD") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set input_prompt = input_prompt | default([["I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory."]]) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_prompt = {{ input_prompt }}
+
+from transformers import pipeline, AutoTokenizer
+
+class EpisodeTokenizerWrapper:
+    def __init__(self, tokenizer):
+        self.tokenizer = tokenizer
+
+    def __getattr__(self, name):
+        return getattr(self.tokenizer, name)
+
+    @staticmethod
+    def _normalize(inputs):
+        if isinstance(inputs, str):
+            return [[inputs]]
+        if isinstance(inputs, (list, tuple)) and inputs and isinstance(inputs[0], (list, tuple)):
+            return [list(e) for e in inputs]
+        if isinstance(inputs, (list, tuple)):
+            return [list(inputs)]
+        raise ValueError(f"Unsupported input type: {type(inputs)}")
+
+    def __call__(self, inputs, **kwargs):
+        normalized = self._normalize(inputs)
+        batch_size = len(normalized)
+        episode_length = max(len(e) for e in normalized)
+        flattened = []
+        for episodes in normalized:
+            eps = list(episodes)
+            if len(eps) < episode_length:
+                eps = eps + [""] * (episode_length - len(eps))
+            else:
+                eps = eps[:episode_length]
+            flattened.extend(eps)
+        model_inputs = self.tokenizer(flattened, **kwargs)
+        seq_len = model_inputs["input_ids"].size(-1)
+        model_inputs["input_ids"] = model_inputs["input_ids"].reshape(batch_size, episode_length, seq_len)
+        model_inputs["attention_mask"] = model_inputs["attention_mask"].reshape(batch_size, episode_length, seq_len)
+        return model_inputs
+
+# Initialize tokenizer wrapper
+base_tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True)
+tokenizer = EpisodeTokenizerWrapper(base_tokenizer)
+
+# Create pipeline with custom tokenizer
+pipe = pipeline(task=task, model=repo_id, tokenizer=tokenizer, device=device, trust_remote_code=True)
+
+# Run inference
+RESULT = pipe(input_prompt, tokenize_kwargs={"padding": "max_length", "truncation": True})

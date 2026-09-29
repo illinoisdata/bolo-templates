@@ -1,0 +1,58 @@
+{% set repo_id = repo_id | default("mrm8488/longformer-base-4096-finetuned-squadv2") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What has Huggingface done?') %}
+{% set context = context | default('Huggingface has democratized NLP. Huge thanks to Huggingface for this.') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = {{ question | tojson }}
+context = {{ context | tojson }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+model = AutoModelForQuestionAnswering.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+
+encoding = tokenizer(question, context, return_tensors="pt", truncation=True)
+input_ids = encoding["input_ids"].to(device)
+attention_mask = encoding["attention_mask"].to(device)
+
+global_attention_mask = torch.zeros_like(attention_mask)
+sep_token_id = tokenizer.sep_token_id
+if sep_token_id is not None:
+    sep_positions = (input_ids[0] == sep_token_id).nonzero(as_tuple=True)[0]
+    if len(sep_positions) > 0:
+        global_attention_mask[0, : sep_positions[0].item() + 1] = 1
+else:
+    global_attention_mask[:, 0] = 1
+
+with torch.no_grad():
+    outputs = model(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        global_attention_mask=global_attention_mask,
+    )
+
+start_logits = outputs.start_logits
+end_logits = outputs.end_logits
+start_idx = torch.argmax(start_logits, dim=-1).item()
+end_idx = torch.argmax(end_logits, dim=-1).item()
+if end_idx < start_idx:
+    end_idx = start_idx
+
+all_tokens = tokenizer.convert_ids_to_tokens(input_ids[0].tolist())
+answer_tokens = all_tokens[start_idx : end_idx + 1]
+answer = tokenizer.decode(tokenizer.convert_tokens_to_ids(answer_tokens), skip_special_tokens=True).strip()
+
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx}

@@ -1,24 +1,31 @@
 {% set repo_id = repo_id | default("google/switch-base-32") %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("A <extra_id_0> walks into a bar and orders a <extra_id_1> with <extra_id_2> pinch of <extra_id_3>.") %}
-
+{% set text = text | default("The <extra_id_0> walks in <extra_id_1> park") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = """{{ text_input }}"""
+text = "{{ text }}"
 
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, SwitchTransformersForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
 
+_tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = SwitchTransformersForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
-inputs = tokenizer(text_input, return_tensors="pt")
-inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
 
-generated_ids = model.generate(**inputs)
-decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-generated_text = decoded[0] if decoded else ""
+inputs = _tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=32)
+output_text = _tokenizer.decode(output_ids[0], skip_special_tokens=False)
 
-RESULT = {"generated_text": generated_text}
+RESULT = {"output_text": output_text}

@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("numind/NuExtract-1.5-tiny") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('We introduce Mistral 7B, a 7-billion-parameter language model engineered for superior performance and efficiency. Mistral 7B outperforms the best open 13B model across all evaluated benchmarks.') %}
+{% set template_json = template_json | default('{"Model": {"Name": "", "Number of parameters": "", "Number of max token": "", "Architecture": []}, "Usage": {"Use case": [], "Licence": ""}}') %}
+{% set max_length = max_length | default(4096) %}
+{% set max_new_tokens = max_new_tokens | default(512) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = """{{ text }}"""
+template_json = """{{ template_json }}"""
+max_length = {{ max_length }}
+max_new_tokens = {{ max_new_tokens }}
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    trust_remote_code=True,
+    local_files_only=True,
+).to(device).eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True, local_files_only=True)
+
+prompt_template = json.dumps(json.loads(template_json), indent=4)
+prompt = f"<|input|>\n### Template:\n{prompt_template}\n### Text:\n{text}\n\n<|output|>"
+inputs = tokenizer(prompt, return_tensors="pt", truncation=True, padding=False, max_length=max_length).to(device)
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False, temperature=0.0)
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+if "<|output|>" in output_text:
+    output_text = output_text.split("<|output|>", 1)[1].strip()
+
+RESULT = {"prediction": output_text}

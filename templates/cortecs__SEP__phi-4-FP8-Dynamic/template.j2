@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("cortecs/phi-4-FP8-Dynamic") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('San Francisco is a') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+_ = hf_hub_download(repo_id=repo_id, filename='model.safetensors.index.json')
+_ = hf_hub_download(repo_id=repo_id, filename='tokenizer.json')
+_ = hf_hub_download(repo_id=repo_id, filename='tokenizer_config.json')
+_ = hf_hub_download(repo_id=repo_id, filename='special_tokens_map.json')
+_ = hf_hub_download(repo_id=repo_id, filename='vocab.json')
+_ = hf_hub_download(repo_id=repo_id, filename='merges.txt')
+
+model_dir = os.path.dirname(config_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True, trust_remote_code=False)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+    trust_remote_code=False,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=32,
+        do_sample=False,
+        pad_token_id=tokenizer.eos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+RESULT = {"text": output_text}

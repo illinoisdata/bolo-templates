@@ -1,38 +1,27 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-mul-en") %}
-{% set src_text = src_text | default("Bonjour, ceci est un test de traduction.") %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text|default('This is a test sentence.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-src_text = "{{ src_text }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-
-from pathlib import Path
+text = {{ text | tojson }}
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
+from transformers import MarianMTModel, MarianTokenizer
+from huggingface_hub import hf_hub_download
 
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+src_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+tgt_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+
+# MarianTokenizer expects the local vocabulary file path; in this repo it is present as vocab.json in the hub.
+# Use the pretrained loader with the repo id so tokenizer assets are resolved correctly.
 tokenizer = MarianTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = MarianMTModel.from_pretrained(repo_id).to(device)
+model.eval()
 
-inputs = tokenizer(
-    src_text,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-    max_length=max_length,
-)
-inputs = {key: value.to(device) for key, value in inputs.items()}
-
+inputs = tokenizer([text], return_tensors="pt", padding=True, truncation=True).to(device)
 with torch.no_grad():
-    generated_tokens = model.generate(
-        **inputs,
-        max_length=max_length,
-        num_beams=num_beams,
-    )
+    generated_ids = model.generate(**inputs, num_beams=6, max_length=128)
+translation = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-
-RESULT = {"translations": translations}
+RESULT = {"translation": translation}

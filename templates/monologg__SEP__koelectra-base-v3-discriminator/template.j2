@@ -1,33 +1,38 @@
 {% set repo_id = repo_id | default("monologg/koelectra-base-v3-discriminator") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("나는 내일 밥을 먹었다.") %}
-
+{% set text = text | default("나는 방금 밥을 먹었다.") %}
+{% set fake_text = fake_text | default("나는 내일 밥을 먹었다.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
+fake_text = "{{ fake_text }}"
 
-from transformers import AutoModelForPreTraining, ElectraTokenizer
 import torch
-import json
-import os
+from transformers import ElectraForPreTraining, ElectraTokenizer
+from huggingface_hub import hf_hub_download
 
-# Load model and tokenizer
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
-tokenizer = ElectraTokenizer.from_pretrained(repo_id)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-# Pre-process input
-inputs = tokenizer(text, return_tensors="pt")
-inputs = {k: v.to(device) for k, v in inputs.items()}
+model = ElectraForPreTraining.from_pretrained(
+    model_path,
+    config=config_path,
+).to(device)
+model.eval()
+tokenizer = ElectraTokenizer(vocab_file=vocab_path, tokenizer_file=None)
 
-# Run inference
-outputs = model(**inputs)
-logits = outputs.logits
-preds = torch.round((torch.sign(logits) + 1) / 2)[0]
+fake_tokens = tokenizer.tokenize(fake_text)
+fake_inputs = tokenizer(fake_text, return_tensors="pt")
+fake_inputs = {k: v.to(device) for k, v in fake_inputs.items()}
 
-# Post-process & build RESULT
-tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
-tokens = tokens[1:-1]
-preds = preds.tolist()[1:-1]
-predictions = [{"token": t, "prediction": p} for t, p in zip(tokens, preds)]
+with torch.no_grad():
+    discriminator_outputs = model(**fake_inputs)
+    scores = discriminator_outputs.logits
+    predictions = torch.round((torch.sign(scores) + 1) / 2)
 
-RESULT = {"predictions": predictions}
+RESULT = {
+    "fake_tokens": fake_tokens,
+    "predictions": predictions.detach().cpu().tolist(),
+}

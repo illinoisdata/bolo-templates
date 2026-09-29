@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("ahotrod/albert_xxlargev1_squad2_512") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What model is this repository fine-tuned on?') %}
+{% set context = context | default('This repository contains an ALBERT xxlarge version 1 language model fine-tuned on SQuAD 2.0. It is designed for question answering.') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import os
+import torch
+from transformers import AlbertTokenizer, AlbertForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+spm_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+
+tokenizer = AlbertTokenizer(vocab_file=spm_path, do_lower_case=True)
+model = AlbertForQuestionAnswering.from_pretrained(os.path.dirname(weights_path))
+model.to(device)
+model.eval()
+
+inputs = tokenizer(
+    question,
+    context,
+    return_tensors="pt",
+    truncation="only_second",
+    max_length=512,
+    stride=128,
+    return_overflowing_tokens=False,
+    return_offsets_mapping=False,
+    padding="max_length",
+)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits[0]
+end_logits = outputs.end_logits[0]
+start_idx = int(torch.argmax(start_logits).item())
+end_idx = int(torch.argmax(end_logits).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+
+input_ids = inputs["input_ids"][0].detach().cpu().tolist()
+answer = tokenizer.decode(input_ids[start_idx:end_idx + 1], skip_special_tokens=True).strip()
+
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx}

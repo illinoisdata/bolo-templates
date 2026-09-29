@@ -1,23 +1,30 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("sshleifer/tiny-mbart") %}
-{% set src_text = src_text | default("Hello, world!") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('translate English to French: The house is wonderful.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-src_text = "{{ src_text }}"
+text = "{{ text }}"
 
-import os
-import json
-
+from huggingface_hub import hf_hub_download
+from transformers import MBartTokenizer, MBartConfig, BartForConditionalGeneration
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-inputs = tokenizer(src_text, return_tensors="pt").to(device)
+device_obj = torch.device(device)
+config = MBartConfig.from_json_file(config_path)
+tokenizer = MBartTokenizer(vocab_file=tokenizer_path)
+model = BartForConditionalGeneration.from_pretrained(repo_id, config=config)
+model.to(device_obj)
+model.eval()
 
-outputs = model.generate(**inputs)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device_obj) for k, v in inputs.items()}
+output_ids = model.generate(**inputs, max_new_tokens=20, num_beams=2)
+output_text = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
 
-generated_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-
-RESULT = {"generated_text": generated_text}
+RESULT = {"output_text": output_text}

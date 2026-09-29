@@ -1,49 +1,39 @@
-{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 {% set repo_id = repo_id | default("magic-leap-community/superpoint") %}
-{% set image_path = image_path | default('/u/yli77/projects/ML-code-generation/data/image1.jpeg') %}
+{% set device = device | default("cuda:0") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 
-import json
-from pathlib import Path
-from urllib.parse import urlparse
-
-import requests
+import os
 import torch
 from PIL import Image
-from transformers import AutoImageProcessor, AutoModelForKeypointDetection
+import requests
+from transformers import AutoImageProcessor, SuperPointForKeypointDetection
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-processor = AutoImageProcessor.from_pretrained(repo_id)
-model = AutoModelForKeypointDetection.from_pretrained(repo_id).to(torch_device)
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
 
-def load_image(path: str) -> Image.Image:
-    parsed = urlparse(path)
-    if parsed.scheme in ("http", "https"):
-        return Image.open(requests.get(path, stream=True).raw).convert("RGB")
-    return Image.open(path).convert("RGB")
+processor = AutoImageProcessor.from_pretrained(os.path.dirname(preprocessor_path))
+model = SuperPointForKeypointDetection.from_pretrained(os.path.dirname(weights_path)).to(device)
+model.eval()
 
-image = load_image(image_path)
-inputs = processor(image, return_tensors="pt")
-inputs = {key: value.to(torch_device) for key, value in inputs.items()}
-
+inputs = processor(images=image, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
     outputs = model(**inputs)
 
-image_mask = outputs.mask[0]
-image_indices = torch.nonzero(image_mask, as_tuple=False).view(-1)
-keypoints = outputs.keypoints[0][image_indices]
-scores = outputs.scores[0][image_indices]
-descriptors = outputs.descriptors[0][image_indices]
+mask = outputs.mask[0]
+indices = torch.nonzero(mask, as_tuple=False).squeeze(-1)
+keypoints = outputs.keypoints[0][indices].detach().cpu()
+scores = outputs.scores[0][indices].detach().cpu()
+descriptors = outputs.descriptors[0][indices].detach().cpu()
 
-valid_keypoints = keypoints.detach().cpu().tolist()
-valid_scores = scores.detach().cpu().tolist()
-valid_descriptors = descriptors.detach().cpu().tolist()
-
-RESULT = {
-    "keypoints": valid_keypoints,
-    "scores": valid_scores,
-    "descriptors": valid_descriptors,
-}
+RESULT = {"keypoints": keypoints, "scores": scores, "descriptors": descriptors}

@@ -1,25 +1,35 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("KETI-AIR/ke-t5-small") %}
-{% set input_text = input_text | default("아버지가 방에 들어가신다.</s>") %}
-{% set max_length = max_length | default(50) %}
-{% set num_beams = num_beams | default(5) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('아버지가 방에 들어가신다.') %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text = "{{ text }}"
+max_new_tokens = {{ max_new_tokens }}
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
-from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
 
-inputs = tokenizer(input_text, return_tensors="pt")
+# Load tokenizer/model from the repository id while ensuring required files are present locally.
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-outputs = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
-generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
 
-RESULT = {"generated_text": generated_text}
+decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"generated_text": decoded[0]}

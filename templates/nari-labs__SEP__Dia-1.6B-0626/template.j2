@@ -1,0 +1,65 @@
+{% set repo_id = repo_id | default("nari-labs/Dia-1.6B-0626") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('[S1] Dia is an open weights text to dialogue model. [S2] You get full control over scripts and voices. [S1] Wow. Amazing. (laughs) [S2] Try it now on Git hub or Hugging Face.') %}
+{% set audio_prompt = audio_prompt | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+audio_prompt = {{ audio_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+
+import os
+import tempfile
+from urllib.parse import urlparse
+
+import requests
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoProcessor, DiaForConditionalGeneration
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+audio_tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="audio_tokenizer_config.json")
+processor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+processor = AutoProcessor.from_pretrained(os.path.dirname(processor_config_path), trust_remote_code=True)
+model = DiaForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32, trust_remote_code=True)
+model = model.to(device)
+model.eval()
+
+if isinstance(audio_prompt, str) and audio_prompt.startswith(("http://", "https://")):
+    r = requests.get(audio_prompt, timeout=30)
+    r.raise_for_status()
+    suffix = os.path.splitext(urlparse(audio_prompt).path)[-1] or ".wav"
+    tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+    tmp.write(r.content)
+    tmp.close()
+    audio_path = tmp.name
+else:
+    audio_path = audio_prompt
+
+from datasets import Audio
+from soundfile import read as sf_read
+
+sr_audio, _ = sf_read(audio_path)
+if isinstance(sr_audio, int):
+    pass
+
+import soundfile as sf
+waveform, sample_rate = sf.read(audio_path)
+if waveform.ndim > 1:
+    waveform = waveform[:, 0]
+if sample_rate != 44100:
+    import resampy
+    waveform = resampy.resample(waveform, sample_rate, 44100)
+    sample_rate = 44100
+
+inputs = processor(text=[text], audio=waveform, padding=True, return_tensors="pt").to(device)
+prompt_len = processor.get_audio_prompt_len(inputs["decoder_attention_mask"]) if "decoder_attention_mask" in inputs else None
+
+with torch.inference_mode():
+    generated = model.generate(**inputs, max_new_tokens=max_new_tokens)
+
+audio_outputs = processor.batch_decode(generated, audio_prompt_len=prompt_len) if prompt_len is not None else processor.batch_decode(generated)
+
+RESULT = {"audio": audio_outputs}

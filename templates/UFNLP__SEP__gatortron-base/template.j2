@@ -1,33 +1,28 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("UFNLP/gatortron-base") %}
-{% set text_input = text_input | default("Bone scan: Negative for distant metastasis.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Bone scan: Negative for distant metastasis.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = """{{ text_input }}"""
+text = "{{ text }}"
 
-import os
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id)
-model.to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, vocab_file=vocab_path, use_fast=False)
+model = AutoModel.from_pretrained(repo_id, local_files_only=True)
+state_dict = torch.load(weights_path, map_location="cpu")
+state_dict = {k.replace("bert.", "", 1): v for k, v in state_dict.items()}
+model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
 model.eval()
 
-# Pre-process input text
-encoded_input = tokenizer(text_input, truncation=True, padding=True, max_length=512, return_tensors="pt")
-encoded_input = {key: value.to(device) for key, value in encoded_input.items()}
-
-# Run inference
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    outputs = model(**encoded_input)
+    outputs = model(**inputs)
 
-# Post-process outputs
-last_hidden_state = outputs.last_hidden_state.cpu()
-pooler_output = outputs.pooler_output.cpu() if outputs.pooler_output is not None else None
-
-RESULT = {
-    "last_hidden_state": last_hidden_state,
-    "pooler_output": pooler_output,
-}
+RESULT = {"last_hidden_state": outputs.last_hidden_state.detach().cpu().numpy(), "pooler_output": outputs.pooler_output.detach().cpu().numpy() if outputs.pooler_output is not None else None}

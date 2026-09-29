@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("lmstudio-community/DeepSeek-R1-Distill-Qwen-1.5B-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf') %}
+{% set prompt = prompt | default('Explain in a few sentences what chain-of-thought reasoning is.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+n_gpu_layers = -1 if device.startswith("cuda") and torch.cuda.is_available() else 0
+llm = Llama(
+    model_path=model_path,
+    n_ctx=2048,
+    n_gpu_layers=n_gpu_layers,
+    verbose=False,
+)
+
+messages = [
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user", "content": prompt},
+]
+
+prompt_text = llm.create_chat_completion(messages=messages, max_tokens=128)
+output_text = prompt_text["choices"][0]["message"]["content"]
+
+RESULT = {"output": output_text}

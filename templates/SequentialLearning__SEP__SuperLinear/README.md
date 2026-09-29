@@ -1,0 +1,89 @@
+---
+license: mit
+tags:
+  - time-series
+  - mixture-of-experts
+  - forecasting
+  - pytorch
+  - fft
+model-index:
+  - name: SuperLinear
+    results: []
+---
+
+
+# Super-Linear: A Mixture of Experts Time Series Forecasting Model
+
+SuperLinear is a novel time series forecasting model that employs a Mixture of Experts (MoE) architecture to achieve superior performance across various forecasting tasks. The model routes inputs to the most relevant experts based on frequency-domain analysis using FFT-based gating networks.
+
+## Model Architecture
+
+The SuperLinear model consists of:
+
+- **Sparse Mixture of Experts (MoE)**: Routes inputs to the top-k most relevant experts
+- **FFT-based Gating Network**: Uses frequency domain analysis to determine expert routing
+- **Frequency-specific Experts**: Pre-trained experts specialized for different temporal patterns
+
+## Key Features
+
+- **Adaptive Expert Selection**: Dynamic routing based on input characteristics
+- **Frequency-aware Processing**: Leverages FFT analysis for intelligent expert selection
+- **Auto-regressive Capabilities**: Supports long-horizon forecasting
+- **Multi-scale Processing**: Handles various sequence lengths through resampling
+
+## Updates
+- On 26/01/2026 a slight implementation modification was introduced, now inference is more than 10x faster! Making Super-Linear the fastest pre-trained forecaster!
+  
+## Usage
+
+```python
+from transformers import AutoModelForCausalLM, AutoConfig
+import torch
+
+# Load the model
+model = AutoModelForCausalLM.from_pretrained("SequentialLearning/SuperLinear", trust_remote_code=True)
+
+# Prepare input time series data
+# Shape: [batch_size, channel, sequence_length] or [batch_size, sequence_length]
+input_data = torch.randn(1, 1, 512)
+
+# Generate predictions
+with torch.no_grad():
+    outputs = model(inputs_embeds=input_data, pred_len=96, get_prob = True)
+    preds = outputs.logits # Predicted values
+    probs = outputs.attentions  # Expert probabilities stored here
+  
+```
+
+## Configuration
+
+Key parameters:
+
+- `train_seq_len`: Training sequence length (default: 512)
+- `train_pred_len`: Training prediction length (default: 96)
+- `top_k_experts`: Number of experts to use (default: 12)
+- `use_fft`: Whether to use FFT-based gating (default: True)
+- `freq_experts`: Frequency-specific expert configuration
+- `moe_temp`: Temperature for expert selection during inference (default: 1)
+
+## Links
+
+- **GitHub Repository**: [https://github.com/azencot-group/SuperLinear](https://github.com/azencot-group/SuperLinear)
+- **Paper**: [https://arxiv.org/abs/2509.15105](https://arxiv.org/abs/2509.15105)
+
+## Citation
+
+If you use SuperLinear in your research, please cite:
+
+```bibtex
+@article{nochumsohn2025super,
+  title={Super-Linear: A Lightweight Pretrained Mixture of Linear Experts for Time Series Forecasting},
+  author={Nochumsohn, Liran and Marshanski, Raz and Zisling, Hedi and Azencot, Omri},
+  journal={arXiv preprint arXiv:2509.15105},
+  year={2025}
+}
+```
+
+## License
+
+This model is released under the MIT License.

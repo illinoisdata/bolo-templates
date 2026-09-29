@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("google/tapas-base") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("table-question-answering") %}
+{% set table = table | default({"Date": ["2020-01-01", "2020-01-02"], "Temperature": [30, 32]}) %}
+{% set query = query | default("What was the temperature on 2020-01-02?") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+table = {{ table | tojson }}
+query = {{ query | tojson }}
+
+import pandas as pd
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, tokenizer=repo_id, device=device)
+
+df = pd.DataFrame(table).astype(str)
+RESULT = pipe(table=df, query=query)

@@ -1,29 +1,30 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("DeepChem/ChemBERTa-77M-MTR") %}
-{% set input_smiles = input_smiles | default("CCO") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('CC(=O)Oc1ccccc1C(=O)O') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_smiles = "{{ input_smiles }}"
+text = "{{ text }}"
 
-import json
-from pathlib import Path
+import torch
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSequenceClassification.from_pretrained(repo_id)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModel.from_pretrained(repo_id, trust_remote_code=True)
+state_dict = torch.load(weights_path, map_location="cpu")
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
 model.to(device)
+model.eval()
 
-encoded_inputs = tokenizer(input_smiles, truncation=True, padding=True, return_tensors="pt")
-encoded_inputs = {key: tensor.to(device) for key, tensor in encoded_inputs.items()}
+inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-outputs = model(**encoded_inputs)
-logits = outputs.logits[0].detach().cpu().tolist()
-id2label = getattr(model.config, "id2label", {})
-per_label_scores = (
-    {id2label.get(str(index), str(index)): value for index, value in enumerate(logits)}
-    if id2label
-    else {str(index): value for index, value in enumerate(logits)}
-)
+with torch.no_grad():
+    outputs = model(**inputs)
 
-RESULT = {"regression_per_label": per_label_scores}
+last_hidden_state = outputs.last_hidden_state
+pooled_output = last_hidden_state[:, 0, :]
+RESULT = {"last_hidden_state": last_hidden_state.detach().cpu().tolist(), "pooled_output": pooled_output.detach().cpu().tolist()}

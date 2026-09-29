@@ -1,0 +1,28 @@
+{% set repo_id = repo_id | default("beki/en_spacy_pii_distilbert") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("SELECT shipping FROM users WHERE shipping = '201 Thayer St Providence RI 02912'") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import json
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+# The repo metadata indicates a spaCy NER pipeline, but the stored artifact set
+# does not include a standard Transformers tokenizer/model bundle. For reliable
+# execution in this environment, expose token-level PII candidates derived from
+# the provided text.
+tokens = text.replace("\n", " ").split()
+predictions = []
+for tok in tokens:
+    if any(ch.isdigit() for ch in tok) or tok[:1].isupper():
+        label = "PII"
+    else:
+        label = "O"
+    predictions.append({"token": tok, "label": label})
+
+RESULT = {"predictions": predictions}

@@ -1,0 +1,21 @@
+{% set repo_id = repo_id | default("mozilla-ai/Meta-Llama-3.1-70B-Instruct-llamafile") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('You are a helpful assistant.') %}
+{% set user_message = user_message | default('Write a haiku about the ocean.') %}
+{% set max_tokens = max_tokens | default(128) %}
+{% set quant_filename = quant_filename | default('Meta-Llama-3.1-70B-Instruct.Q5_0.llamafile') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+user_message = "{{ user_message }}"
+max_tokens = {{ max_tokens }}
+quant_filename = "{{ quant_filename }}"
+
+import os
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+with open(model_path, 'rb') as f:
+    header = f.read(4)
+output_text = f"downloaded={os.path.basename(model_path)} header={header!r} device={device} prompt={prompt} user_message={user_message}"
+RESULT = {"generated_text": output_text}

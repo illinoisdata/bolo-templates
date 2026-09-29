@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("Ralriki/multilingual-e5-large-instruct-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('multilingual-e5-large-instruct-q6_k.gguf') %}
+{% set query_text = query_text | default('query: What is the capital of France?') %}
+{% set passage_text = passage_text | default('passage: Paris is the capital and most populous city of France.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+query_text = "{{ query_text }}"
+passage_text = "{{ passage_text }}"
+
+import os
+import numpy as np
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+llm = Llama(
+    model_path=model_path,
+    embedding=True,
+    n_ctx=512,
+    n_batch=8,
+    verbose=False,
+    n_threads=max(1, os.cpu_count() or 1),
+)
+
+query_embedding = llm.create_embedding(query_text)["data"][0]["embedding"]
+passage_embedding = llm.create_embedding(passage_text)["data"][0]["embedding"]
+
+query_vec = np.array(query_embedding, dtype=np.float32)
+passage_vec = np.array(passage_embedding, dtype=np.float32)
+similarity = float(np.dot(query_vec, passage_vec) / (np.linalg.norm(query_vec) * np.linalg.norm(passage_vec) + 1e-12))
+
+RESULT = {
+    "query_embedding": query_embedding,
+    "passage_embedding": passage_embedding,
+    "cosine_similarity": similarity,
+}

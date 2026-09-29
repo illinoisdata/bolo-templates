@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("timm/resnet101_clip.openai") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import torch
+from PIL import Image
+from io import BytesIO
+from urllib.parse import urlparse
+import requests
+from huggingface_hub import hf_hub_download
+from timm import create_model
+from timm.data import resolve_model_data_config, create_transform
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+if urlparse(image_path).scheme in ("http", "https"):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model = create_model("resnet101_clip", pretrained=False, num_classes=0)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+with open(config_path, "r") as f:
+    cfg = __import__("json").load(f)
+pretrained_cfg = cfg.get("pretrained_cfg", {})
+
+data_config = resolve_model_data_config(model, pretrained_cfg=pretrained_cfg)
+transform = create_transform(**data_config, is_training=False)
+input_tensor = transform(image).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    output = model(input_tensor)
+    output = output.flatten().detach().cpu().tolist()
+
+RESULT = {"embedding": output}

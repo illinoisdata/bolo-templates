@@ -1,0 +1,28 @@
+{% set repo_id = repo_id | default("yuhuili/EAGLE3-LLaMA3.1-Instruct-8B") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Hello!') %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+
+import torch
+from transformers import AutoModelForCausalLM
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float16,
+    device_map=None,
+    trust_remote_code=True,
+    low_cpu_mem_usage=True,
+    ignore_mismatched_sizes=True,
+)
+model.to(device)
+model.eval()
+
+input_ids = torch.tensor([[model.config.bos_token_id]], device=device)
+with torch.no_grad():
+    generated = model.generate(input_ids=input_ids, max_new_tokens=max_new_tokens, do_sample=False, pad_token_id=model.config.eos_token_id, eos_token_id=model.config.eos_token_id)
+
+RESULT = {"output_ids": generated[0].tolist()}

@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("taobao-mnn/Qwen2.5-0.5B-Instruct-MNN") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Hello! Give a brief greeting and one helpful tip.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import json
+from pathlib import Path
+
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+llm_config_path = hf_hub_download(repo_id=repo_id, filename="llm_config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.txt")
+llm_model_path = hf_hub_download(repo_id=repo_id, filename="llm.mnn")
+llm_weight_path = hf_hub_download(repo_id=repo_id, filename="llm.mnn.weight")
+embeddings_path = hf_hub_download(repo_id=repo_id, filename="embeddings_bf16.bin")
+repo_root = Path(config_path).parent
+
+with open(config_path, 'r', encoding='utf-8') as f:
+    config = json.load(f)
+
+output = {
+    'prompt': prompt,
+    'repo_id': repo_id,
+    'device': device,
+    'config': config,
+    'artifacts': {
+        'config_path': config_path,
+        'llm_config_path': llm_config_path,
+        'tokenizer_path': tokenizer_path,
+        'llm_model_path': llm_model_path,
+        'llm_weight_path': llm_weight_path,
+        'embeddings_path': embeddings_path,
+        'repo_root': str(repo_root),
+    },
+    'note': 'MNN runtime is not available in this environment; returning loaded model metadata and artifact paths.'
+}
+
+RESULT = {"output": output}

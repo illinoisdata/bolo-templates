@@ -1,0 +1,21 @@
+{% set repo_id = repo_id | default("oschamp/vit-artworkclassifier") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") -%}
+{% set image_processor = image_processor | default("google/vit-base-patch16-224-in21k") -%}
+{% set image_input = image_input | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") -%}
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+image_processor = {{ image_processor | tojson }}
+image_input = {{ image_input | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    device=device,
+    image_processor=image_processor,
+)
+
+RESULT = pipe(image_input)

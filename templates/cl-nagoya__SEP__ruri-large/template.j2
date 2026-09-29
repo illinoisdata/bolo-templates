@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("cl-nagoya/ruri-large") %}
+{% set device = device | default("cuda:0") %}
+{% set text1 = text1 | default("クエリ: 瑠璃色はどんな色？") %}
+{% set text2 = text2 | default("文章: 瑠璃色（るりいろ）は、紫みを帯びた濃い青。名は、半貴石の瑠璃（ラピスラズリ、英: lapis lazuli）による。JIS慣用色名では「こい紫みの青」（略号 dp-pB）と定義している[1][2]。") %}
+{% set text3 = text3 | default("クエリ: ワシやタカのように、鋭いくちばしと爪を持った大型の鳥類を総称して「何類」というでしょう?") %}
+{% set text4 = text4 | default("文章: ワシ、タカ、ハゲワシ、ハヤブサ、コンドル、フクロウが代表的である。これらの猛禽類はリンネ前後の時代(17~18世紀)には鷲類・鷹類・隼類及び梟類に分類された。ちなみにリンネは狩りをする鳥を単一の目(もく)にまとめ、vultur(コンドル、ハゲワシ)、falco(ワシ、タカ、ハヤブサなど)、strix(フクロウ)、lanius(モズ)の4属を含めている。") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text1 = "{{ text1 }}"
+text2 = "{{ text2 }}"
+text3 = "{{ text3 }}"
+text4 = "{{ text4 }}"
+
+import os
+import torch
+import torch.nn.functional as F
+from huggingface_hub import hf_hub_download
+from transformers import BertModel, BertTokenizer
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+repo_dir = os.path.dirname(config_path)
+
+tokenizer = BertTokenizer.from_pretrained(repo_dir)
+model = BertModel.from_pretrained(repo_dir).to(device)
+model.eval()
+
+sentences = [text1, text2, text3, text4]
+inputs = tokenizer(sentences, padding=True, truncation=True, max_length=512, return_tensors="pt").to(device)
+with torch.no_grad():
+    outputs = model(**inputs)
+    token_embeddings = outputs.last_hidden_state
+    attention_mask = inputs["attention_mask"].unsqueeze(-1)
+    summed = (token_embeddings * attention_mask).sum(dim=1)
+    counts = attention_mask.sum(dim=1).clamp(min=1)
+    embeddings = summed / counts
+similarities = F.cosine_similarity(embeddings.unsqueeze(0), embeddings.unsqueeze(1), dim=2)
+
+RESULT = {"embeddings": embeddings, "similarities": similarities}

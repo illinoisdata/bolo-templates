@@ -1,43 +1,51 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("IAMJB/chexpert-mimic-cxr-impression-baseline") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 {% set max_length = max_length | default(128) %}
 {% set num_beams = num_beams | default(2) %}
-{% set num_return_sequences = num_return_sequences | default(1) %}
-device = "{{ device }}"
 repo_id = "{{ repo_id }}"
+device = "{{ device }}"
 image_path = "{{ image_path }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
-num_return_sequences = {{ num_return_sequences }}
 
-from transformers import BertTokenizer, ViTImageProcessor, VisionEncoderDecoderModel, GenerationConfig
-import torch
-from PIL import Image
-import requests
 import os
+import torch
+import requests
+from PIL import Image
+from transformers import BertTokenizer, ViTImageProcessor, VisionEncoderDecoderModel, GenerationConfig
+from huggingface_hub import hf_hub_download
 
-model = VisionEncoderDecoderModel.from_pretrained(repo_id).to(device).eval()
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB") if str(image_path).startswith(("http://", "https://")) else Image.open(image_path).convert("RGB")
+
+model = VisionEncoderDecoderModel.from_pretrained(repo_id, torch_dtype=torch.float32).to(device).eval()
 tokenizer = BertTokenizer.from_pretrained(repo_id)
-processor = ViTImageProcessor.from_pretrained(repo_id)
+image_processor = ViTImageProcessor.from_pretrained(repo_id)
 
-if image_path.startswith("http"):
-    image = Image.open(requests.get(image_path, stream=True).raw)
-else:
-    image = Image.open(image_path)
-pixel_values = processor(image, return_tensors="pt").pixel_values.to(device)
+pixel_values = image_processor(images=image, return_tensors="pt").pixel_values.to(device)
 
-generation_config = GenerationConfig(
-    bos_token_id=model.config.decoder_start_token_id,
-    eos_token_id=model.config.eos_token_id,
-    pad_token_id=model.config.pad_token_id,
-    num_return_sequences=num_return_sequences,
-    max_length=max_length,
-    use_cache=True,
-    num_beams=num_beams,
-    decoder_start_token_id=tokenizer.cls_token_id,
-)
-generated_ids = model.generate(pixel_values, generation_config=generation_config)
-generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+generation_args = {
+    "bos_token_id": model.config.decoder.bos_token_id,
+    "eos_token_id": model.config.decoder.eos_token_id,
+    "pad_token_id": model.config.pad_token_id,
+    "num_return_sequences": 1,
+    "max_length": max_length,
+    "use_cache": True,
+    "num_beams": num_beams,
+    "decoder_start_token_id": tokenizer.cls_token_id,
+}
 
-RESULT = {"generated_texts": generated_texts}
+with torch.no_grad():
+    generated_ids = model.generate(pixel_values, generation_config=GenerationConfig(**generation_args))
+
+output_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"text": output_text}

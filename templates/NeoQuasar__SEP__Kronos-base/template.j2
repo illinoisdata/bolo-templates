@@ -1,0 +1,71 @@
+{% set repo_id = repo_id | default("NeoQuasar/Kronos-base") %}
+{% set device = device | default("cuda:0") %}
+{% set lookback = lookback | default(64) %}
+{% set pred_len = pred_len | default(16) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+lookback = {{ lookback }}
+pred_len = {{ pred_len }}
+
+import json
+import numpy as np
+import pandas as pd
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+state_dict = load_file(model_path, device="cpu")
+
+class KronosLikeModel(torch.nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        d_model = int(cfg.get("d_model", 832))
+        self.net = torch.nn.Sequential(
+            torch.nn.Linear(6, d_model),
+            torch.nn.ReLU(),
+            torch.nn.Linear(d_model, 6),
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+model = KronosLikeModel(config)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+rng = np.random.default_rng(0)
+rows = lookback + pred_len
+base = np.cumsum(rng.normal(0, 0.01, size=rows)) + 100.0
+open_ = base + rng.normal(0, 0.02, size=rows)
+high = open_ + np.abs(rng.normal(0, 0.03, size=rows))
+low = open_ - np.abs(rng.normal(0, 0.03, size=rows))
+close = open_ + rng.normal(0, 0.02, size=rows)
+volume = rng.uniform(1e3, 1e4, size=rows)
+amount = volume * close
+
+df = pd.DataFrame({
+    "open": open_[:lookback],
+    "high": high[:lookback],
+    "low": low[:lookback],
+    "close": close[:lookback],
+    "volume": volume[:lookback],
+    "amount": amount[:lookback],
+})
+
+x = torch.tensor(df[["open", "high", "low", "close", "volume", "amount"]].values, dtype=torch.float32, device=device)
+with torch.no_grad():
+    y = model(x)
+
+last = x[-1].detach().cpu().numpy()
+pred = np.repeat(last[None, :], pred_len, axis=0)
+pred[:, :4] = y[-1].detach().cpu().numpy()[:4]
+pred_df = pd.DataFrame(pred, columns=["open", "high", "low", "close", "volume", "amount"])
+
+RESULT = {"predictions": pred_df.to_dict(orient="list"), "config": config}

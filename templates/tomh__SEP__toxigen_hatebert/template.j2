@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("tomh/toxigen_hatebert") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") -%}
+{% set tokenizer_name = tokenizer_name | default("bert-base-uncased") -%}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") -%}
+
+task = {{ task | tojson }}
+tokenizer_name = {{ tokenizer_name | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer_name, device=device)
+RESULT = pipe(input_prompt)

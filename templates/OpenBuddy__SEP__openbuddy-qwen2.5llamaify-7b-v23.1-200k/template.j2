@@ -1,0 +1,64 @@
+{% set repo_id = repo_id | default("OpenBuddy/openbuddy-qwen2.5llamaify-7b-v23.1-200k") %}
+{% set device = device | default("cuda:0") %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.9) %}
+{% set do_sample = do_sample | default(true) %}
+{% set system_prompt = system_prompt | default('You are a helpful, respectful and honest assistant.') %}
+{% set user_prompt = user_prompt | default('Write a short haiku about the ocean.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+do_sample = {{ do_sample }}
+system_prompt = "{{ system_prompt }}"
+user_prompt = "{{ user_prompt }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+model_index_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+
+_ = config_path, tokenizer_config_path, special_tokens_map_path, added_tokens_path, model_index_path
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+)
+model = model.to(device)
+model.eval()
+
+messages = [
+    {"role": "system", "content": system_prompt},
+    {"role": "user", "content": user_prompt},
+]
+input_ids = tokenizer.apply_chat_template(
+    messages,
+    tokenize=True,
+    add_generation_prompt=True,
+    return_dict=False,
+)
+input_ids = torch.tensor([input_ids], device=device)
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        input_ids=input_ids,
+        max_new_tokens=max_new_tokens,
+        do_sample=do_sample,
+        temperature=temperature,
+        top_p=top_p,
+        pad_token_id=tokenizer.eos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+generated_text = tokenizer.decode(generated_ids[0][input_ids.shape[-1]:], skip_special_tokens=True)
+
+RESULT = {"text": generated_text}

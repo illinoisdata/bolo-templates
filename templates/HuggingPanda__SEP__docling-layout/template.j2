@@ -1,0 +1,62 @@
+{% set repo_id = repo_id | default("HuggingPanda/docling-layout") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+{% set threshold = threshold | default(0.3) %}
+{% set resize_height = resize_height | default(640) %}
+{% set resize_width = resize_width | default(640) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+threshold = {{ threshold }}
+resize_height = {{ resize_height }}
+resize_width = {{ resize_width }}
+
+import torch
+from PIL import Image
+from transformers import RTDetrForObjectDetection, RTDetrImageProcessor
+from huggingface_hub import hf_hub_download
+from pathlib import Path
+from urllib.parse import urlparse
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+if urlparse(image_path).scheme in ("http", "https"):
+    image = Image.open(torch.hub.load_state_dict_from_url(image_path, map_location="cpu", file_name=Path(urlparse(image_path).path).name)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+image_processor = RTDetrImageProcessor.from_pretrained(Path(processor_path).parent)
+model = RTDetrForObjectDetection.from_pretrained(Path(weights_path).parent).to(device)
+model.eval()
+
+inputs = image_processor(
+    images=image,
+    return_tensors="pt",
+    size={"height": resize_height, "width": resize_width},
+)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+results = image_processor.post_process_object_detection(
+    outputs,
+    target_sizes=torch.tensor([image.size[::-1]], device=device),
+    threshold=threshold,
+)
+
+result = results[0]
+boxes = result["boxes"].detach().cpu().tolist()
+scores = result["scores"].detach().cpu().tolist()
+labels = result["labels"].detach().cpu().tolist()
+objects = []
+for score, label_id, box in zip(scores, labels, boxes):
+    objects.append({
+        "label": model.config.id2label[int(label_id)],
+        "score": float(score),
+        "box": [float(x) for x in box],
+    })
+
+RESULT = {"objects": objects}

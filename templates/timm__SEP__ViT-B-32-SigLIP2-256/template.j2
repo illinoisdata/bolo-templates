@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("timm/ViT-B-32-SigLIP2-256") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set labels_list = labels_list | default(['a dog', 'a cat', 'a donut', 'a beignet']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+labels_list = {{ labels_list }}
+
+import json
+import torch
+import requests
+from PIL import Image
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+from open_clip import create_model_from_pretrained, get_tokenizer
+
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+if str(image_path).startswith(("http://", "https://")):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model, preprocess = create_model_from_pretrained(
+    f"hf-hub:{repo_id}",
+    pretrained_image=None,
+    pretrained_text=None,
+)
+model = model.to(device)
+model.eval()
+
+tokenizer = get_tokenizer(f"hf-hub:{repo_id}")
+image_tensor = preprocess(image).unsqueeze(0).to(device)
+text_tokens = tokenizer(labels_list, context_length=model.context_length).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_tensor, normalize=True)
+    text_features = model.encode_text(text_tokens, normalize=True)
+    logits = image_features @ text_features.T * model.logit_scale.exp() + model.logit_bias
+    probs = torch.sigmoid(logits)[0].detach().cpu().tolist()
+
+RESULT = {"labels": labels_list, "probabilities": probs}

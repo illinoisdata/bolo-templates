@@ -1,18 +1,36 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("google/mt5-base") %}
-{% set text = text | default("translate English to German: Hello, world!") %}
-device = "{{ device }}"
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('translate English to German: The house is wonderful.') %}
 repo_id = "{{ repo_id }}"
+device = "{{ device }}"
 text = "{{ text }}"
 
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import T5Tokenizer, MT5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
 
-inputs = tokenizer(text, return_tensors="pt").to(device)
-outputs = model.generate(**inputs)
-generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+tokenizer = T5Tokenizer.from_pretrained(repo_id)
+model = MT5ForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-RESULT = {"generated_text": generated_text}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=32,
+        num_beams=4,
+        do_sample=False,
+    )
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

@@ -1,0 +1,14 @@
+{% set repo_id = repo_id | default("jarvisx17/japanese-sentiment-analysis") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set input_prompt = input_prompt | default("🤗セグメント利益は、前期比8.3％増の24億28百万円となった") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = """{{ input_prompt }}"""
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = pipe(input_prompt)

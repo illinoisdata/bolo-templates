@@ -1,37 +1,32 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-en-af") %}
-{% set text_inputs = text_inputs | default(["The quick brown fox jumps over the lazy dog."]) %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(4) %}
-{% set output_filename = output_filename | default("translations.txt") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hello, how are you?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_inputs = {{ text_inputs }}
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-output_filename = "{{ output_filename }}"
+text = {{ text | tojson }}
 
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = MarianTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-inputs = tokenizer(
-    text_inputs,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-    max_length=max_length,
-)
-inputs = inputs.to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-generated_tokens = model.generate(
-    **inputs,
-    max_length=max_length,
-    num_beams=num_beams,
-)
+inputs = tokenizer([text], return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+with torch.no_grad():
+    generated_tokens = model.generate(**inputs, num_beams=4, max_length=128)
 
-RESULT = {"translations": translations}
+translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"translation": translation}

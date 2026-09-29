@@ -1,0 +1,100 @@
+{% set repo_id = repo_id | default("ibm-nasa-geospatial/Prithvi-EO-2.0-300M") %}
+{% set device = device | default("cuda:0") %}
+{% set image_files = image_files | default(['/u/yunqili4/projects/ML-code-generation/data/image1.jpeg', '/u/yunqili4/projects/ML-code-generation/data/image2.jpeg', '/u/yunqili4/projects/ML-code-generation/data/doc.jpeg']) %}
+{% set input_indices = input_indices | default([0, 1, 2, 3, 4, 5]) %}
+{% set num_frames = num_frames | default(4) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_files = {{ image_files }}
+input_indices = {{ input_indices }}
+num_frames = {{ num_frames }}
+
+import json
+import os
+from pathlib import Path
+
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from PIL import Image
+from torchvision import transforms
+
+import sys
+from importlib.util import spec_from_file_location, module_from_spec
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="Prithvi_EO_V2_300M.pt")
+from huggingface_hub import hf_hub_download
+prithvi_path = hf_hub_download(repo_id=repo_id, filename="prithvi_mae.py")
+spec = spec_from_file_location("prithvi_mae", prithvi_path)
+prithvi_mod = module_from_spec(spec)
+spec.loader.exec_module(prithvi_mod)
+PrithviMAE = prithvi_mod.PrithviMAE
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+pretrained_cfg = cfg["pretrained_cfg"]
+
+mean = torch.tensor(pretrained_cfg["mean"], dtype=torch.float32).view(-1, 1, 1)
+std = torch.tensor(pretrained_cfg["std"], dtype=torch.float32).view(-1, 1, 1)
+
+loaded = []
+for p in image_files[:num_frames]:
+    if str(p).startswith(("http://", "https://")):
+        from urllib.request import urlopen
+        img = Image.open(urlopen(p)).convert("RGB")
+    else:
+        img = Image.open(p).convert("RGB")
+    loaded.append(img)
+
+if len(loaded) < num_frames:
+    loaded = loaded + [loaded[-1]] * (num_frames - len(loaded))
+
+resize = transforms.Resize((224, 224))
+to_tensor = transforms.ToTensor()
+frames = []
+for img in loaded:
+    x = to_tensor(resize(img)) * 10000.0
+    x = x[:6]
+    if x.shape[0] < 6:
+        pad = torch.zeros(6 - x.shape[0], x.shape[1], x.shape[2])
+        x = torch.cat([x, pad], dim=0)
+    frames.append(x)
+video = torch.stack(frames, dim=0).permute(1, 0, 2, 3).unsqueeze(0)
+video = (video - mean[:, None, :, :]) / std[:, None, :, :]
+video = video.to(device)
+
+model = PrithviMAE(
+    img_size=pretrained_cfg["img_size"],
+    num_frames=pretrained_cfg["num_frames"],
+    patch_size=tuple(pretrained_cfg["patch_size"]),
+    embed_dim=pretrained_cfg["embed_dim"],
+    depth=pretrained_cfg["depth"],
+    num_heads=pretrained_cfg["num_heads"],
+    decoder_embed_dim=pretrained_cfg["decoder_embed_dim"],
+    decoder_depth=pretrained_cfg["decoder_depth"],
+    decoder_num_heads=pretrained_cfg["decoder_num_heads"],
+    mlp_ratio=pretrained_cfg["mlp_ratio"],
+    coords_encoding=pretrained_cfg["coords_encoding"],
+    coords_scale_learn=pretrained_cfg["coords_scale_learn"],
+    mask_ratio=0.0,
+    norm_pix_loss=pretrained_cfg["norm_pix_loss"],
+    in_chans=pretrained_cfg["in_chans"],
+)
+state = torch.load(weights_path, map_location="cpu")
+if isinstance(state, dict) and "state_dict" in state:
+    state = state["state_dict"]
+state = {k.replace("module.", ""): v for k, v in state.items()}
+missing, unexpected = model.load_state_dict(state, strict=False)
+model = model.to(device)
+model.eval()
+
+with torch.no_grad():
+    output = model(video)
+
+if isinstance(output, (tuple, list)):
+    output = output[0]
+output = output.detach().cpu()
+
+RESULT = {"output": output}

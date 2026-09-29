@@ -1,23 +1,38 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("UBC-NLP/AraT5-base") %}
-{% set prompt = prompt | default("هذا اختبار لتوليد نص عربي باستخدام AraT5-base.") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default('اكتب عنوانًا إخباريًا قصيرًا يلخص النص التالي: أعلنت الشركة عن إطلاق منتج جديد يستهدف المستخدمين في المنطقة العربية.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
-
-from pathlib import Path
+text_input = "{{ text_input }}"
 
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-inputs = tokenizer(prompt, return_tensors="pt")
+model_dir = weights_path.rsplit('/', 1)[0]
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text_input, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(**inputs)
-decoded_output = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=32,
+        num_beams=4,
+        length_penalty=1.0,
+        early_stopping=True,
+    )
 
-RESULT = {"generated_text": decoded_output}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

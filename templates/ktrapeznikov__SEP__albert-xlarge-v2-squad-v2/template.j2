@@ -1,0 +1,73 @@
+{% set repo_id = repo_id | default("ktrapeznikov/albert-xlarge-v2-squad-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What model is fine-tuned on SQuAD V2?') %}
+{% set context = context | default('albert-xlarge-v2 fine-tuned on SQuAD V2 using run_squad.py.') %}
+{% set max_length = max_length | default(384) %}
+{% set doc_stride = doc_stride | default(128) %}
+{% set max_answer_length = max_answer_length | default(30) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+max_length = {{ max_length }}
+doc_stride = {{ doc_stride }}
+max_answer_length = {{ max_answer_length }}
+
+import torch
+from transformers import AlbertTokenizer, AlbertForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+
+from pathlib import Path
+
+tokenizer_dir = str(Path(tokenizer_config_path).parent)
+model_dir = str(Path(config_path).parent)
+
+tokenizer = AlbertTokenizer.from_pretrained(tokenizer_dir, use_fast=False)
+model = AlbertForQuestionAnswering.from_pretrained(model_dir, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(
+    question,
+    context,
+    max_length=max_length,
+    truncation="only_second",
+    stride=doc_stride,
+    return_overflowing_tokens=False,
+    return_offsets_mapping=True,
+    padding="max_length",
+    return_tensors="pt",
+)
+offset_mapping = inputs.pop("offset_mapping")[0].tolist()
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    start_logits = outputs.start_logits[0]
+    end_logits = outputs.end_logits[0]
+
+best_score = None
+best_start = 0
+best_end = 0
+for start_idx in range(len(offset_mapping)):
+    for end_idx in range(start_idx, min(len(offset_mapping), start_idx + max_answer_length)):
+        if offset_mapping[start_idx] is None or offset_mapping[end_idx] is None:
+            continue
+        start_char, _ = offset_mapping[start_idx]
+        _, end_char = offset_mapping[end_idx]
+        score = float(start_logits[start_idx] + end_logits[end_idx])
+        if best_score is None or score > best_score:
+            best_score = score
+            best_start = start_char
+            best_end = end_char
+
+answer = context[best_start:best_end].strip()
+RESULT = {"answer": answer, "start_index": best_start, "end_index": best_end, "score": best_score}

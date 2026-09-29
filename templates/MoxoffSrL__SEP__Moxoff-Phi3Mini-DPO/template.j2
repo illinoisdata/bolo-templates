@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("MoxoffSrL/Moxoff-Phi3Mini-DPO") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set rope_original_max_position_embeddings = rope_original_max_position_embeddings | default(4096) %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+rope_original_max_position_embeddings = {{ rope_original_max_position_embeddings }}
+
+import json
+from huggingface_hub import hf_hub_download
+from transformers import AutoModelForCausalLM, AutoTokenizer, Phi3Config, pipeline
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_path, "r", encoding="utf-8") as config_file:
+    config_dict = json.load(config_file)
+
+rope_scaling = config_dict.pop("rope_scaling", {})
+short_factor = rope_scaling.get("short_factor")
+long_factor = rope_scaling.get("long_factor")
+rope_theta_value = config_dict.get("rope_theta")
+
+rope_parameters = config_dict.get("rope_parameters")
+if rope_parameters is None:
+    rope_parameters = {
+        "rope_type": "longrope",
+        "original_max_position_embeddings": rope_original_max_position_embeddings,
+    }
+else:
+    rope_parameters = dict(rope_parameters)
+    rope_parameters.setdefault("rope_type", "longrope")
+    rope_parameters.setdefault("original_max_position_embeddings", rope_original_max_position_embeddings)
+    rope_parameters.setdefault("rope_theta", rope_theta_value)
+
+if short_factor is not None and "short_factor" not in rope_parameters:
+    rope_parameters["short_factor"] = short_factor
+if long_factor is not None and "long_factor" not in rope_parameters:
+    rope_parameters["long_factor"] = long_factor
+if rope_theta_value is not None:
+    rope_parameters.setdefault("rope_theta", rope_theta_value)
+
+config_dict["rope_parameters"] = rope_parameters
+config = Phi3Config(**config_dict)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, config=config)
+model = AutoModelForCausalLM.from_pretrained(repo_id, config=config)
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt)

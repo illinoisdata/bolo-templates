@@ -1,20 +1,33 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-roa-en") %}
 {% set device = device | default("cuda:0") %}
-{% set source_text = source_text | default("Ciao, come stai?") %}
+{% set text = text | default('Hola mundo. Esto es una prueba de traducción.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_text = "{{ source_text }}"
+text = {{ text | tojson }}
 
-from pathlib import Path
-from transformers import MarianTokenizer, AutoModelForSeq2SeqLM
+import torch
+from transformers import AutoTokenizer, MarianMTModel
+from huggingface_hub import hf_hub_download
 
-tokenizer = MarianTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
 
-inputs = tokenizer(source_text, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+_tokenizer = AutoTokenizer.from_pretrained(repo_id)
+_model = MarianMTModel.from_pretrained(repo_id, torch_dtype=torch.float32)
+_model.to(device)
+_model.eval()
 
-generated_tokens = model.generate(**inputs)
-translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+inputs = _tokenizer([text], return_tensors="pt", padding=True, truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-RESULT = {"translation": translation}
+with torch.no_grad():
+    generated_ids = _model.generate(**inputs, num_beams=6, max_length=128)
+
+output_text = _tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"translation": output_text}

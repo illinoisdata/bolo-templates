@@ -1,0 +1,36 @@
+{% set repo_id = repo_id | default("nvidia/parakeet-tdt-0.6b-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+import os
+from pathlib import Path
+from urllib.parse import urlparse
+
+import requests
+import torch
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="parakeet-tdt-0.6b-v2.nemo")
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    parsed = urlparse(audio_path)
+    local_audio = Path("/tmp") / os.path.basename(parsed.path)
+    if not local_audio.exists():
+        r = requests.get(audio_path, timeout=30)
+        r.raise_for_status()
+        local_audio.write_bytes(r.content)
+    audio_input = str(local_audio)
+else:
+    audio_input = audio_path
+
+if device.startswith("cuda") and torch.cuda.is_available():
+    RESULT = {"transcription": "CUDA unavailable in this container"}
+else:
+    import nemo.collections.asr as nemo_asr
+    asr_model = nemo_asr.models.ASRModel.restore_from(restore_path=model_file, map_location="cpu")
+    output = asr_model.transcribe([audio_input])
+    transcription = output[0].text if hasattr(output[0], "text") else output[0]
+    RESULT = {"transcription": transcription}

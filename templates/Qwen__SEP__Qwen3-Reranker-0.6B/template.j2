@@ -1,78 +1,75 @@
 {% set repo_id = repo_id | default("Qwen/Qwen3-Reranker-0.6B") %}
 {% set device = device | default("cuda:0") %}
-{% set instruction = instruction | default("Given a web search query, retrieve relevant passages that answer the query") %}
-{% set queries = queries | default(["What is the capital of China?", "Explain gravity"]) %}
-{% set documents = [
-    "The capital of China is Beijing.",
-    "Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun."
-] %}
-
+{% set query = query | default('What is the capital of China?') %}
+{% set document = document | default('The capital of China is Beijing.') %}
+{% set task = task | default('Given a web search query, retrieve relevant passages that answer the query') %}
+{% set max_length = max_length | default(8192) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-instruction = "{{ instruction }}"
-queries = [
-{% for query in queries %}
-    "{{ query }}"{% if not loop.last %},{% endif %}
-{% endfor %}
-]
-documents = [
-{% for doc in documents %}
-    "{{ doc }}"{% if not loop.last %},{% endif %}
-{% endfor %}
-]
-
-import json
-import os
-from pathlib import Path
+query = {{ query | tojson }}
+document = {{ document | tojson }}
+task = {{ task | tojson }}
+max_length = {{ max_length }}
 
 import torch
-import torch.nn.functional as F
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
 
-device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-# Load tokenizer and model
-max_length = 8192
-tokenizer = AutoTokenizer.from_pretrained(repo_id, padding_side="left")
-model = AutoModelForCausalLM.from_pretrained(repo_id).to(device)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+    trust_remote_code=False,
+    local_files_only=True,
+)
+model.to(device)
 model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True, local_files_only=True)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+def format_instruction(instruction, query, doc):
+    if instruction is None:
+        instruction = 'Given a web search query, retrieve relevant passages that answer the query'
+    return "<Instruct>: {instruction}\n<Query>: {query}\n<Document>: {doc}".format(
+        instruction=instruction, query=query, doc=doc
+    )
 
 prefix = "<|im_start|>system\nJudge whether the Document meets the requirements based on the Query and the Instruct provided. Note that the answer can only be \"yes\" or \"no\".<|im_end|>\n<|im_start|>user\n"
 suffix = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
-token_true_id = tokenizer.convert_tokens_to_ids("yes")
-token_false_id = tokenizer.convert_tokens_to_ids("no")
+prefix_tokens = tokenizer.encode(prefix, add_special_tokens=False)
+suffix_tokens = tokenizer.encode(suffix, add_special_tokens=False)
+true_token = tokenizer.encode("yes", add_special_tokens=False)[0]
+false_token = tokenizer.encode("no", add_special_tokens=False)[0]
 
-def format_instruction_sections(instruction_text: str, query: str, document: str) -> str:
-    return (
-        f"<Instruct>: {instruction_text}\n"
-        f"<Query>: {query}\n"
-        f"<Document>: {document}"
-    )
-
-pairs = [
-    prefix + format_instruction_sections(instruction, query, document) + suffix
-    for query, document in zip(queries, documents)
-]
-
+pair_text = format_instruction(task, query, document)
 inputs = tokenizer(
-    pairs,
-    padding=True,
-    truncation="longest_first",
+    [pair_text],
+    padding=False,
+    truncation=True,
+    max_length=max_length - len(prefix_tokens) - len(suffix_tokens),
     return_attention_mask=True,
     return_tensors="pt",
-    max_length=max_length,
 )
-
-inputs = {key: value.to(device) for key, value in inputs.items()}
+input_ids = inputs["input_ids"][0].tolist()
+input_ids = prefix_tokens + input_ids + suffix_tokens
+inputs = tokenizer.pad({"input_ids": [input_ids]}, padding=True, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    logits = model(**inputs).logits
+    logits = model(**inputs).logits[:, -1, :]
+    true_logit = logits[:, true_token]
+    false_logit = logits[:, false_token]
+    batch_scores = torch.stack([false_logit, true_logit], dim=1)
+    batch_scores = torch.nn.functional.log_softmax(batch_scores, dim=1)
+    score = batch_scores[:, 1].exp().item()
 
-logits = logits[:, -1, :]
-true_logits = logits[:, token_true_id]
-false_logits = logits[:, token_false_id]
-stacked_logits = torch.stack([false_logits, true_logits], dim=1)
-log_probs = F.log_softmax(stacked_logits, dim=1)
-scores = log_probs[:, 1].exp().tolist()
-
-RESULT = {"rerank_scores": scores}
+RESULT = {"score": score}

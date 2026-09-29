@@ -1,0 +1,57 @@
+{% set repo_id = repo_id | default("SmilingWolf/wd-convnext-tagger-v3") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set threshold = threshold | default(0.35) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+threshold = {{ threshold }}
+
+import json
+import requests
+import pandas as pd
+from PIL import Image
+import torch
+import timm
+from timm.data import resolve_model_data_config, create_transform
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+labels_path = hf_hub_download(repo_id=repo_id, filename="selected_tags.csv")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model = timm.create_model(cfg["architecture"], pretrained=False, num_classes=cfg["num_classes"], act_layer=cfg["model_args"]["act_layer"])
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict, strict=True)
+model.to(device)
+model.eval()
+
+pretrained_cfg = cfg["pretrained_cfg"]
+data_cfg = resolve_model_data_config(model, pretrained_cfg=pretrained_cfg)
+transform = create_transform(**data_cfg, is_training=False)
+input_tensor = transform(image).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    logits = model(input_tensor)
+    probs = torch.sigmoid(logits)[0].detach().cpu().numpy()
+
+df = pd.read_csv(labels_path)
+result = []
+for _, row in df.iterrows():
+    idx = int(row["tag_id"])
+    if idx >= len(probs):
+        continue
+    score = float(probs[idx])
+    if score >= threshold:
+        result.append({"tag": row["name"], "category": int(row["category"]), "score": score})
+
+RESULT = {"predictions": result, "all_probs": probs}

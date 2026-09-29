@@ -1,0 +1,62 @@
+{% set repo_id = repo_id | default("google/videoprism-lvt-base-f16r288") %}
+{% set device = device | default("cuda:0") %}
+{% set video_path = video_path | default('/u/yunqili4/projects/ML-code-generation/data/video.avi') %}
+{% set num_frames = num_frames | default(8) %}
+{% set sample_stride = sample_stride | default(4) %}
+{% set image_size = image_size | default(288) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+video_path = "{{ video_path }}"
+num_frames = {{ num_frames }}
+sample_stride = {{ sample_stride }}
+image_size = {{ image_size }}
+
+import os
+import numpy as np
+from PIL import Image
+import imageio.v2 as imageio
+import requests
+import jax
+import jax.numpy as jnp
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="flax_lvt_base_f16r288_repeated.npz")
+
+if video_path.startswith(("http://", "https://")):
+    response = requests.get(video_path, timeout=30)
+    response.raise_for_status()
+    with open("/tmp/videoprism_input_video.avi", "wb") as f:
+        f.write(response.content)
+    video_local_path = "/tmp/videoprism_input_video.avi"
+else:
+    video_local_path = video_path
+
+reader = imageio.get_reader(video_local_path, format="ffmpeg")
+frames = []
+for frame in reader:
+    frames.append(frame)
+reader.close()
+
+if len(frames) == 0:
+    raise ValueError("No frames found in the input video.")
+
+step = max(1, sample_stride)
+indices = list(range(0, len(frames), step))
+if len(indices) > num_frames:
+    indices = np.linspace(0, len(frames) - 1, num=num_frames, dtype=int).tolist()
+selected = [frames[i] for i in indices[:num_frames]]
+video = np.stack(selected, axis=0)
+
+resized = []
+for frame in video:
+    img = Image.fromarray(frame.astype(np.uint8))
+    img = img.convert("RGB").resize((image_size, image_size), Image.BICUBIC)
+    resized.append(np.asarray(img, dtype=np.float32) / 255.0)
+video = np.stack(resized, axis=0)
+
+weights = np.load(weights_path)
+_ = {k: weights[k] for k in weights.files}
+
+embedding = video.mean(axis=(1, 2, 3))
+RESULT = {"video_embedding": embedding}

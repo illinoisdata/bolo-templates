@@ -1,0 +1,42 @@
+{% set repo_id = repo_id | default("vectara/hallucination_evaluation_model") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set tokenizer_id = tokenizer_id | default("google/flan-t5-base") %}
+{% if prompt_template is not defined %}{% set prompt_template %}
+<pad> Determine if the hypothesis is true given the premise?
+
+Premise: {text1}
+
+Hypothesis: {text2}
+{% endset %}{% endif %}
+{% set pairs = pairs | default([
+    ["The capital of France is Berlin.", "The capital of France is Paris."],
+    ["I am in California", "I am in United States."],
+    ["I am in United States", "I am in California."],
+    ["A person on a horse jumps over a broken down airplane.", "A person is outdoors, on a horse."],
+    ["A boy is jumping on skateboard in the middle of a red bridge.", "The boy skates down the sidewalk on a red bridge"],
+    ["A man with blond-hair, and a brown shirt drinking out of a public water fountain.", "A blond man wearing a brown shirt is reading a book."],
+    ["Mark Wahlberg was a fan of Manny.", "Manny was a fan of Mark Wahlberg."]
+]) %}
+
+repo_id = "{{ repo_id }}"
+task = "{{ task }}"
+device = "{{ device }}"
+tokenizer_id = "{{ tokenizer_id }}"
+prompt_template = """{{ prompt_template }}"""
+pairs = {{ pairs | tojson }}
+
+from transformers import pipeline, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_id)
+pipe = pipeline(
+    task=task,
+    model=repo_id,
+    tokenizer=tokenizer,
+    trust_remote_code=True,
+    device=device
+)
+
+input_strings = [prompt_template.format(text1=p[0], text2=p[1]) for p in pairs]
+
+RESULT = pipe(input_strings, top_k=None)

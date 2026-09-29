@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("lmstudio-community/LFM2.5-1.2B-Instruct-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('LFM2.5-1.2B-Instruct-Q4_K_M.gguf') %}
+{% set prompt = prompt | default('Write a short greeting from the model.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+# Load tokenizer from the original base model repo referenced by metadata.
+tokenizer = AutoTokenizer.from_pretrained("LiquidAI/LFM2.5-1.2B-Instruct", use_fast=True)
+if tokenizer.pad_token_id is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+# GGUF models are loaded through llama.cpp-compatible tooling.
+# Use llama-cpp-python if available.
+from llama_cpp import Llama
+
+llm = Llama(
+    model_path=model_path,
+    n_ctx=1024,
+    n_threads=max(1, os.cpu_count() or 1),
+    n_gpu_layers=-1 if str(device).startswith("cuda") else 0,
+    verbose=False,
+)
+
+messages = [
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user", "content": prompt},
+]
+formatted_prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+output = llm(
+    formatted_prompt,
+    max_tokens=64,
+    temperature=0.7,
+    top_p=0.95,
+    stop=[tokenizer.eos_token] if tokenizer.eos_token else None,
+)
+
+generated_text = output["choices"][0]["text"]
+
+RESULT = {"text": generated_text}

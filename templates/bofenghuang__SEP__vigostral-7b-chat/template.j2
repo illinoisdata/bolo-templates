@@ -1,0 +1,29 @@
+{% set repo_id = repo_id | default("bofenghuang/vigostral-7b-chat") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Bonjour ! Pouvez-vous me raconter une histoire passionnante en français ?") %}
+{% set max_new_tokens = max_new_tokens | default(256) %}
+{% set temperature = temperature | default(0.75) %}
+{% set top_p = top_p | default(0.95) %}
+{% set repetition_penalty = repetition_penalty | default(1.1) %}
+
+repo_id = {{ repo_id | tojson }}
+model = repo_id
+task = {{ task | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+repetition_penalty = {{ repetition_penalty }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(
+    input_prompt,
+    max_new_tokens=max_new_tokens,
+    temperature=temperature,
+    top_p=top_p,
+    repetition_penalty=repetition_penalty,
+)

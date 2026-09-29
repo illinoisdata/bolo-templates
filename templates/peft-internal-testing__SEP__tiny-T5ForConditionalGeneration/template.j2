@@ -1,26 +1,27 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("peft-internal-testing/tiny-T5ForConditionalGeneration") %}
-{% set prompt = prompt | default("translate English to French: The house is wonderful.") %}
-{% set max_new_tokens = max_new_tokens | default(32) %}
-{% set num_beams = num_beams | default(1) %}
-{% set use_cache = use_cache | default(False) %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-prompt = {{ prompt | tojson }}
-max_new_tokens = {{ max_new_tokens }}
-num_beams = {{ num_beams }}
-use_cache = {{ use_cache }}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('translate English to German: The house is wonderful.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
 
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-inputs = tokenizer(prompt, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens, num_beams=num_beams, use_cache=use_cache)
-generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=16, use_cache=False)
 
-RESULT = {"generated_text": generated_text}
+decoded = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
+RESULT = {"output": decoded[0]}

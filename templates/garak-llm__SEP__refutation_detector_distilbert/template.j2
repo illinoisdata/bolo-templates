@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("garak-llm/refutation_detector_distilbert") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Explain why the sky is not green.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+model = AutoModelForSequenceClassification.from_pretrained(repo_id, local_files_only=True)
+model.load_state_dict(load_file(model_path))
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probs = torch.softmax(logits, dim=-1)
+    pred_id = int(torch.argmax(probs, dim=-1).item())
+    pred_label = model.config.id2label.get(pred_id, str(pred_id)) if hasattr(model.config, "id2label") else str(pred_id)
+
+RESULT = {"logits": logits.detach().cpu().tolist(), "probabilities": probs.detach().cpu().tolist(), "predicted_label": pred_label}

@@ -1,0 +1,106 @@
+{% set repo_id = repo_id | default("rtr46/meiki.text.detect.v0") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text_threshold = text_threshold | default(0.3) %}
+{% set nms_threshold = nms_threshold | default(0.45) %}
+{% set max_det = max_det | default(64) %}
+{% set model_filename = model_filename | default('meiki.text.detect.small.v0.onnx') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text_threshold = {{ text_threshold }}
+nms_threshold = {{ nms_threshold }}
+max_det = {{ max_det }}
+model_filename = "{{ model_filename }}"
+
+import numpy as np
+from PIL import Image
+import requests
+import onnxruntime as ort
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename=model_filename)
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    image = Image.open(requests.get(image_path, stream=True, timeout=30).raw).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+img = np.array(image)
+h, w = img.shape[:2]
+
+providers = ['CPUExecutionProvider']
+session_options = ort.SessionOptions()
+session_options.intra_op_num_threads = 1
+session_options.inter_op_num_threads = 1
+session = ort.InferenceSession(model_path, sess_options=session_options, providers=providers)
+input_names = [i.name for i in session.get_inputs()]
+input_name = input_names[0]
+input_shape = session.get_inputs()[0].shape
+
+if len(input_shape) == 4:
+    target_h = int(input_shape[2]) if isinstance(input_shape[2], int) else h
+    target_w = int(input_shape[3]) if isinstance(input_shape[3], int) else w
+else:
+    target_h, target_w = h, w
+
+resized = image.resize((target_w, target_h))
+arr = np.asarray(resized).astype(np.float32) / 255.0
+arr = np.transpose(arr, (2, 0, 1))[None, ...]
+feed = {input_name: arr}
+if 'orig_target_sizes' in input_names:
+    feed['orig_target_sizes'] = np.array([[h, w]], dtype=np.int64)
+
+outputs = session.run(None, feed)
+output_names = [o.name for o in session.get_outputs()]
+
+boxes = None
+scores = None
+labels = None
+for out, name in zip(outputs, output_names):
+    if out.ndim == 3 and out.shape[-1] == 4:
+        boxes = out[0]
+    elif out.ndim == 2 and out.dtype.kind in ('f',):
+        scores = out[0]
+    elif out.ndim == 2 and out.dtype.kind in ('i', 'u'):
+        labels = out[0]
+
+if boxes is None:
+    primary = outputs[0]
+    if primary.ndim == 3 and primary.shape[-1] >= 6:
+        boxes = primary[0, :, :4]
+        scores = primary[0, :, 4]
+        labels = primary[0, :, 5].astype(np.int64) if primary.shape[-1] > 5 else np.zeros(primary.shape[1], dtype=np.int64)
+    elif primary.ndim == 2 and primary.shape[-1] >= 6:
+        boxes = primary[:, :4]
+        scores = primary[:, 4]
+        labels = primary[:, 5].astype(np.int64) if primary.shape[-1] > 5 else np.zeros(primary.shape[0], dtype=np.int64)
+    else:
+        boxes = np.zeros((0, 4), dtype=np.float32)
+        scores = np.zeros((0,), dtype=np.float32)
+        labels = np.zeros((0,), dtype=np.int64)
+
+boxes = np.asarray(boxes, dtype=np.float32)
+scores = np.asarray(scores if scores is not None else np.ones((len(boxes),), dtype=np.float32), dtype=np.float32)
+labels = np.asarray(labels if labels is not None else np.zeros((len(boxes),), dtype=np.int64), dtype=np.int64)
+
+if boxes.size > 0:
+    if np.max(boxes) <= 1.5:
+        boxes_abs = boxes.copy()
+        boxes_abs[:, [0, 2]] *= w
+        boxes_abs[:, [1, 3]] *= h
+    else:
+        boxes_abs = boxes.copy()
+else:
+    boxes_abs = boxes
+
+results = []
+for box, score, label in zip(boxes_abs, scores, labels):
+    if float(score) < float(text_threshold):
+        continue
+    x1, y1, x2, y2 = [float(v) for v in box[:4]]
+    results.append({'bbox': [x1, y1, x2, y2], 'score': float(score), 'label': int(label)})
+    if len(results) >= int(max_det):
+        break
+
+RESULT = {"detections": results}

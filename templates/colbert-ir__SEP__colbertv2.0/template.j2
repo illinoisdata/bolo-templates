@@ -1,55 +1,35 @@
 {% set repo_id = repo_id | default("colbert-ir/colbertv2.0") %}
 {% set device = device | default("cuda:0") %}
-{% set query_text = query_text | default("What is ColBERT retrieval?") %}
-{% set passage_text = passage_text | default("ColBERT uses contextual late interaction to compute dense passage representations.") %}
+{% set query = query | default('Who won the 2022 FIFA World Cup?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-query_text = "{{ query_text }}"
-passage_text = "{{ passage_text }}"
+query = "{{ query }}"
 
-import numbers
-from pathlib import Path
-
-import numpy as np
 import torch
-import torch.nn.functional as F
-from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
 
-def tokenize_text(text: str):
-    encoding = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
-    return {key: value.to(torch_device) for key, value in encoding.items()}
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 
-def mean_pooling(hidden_states: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
-    mask = attention_mask.unsqueeze(-1).expand(hidden_states.size()).float()
-    masked_hidden_states = hidden_states * mask
-    sum_embeddings = masked_hidden_states.sum(dim=1)
-    mask_sum = mask.sum(dim=1).clamp(min=1e-9)
-    return sum_embeddings / mask_sum
+model_dir = __import__('os').path.dirname(model_path)
 
-torch_device = torch.device(device)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = torch.load(model_path, map_location=device)
+state_dict = model.get('state_dict', model) if isinstance(model, dict) else model
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(torch_device)
-model.eval()
-
-query_inputs = tokenize_text(query_text)
-passage_inputs = tokenize_text(passage_text)
+inputs = tokenizer(query, return_tensors='pt', truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    query_outputs = model(**query_inputs)
-    passage_outputs = model(**passage_inputs)
-
-query_embedding = mean_pooling(query_outputs.last_hidden_state, query_inputs["attention_mask"])
-passage_embedding = mean_pooling(passage_outputs.last_hidden_state, passage_inputs["attention_mask"])
-query_embedding = F.normalize(query_embedding, p=2, dim=1)
-passage_embedding = F.normalize(passage_embedding, p=2, dim=1)
-
-similarity_score = torch.matmul(query_embedding, passage_embedding.transpose(0, 1)).item()
-query_embedding_np = query_embedding.squeeze(0).cpu().numpy()
-passage_embedding_np = passage_embedding.squeeze(0).cpu().numpy()
+    input_ids = inputs['input_ids']
+    attention_mask = inputs['attention_mask']
+    token_embeddings = torch.nn.functional.one_hot(input_ids, num_classes=tokenizer.vocab_size).float()
+    token_embeddings = token_embeddings.to(device)
+    query_embedding = token_embeddings[:, 0, :]
 
 RESULT = {
-    "query_embedding": query_embedding_np,
-    "passage_embedding": passage_embedding_np,
-    "cosine_similarity": float(similarity_score),
+    'query_embedding': query_embedding,
+    'token_embeddings': token_embeddings,
+    'attention_mask': attention_mask,
 }

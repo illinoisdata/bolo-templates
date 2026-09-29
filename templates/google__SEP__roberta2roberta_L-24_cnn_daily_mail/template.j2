@@ -1,25 +1,32 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("google/roberta2roberta_L-24_cnn_daily_mail") %}
-{% set article_text = article_text | default("(The Hollywood Reporter)\"The Rocky Horror Picture Show\" is the latest musical getting the small-screen treatment. Fox is developing a two-hour remake of the 1975 cult classic to be directed, executive-produced and choreographed by Kenneth Ortega (\"High School Musical\"). The project, tentatively titled \"The Rocky Horror Picture Show Event,\" is casting-contingent. The special will be filmed in advance and not air live, but few details beyond that are known. In addition to Ortega, Gail Berman and Lou Adler, who produced the original film, are also attached as executive producers. The special will be produced by Fox 21 Television Studios, and Berman's The Jackal Group. The special is timed to celebrate the 40th anniversary of the film, which has grossed more than $112 million and still plays in theaters across the country.") %}
-{% set max_new_tokens = max_new_tokens | default(200) %}
+{% set device = device | default("cuda:0") %}
+{% set article = article | default('The Hollywood Reporter article about The Rocky Horror Picture Show remake and Fox developing a two-hour remake directed by Kenneth Ortega.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-article = {{ article_text | tojson }}
-max_new_tokens = {{ max_new_tokens }}
+article = "{{ article }}"
 
 import os
-from pathlib import Path
 import torch
-from transformers import BertGenerationTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = BertGenerationTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+
+repo_dir = os.path.dirname(config_path)
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_dir, torch_dtype=torch.float32)
+state_dict = torch.load(weights_path, map_location="cpu")
+state_dict.pop("encoder.embeddings.position_ids", None)
+state_dict.pop("decoder.bert.embeddings.position_ids", None)
+model.load_state_dict(state_dict, strict=True)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(article, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs = tokenizer(article, return_tensors="pt", truncation=True, max_length=512).to(device)
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_length=128, num_beams=4)
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
-summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
-
-RESULT = {"summary": summary}
+RESULT = {"output": output_text}

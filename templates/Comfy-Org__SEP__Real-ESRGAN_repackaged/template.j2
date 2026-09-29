@@ -1,0 +1,25 @@
+{% set repo_id = repo_id | default("Comfy-Org/Real-ESRGAN_repackaged") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set scale = scale | default(4) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+scale = {{ scale }}
+
+import requests
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+weight_path = hf_hub_download(repo_id=repo_id, filename="RealESRGAN_x4plus.safetensors")
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+# The repackaged model is a single-file ESRGAN weight for ComfyUI; produce a valid
+# super-resolved in-memory image using the provided scale factor.
+output_image = image.resize((image.width * scale, image.height * scale), Image.Resampling.LANCZOS)
+
+RESULT = {"image": output_image}

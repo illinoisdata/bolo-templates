@@ -1,103 +1,37 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Searchium-ai/clip4clip-webvid150k") %}
-{% set text_query = text_query | default("a cinematic drone shot of a coastline") %}
-{% set video_path = video_path | default("/u/yli77/projects/ML-code-generation/data/video.avi") %}
-{% set max_video_frames = max_video_frames | default(16) %}
+{% set device = device | default("cuda:0") %}
+{% set search_sentence = search_sentence | default('a basketball player performing a slam dunk') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_query = "{{ text_query }}"
-video_path = "{{ video_path }}"
-max_video_frames = {{ max_video_frames }}
+search_sentence = "{{ search_sentence }}"
+image_path = "{{ image_path }}"
 
-import os
-import tempfile
-from pathlib import Path
-
-import cv2
 import requests
-import numpy as np
 import torch
 from PIL import Image
-from transformers import AutoModel, AutoProcessor
+from io import BytesIO
+from transformers import CLIPTokenizer, CLIPTextModelWithProjection
+from huggingface_hub import snapshot_download
 
-processor = AutoProcessor.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id)
-model = model.to(device)
+model_dir = snapshot_download(repo_id, allow_patterns=['config.json','model.safetensors','tokenizer.json','tokenizer_config.json','special_tokens_map.json','vocab.json','merges.txt','preprocessor_config.json'])
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    response = requests.get(image_path, timeout=30)
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model = CLIPTextModelWithProjection.from_pretrained(model_dir, local_files_only=True).to(device)
 model.eval()
+tokenizer = CLIPTokenizer.from_pretrained(model_dir, local_files_only=True)
 
-def _is_remote_resource(location: str) -> bool:
-    return location.startswith(("http://", "https://"))
-
-def _download_to_temp(location: str) -> str:
-    response = requests.get(location, stream=True)
-    response.raise_for_status()
-    suffix = Path(location).suffix or ".mp4"
-    tmp_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
-    with tmp_file as handle:
-        for chunk in response.iter_content(chunk_size=8192):
-            handle.write(chunk)
-    return tmp_file.name
-
-def _extract_video_frames(video_file: str, max_frames: int) -> list[Image.Image]:
-    capture = cv2.VideoCapture(video_file)
-    if not capture.isOpened():
-        raise ValueError("Unable to open the video file for frame extraction.")
-    frames = []
-    try:
-        while len(frames) < max_frames:
-            success, frame = capture.read()
-            if not success:
-                break
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frames.append(Image.fromarray(rgb_frame))
-    finally:
-        capture.release()
-    if not frames:
-        raise ValueError("No frames were decoded from the video file.")
-    return frames
-
-frames: list[Image.Image]
-temp_video = None
-try:
-    resolved_video_path = video_path
-    if _is_remote_resource(video_path):
-        temp_video = _download_to_temp(video_path)
-        resolved_video_path = temp_video
-    frames = _extract_video_frames(resolved_video_path, max_video_frames)
-finally:
-    if temp_video is not None:
-        os.remove(temp_video)
-
-text_inputs = processor(text=text_query, return_tensors="pt", padding=True, truncation=True)
-image_inputs = processor(images=frames, return_tensors="pt")
-text_inputs = {k: v.to(device) for k, v in text_inputs.items()}
-image_inputs = {k: v.to(device) for k, v in image_inputs.items()}
+inputs = tokenizer(text=search_sentence, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    text_outputs = model.text_model(**text_inputs)
-    text_pool = (
-        text_outputs.pooler_output
-        if text_outputs.pooler_output is not None
-        else text_outputs.last_hidden_state[:, 0, :]
-    )
-    text_features = model.text_projection(text_pool)
-    image_outputs = model.vision_model(**image_inputs)
-    image_pool = (
-        image_outputs.pooler_output
-        if image_outputs.pooler_output is not None
-        else image_outputs.last_hidden_state[:, 0, :]
-    )
-    image_features = model.visual_projection(image_pool)
+    outputs = model(input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"])
+    embeddings = outputs[0]
+    embeddings = embeddings / embeddings.norm(dim=-1, keepdim=True)
 
-text_embedding_tensor = text_features / text_features.norm(dim=-1, keepdim=True)
-video_embedding_tensor = image_features.mean(dim=0, keepdim=True)
-video_embedding_tensor = video_embedding_tensor / video_embedding_tensor.norm(dim=-1, keepdim=True)
-text_embedding_vector = text_embedding_tensor.squeeze(0)
-video_embedding_vector = video_embedding_tensor.squeeze(0)
-similarity_score = float(torch.matmul(text_embedding_vector, video_embedding_vector))
-
-RESULT = {
-    "text_embedding": text_embedding_vector.cpu().tolist(),
-    "video_embedding": video_embedding_vector.cpu().tolist(),
-    "text_video_similarity": similarity_score,
-}
+RESULT = {"text_embedding": embeddings.detach().cpu().numpy(), "image": image}

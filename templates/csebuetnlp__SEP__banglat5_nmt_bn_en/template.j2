@@ -1,27 +1,41 @@
 {% set repo_id = repo_id | default("csebuetnlp/banglat5_nmt_bn_en") %}
 {% set device = device | default("cuda:0") %}
-{% set source_text = source_text | default("আমি একটি প্রকল্পের উপর কাজ করছি এবং ইংরেজিতে অনুবাদ করতে চাই।") %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(4) %}
+{% set input_sentence = input_sentence | default('') %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_text = "{{ source_text }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+input_sentence = "{{ input_sentence }}"
+max_new_tokens = {{ max_new_tokens }}
 
+import os
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoModelForSeq2SeqLM, T5Tokenizer
+from huggingface_hub import hf_hub_download
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
-compute_device = torch.device(device)
-model = model.to(compute_device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-encoded_inputs = tokenizer(source_text, return_tensors="pt")
-encoded_inputs = {key: value.to(compute_device) for key, value in encoded_inputs.items()}
+model_dir = os.path.dirname(model_path)
 
-generated_tokens = model.generate(**encoded_inputs, max_length=max_length, num_beams=num_beams)
-translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+tokenizer = T5Tokenizer(vocab_file=vocab_path, extra_ids=0)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
+model.to(device)
+model.eval()
 
-RESULT = {"translation": translation}
+inputs = tokenizer(input_sentence, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_tokens = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=4,
+        length_penalty=0.6,
+    )
+
+decoded_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"translation": decoded_text}

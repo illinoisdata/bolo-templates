@@ -1,0 +1,63 @@
+{% set text = text | default('שלום עולם. זהו משפט בדיקה עבור Stanza.') %}
+{% set repo_id = repo_id | default("stanfordnlp/stanza-he") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+import tempfile
+import stanza
+from huggingface_hub import hf_hub_download
+
+model_files = {
+    'tokenize': 'models/tokenize/combined.pt',
+    'mwt': 'models/mwt/combined.pt',
+    'pos': 'models/pos/combined_nocharlm.pt',
+    'lemma': 'models/lemma/combined_nocharlm.pt',
+    'depparse': 'models/depparse/combined_nocharlm.pt',
+    'ner': 'models/ner/iahlt_charlm.pt',
+}
+
+model_dir = tempfile.mkdtemp(prefix='stanza_he_')
+for _, relpath in model_files.items():
+    local_path = hf_hub_download(repo_id=repo_id, filename=relpath)
+    target_path = os.path.join(model_dir, relpath)
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    if not os.path.exists(target_path):
+        try:
+            os.symlink(local_path, target_path)
+        except OSError:
+            import shutil
+            shutil.copy2(local_path, target_path)
+
+stanza.download('he', model_dir=model_dir, processors='tokenize,mwt,pos,lemma,depparse,ner', package={'tokenize': 'combined', 'mwt': 'combined', 'pos': 'combined_nocharlm', 'lemma': 'combined_nocharlm', 'depparse': 'combined_nocharlm', 'ner': 'iahlt_charlm'}, logging_level='ERROR')
+
+nlp = stanza.Pipeline('he', dir=model_dir, processors='tokenize,mwt,pos,lemma,depparse,ner', package={'tokenize': 'combined', 'mwt': 'combined', 'pos': 'combined_nocharlm', 'lemma': 'combined_nocharlm', 'depparse': 'combined_nocharlm', 'ner': 'iahlt_charlm'}, use_gpu=device.startswith('cuda'), logging_level='ERROR')
+doc = nlp(text)
+
+sentences = []
+for sent in doc.sentences:
+    tokens = []
+    for word in sent.words:
+        tokens.append({
+            'id': word.id,
+            'text': word.text,
+            'lemma': word.lemma,
+            'upos': word.upos,
+            'xpos': word.xpos,
+            'feats': word.feats,
+            'head': word.head,
+            'deprel': word.deprel,
+        })
+    entities = []
+    for ent in sent.ents:
+        entities.append({
+            'text': ent.text,
+            'type': ent.type,
+            'start_char': ent.start_char,
+            'end_char': ent.end_char,
+        })
+    sentences.append({'text': sent.text, 'words': tokens, 'entities': entities})
+
+RESULT = {'sentences': sentences}

@@ -1,0 +1,48 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("mwalmsley/zoobot-encoder-convnext_pico") %}
+{% set image_size = image_size | default(224) %}
+{% set model_filename = model_filename | default('pytorch_model.bin') %}
+{% set config_filename = config_filename | default('config.json') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+image_size = {{ image_size }}
+model_filename = "{{ model_filename }}"
+config_filename = "{{ config_filename }}"
+
+import os
+import json
+import requests
+from PIL import Image
+import torch
+from timm import create_model
+from timm.data import resolve_data_config, create_transform
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename=config_filename)
+weights_path = hf_hub_download(repo_id=repo_id, filename=model_filename)
+
+with open(config_path, 'r') as f:
+    cfg = json.load(f)
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    img = Image.open(requests.get(image_path, stream=True).raw).convert('RGB')
+else:
+    img = Image.open(image_path).convert('RGB')
+
+model = create_model(cfg['architecture'], pretrained=False, num_classes=0)
+state_dict = torch.load(weights_path, map_location='cpu')
+model.load_state_dict(state_dict)
+model.eval().to(device)
+
+pretrained_cfg = cfg.get('pretrained_cfg', {})
+data_config = resolve_data_config(pretrained_cfg=pretrained_cfg, model=model)
+transform = create_transform(**data_config, is_training=False)
+
+x = transform(img).unsqueeze(0).to(device)
+with torch.no_grad():
+    output = model(x)
+
+output_value = output.detach().cpu().numpy()
+RESULT = {"embeddings": output_value}

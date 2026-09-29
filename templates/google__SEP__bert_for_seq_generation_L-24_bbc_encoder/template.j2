@@ -1,25 +1,35 @@
 {% set repo_id = repo_id | default("google/bert_for_seq_generation_L-24_bbc_encoder") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("Hello, world!") %}
+{% set text = text | default('The quick brown fox jumps over the lazy dog.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
-import os
-import numpy as np
 import torch
-from transformers import AutoModel, BertTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import BertTokenizer, BertConfig, BertModel
 
-tokenizer = BertTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+
+config = BertConfig.from_json_file(config_path)
+config.type_vocab_size = 1
+tokenizer = BertTokenizer(vocab_file=vocab_path)
+inputs = tokenizer(text, return_tensors="pt")
+
+model = BertModel(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+state_dict = {k: v for k, v in state_dict.items() if k != "embeddings.position_ids"}
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
 model.eval()
-
-inputs = tokenizer(text, return_tensors="pt").to(device)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
     outputs = model(**inputs)
-    hidden_states = outputs.last_hidden_state
 
-embeddings = hidden_states.cpu().numpy()
-
-RESULT = {"embeddings": embeddings}
+RESULT = {
+    "last_hidden_state": outputs.last_hidden_state.detach().cpu(),
+    "pooler_output": outputs.pooler_output.detach().cpu(),
+}

@@ -1,14 +1,20 @@
 {% set repo_id = repo_id | default("vikp/surya_tablerec") %}
 {% set device = device | default("cuda:0") %}
-{% set image = image | default("/u/yli77/projects/ML-code-generation/data/doc.jpeg") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-image = "{{ image }}"
+image_path = "{{ image_path }}"
 
-import inspect
-import transformers
+import requests
+import torch
+from PIL import Image
+from io import BytesIO
+from huggingface_hub import hf_hub_download
 
-module = transformers.models
-print([name for name in dir(module) if name.endswith("table_rec")])
-print(dir(transformers.models.donut))
-print(transformers.__version__)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB") if str(image_path).startswith(("http://", "https://")) else Image.open(image_path).convert("RGB")
+
+RESULT = {"image_size": image.size, "config_path": config_path, "weights_path": weights_path, "preprocessor_path": preprocessor_path}

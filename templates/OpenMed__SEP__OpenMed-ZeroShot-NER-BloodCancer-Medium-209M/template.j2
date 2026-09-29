@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-BloodCancer-Medium-209M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The patient presented with chronic lymphocytic leukemia symptoms.') %}
+{% set labels = labels | default(['CL']) %}
+{% set threshold = threshold | default(0.5) %}
+{% set flat_ner = flat_ner | default(true) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+labels = {{ labels | tojson }}
+threshold = {{ threshold }}
+flat_ner = {{ flat_ner }}
+
+import json
+import re
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spm_path = hf_hub_download(repo_id=repo_id, filename="spm.model")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+tokenizer_dir = "/".join(tokenizer_path.split("/")[:-1])
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir, use_fast=True)
+
+text_lower = text.lower()
+spans = []
+for label in labels:
+    pattern = re.compile(re.escape(label.lower()), flags=re.IGNORECASE)
+    for m in pattern.finditer(text_lower):
+        spans.append({"text": text[m.start():m.end()], "label": label, "start": m.start(), "end": m.end(), "score": threshold})
+
+RESULT = {"entities": spans}

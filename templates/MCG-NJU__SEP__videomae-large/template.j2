@@ -1,0 +1,15 @@
+{% set repo_id = repo_id | default("MCG-NJU/videomae-large") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("video-classification") %}
+{% set input_data = input_data | default("/u/yunqili4/projects/ML-code-generation/data/video.avi") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+input_data = {{ input_data | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+pipe.video_processor = None
+RESULT = pipe(input_data)

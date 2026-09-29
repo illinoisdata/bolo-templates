@@ -1,0 +1,30 @@
+{% set repo_id = repo_id | default("echo840/MonkeyOCR") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+from urllib.parse import urlparse
+from io import BytesIO
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+
+def load_image(path_or_url):
+    if isinstance(path_or_url, str) and urlparse(path_or_url).scheme in ("http", "https"):
+        import requests
+        return Image.open(BytesIO(requests.get(path_or_url, timeout=30).content)).convert("RGB")
+    return Image.open(path_or_url).convert("RGB")
+
+
+_ = hf_hub_download(repo_id=repo_id, filename="Structure/PP-DocLayoutV2/config.json")
+image = load_image(image_path)
+arr = np.array(image)
+pixel_mean = float(arr.mean())
+image_size = image.size
+
+RESULT = {"image_size": image_size, "pixel_mean": pixel_mean}

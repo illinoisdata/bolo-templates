@@ -1,0 +1,59 @@
+{% set repo_id = repo_id | default("Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default("Janet\u2019s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers\' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers\' market?") %}
+{% set response = response | default("To determine how much money Janet makes every day at the farmers\' market, we need to follow these steps:\n1. Janet\'s ducks lay 16 eggs per day.\n2. She eats 3 eggs for breakfast and uses 4 eggs for muffins.\n3. Remaining eggs: 16 - 3 - 4 = 9.\n4. At $2 per egg, she makes 9 * 2 = 18 dollars.\nTherefore, the answer is 18.") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = {{ question | tojson }}
+response = {{ response | tojson }}
+
+import os
+import sys
+import types
+import torch
+from transformers import AutoTokenizer
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+modeling_path = hf_hub_download(repo_id=repo_id, filename="modeling_qwen2_rm.py")
+configuration_path = hf_hub_download(repo_id=repo_id, filename="configuration_qwen2_rm.py")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+repo_dir = os.path.dirname(config_path)
+sys.path.insert(0, os.path.dirname(repo_dir))
+package_name = os.path.basename(repo_dir)
+package = types.ModuleType(package_name)
+package.__path__ = [repo_dir]
+sys.modules[package_name] = package
+
+import importlib.util
+spec_cfg = importlib.util.spec_from_file_location(f"{package_name}.configuration_qwen2_rm", configuration_path)
+configuration_module = importlib.util.module_from_spec(spec_cfg)
+sys.modules[f"{package_name}.configuration_qwen2_rm"] = configuration_module
+spec_cfg.loader.exec_module(configuration_module)
+spec_mdl = importlib.util.spec_from_file_location(f"{package_name}.modeling_qwen2_rm", modeling_path)
+modeling_module = importlib.util.module_from_spec(spec_mdl)
+sys.modules[f"{package_name}.modeling_qwen2_rm"] = modeling_module
+spec_mdl.loader.exec_module(modeling_module)
+Qwen2RMConfig = configuration_module.Qwen2RMConfig
+Qwen2ForRewardModel = modeling_module.Qwen2ForRewardModel
+
+config = Qwen2RMConfig.from_pretrained(repo_id, trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True)
+model = Qwen2ForRewardModel.from_pretrained(repo_id, config=config, torch_dtype=torch.float32, trust_remote_code=True)
+model.to(device)
+model.eval()
+
+prompt = question + "\n" + response
+inputs = tokenizer(prompt, return_tensors="pt").to(device)
+with torch.no_grad():
+    outputs = model(**inputs)
+
+if isinstance(outputs, tuple):
+    logits = outputs[0]
+else:
+    logits = outputs.logits if hasattr(outputs, "logits") else outputs
+
+output_value = logits.detach().float().cpu().numpy().tolist()
+
+RESULT = {"logits": output_value}

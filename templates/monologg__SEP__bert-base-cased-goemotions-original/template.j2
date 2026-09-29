@@ -1,31 +1,42 @@
 {% set repo_id = repo_id | default("monologg/bert-base-cased-goemotions-original") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("I feel happy and excited today.") %}
-{% set threshold = threshold | default(0.5) %}
-
+{% set text = text | default('I just got a new job and I am so excited!') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-threshold = {{ threshold }}
 
 import os
 import json
 import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSequenceClassification.from_pretrained(repo_id)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+model_dir = os.path.dirname(weights_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+config = AutoConfig.from_pretrained(model_dir)
+model = AutoModelForSequenceClassification.from_config(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict)
 model.to(device)
+model.eval()
 
-inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
 inputs = {k: v.to(device) for k, v in inputs.items()}
-
 with torch.no_grad():
-    outputs = model(**inputs)
-    logits = outputs.logits
+    logits = model(**inputs).logits
+    probs = torch.sigmoid(logits).squeeze(0)
 
-probs = torch.sigmoid(logits)[0]
-labels = [model.config.id2label[i] for i, p in enumerate(probs) if p > threshold]
-scores = [p.item() for p in probs if p > threshold]
+id2label = model.config.id2label
+scores = [(id2label[str(i)] if str(i) in id2label else id2label[i], float(probs[i].item())) for i in range(probs.shape[-1])]
+scores = sorted(scores, key=lambda x: x[1], reverse=True)
+labels = [label for label, score in scores if score >= 0.5]
+if not labels:
+    labels = [scores[0][0]]
 
-RESULT = {"labels": labels, "scores": scores}
+RESULT = {"text": text, "labels": labels, "scores": scores}

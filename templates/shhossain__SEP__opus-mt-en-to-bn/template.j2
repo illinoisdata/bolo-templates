@@ -1,20 +1,38 @@
 {% set repo_id = repo_id | default("shhossain/opus-mt-en-to-bn") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("Will you come home tonight?") %}
+{% set text = text | default('Will you come home tonight?') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = "{{ text }}"
+text = {{ text | tojson }}
+max_new_tokens = {{ max_new_tokens }}
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+# Load tokenizer/model directly from downloaded files' directory
 import os
+model_dir = os.path.dirname(config_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-inputs = tokenizer(text, return_tensors="pt").to(device)
-generated_tokens = model.generate(**inputs)
-translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-translation = translations[0]
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+translated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-RESULT = {"translation": translation}
+RESULT = {"translation": translated_text}

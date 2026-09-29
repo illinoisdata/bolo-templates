@@ -1,0 +1,67 @@
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("ivrit-ai/pyannote-segmentation-3.0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+
+import os
+from pathlib import Path
+import numpy as np
+import torch
+import yaml
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from torchvision import transforms
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.yaml")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+with open(config_path, "r") as f:
+    config = yaml.safe_load(f)
+
+image_path = "{{ image1 | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') }}"
+if str(image_path).startswith(("http://", "https://")):
+    from urllib.request import urlopen
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+image_size = config.get("image_size", config.get("input_size", 256))
+mean = config.get("mean", [0.485, 0.456, 0.406])
+std = config.get("std", [0.229, 0.224, 0.225])
+
+preprocess = transforms.Compose([
+    transforms.Resize((image_size, image_size)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=mean, std=std),
+])
+
+x = preprocess(image).unsqueeze(0).to(device)
+
+class SegmentationModel(torch.nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        num_channels = config.get("in_channels", 3)
+        self.net = torch.nn.Sequential(
+            torch.nn.Conv2d(num_channels, 16, kernel_size=3, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(16, 32, kernel_size=3, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(32, 1, kernel_size=1),
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+model = SegmentationModel(config)
+state_dict = torch.load(weights_path, map_location="cpu", weights_only=False)
+if isinstance(state_dict, dict) and "state_dict" in state_dict:
+    state_dict = state_dict["state_dict"]
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
+model.eval()
+
+with torch.no_grad():
+    logits = model(x)
+    mask = torch.sigmoid(logits)[0, 0].detach().cpu().numpy()
+
+RESULT = {"mask": mask, "logits": logits.detach().cpu().numpy()}

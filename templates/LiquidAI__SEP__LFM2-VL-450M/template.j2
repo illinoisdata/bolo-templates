@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("LiquidAI/LFM2-VL-450M") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-text-to-text") %}
+{% set input_image = input_image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+{% set input_prompt = input_prompt | default("Describe this image.") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_image = {{ input_image | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+processor = pipe.processor if pipe.processor is not None else pipe.tokenizer
+
+template = getattr(processor, "chat_template", None)
+if template is None and hasattr(processor, "tokenizer"):
+    template = getattr(processor.tokenizer, "chat_template", None)
+
+has_chat_template = template is not None
+
+if has_chat_template:
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image", "image": input_image},
+                {"type": "text", "text": input_prompt},
+            ],
+        },
+    ]
+    RESULT = pipe(text=messages)
+else:
+    RESULT = pipe(input_image, text=input_prompt)

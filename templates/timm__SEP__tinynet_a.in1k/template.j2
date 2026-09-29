@@ -1,0 +1,15 @@
+{% set repo_id = repo_id | default("timm/tinynet_a.in1k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set input_image_path = input_image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_image_path = "{{ input_image_path }}"
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+input_data = input_image_path
+RESULT = pipe(input_data)

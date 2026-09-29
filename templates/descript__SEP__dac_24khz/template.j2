@@ -1,0 +1,42 @@
+{% set repo_id = repo_id | default("descript/dac_24khz") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+audio_path = {{ audio_path | tojson }}
+
+from transformers import pipeline, AutoFeatureExtractor
+import soundfile as sf
+import torch
+import torchaudio.functional as F
+
+# Load feature extractor and model
+feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
+pipe = pipeline(
+    task=task,
+    model=repo_id,
+    tokenizer=feature_extractor,
+    feature_extractor=feature_extractor,
+    device=device,
+)
+
+# Preprocess input
+audio_array, sr = sf.read(audio_path, dtype="float32")
+target_sr = feature_extractor.sampling_rate
+if sr != target_sr:
+    audio_tensor = torch.from_numpy(audio_array).float()
+    if audio_tensor.ndim == 1:
+        audio_tensor = audio_tensor.unsqueeze(0)
+    audio_tensor = F.resample(audio_tensor, sr, target_sr)
+    audio_array = audio_tensor.squeeze(0).numpy()
+    sr = target_sr
+tokenize_kwargs = {"sampling_rate": sr, "padding": False}
+
+# Run inference
+raw_outputs = pipe(audio_array, tokenize_kwargs=tokenize_kwargs)
+
+# Post-process and build RESULT dict
+RESULT = {"features": raw_outputs}

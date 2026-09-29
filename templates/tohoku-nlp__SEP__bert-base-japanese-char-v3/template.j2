@@ -1,55 +1,46 @@
-{% set text_input = text_input | default("東北大学で[MASK]の研究をしています。") %}
 {% set repo_id = repo_id | default("tohoku-nlp/bert-base-japanese-char-v3") %}
 {% set device = device | default("cuda:0") %}
+{% set text = text | default('東北大学で[MASK]の研究をしています。') %}
 {% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+text = "{{ text }}"
 top_k = {{ top_k }}
 
-import json
-import os
-
 import torch
-from transformers import AutoModelForPreTraining, AutoTokenizer, pipeline
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-if torch_device.type == "cpu":
-    pipeline_device = -1
-else:
-    pipeline_device = torch_device.index if torch_device.index is not None else 0
+model_dir = "/".join(weights_path.split("/")[:-1])
 
-class MaskedLMAdapter(torch.nn.Module):
-    def __init__(self, base_model: torch.nn.Module):
-        super().__init__()
-        self.base_model = base_model
-        self.config = base_model.config
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False)
+model = AutoModelForMaskedLM.from_pretrained(model_dir)
+model.to(device)
+model.eval()
 
-    def forward(self, *args, **kwargs):
-        outputs = self.base_model(*args, **kwargs)
-        logits = getattr(outputs, "logits", None)
-        if logits is None:
-            logits = outputs.prediction_logits
-        return {"logits": logits}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+mask_token_id = tokenizer.mask_token_id
+mask_positions = (inputs["input_ids"][0] == mask_token_id).nonzero(as_tuple=False).flatten()
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
 
-    @property
-    def device(self):
-        return next(self.base_model.parameters()).device
+predictions = []
+for pos in mask_positions.tolist():
+    probs = torch.softmax(logits[0, pos], dim=-1)
+    values, indices = torch.topk(probs, k=top_k)
+    tokens = tokenizer.convert_ids_to_tokens(indices.tolist())
+    predictions.append(
+        [
+            {"token": tok, "score": float(score), "id": int(idx)}
+            for tok, score, idx in zip(tokens, values.tolist(), indices.tolist())
+        ]
+    )
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-base_model = AutoModelForPreTraining.from_pretrained(repo_id)
-wrapped_model = MaskedLMAdapter(base_model).to(torch_device)
-wrapped_model.eval()
-
-fill_mask_pipeline = pipeline(
-    "fill-mask",
-    model=wrapped_model,
-    tokenizer=tokenizer,
-    device=pipeline_device,
-    top_k=top_k,
-)
-
-predictions = fill_mask_pipeline(text_input)
-
-RESULT = {"fill_mask": predictions}
+RESULT = {"predictions": predictions, "text": text}

@@ -1,38 +1,47 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("ddobokki/ko-trocr") %}
-{% set image_path = image_path | default('/u/yli77/projects/ML-code-generation/data/image1.jpeg') %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set max_length = max_length | default(64) %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
+max_length = {{ max_length }}
 
-import os
+import unicodedata
 from io import BytesIO
-from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 import torch
-import unicodedata
 from PIL import Image
-from transformers import AutoProcessor, AutoTokenizer, VisionEncoderDecoderModel
+from transformers import AutoTokenizer, TrOCRProcessor, VisionEncoderDecoderModel
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-processor = AutoProcessor.from_pretrained(repo_id)
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = VisionEncoderDecoderModel.from_pretrained(repo_id)
-model = model.to(torch_device)
-model.eval()
-
-if image_path.startswith(("http://", "https://")):
-    response = requests.get(image_path)
+if urlparse(image_path).scheme in ("http", "https"):
+    response = requests.get(image_path, timeout=30)
     image = Image.open(BytesIO(response.content)).convert("RGB")
 else:
     image = Image.open(image_path).convert("RGB")
 
-pixel_values = processor(image, return_tensors="pt").pixel_values.to(torch_device)
-generated_ids = model.generate(pixel_values, max_length=64)
-generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-generated_text = unicodedata.normalize("NFC", generated_text)
+processor = TrOCRProcessor.from_pretrained(repo_id)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = VisionEncoderDecoderModel.from_pretrained(repo_id, torch_dtype=torch.float16 if device.startswith("cuda") else torch.float32)
+model.to(device)
+model.eval()
 
-RESULT = {"generated_text": generated_text}
+pixel_values = processor(images=image, return_tensors="pt").pixel_values.to(device)
+with torch.no_grad():
+    generated_ids = model.generate(pixel_values, max_length=max_length)
+output_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+output_text = unicodedata.normalize("NFC", output_text)
+
+RESULT = {"text": output_text}

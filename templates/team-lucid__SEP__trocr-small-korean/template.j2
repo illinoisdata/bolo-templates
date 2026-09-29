@@ -1,43 +1,40 @@
 {% set repo_id = repo_id | default("team-lucid/trocr-small-korean") %}
 {% set device = device | default("cuda:0") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(4) %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+{% set max_new_tokens = max_new_tokens | default(32) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+max_new_tokens = {{ max_new_tokens }}
 
 import os
-from io import BytesIO
-from pathlib import Path
-
 import requests
+import torch
 from PIL import Image
-from torchvision import transforms as T
-from transformers import AutoTokenizer, VisionEncoderDecoderModel
+from transformers import VisionEncoderDecoderModel, TrOCRProcessor
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = VisionEncoderDecoderModel.from_pretrained(repo_id)
-model.to(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_dir_or_file = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+_tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+_merges_file = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+_special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
 if image_path.startswith("http://") or image_path.startswith("https://"):
-    response = requests.get(image_path)
-    image = Image.open(BytesIO(response.content)).convert("RGB")
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
 else:
     image = Image.open(image_path).convert("RGB")
 
-preprocess = T.Compose([
-    T.Resize((384, 384), interpolation=Image.BICUBIC),
-    T.CenterCrop((384, 384)),
-    T.ToTensor(),
-    T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-])
-pixel_values = preprocess(image).unsqueeze(0).to(device)
+processor = TrOCRProcessor.from_pretrained(os.path.dirname(processor_dir_or_file))
+model = VisionEncoderDecoderModel.from_pretrained(repo_id).to(device)
+model.eval()
 
-generated_ids = model.generate(pixel_values, max_length=max_length, num_beams=num_beams)
-text_outputs = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-text_result = text_outputs[0]
+pixel_values = processor(images=image, return_tensors="pt").pixel_values.to(device)
+with torch.no_grad():
+    generated_ids = model.generate(pixel_values, max_new_tokens=max_new_tokens)
+text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-RESULT = {"generated_text": text_result}
+RESULT = {"text": text}

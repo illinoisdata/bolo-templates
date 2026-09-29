@@ -1,9 +1,0 @@
-{% set device = device | default("cuda:0") %}
-{% set repo_id = repo_id | default("Qwen/Qwen3-VL-Reranker-8B") %}
-repo_id = "{{ repo_id }}"
-device = "{{ device }}"
-
-from pathlib import Path
-import transformers.models.qwen3_vl as qwen_module
-
-print(Path(qwen_module.__file__).read_text())

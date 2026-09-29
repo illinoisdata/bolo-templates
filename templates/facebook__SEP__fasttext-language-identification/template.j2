@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("facebook/fasttext-language-identification") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hello, world!') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import fasttext
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.bin")
+model = fasttext.load_model(model_path)
+labels, scores = model.predict(text, k=5)
+
+RESULT = {
+    "labels": labels,
+    "scores": scores.tolist(),
+}

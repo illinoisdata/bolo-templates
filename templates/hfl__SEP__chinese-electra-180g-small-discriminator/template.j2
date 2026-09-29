@@ -1,24 +1,35 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("hfl/chinese-electra-180g-small-discriminator") %}
-{% set text = text | default("这是一个用于测试的中文输入。") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('今天天气很好，我们一起去公园散步。') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
-from pathlib import Path
-import json
-
 import torch
-from transformers import AutoModelForPreTraining, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForPreTraining
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+model_dir = __import__('os').path.dirname(weights_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = AutoModelForPreTraining.from_pretrained(model_dir)
+model.to(device)
 model.eval()
 
-tokenized = tokenizer(text, return_tensors="pt")
-tokenized = {key: value.to(device) for key, value in tokenized.items()}
-with torch.no_grad():
-    outputs = model(**tokenized)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-logits = outputs.logits
-RESULT = {"logits": logits.cpu().tolist()}
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probabilities = torch.sigmoid(logits)
+    predictions = (probabilities > 0.5).long()
+
+RESULT = {
+    "logits": logits.detach().cpu().tolist(),
+    "probabilities": probabilities.detach().cpu().tolist(),
+    "predictions": predictions.detach().cpu().tolist(),
+}

@@ -1,0 +1,130 @@
+{% set repo_id = repo_id | default("waveletdeboshir/gigaam-rnnt") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("automatic-speech-recognition") %}
+{% set audio_file = audio_file | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+{% set hf_cache_dir = hf_cache_dir | default("/workspace/hf_cache") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+audio_file = {{ audio_file | tojson }}
+hf_cache_dir = {{ hf_cache_dir | tojson }}
+
+import os
+import sys
+import torch
+from types import MethodType
+from huggingface_hub import snapshot_download
+from transformers import pipeline
+from transformers.pipelines.automatic_speech_recognition import rescale_stride
+
+repo_local_path = snapshot_download(repo_id=repo_id, cache_dir=hf_cache_dir)
+# Patch for relative import in gigaam_transformers
+file_path = os.path.join(repo_local_path, "gigaam_transformers.py")
+text = open(file_path, "r").read()
+if "from .encoder import ConformerEncoder" in text:
+    text = text.replace(
+        "from .encoder import ConformerEncoder",
+        "from encoder import ConformerEncoder",
+    )
+    open(file_path, "w").write(text)
+sys.path.insert(0, repo_local_path)
+from gigaam_transformers import GigaAMProcessor, GigaAMRNNTHF
+
+processor = GigaAMProcessor.from_pretrained(repo_local_path)
+model = GigaAMRNNTHF.from_pretrained(repo_local_path)
+model.to(device)
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=processor.tokenizer,
+    feature_extractor=processor.feature_extractor,
+    device=device,
+)
+
+
+def _forward_with_lengths(self, model_inputs, return_timestamps=False, **generate_kwargs):
+    attention_mask = model_inputs.pop("attention_mask", None)
+    stride = model_inputs.pop("stride", None)
+    num_frames = model_inputs.pop("num_frames", None)
+    is_last = model_inputs.pop("is_last")
+
+    if stride is not None and num_frames is not None:
+        raise ValueError("num_frames must be used only when stride is None")
+
+    if self.type in {"seq2seq", "seq2seq_whisper"}:
+        if "input_features" in model_inputs:
+            inputs = model_inputs.pop("input_features")
+        elif "input_values" in model_inputs:
+            inputs = model_inputs.pop("input_values")
+        else:
+            raise ValueError(
+                "Seq2Seq speech recognition model requires either a "
+                f"`input_features` or `input_values` key, but only has {model_inputs.keys()}"
+            )
+
+        if return_timestamps and self.type == "seq2seq_whisper":
+            generate_kwargs["return_timestamps"] = return_timestamps
+            if return_timestamps == "word":
+                generate_kwargs["return_token_timestamps"] = True
+                generate_kwargs["return_segments"] = True
+                if stride is not None:
+                    if isinstance(stride, tuple):
+                        generate_kwargs["num_frames"] = stride[0] // self.feature_extractor.hop_length
+                    else:
+                        generate_kwargs["num_frames"] = [s[0] // self.feature_extractor.hop_length for s in stride]
+                else:
+                    generate_kwargs["num_frames"] = num_frames
+
+        if "generation_config" not in generate_kwargs:
+            generate_kwargs["generation_config"] = self.generation_config
+
+        tokens = self.model.generate(
+            inputs=inputs,
+            attention_mask=attention_mask,
+            **generate_kwargs,
+        )
+        if return_timestamps == "word" and self.type == "seq2seq_whisper":
+            if "segments" not in tokens:
+                out = {"tokens": tokens["sequences"], "token_timestamps": tokens["token_timestamps"]}
+            else:
+                token_timestamps = [
+                    torch.cat([segment["token_timestamps"] for segment in segment_list])
+                    for segment_list in tokens["segments"]
+                ]
+                out = {"tokens": tokens["sequences"], "token_timestamps": token_timestamps}
+        else:
+            out = {"tokens": tokens}
+        if self.type == "seq2seq_whisper" and stride is not None:
+            out["stride"] = stride
+
+    else:
+        inputs = {
+            self.model.main_input_name: model_inputs.pop(self.model.main_input_name),
+            "attention_mask": attention_mask,
+        }
+        input_lengths = model_inputs.pop("input_lengths", None)
+        if input_lengths is not None:
+            inputs["input_lengths"] = input_lengths
+        outputs = self.model(**inputs)
+        logits = outputs.logits
+
+        if self.type == "ctc_with_lm":
+            out = {"logits": logits}
+        else:
+            out = {"tokens": logits.argmax(dim=-1)}
+        if stride is not None:
+            ratio = 1 / self.model.config.inputs_to_logits_ratio
+            if isinstance(stride, tuple):
+                out["stride"] = rescale_stride([stride], ratio)[0]
+            else:
+                out["stride"] = rescale_stride(stride, ratio)
+    extra = model_inputs
+    return {"is_last": is_last, **out, **extra}
+
+pipe._forward = MethodType(_forward_with_lengths, pipe)
+
+input_data = audio_file
+
+RESULT = pipe(input_data)

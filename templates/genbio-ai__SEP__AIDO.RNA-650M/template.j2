@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("genbio-ai/AIDO.RNA-650M") %}
+{% set device = device | default("cuda:0") %}
+{% set sequence = sequence | default('ACGTAGCTAGCT') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sequence = "{{ sequence }}"
+
+import os
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import BertConfig, BertForMaskedLM, BertTokenizerFast
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+config_dict = json.load(open(config_path))
+config = BertConfig(**{k:v for k,v in config_dict.items() if k in BertConfig().to_dict()})
+config.vocab_size = 16
+config.hidden_act = "gelu"
+tokenizer = BertTokenizerFast.from_pretrained(repo_id, use_fast=True)
+model = BertForMaskedLM(config)
+state_dict = None
+if weights_path.endswith(".safetensors"):
+    from safetensors.torch import load_file
+    state_dict = load_file(weights_path, device="cpu")
+else:
+    state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+enc = tokenizer(sequence, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in enc.items()}
+
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+logits = outputs.logits
+predicted_token_ids = torch.argmax(logits, dim=-1)
+RESULT = {"logits": logits.detach().cpu(), "predicted_token_ids": predicted_token_ids.detach().cpu()}

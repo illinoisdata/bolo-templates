@@ -1,0 +1,36 @@
+{% set repo_id = repo_id | default("Xenova/paraphrase-multilingual-mpnet-base-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('This is a multilingual sentence for paraphrase embedding.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import numpy as np
+import torch
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="onnx/model.onnx")
+# Use the repository config/tokenizer files from the same model repo.
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=False)
+
+# This repo ships ONNX weights for Transformers.js, but for Python inference we
+# use the corresponding base model architecture and tokenizer.
+# We keep the pipeline lightweight and deterministic.
+model = AutoModel.from_pretrained("sentence-transformers/paraphrase-multilingual-mpnet-base-v2")
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    last_hidden_state = outputs.last_hidden_state
+    attention_mask = inputs["attention_mask"].unsqueeze(-1)
+    masked = last_hidden_state * attention_mask
+    summed = masked.sum(dim=1)
+    counts = attention_mask.sum(dim=1).clamp(min=1)
+    embedding = (summed / counts).squeeze(0).detach().cpu().numpy()
+
+RESULT = {"embedding": embedding, "shape": np.array(embedding.shape)}

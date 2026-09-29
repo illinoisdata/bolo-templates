@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("PaddlePaddle/PP-LCNet_x1_0_table_cls") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set batch_size = batch_size | default(1) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+batch_size = {{ batch_size }}
+
+import json
+import numpy as np
+from PIL import Image
+import requests
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="inference.yml")
+_ = hf_hub_download(repo_id=repo_id, filename="inference.pdiparams")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+label_list = cfg["PostProcess"]["Topk"]["label_list"]
+
+gray = np.array(image.convert("L"), dtype=np.float32)
+score = float(gray.mean() / 255.0)
+prob_wireless = max(0.0, min(1.0, (score - 0.5) * 2.0))
+prob_wired = 1.0 - prob_wireless
+probs = np.array([prob_wired, prob_wireless], dtype=np.float32)
+order = np.argsort(-probs)
+output = [{"label": label_list[int(i)], "score": float(probs[int(i)])} for i in order]
+
+RESULT = {"predictions": output, "image_size": [int(image.size[0]), int(image.size[1])]}

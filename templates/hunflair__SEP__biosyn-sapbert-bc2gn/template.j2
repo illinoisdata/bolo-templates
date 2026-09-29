@@ -1,0 +1,28 @@
+{% set repo_id = repo_id | default("hunflair/biosyn-sapbert-bc2gn") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('The mutation in the ABCD1 gene causes X-linked adrenoleukodystrophy, a neurodegenerative disease, which is exacerbated by exposure to high levels of mercury in dolphin populations.') %}
+{% set linker_name = linker_name | default('gene-linker') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = "{{ input_text }}"
+linker_name = "{{ linker_name }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from flair.data import Sentence
+from flair.models import EntityMentionLinker
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+sentence = Sentence(input_text)
+linker = EntityMentionLinker.load(weights_path)
+linker.predict(sentence)
+
+output = []
+for span in sentence.get_spans(linker.label_type):
+    span_links = []
+    for link in span.get_labels(linker.label_type):
+        span_links.append({"value": link.value, "score": float(link.score)})
+    output.append({"text": span.text, "links": span_links})
+
+RESULT = {"output": output}

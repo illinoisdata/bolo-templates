@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("tohoku-nlp/bert-large-japanese") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("東北大学で{mask}の研究をしています。") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+masked_prompt = "{{ masked_prompt }}"
+
+from transformers import pipeline
+
+# Load the fill-mask pipeline
+pipe = pipeline(task=task, model=repo_id, device=device)
+# Prepare the text by replacing the placeholder with the tokenizer's mask token
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+# Run inference
+RESULT = pipe(text)

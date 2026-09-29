@@ -1,0 +1,61 @@
+{% set repo_id = repo_id | default("speechbrain/tts-hifigan-libritts-16kHz") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set sample_rate = sample_rate | default(16000) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+sample_rate = {{ sample_rate }}
+
+import os
+import torch
+import torchaudio
+from huggingface_hub import hf_hub_download
+from speechbrain.inference.vocoders import HIFIGAN
+from speechbrain.lobes.models.FastSpeech2 import mel_spectrogram
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="generator.ckpt")
+_ = hf_hub_download(repo_id=repo_id, filename="hyperparams.yaml")
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    waveform, sr = torchaudio.load(audio_path)
+else:
+    waveform, sr = torchaudio.load(audio_path)
+
+if waveform.shape[0] > 1:
+    waveform = waveform.mean(dim=0, keepdim=True)
+
+if sr != sample_rate:
+    waveform = torchaudio.functional.resample(waveform, sr, sample_rate)
+
+signal = waveform[0].squeeze()
+
+hifi_gan = HIFIGAN.from_hparams(
+    source=repo_id,
+    savedir=os.path.dirname(weights_path),
+    run_opts={"device": device},
+)
+
+spectrogram, _ = mel_spectrogram(
+    audio=signal.squeeze(),
+    sample_rate=sample_rate,
+    hop_length=256,
+    win_length=1024,
+    n_mels=80,
+    n_fft=1024,
+    f_min=0.0,
+    f_max=8000.0,
+    power=1,
+    normalized=False,
+    min_max_energy_norm=True,
+    norm="slaney",
+    mel_scale="slaney",
+    compression=True,
+)
+
+spectrogram = spectrogram.unsqueeze(0).to(device)
+waveforms = hifi_gan.decode_batch(spectrogram)
+output_waveform = waveforms.squeeze(0).detach().cpu()
+
+RESULT = {"waveform": output_waveform}

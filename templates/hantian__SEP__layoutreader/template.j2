@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("hantian/layoutreader") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("token-classification") %}
+{% set words = words | default(["This", "is", "a", "test"]) %}
+{% set boxes = boxes | default([[0, 0, 50, 50], [50, 0, 100, 50], [0, 50, 50, 100], [50, 50, 100, 100]]) %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+words = {{ words | tojson }}
+boxes = {{ boxes | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+class _TokenizerWrapper:
+    def __init__(self, tokenizer):
+        self._tokenizer = tokenizer
+
+    def __call__(self, *args, **kwargs):
+        kwargs.pop("is_split_into_words", None)
+        return self._tokenizer(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._tokenizer, name)
+
+pipe.tokenizer = _TokenizerWrapper(pipe.tokenizer)
+
+tokenizer_params = dict(pipe._preprocess_params.get("tokenizer_params", {}))
+tokenizer_params["boxes"] = boxes
+pipe._preprocess_params["tokenizer_params"] = tokenizer_params
+
+raw_result = pipe(words, is_split_into_words=True)
+RESULT = {"predictions": raw_result}

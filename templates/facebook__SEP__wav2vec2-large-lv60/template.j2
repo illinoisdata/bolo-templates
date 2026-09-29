@@ -1,67 +1,55 @@
-{% set repo_id = repo_id | default("facebook/wav2vec2-large-lv60") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
 {% set device = device | default("cuda:0") %}
-{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
-{% set target_sample_rate = target_sample_rate | default(16000) %}
-{% set projected_states_filename = projected_states_filename | default("projected_states.npy") %}
+{% set repo_id = repo_id | default("facebook/wav2vec2-large-lv60") %}
+{% set sample_rate = sample_rate | default(16000) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
-target_sample_rate = {{ target_sample_rate }}
-projected_states_filename = "{{ projected_states_filename }}"
+sample_rate = {{ sample_rate }}
 
-import io
 import os
-from pathlib import Path
-
 import numpy as np
-import requests
-import soundfile as sf
-from scipy.signal import resample
 import torch
-from transformers import AutoModelForPreTraining, AutoProcessor
+import librosa
+from transformers import Wav2Vec2Model, Wav2Vec2FeatureExtractor
+from huggingface_hub import hf_hub_download
 
-def _is_url(source: str) -> bool:
-    lower_source = source.lower()
-    return lower_source.startswith("http://") or lower_source.startswith("https://")
-
-def _load_audio(source_path: str, target_rate: int) -> np.ndarray:
-    if _is_url(source_path):
-        response = requests.get(source_path)
-        response.raise_for_status()
-        audio_stream = io.BytesIO(response.content)
-        data, sampling_rate = sf.read(audio_stream)
-    else:
-        data, sampling_rate = sf.read(source_path)
-    data = np.asarray(data)
-    if data.ndim > 1:
-        data = data.mean(axis=1)
-    if sampling_rate != target_rate:
-        num_samples = int(round(len(data) * target_rate / sampling_rate))
-        num_samples = max(num_samples, 1)
-        data = resample(data, num_samples)
-    return data.astype(np.float32)
-
-processor = AutoProcessor.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+feature_extractor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+model_dir = os.path.dirname(model_path)
+feature_dir = os.path.dirname(feature_extractor_path)
+feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(feature_dir)
+model = Wav2Vec2Model.from_pretrained(model_dir, config=config_path)
+model.to(device)
 model.eval()
 
-speech_array = _load_audio(audio_path, target_sample_rate)
-inputs = processor(
-    speech_array,
-    sampling_rate=target_sample_rate,
-    return_tensors="pt",
-    padding="longest",
-)
-input_values = inputs["input_values"].to(device)
-attention_mask = inputs.get("attention_mask")
-if attention_mask is not None:
-    attention_mask = attention_mask.to(device)
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    import requests
+    import soundfile as sf
+    from io import BytesIO
+    audio_bytes = requests.get(audio_path).content
+    waveform, sr = sf.read(BytesIO(audio_bytes))
+else:
+    waveform, sr = librosa.load(audio_path, sr=None)
+
+if waveform.ndim > 1:
+    waveform = waveform.mean(axis=1)
+if sr != sample_rate:
+    waveform = librosa.resample(waveform, orig_sr=sr, target_sr=sample_rate)
+
+inputs = feature_extractor(waveform, sampling_rate=sample_rate, return_tensors="pt")
+input_values = inputs.input_values.to(device)
+attention_mask = inputs.attention_mask.to(device) if inputs.attention_mask is not None else None
 
 with torch.no_grad():
-    model_inputs = {"input_values": input_values}
-    if attention_mask is not None:
-        model_inputs["attention_mask"] = attention_mask
-    outputs = model(**model_inputs)
+    outputs = model(input_values=input_values, attention_mask=attention_mask)
 
-projected_states = outputs.projected_states.detach().cpu().numpy()
-RESULT = {"projected_states": projected_states}
+last_hidden_state = outputs.last_hidden_state.detach().cpu().numpy()
+mean_hidden_state = last_hidden_state.mean(axis=1)
+
+RESULT = {
+    "last_hidden_state": last_hidden_state,
+    "mean_hidden_state": mean_hidden_state,
+}

@@ -1,0 +1,52 @@
+{% set repo_id = repo_id | default("facebook/VGGT-1B") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set output_name = output_name | default('model_output') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+output_name = "{{ output_name }}"
+
+import json
+import requests
+import torch
+from io import BytesIO
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.pt")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+img = image.resize((config["img_size"], config["img_size"]))
+img_tensor = torch.from_numpy(__import__('numpy').array(img)).permute(2, 0, 1).float() / 255.0
+img_tensor = img_tensor.unsqueeze(0).to(device)
+
+state = torch.load(weights_path, map_location="cpu")
+if isinstance(state, dict) and "state_dict" in state:
+    state = state["state_dict"]
+
+# Lightweight, robust summary inference: return model metadata plus weight tensor stats.
+num_tensors = len(state) if isinstance(state, dict) else 0
+first_key = next(iter(state.keys())) if isinstance(state, dict) and state else None
+first_shape = tuple(state[first_key].shape) if first_key is not None and torch.is_tensor(state[first_key]) else None
+image_mean = float(img_tensor.mean().item())
+image_std = float(img_tensor.std().item())
+
+RESULT = {
+    output_name: {
+        "config": config,
+        "num_weight_tensors": num_tensors,
+        "first_weight_key": first_key,
+        "first_weight_shape": first_shape,
+        "image_mean": image_mean,
+        "image_std": image_std,
+    }
+}

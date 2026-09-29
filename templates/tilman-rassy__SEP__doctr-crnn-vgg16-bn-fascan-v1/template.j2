@@ -1,5 +1,36 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("tilman-rassy/doctr-crnn-vgg16-bn-fascan-v1") %}
-import doctr
-import inspect
-print(doctr.models.recognition.crnn.__file__)
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from doctr.io import DocumentFile
+from doctr.models import ocr_predictor, from_hub
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+doc = DocumentFile.from_images([image_path])
+reco_model = from_hub(repo_id)
+predictor = ocr_predictor(det_arch="db_mobilenet_v3_large", reco_arch=reco_model, pretrained=True)
+
+state_dict = torch.load(weights_path, map_location="cpu")
+reco_model.load_state_dict(state_dict, strict=False)
+predictor = predictor.to(device)
+
+pred = predictor(doc)
+words = []
+for page in pred.pages:
+    for block in page.blocks:
+        for line in block.lines:
+            for word in line.words:
+                words.append({"value": word.value, "confidence": float(word.confidence)})
+
+RESULT = {"words": words, "config": config}

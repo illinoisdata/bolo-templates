@@ -1,28 +1,32 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("wasmdashai/vits-ar") %}
-{% set text = text | default("السلام عليكم ورحمة الله وبركاتة  ما الجديد ؟") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('السلام عليكم ورحمة الله وبركاتة ما الجديد ؟') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = """{{ text }}"""
+text = "{{ text }}"
 
-import numpy as np
 import torch
-from pathlib import Path
-from scipy.io import wavfile
+import numpy as np
 from transformers import VitsModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
 
-model = VitsModel.from_pretrained(repo_id)
-model = model.to(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+
+model = VitsModel.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
-
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
 inputs = tokenizer(text, return_tensors="pt")
-inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**inputs)
+    output = model(**inputs)
 
-waveform = outputs.waveform.cpu().numpy().reshape(-1)
-sampling_rate = model.config.sampling_rate
-
-RESULT = {"waveform": waveform, "sampling_rate": sampling_rate}
+waveform = output.waveform.detach().cpu().numpy().reshape(-1)
+RESULT = {"waveform": waveform, "sampling_rate": model.config.sampling_rate}

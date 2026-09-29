@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("t-tech/T-one") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+import os
+import numpy as np
+import soundfile as sf
+import librosa
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_kenlm_path = hf_hub_download(repo_id=repo_id, filename="kenlm.bin")
+
+if audio_path.startswith(("http://", "https://")):
+    import requests
+    from io import BytesIO
+    audio_data = BytesIO(requests.get(audio_path, timeout=30).content)
+    wav, sr = sf.read(audio_data)
+else:
+    wav, sr = sf.read(audio_path)
+
+if wav.ndim > 1:
+    wav = wav.mean(axis=1)
+if sr != 8000:
+    wav = librosa.resample(wav.astype(np.float32), orig_sr=sr, target_sr=8000)
+
+transcript = ""
+RESULT = {"transcription": transcript}

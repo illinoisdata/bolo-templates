@@ -1,61 +1,52 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("UrukHan/t5-russian-spell") %}
-{% set input_text = input_text | default(["сеглдыя хорош ден", "когд а вы прдет к нам в госи"]) %}
-{% set task_prefix = task_prefix | default("Spell correct: ") %}
-{% set max_input_length = max_input_length | default(256) %}
-{% set max_output_length = max_output_length | default(256) %}
-{% set num_return_sequences = num_return_sequences | default(1) %}
+{% set device = device | default("cuda:0") %}
+{% set input_sequences = input_sequences | default(['сеглдыя хорош ден', 'когд а вы прдет к нам в госи']) %}
+{% set max_input = max_input | default(256) %}
+{% set max_output = max_output | default(256) %}
 {% set num_beams = num_beams | default(4) %}
+{% set task_prefix = task_prefix | default('Spell correct: ') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = {{ input_text | tojson }}
-task_prefix = {{ task_prefix | tojson }}
-max_input_length = {{ max_input_length }}
-max_output_length = {{ max_output_length }}
-num_return_sequences = {{ num_return_sequences }}
+input_sequences = {{ input_sequences }}
+max_input = {{ max_input }}
+max_output = {{ max_output }}
 num_beams = {{ num_beams }}
-
-import json
-from pathlib import Path
+task_prefix = "{{ task_prefix }}"
 
 import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-torch_device = torch.device(device)
-model = model.to(torch_device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32, device_map=None)
+model.to(device)
 model.eval()
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
 
-if isinstance(input_text, str):
-    normalized_inputs = [input_text]
-else:
-    normalized_inputs = list(input_text)
-prefixed_inputs = [f"{task_prefix}{sequence}" for sequence in normalized_inputs]
-encoded_inputs = tokenizer(
-    prefixed_inputs,
-    padding="longest",
+if isinstance(input_sequences, str):
+    input_sequences = [input_sequences]
+
+inputs = tokenizer(
+    [task_prefix + seq for seq in input_sequences],
+    padding=True,
     truncation=True,
-    max_length=max_input_length,
+    max_length=max_input,
     return_tensors="pt",
 )
-encoded_inputs = {name: tensor.to(torch_device) for name, tensor in encoded_inputs.items()}
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    generated_sequences = model.generate(
-        **encoded_inputs,
-        max_length=max_output_length,
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_output,
         num_beams=num_beams,
-        num_return_sequences=num_return_sequences,
     )
 
-decoded_outputs = tokenizer.batch_decode(generated_sequences, skip_special_tokens=True)
-if num_return_sequences > 1:
-    grouped_outputs = [
-        decoded_outputs[i : i + num_return_sequences]
-        for i in range(0, len(decoded_outputs), num_return_sequences)
-    ]
-else:
-    grouped_outputs = decoded_outputs
-
-RESULT = {"generated_text": grouped_outputs}
+output_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+RESULT = {"output_text": output_text}

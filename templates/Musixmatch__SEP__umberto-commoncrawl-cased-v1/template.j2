@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("Musixmatch/umberto-commoncrawl-cased-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Umberto Eco è <mask> un grande scrittore.") %}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+from transformers import RobertaTokenizerFast, pipeline
+
+tokenizer = RobertaTokenizerFast.from_pretrained(model)
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

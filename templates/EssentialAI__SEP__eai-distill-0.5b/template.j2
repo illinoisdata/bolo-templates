@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("EssentialAI/eai-distill-0.5b") %}
+{% set device = device | default("cuda:0") %}
+{% set document_text = document_text | default('This is a sample web document discussing taxonomy, classification, and educational metadata. It describes how documents can be categorized by subject matter, Bloom\'s taxonomy, document type, content quality, and reasoning depth.') %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set temperature = temperature | default(0.0) %}
+{% set top_p = top_p | default(1.0) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+document_text = "{{ document_text }}"
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    trust_remote_code=True,
+    torch_dtype=torch.float32,
+)
+model.to(device)
+model.eval()
+
+messages = [
+    {"role": "system", "content": "taxonomy"},
+    {"role": "user", "content": document_text},
+]
+prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=temperature > 0,
+        temperature=temperature if temperature > 0 else None,
+        top_p=top_p,
+    )
+
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+RESULT = {"output_text": output_text}

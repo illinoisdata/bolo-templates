@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("laion/CLIP-ViT-L-14-laion2B-s32B-b82K") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set candidate_labels = candidate_labels | default(['playing music', 'playing sports']) %}
+{% set top_k = top_k | default(2) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+candidate_labels = {{ candidate_labels }}
+top_k = {{ top_k }}
+
+import torch
+from PIL import Image
+from io import BytesIO
+from urllib.request import urlopen
+from huggingface_hub import hf_hub_download
+import open_clip
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.safetensors")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(BytesIO(urlopen(image_path).read())).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model, _, preprocess = open_clip.create_model_and_transforms("ViT-L-14", pretrained=weights_path, device=device)
+tokenizer = open_clip.get_tokenizer("ViT-L-14")
+model.eval()
+
+image_tensor = preprocess(image).unsqueeze(0).to(device)
+text_tokens = tokenizer(candidate_labels).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_tensor)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logits = model.logit_scale.exp() * image_features @ text_features.T
+    probs = logits.softmax(dim=-1)[0]
+
+sorted_indices = torch.argsort(probs, descending=True)
+labels = [candidate_labels[i] for i in sorted_indices[:top_k].tolist()]
+scores = probs[sorted_indices[:top_k]].tolist()
+
+RESULT = {"labels": labels, "scores": scores}

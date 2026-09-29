@@ -1,0 +1,27 @@
+{% set repo_id = repo_id | default("Rostlab/prot_bert_bfd") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("D L I P T S S K L V V [MASK] D T S L Q V K K A F F A L V T") %}
+{% set do_lower_case = do_lower_case | default(False) %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+
+task = {{ task | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+do_lower_case = {{ do_lower_case }}
+
+from transformers import BertConfig, BertTokenizer, pipeline
+
+tokenizer = BertTokenizer.from_pretrained(repo_id, do_lower_case=do_lower_case)
+config = BertConfig.from_pretrained(repo_id)
+pipe = pipeline(
+    task=task,
+    model=repo_id,
+    config=config,
+    tokenizer=tokenizer,
+    device=device,
+)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

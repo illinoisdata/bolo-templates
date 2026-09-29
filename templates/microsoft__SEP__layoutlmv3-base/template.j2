@@ -1,47 +1,52 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("microsoft/layoutlmv3-base") %}
-{% set document_image_path = document_image_path | default("/u/yli77/projects/ML-code-generation/data/doc.jpeg") %}
-{% set text_inputs = text_inputs | default(["LayoutLMv3", "document", "processor"]) %}
-{% set boxes = boxes | default([[0, 0, 500, 500], [0, 500, 500, 1000], [500, 500, 1000, 1000]]) %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+{% set text_input = text_input | default('What is the document about?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-document_image_path = "{{ document_image_path }}"
-text_inputs = {{ text_inputs }}
-boxes = {{ boxes }}
+image_path = "{{ image_path }}"
+text_input = "{{ text_input }}"
 
-import numpy as np
-import requests
+import os
+import io
 import torch
-from io import BytesIO
-from pathlib import Path
-
 from PIL import Image
-from transformers import AutoModel, AutoProcessor
+from urllib.parse import urlparse
+from huggingface_hub import hf_hub_download
+from transformers import LayoutLMv3Processor, LayoutLMv3ForSequenceClassification
 
-model = AutoModel.from_pretrained(repo_id)
-processor = AutoProcessor.from_pretrained(repo_id)
-if hasattr(processor, "image_processor"):
-    processor.image_processor.apply_ocr = False
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+_ = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+if urlparse(image_path).scheme in ("http", "https"):
+    import requests
+    image = Image.open(io.BytesIO(requests.get(image_path, timeout=30).content)).convert('RGB')
 else:
-    processor.feature_extractor.apply_ocr = False
+    image = Image.open(image_path).convert('RGB')
 
-device = torch.device(device)
-model = model.to(device)
+processor_dir = os.path.dirname(processor_path)
+processor = LayoutLMv3Processor.from_pretrained(processor_dir)
+model = LayoutLMv3ForSequenceClassification.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-if document_image_path.startswith(("http://", "https://")):
-    response = requests.get(document_image_path)
-    response.raise_for_status()
-    with BytesIO(response.content) as buffer:
-        image = Image.open(buffer).convert("RGB")
-else:
-    image = Image.open(document_image_path).convert("RGB")
-
-encoding = processor(images=image, text=text_inputs, boxes=boxes, return_tensors="pt")
-encoding = {key: value.to(device) for key, value in encoding.items()}
-
+encoding = processor(image, text_input, return_tensors='pt')
+encoding = {k: v.to(device) for k, v in encoding.items()}
 with torch.no_grad():
     outputs = model(**encoding)
+    logits = outputs.logits
+    probs = torch.softmax(logits, dim=-1)
+    pred_idx = int(torch.argmax(probs, dim=-1).item())
+    pred_label = model.config.id2label.get(pred_idx, str(pred_idx))
+    confidence = float(probs[0, pred_idx].item())
 
-last_hidden_state = outputs.last_hidden_state.detach().cpu().numpy()
-RESULT = {"last_hidden_state": last_hidden_state}
+RESULT = {
+    "predicted_label": pred_label,
+    "predicted_index": pred_idx,
+    "confidence": confidence,
+    "logits": logits.detach().cpu().tolist(),
+}

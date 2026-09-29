@@ -1,0 +1,81 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("SmilingWolf/wd-vit-large-tagger-v3") %}
+{% set device = device | default("cuda:0") %}
+{% set top_k = top_k | default(10) %}
+{% set threshold = threshold | default(0.35) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+top_k = {{ top_k }}
+threshold = {{ threshold }}
+
+import json
+from pathlib import Path
+from urllib.parse import urlparse
+
+import numpy as np
+import torch
+import timm
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+labels_path = hf_hub_download(repo_id=repo_id, filename="selected_tags.csv")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+input_size = cfg["pretrained_cfg"]["input_size"]
+mean = cfg["pretrained_cfg"]["mean"]
+std = cfg["pretrained_cfg"]["std"]
+
+if urlparse(image_path).scheme in ("http", "https"):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model = timm.create_model(
+    "vit_large_patch16_224",
+    pretrained=False,
+    num_classes=cfg["num_classes"],
+    img_size=cfg["model_args"]["img_size"],
+    class_token=cfg["model_args"]["class_token"],
+    global_pool=cfg["model_args"]["global_pool"],
+    fc_norm=cfg["model_args"]["fc_norm"],
+    act_layer=cfg["model_args"]["act_layer"],
+    patch_size=cfg["model_args"]["patch_size"],
+)
+state_dict = torch.load(weights_path, map_location="cpu")
+if isinstance(state_dict, dict) and "state_dict" in state_dict:
+    state_dict = state_dict["state_dict"]
+model.load_state_dict(state_dict, strict=True)
+model.eval().to(device)
+
+transform = timm.data.create_transform(
+    input_size=input_size[1:],
+    is_training=False,
+    interpolation=cfg["pretrained_cfg"]["interpolation"],
+    mean=mean,
+    std=std,
+    crop_pct=cfg["pretrained_cfg"]["crop_pct"],
+    crop_mode=cfg["pretrained_cfg"]["crop_mode"],
+)
+
+x = transform(image).unsqueeze(0).to(device)
+with torch.no_grad():
+    logits = model(x)
+    probs = torch.sigmoid(logits)[0].detach().cpu().numpy()
+
+with open(labels_path, "r") as f:
+    lines = f.read().strip().splitlines()
+if len(lines) > 1 and lines[0].lower().startswith("name"):
+    tag_names = [line.split(",", 1)[1] for line in lines[1:]]
+else:
+    tag_names = [line.split(",", 1)[1] for line in lines]
+
+n = min(len(tag_names), len(probs))
+pairs = [(tag_names[i], float(probs[i])) for i in range(n) if probs[i] >= threshold]
+pairs.sort(key=lambda x: x[1], reverse=True)
+RESULT = {"tags": pairs[:top_k], "all_probs": probs}

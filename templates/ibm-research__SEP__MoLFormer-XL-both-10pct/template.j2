@@ -1,0 +1,59 @@
+{% set repo_id = repo_id | default("ibm-research/MoLFormer-XL-both-10pct") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set model_local_path = model_local_path | default("/workspace/" ~ repo_id) %}
+{% set input_smiles = input_smiles | default("CCO") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+model_local_path = {{ model_local_path | tojson }}
+input_smiles = {{ input_smiles | tojson }}
+
+import importlib.util
+import json
+import os
+import sys
+import types
+
+from safetensors.torch import load_file
+from transformers import AutoTokenizer, pipeline
+
+molformer_package_name = "molformer"
+molformer_pkg = types.ModuleType(molformer_package_name)
+molformer_pkg.__path__ = [model_local_path]
+sys.modules[molformer_package_name] = molformer_pkg
+
+config_spec = importlib.util.spec_from_file_location(
+    f"{molformer_package_name}.configuration_molformer",
+    os.path.join(model_local_path, "configuration_molformer.py"),
+)
+config_module = importlib.util.module_from_spec(config_spec)
+sys.modules[config_spec.name] = config_module
+config_spec.loader.exec_module(config_module)
+MolformerConfig = config_module.MolformerConfig
+
+model_spec = importlib.util.spec_from_file_location(
+    f"{molformer_package_name}.modeling_molformer",
+    os.path.join(model_local_path, "modeling_molformer.py"),
+)
+model_module = importlib.util.module_from_spec(model_spec)
+sys.modules[model_spec.name] = model_module
+model_spec.loader.exec_module(model_module)
+MolformerForMaskedLM = model_module.MolformerForMaskedLM
+
+with open(os.path.join(model_local_path, "config.json"), "r") as config_file:
+    config_data = json.load(config_file)
+molformer_config = MolformerConfig(**config_data)
+
+model_state = load_file(os.path.join(model_local_path, "model.safetensors"))
+model = MolformerForMaskedLM(molformer_config)
+model.load_state_dict(model_state)
+model.eval()
+model.to(device)
+
+tokenizer = AutoTokenizer.from_pretrained(model_local_path)
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, config=molformer_config, device=device)
+model_output = pipe(input_smiles)
+RESULT = {"features": model_output}

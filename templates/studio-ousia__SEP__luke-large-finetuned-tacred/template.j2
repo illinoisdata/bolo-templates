@@ -1,35 +1,60 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("studio-ousia/luke-large-finetuned-tacred") %}
-{% set text = text | default("Barack Obama was born in Honolulu.") %}
-{% set entity_spans = entity_spans | default([(0, 12), (25, 33)]) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('John Doe founded Acme Corp.') %}
+{% set subject_entity = subject_entity | default('John Doe') %}
+{% set object_entity = object_entity | default('Acme Corp') %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-entity_spans = {{ entity_spans }}
+subject_entity = "{{ subject_entity }}"
+object_entity = "{{ object_entity }}"
 
-import json
 import os
-
 import torch
-from transformers import LukeForEntityPairClassification, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import LukeTokenizer, LukeForEntityPairClassification
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = LukeForEntityPairClassification.from_pretrained(repo_id).to(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+_ = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="entity_vocab.json")
+_ = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
 
-encoded_inputs = tokenizer(text, entity_spans=entity_spans, return_tensors="pt")
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+model_dir = os.path.dirname(model_path)
+tokenizer = LukeTokenizer.from_pretrained(model_dir)
+model = LukeForEntityPairClassification.from_pretrained(model_dir)
+model.to(device)
+model.eval()
+
+subj_start = text.index(subject_entity)
+subj_end = subj_start + len(subject_entity)
+obj_start = text.index(object_entity)
+obj_end = obj_start + len(object_entity)
+
+entity_spans = [(subj_start, subj_end), (obj_start, obj_end)]
+entity_ids = [1, 2]
+
+inputs = tokenizer(
+    text,
+    entity_spans=entity_spans,
+    entity_ids=entity_ids,
+    return_tensors="pt",
+    truncation=True,
+)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
-
-logits = outputs.logits
-probabilities = torch.softmax(logits, dim=-1)
-predicted_label_id = int(torch.argmax(probabilities, dim=-1).item())
-predicted_label = model.config.id2label[predicted_label_id]
+    outputs = model(**inputs)
+probs = torch.softmax(outputs.logits, dim=-1)[0]
+pred_id = int(torch.argmax(probs).item())
+label = model.config.id2label.get(str(pred_id), model.config.id2label.get(pred_id))
 
 RESULT = {
-    "label": predicted_label,
-    "label_id": predicted_label_id,
-    "logits": logits[0].cpu().tolist(),
-    "probabilities": probabilities[0].cpu().tolist(),
+    "label": label,
+    "predicted_id": pred_id,
+    "probabilities": probs.detach().cpu().tolist(),
 }

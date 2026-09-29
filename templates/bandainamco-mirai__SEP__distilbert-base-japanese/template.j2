@@ -1,32 +1,40 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("bandainamco-mirai/distilbert-base-japanese") %}
-{% set input_text = input_text | default("吾輩は猫である。") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('こんにちは。これはテスト入力です。') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
+text = {{ text | tojson }}
 
 import json
-import os
-
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer, DistilBertConfig, DistilBertModel
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id)
-model.to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+tokenizer = AutoTokenizer.from_pretrained(vocab_path.rsplit("/", 1)[0], use_fast=False)
+config = DistilBertConfig(**config)
+model = DistilBertModel(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(
-    input_text,
-    return_tensors="pt",
-    truncation=True,
-    max_length=512,
-    padding=True,
-)
-encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
+    outputs = model(**inputs)
 
 last_hidden_state = outputs.last_hidden_state
-cls_embedding = last_hidden_state[:, 0, :].squeeze(0).cpu()
-RESULT = {"cls_embedding": cls_embedding.tolist()}
+pooler_output = last_hidden_state[:, 0]
+
+RESULT = {
+    "last_hidden_state": last_hidden_state.detach().cpu(),
+    "pooler_output": pooler_output.detach().cpu(),
+}

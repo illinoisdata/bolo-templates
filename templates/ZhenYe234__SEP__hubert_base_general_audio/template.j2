@@ -1,0 +1,58 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set sample_rate = sample_rate | default(16000) %}
+{% set repo_id = repo_id | default("ZhenYe234/hubert_base_general_audio") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+sample_rate = {{ sample_rate }}
+
+import os
+import json
+import numpy as np
+import torch
+import soundfile as sf
+from scipy.signal import resample_poly
+from huggingface_hub import hf_hub_download
+from transformers import AutoConfig, AutoModel
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+config = AutoConfig.from_pretrained(config_path)
+model = AutoModel.from_pretrained(repo_id, config=config, trust_remote_code=False)
+state_dict = None
+if weights_path.endswith(".safetensors"):
+    from safetensors.torch import load_file
+    state_dict = load_file(weights_path)
+else:
+    state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=True)
+model.to(device)
+model.eval()
+
+if audio_path.startswith(("http://", "https://")):
+    import urllib.request
+    import tempfile
+    with urllib.request.urlopen(audio_path) as response:
+        audio_bytes = response.read()
+    tmp_audio_path = os.path.join(tempfile.gettempdir(), "input_audio.wav")
+    with open(tmp_audio_path, "wb") as f:
+        f.write(audio_bytes)
+    audio_path_local = tmp_audio_path
+else:
+    audio_path_local = audio_path
+
+audio, sr = sf.read(audio_path_local)
+if audio.ndim > 1:
+    audio = audio.mean(axis=1)
+if sr != sample_rate:
+    audio = resample_poly(audio, sample_rate, sr)
+    sr = sample_rate
+
+inputs = torch.tensor(audio, dtype=torch.float32).unsqueeze(0).to(device)
+with torch.no_grad():
+    outputs = model(inputs)
+
+last_hidden_state = outputs.last_hidden_state.detach().cpu().numpy()
+RESULT = {"last_hidden_state": last_hidden_state}

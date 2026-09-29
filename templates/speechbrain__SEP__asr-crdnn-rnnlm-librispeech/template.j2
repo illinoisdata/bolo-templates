@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("speechbrain/asr-crdnn-rnnlm-librispeech") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set savedir = savedir | default('/workspace/pretrained_models/asr-crdnn-rnnlm-librispeech') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+savedir = "{{ savedir }}"
+
+import os
+from pathlib import Path
+from urllib.parse import urlparse
+
+import torch
+import torchaudio
+from speechbrain.inference.ASR import EncoderDecoderASR
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+asr_ckpt = hf_hub_download(repo_id=repo_id, filename="asr.ckpt")
+lm_ckpt = hf_hub_download(repo_id=repo_id, filename="lm.ckpt")
+normalizer_ckpt = hf_hub_download(repo_id=repo_id, filename="normalizer.ckpt")
+tokenizer_ckpt = hf_hub_download(repo_id=repo_id, filename="tokenizer.ckpt")
+hyperparams_path = hf_hub_download(repo_id=repo_id, filename="hyperparams.yaml")
+
+run_opts = {"device": device}
+asr_model = EncoderDecoderASR.from_hparams(
+    source=repo_id,
+    savedir=savedir,
+    run_opts=run_opts,
+)
+
+if urlparse(audio_path).scheme in ("http", "https"):
+    audio_input = audio_path
+else:
+    audio_input = audio_path
+
+transcription = asr_model.transcribe_file(audio_input)
+
+RESULT = {"transcription": transcription}

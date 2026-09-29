@@ -1,44 +1,50 @@
 {% set repo_id = repo_id | default("RussianNLP/FRED-T5-Summarizer") %}
 {% set device = device | default("cuda:0") %}
 {% set input_text = input_text | default('<LM> Сократи текст.\n В деревне, затерянной среди зелёных холмов, жил старик по имени Иван. Его жизнь протекала медленно и размеренно. Каждое утро Иван выходил на поля, чтобы заботиться о своём скромном участке земли. Он выращивал картофель и морковь, которые были его главным источником пищи. Вечера старик проводил у камина, читая книги и вспоминая молодость. Жизнь в деревне была тяжёлая, но Иван находил в ней простые радости.') %}
+{% set max_new_tokens = max_new_tokens | default(80) %}
 {% set num_beams = num_beams | default(5) %}
 {% set min_new_tokens = min_new_tokens | default(17) %}
-{% set max_new_tokens = max_new_tokens | default(200) %}
-{% set do_sample = do_sample | default(True) %}
-{% set no_repeat_ngram_size = no_repeat_ngram_size | default(4) %}
+{% set do_sample = do_sample | default(true) %}
 {% set top_p = top_p | default(0.9) %}
-repo_id = '{{ repo_id }}'
-device = '{{ device }}'
-input_text = '''{{ input_text }}'''
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(4) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_text = {{ input_text | tojson }}
+max_new_tokens = {{ max_new_tokens }}
 num_beams = {{ num_beams }}
 min_new_tokens = {{ min_new_tokens }}
-max_new_tokens = {{ max_new_tokens }}
 do_sample = {{ do_sample }}
-no_repeat_ngram_size = {{ no_repeat_ngram_size }}
 top_p = {{ top_p }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size }}
 
-import os
 import torch
-from transformers import GPT2Tokenizer, AutoModelForSeq2SeqLM
+from transformers import GPT2Tokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
+
+weights_index_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+import json
+with open(weights_index_path, "r") as f:
+    weight_map = json.load(f)["weight_map"]
+for wf in sorted(set(weight_map.values())):
+    hf_hub_download(repo_id=repo_id, filename=wf)
 
 tokenizer = GPT2Tokenizer.from_pretrained(repo_id, eos_token='</s>')
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+model = T5ForConditionalGeneration.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-inputs = tokenizer(input_text, return_tensors='pt').to(device)
-input_ids = inputs.input_ids
+input_ids = torch.tensor([tokenizer.encode(input_text)]).to(device)
+with torch.no_grad():
+    outputs = model.generate(
+        input_ids,
+        eos_token_id=tokenizer.eos_token_id,
+        num_beams=num_beams,
+        min_new_tokens=min_new_tokens,
+        max_new_tokens=max_new_tokens,
+        do_sample=do_sample,
+        no_repeat_ngram_size=no_repeat_ngram_size,
+        top_p=top_p,
+    )
+summary = tokenizer.decode(outputs[0][1:], skip_special_tokens=True)
 
-outputs = model.generate(
-    input_ids=input_ids,
-    num_beams=num_beams,
-    min_new_tokens=min_new_tokens,
-    max_new_tokens=max_new_tokens,
-    do_sample=do_sample,
-    no_repeat_ngram_size=no_repeat_ngram_size,
-    top_p=top_p,
-    eos_token_id=tokenizer.eos_token_id,
-)
-
-summary = tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-RESULT = {'summary_text': summary}
+RESULT = {"summary": summary}

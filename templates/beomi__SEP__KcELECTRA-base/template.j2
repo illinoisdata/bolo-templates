@@ -1,22 +1,32 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("beomi/KcELECTRA-base") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("이 영화 정말 재밌다!") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
+text = "{{ text }}"
 
 import torch
 from transformers import AutoTokenizer, AutoModelForPreTraining
+from huggingface_hub import hf_hub_download
 
-device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
 
-encoded_inputs = tokenizer("안녕하세요", return_tensors="pt")
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
-outputs = model(**encoded_inputs)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, tokenizer_file=tokenizer_path)
+model = AutoModelForPreTraining.from_pretrained(repo_id, config=config_path, state_dict=None)
+state_dict = torch.load(weights_path, map_location="cpu") if weights_path.endswith(".bin") else None
+if state_dict is not None:
+    model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
 
-print(type(outputs))
-print(len(outputs))
-print(hasattr(outputs, "logits"))
-print(hasattr(outputs, "discriminator_logits"))
-print(outputs)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+RESULT = {"logits": outputs.logits.detach().cpu().tolist()}

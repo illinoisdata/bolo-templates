@@ -1,0 +1,65 @@
+{% set repo_id = repo_id | default("XiaomiMiMo/MiMo-7B-RL") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set model_id = model_id | default(repo_id) %}
+{% set local_repo_dir = local_repo_dir | default("/workspace/mimo_model") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+repo_id = {{ repo_id | tojson }}
+task = {{ task | tojson }}
+model_id = {{ model_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+local_repo_dir = {{ local_repo_dir | tojson }}
+
+import importlib.util
+import sys
+import types
+from pathlib import Path
+
+from huggingface_hub import snapshot_download
+from transformers import Qwen2Tokenizer, pipeline
+
+local_repo_path = Path(local_repo_dir)
+if not local_repo_path.exists():
+    snapshot_download(repo_id=model_id, local_dir=local_repo_dir, local_dir_use_symlinks=False)
+
+local_repo_path_str = str(local_repo_path)
+if local_repo_path_str not in sys.path:
+    sys.path.insert(0, local_repo_path_str)
+
+mimo_pkg = types.ModuleType("mimo")
+mimo_pkg.__path__ = [local_repo_path_str]
+sys.modules["mimo"] = mimo_pkg
+
+configuration_spec = importlib.util.spec_from_file_location(
+    "mimo.configuration_mimo", local_repo_path / "configuration_mimo.py"
+)
+configuration_mimo = importlib.util.module_from_spec(configuration_spec)
+sys.modules[configuration_spec.name] = configuration_mimo
+configuration_spec.loader.exec_module(configuration_mimo)
+
+modeling_spec = importlib.util.spec_from_file_location(
+    "mimo.modeling_mimo", local_repo_path / "modeling_mimo.py"
+)
+modeling_mimo = importlib.util.module_from_spec(modeling_spec)
+sys.modules[modeling_spec.name] = modeling_mimo
+modeling_spec.loader.exec_module(modeling_mimo)
+
+MiMoConfig = getattr(configuration_mimo, "MiMoConfig")
+MiMoForCausalLM = getattr(modeling_mimo, "MiMoForCausalLM")
+
+config = MiMoConfig.from_pretrained(local_repo_path_str)
+model = MiMoForCausalLM.from_pretrained(local_repo_path_str, config=config)
+tokenizer = Qwen2Tokenizer.from_pretrained(local_repo_path_str)
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=tokenizer,
+    device=device,
+)
+
+inference_inputs = input_prompt
+inference_output = pipe(inference_inputs)
+RESULT = {"outputs": inference_output}

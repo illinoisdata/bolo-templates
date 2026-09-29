@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("biu-nlp/f-coref") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Alice went to the park with Bob. She enjoyed the sunshine, and he brought a ball.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+merges_file = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+class FastCorefWrapper(torch.nn.Module):
+    def __init__(self, coref_model):
+        super().__init__()
+        self.coref_model = coref_model
+
+    def forward(self, *args, **kwargs):
+        return self.coref_model(*args, **kwargs)
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModel.from_pretrained(repo_id)
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+last_hidden_state = outputs.last_hidden_state
+attention_mask = inputs["attention_mask"]
+tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
+spans = []
+for i, tok in enumerate(tokens):
+    if tok not in tokenizer.all_special_tokens:
+        spans.append({"token": tok, "index": i})
+
+RESULT = {"last_hidden_state": last_hidden_state, "tokens": tokens, "non_special_tokens": spans}

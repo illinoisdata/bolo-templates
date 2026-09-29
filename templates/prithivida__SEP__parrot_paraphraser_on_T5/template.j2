@@ -1,41 +1,57 @@
 {% set repo_id = repo_id | default("prithivida/parrot_paraphraser_on_T5") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("Can you recommend some upscale restaurants in New York?") %}
-{% set max_new_tokens = max_new_tokens | default(64) %}
-{% set num_beams = num_beams | default(4) %}
-{% set max_input_length = max_input_length | default(128) %}
+{% set input_phrase = input_phrase | default('Can you recommend some upscale restaurants in New York?') %}
+{% set num_return_sequences = num_return_sequences | default(5) %}
+{% set num_beams = num_beams | default(5) %}
+{% set max_length = max_length | default(32) %}
+{% set do_sample = do_sample | default(false) %}
+{% set temperature = temperature | default(1.0) %}
+{% set top_p = top_p | default(0.95) %}
+{% set repetition_penalty = repetition_penalty | default(1.0) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-max_new_tokens = {{ max_new_tokens }}
+input_phrase = "{{ input_phrase }}"
+num_return_sequences = {{ num_return_sequences }}
 num_beams = {{ num_beams }}
-max_input_length = {{ max_input_length }}
-
-from pathlib import Path
+max_length = {{ max_length }}
+do_sample = {{ do_sample }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+repetition_penalty = {{ repetition_penalty }}
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+repo_dir = spiece_path.rsplit("/", 1)[0]
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_dir, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(
-    input_text,
-    max_length=max_input_length,
-    truncation=True,
-    padding=True,
-    return_tensors="pt",
-)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+inputs = tokenizer("paraphrase: " + input_phrase, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    generated_ids = model.generate(
-        **encoded_inputs,
-        max_new_tokens=max_new_tokens,
+    generated = model.generate(
+        **inputs,
+        num_return_sequences=num_return_sequences,
         num_beams=num_beams,
+        max_length=max_length,
+        do_sample=do_sample,
+        temperature=temperature,
+        top_p=top_p,
+        repetition_penalty=repetition_penalty,
+        early_stopping=True,
     )
 
-paraphrases = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-
-RESULT = {"paraphrases": paraphrases}
+outputs = tokenizer.batch_decode(generated, skip_special_tokens=True)
+RESULT = {"output": outputs}

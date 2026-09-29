@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("ggml-org/gpt-oss-20b-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('gpt-oss-20b-MXFP4.gguf') %}
+{% set prompt = prompt | default('Write a short haiku about machine learning.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+import os
+import json
+import subprocess
+import sys
+from huggingface_hub import hf_hub_download
+
+repo_id = repo_id
+quant_filename = quant_filename
+prompt = prompt
+
+gguf_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+cmd = [
+    sys.executable,
+    "-m",
+    "pip",
+    "install",
+    "-q",
+    "llama-cpp-python",
+]
+subprocess.check_call(cmd)
+
+from llama_cpp import Llama
+
+llm = Llama(
+    model_path=gguf_path,
+    n_ctx=512,
+    n_threads=max(1, os.cpu_count() or 1),
+    n_gpu_layers=-1 if str(device).startswith("cuda") else 0,
+    verbose=False,
+)
+
+result = llm(prompt, max_tokens=64, temperature=0.7, top_p=0.95)
+output_text = result["choices"][0]["text"]
+
+RESULT = {"text": output_text}

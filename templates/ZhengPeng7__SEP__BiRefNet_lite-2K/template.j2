@@ -1,0 +1,80 @@
+{% set repo_id = repo_id | default("ZhengPeng7/BiRefNet_lite-2K") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set input_size = input_size | default(2560) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+input_size = {{ input_size }}
+
+import sys
+import types
+from pathlib import Path
+import importlib.util
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+repo_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+birefnet_file = hf_hub_download(repo_id=repo_id, filename="birefnet.py")
+config_file = hf_hub_download(repo_id=repo_id, filename="BiRefNet_config.py")
+handler_file = hf_hub_download(repo_id=repo_id, filename="handler.py")
+repo_dir = str(Path(handler_file).parent)
+sys.path.insert(0, repo_dir)
+
+package_name = "birefnet_hf_pkg"
+pkg = types.ModuleType(package_name)
+pkg.__path__ = [repo_dir]
+sys.modules[package_name] = pkg
+
+spec_cfg = importlib.util.spec_from_file_location(f"{package_name}.BiRefNet_config", config_file)
+mod_cfg = importlib.util.module_from_spec(spec_cfg)
+sys.modules[f"{package_name}.BiRefNet_config"] = mod_cfg
+spec_cfg.loader.exec_module(mod_cfg)
+
+spec = importlib.util.spec_from_file_location(f"{package_name}.birefnet", birefnet_file)
+birefnet_module = importlib.util.module_from_spec(spec)
+sys.modules[f"{package_name}.birefnet"] = birefnet_module
+spec.loader.exec_module(birefnet_module)
+BiRefNet = birefnet_module.BiRefNet
+
+img = image_path
+if isinstance(img, str) and img.startswith(("http://", "https://")):
+    import requests
+    from io import BytesIO
+    img = Image.open(BytesIO(requests.get(img, timeout=30).content)).convert("RGB")
+else:
+    img = Image.open(img).convert("RGB")
+
+w, h = img.size
+scale = input_size / max(h, w)
+new_w, new_h = max(1, int(round(w * scale))), max(1, int(round(h * scale)))
+img_resized = img.resize((new_w, new_h), Image.BICUBIC)
+canvas = Image.new("RGB", (input_size, input_size), (0, 0, 0))
+canvas.paste(img_resized, ((input_size - new_w) // 2, (input_size - new_h) // 2))
+
+x = np.asarray(canvas).astype(np.float32) / 255.0
+x = (x - 0.5) / 0.5
+x = torch.from_numpy(x).permute(2, 0, 1).unsqueeze(0).to(device)
+
+model = BiRefNet()
+state_dict = torch.load(repo_file, map_location="cpu")
+if isinstance(state_dict, dict) and "state_dict" in state_dict:
+    state_dict = state_dict["state_dict"]
+if isinstance(state_dict, dict):
+    state_dict = {k.replace("module.", "", 1) if k.startswith("module.") else k: v for k, v in state_dict.items()}
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+with torch.no_grad():
+    pred = model(x)
+    if isinstance(pred, (tuple, list)):
+        pred = pred[0]
+    if pred.ndim == 4:
+        pred = pred[:, 0]
+    pred = torch.sigmoid(pred)[0].detach().cpu().numpy()
+
+RESULT = {"mask": Image.fromarray((pred * 255).clip(0, 255).astype(np.uint8)).resize(img.size, Image.BICUBIC), "mask_array": pred}

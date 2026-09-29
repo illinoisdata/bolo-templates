@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("Qwen/Qwen3-TTS-12Hz-1.7B-Base") %}
+{% set device = device | default("cuda:0") %}
+{% set ref_audio = ref_audio | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set ref_text = ref_text | default('Okay. Yeah. I resent you. I love you. I respect you. But you know what? You blew it! And thanks to you.') %}
+{% set gen_text = gen_text | default('I am solving the equation: x = [-b ± √(b²-4ac)] / 2a? Nobody can — it\'s a disaster, very sad!') %}
+{% set language = language | default('English') %}
+{% set x_vector_only_mode = x_vector_only_mode | default(False) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+ref_audio = "{{ ref_audio }}"
+ref_text = "{{ ref_text }}"
+gen_text = "{{ gen_text }}"
+language = "{{ language }}"
+x_vector_only_mode = {{ x_vector_only_mode }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from qwen_tts import Qwen3TTSModel
+
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+ref_audio_input = ref_audio
+
+model = Qwen3TTSModel.from_pretrained(
+    repo_id,
+    device_map=device,
+    dtype=torch.bfloat16,
+)
+
+prompt = model.create_voice_clone_prompt(
+    ref_audio=ref_audio_input,
+    ref_text=ref_text,
+    x_vector_only_mode=x_vector_only_mode,
+)
+
+wavs, sr = model.generate_voice_clone(
+    text=gen_text,
+    language=language,
+    voice_clone_prompt=prompt,
+)
+
+RESULT = {
+    "audio": wavs[0],
+    "sample_rate": sr,
+}

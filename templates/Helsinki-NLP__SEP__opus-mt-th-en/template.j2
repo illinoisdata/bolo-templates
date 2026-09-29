@@ -1,23 +1,32 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-th-en") %}
-{% set input_text = input_text | default("สวัสดีครับ") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('สวัสดีครับ คุณเป็นอย่างไรบ้าง') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = {{ input_text | tojson }}
-
-from pathlib import Path
+text = {{ text | tojson }}
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
+from transformers import MarianMTModel, MarianTokenizer
+from huggingface_hub import hf_hub_download
 
-tokenizer = MarianTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+src_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+tgt_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
 
-model_inputs = tokenizer(input_text, return_tensors="pt").to(device)
+tokenizer = MarianTokenizer(vocab=vocab_path, source_spm=src_spm_path, target_spm=tgt_spm_path, tokenizer_file=None)
+model = MarianMTModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = tokenizer([text], return_tensors="pt", padding=True, truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    generated_tokens = model.generate(**model_inputs)
+    generated_tokens = model.generate(**inputs, num_beams=6, max_length=128)
 
-translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+translated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
-RESULT = {"translation": translation}
+RESULT = {"translation": translated_text}

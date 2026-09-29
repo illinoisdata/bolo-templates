@@ -1,25 +1,35 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("ElnaggarLab/ankh-base") %}
-{% set input_text = input_text | default("Summarize how proteins fold using structural features.") %}
-{% set max_new_tokens = max_new_tokens | default(256) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('MKVIL') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-max_new_tokens = {{ max_new_tokens }}
-
-from pathlib import Path
+text = "{{ text }}"
 
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(input_text, return_tensors="pt")
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(**encoded_inputs, max_new_tokens=max_new_tokens)
-generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=16)
 
-RESULT = {"generated_text": generated_text}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+RESULT = {"output_text": output_text}

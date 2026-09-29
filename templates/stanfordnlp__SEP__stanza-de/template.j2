@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("stanfordnlp/stanza-de") %}
+{% set device = device | default("cuda:0") %}
+{% set model_file = model_file | default('models/ner/germeval2014.pt') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+model_file = "{{ model_file }}"
+
+import os
+import stanza
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename=model_file)
+model_dir = os.path.dirname(model_path)
+
+# Download the packaged German NER model to ensure the local resource exists.
+# Stanza's downloaded models are stored under the directory derived from the downloaded file path.
+
+text = "Angela Merkel besuchte Berlin im Jahr 2020."
+
+# Build a minimal pipeline around the downloaded model file.
+# The repo contains a Stanza model bundle; we use it via the Stanza package interface.
+# For local inference, load a German pipeline and point it to the downloaded package path.
+nlp = stanza.Pipeline(
+    lang='de',
+    processors='tokenize,ner',
+    dir=model_dir,
+    use_gpu=(device.startswith('cuda')),
+    package={'ner': os.path.basename(model_file).replace('.pt', '')},
+    tokenize_no_ssplit=False,
+    verbose=False,
+)
+
+doc = nlp(text)
+entities = []
+for sent in doc.sentences:
+    for ent in sent.ents:
+        entities.append({
+            'text': ent.text,
+            'type': ent.type,
+            'start_char': ent.start_char,
+            'end_char': ent.end_char,
+        })
+
+RESULT = {"entities": entities}

@@ -1,0 +1,28 @@
+{% set repo_id = repo_id | default("maywell/Synatra-7B-v0.3-base") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") -%}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") -%}
+{% set max_new_tokens = max_new_tokens | default(256) -%}
+{% set return_full_text = return_full_text | default(True) -%}
+repo_id = {{ repo_id | tojson }}
+task = {{ task | tojson }}
+model = repo_id
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+return_full_text = {{ return_full_text }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+preprocessed_input = input_prompt
+
+generated_sequences = pipe(
+    preprocessed_input,
+    max_new_tokens=max_new_tokens,
+    return_full_text=return_full_text,
+)
+
+RESULT = {
+    "generated_sequences": generated_sequences,
+}

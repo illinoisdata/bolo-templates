@@ -1,29 +1,51 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("valhalla/t5-small-qa-qg-hl") %}
-{% set input_text = input_text | default("generate question:  42  is the answer to life, the universe and everything. ") %}
-{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set device = device | default("cuda:0") %}
+{% set question_text = question_text | default('What is 42') %}
+{% set context_text = context_text | default('42 is the answer to life, the universe and everything.') %}
+{% set qg_prefix = qg_prefix | default('generate question: ') %}
+{% set qa_prefix = qa_prefix | default('question: ') %}
+{% set qa_context_sep = qa_context_sep | default(' context: ') %}
+{% set qg_highlight_start = qg_highlight_start | default('<hl> ') %}
+{% set qg_highlight_end = qg_highlight_end | default(' <hl>') %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-max_new_tokens = {{ max_new_tokens }}
+question_text = "{{ question_text }}"
+context_text = "{{ context_text }}"
+qg_prefix = "{{ qg_prefix }}"
+qa_prefix = "{{ qa_prefix }}"
+qa_context_sep = "{{ qa_context_sep }}"
+qg_highlight_start = "{{ qg_highlight_start }}"
+qg_highlight_end = "{{ qg_highlight_end }}"
 
 import torch
-from pathlib import Path
-
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-tokenized_inputs = tokenizer(input_text, return_tensors="pt")
-tokenized_inputs = {key: value.to(torch_device) for key, value in tokenized_inputs.items()}
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+qg_input = f"{qg_prefix}{qg_highlight_start}{question_text}{qg_highlight_end} {context_text}"
+qa_input = f"{qa_prefix}{question_text}{qa_context_sep}{context_text}"
+
+qg_inputs = tokenizer(qg_input, return_tensors="pt").to(device)
+qa_inputs = tokenizer(qa_input, return_tensors="pt").to(device)
 
 with torch.no_grad():
-    generated_ids = model.generate(**tokenized_inputs, max_new_tokens=max_new_tokens)
+    qg_ids = model.generate(**qg_inputs, max_length=32, num_beams=4)
+    qa_ids = model.generate(**qa_inputs, max_length=32, num_beams=4)
 
-generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+qg_output = tokenizer.decode(qg_ids[0], skip_special_tokens=True)
+qa_output = tokenizer.decode(qa_ids[0], skip_special_tokens=True)
 
-RESULT = {"generated_text": generated_text}
+RESULT = {"question_generation": qg_output, "question_answering": qa_output}

@@ -1,30 +1,35 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("wasmdashai/vits-eng-us-ljs") %}
-{% set text_input = text_input | default("The quick brown fox jumps over the lazy dog.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hello, this is a test of the VITS English voice model.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+text = {{ text | tojson }}
 
-import os
-from pathlib import Path
-
-import soundfile as sf
+import json
 import torch
-from transformers import pipeline
+import numpy as np
+from transformers import VitsModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
 
-# initialize text-to-speech pipeline
-torch_device = torch.device(device)
-tts = pipeline("text-to-speech", model=repo_id, device=torch_device)
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
 
-# run inference
-tts_outputs = tts(text_input)
-if isinstance(tts_outputs, list):
-    tts_outputs = tts_outputs[0]
+model = VitsModel.from_pretrained(repo_id, torch_dtype=torch.float32).to(device)
+model.eval()
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
 
-# post-process output
-speech_array = tts_outputs.get("audio")
-if speech_array is None:
-    speech_array = tts_outputs.get("array")
-SAMPLE_RATE = tts_outputs.get("sampling_rate", tts.model.config.sampling_rate)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-RESULT = {"speech": speech_array}
+with torch.no_grad():
+    output = model(**inputs)
+
+waveform = output.waveform.squeeze().detach().cpu().numpy()
+if waveform.ndim == 0:
+    waveform = waveform[None]
+
+RESULT = {"audio": waveform, "sampling_rate": 16000}

@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("bartowski/Qwen2-0.5B-Instruct-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('Qwen2-0.5B-Instruct-Q4_K_M.gguf') %}
+{% set prompt = prompt | default('Write a short haiku about artificial intelligence.') %}
+{% set system_prompt = system_prompt | default('You are a helpful assistant.') %}
+{% set max_tokens = max_tokens | default(64) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.95) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+system_prompt = "{{ system_prompt }}"
+max_tokens = {{ max_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+
+import os
+import requests
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+llm = Llama(
+    model_path=model_path,
+    n_ctx=1024,
+    n_threads=max(1, os.cpu_count() or 1),
+    n_gpu_layers=-1 if device.startswith("cuda") else 0,
+    verbose=False,
+)
+
+full_prompt = (
+    "<|im_start|>system\n"
+    f"{system_prompt}<|im_end|>\n"
+    "<|im_start|>user\n"
+    f"{prompt}<|im_end|>\n"
+    "<|im_start|>assistant\n"
+)
+
+output = llm(
+    full_prompt,
+    max_tokens=max_tokens,
+    temperature=temperature,
+    top_p=top_p,
+    stop=["<|im_end|>"],
+)
+
+text = output["choices"][0]["text"]
+
+RESULT = {"text": text}

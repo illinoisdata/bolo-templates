@@ -1,28 +1,32 @@
 {% set repo_id = repo_id | default("facebook/dpr-ctx_encoder-single-nq-base") %}
 {% set device = device | default("cuda:0") %}
-{% set context_text = context_text | default("The Eiffel Tower is located in Paris and is one of the most popular tourist attractions in the world.") %}
-
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-context_text = {{ context_text | tojson }}
+{% set question = question | default('Hello, is my dog cute ?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
 
 import os
-
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import DPRContextEncoder, DPRContextEncoderTokenizer
+from huggingface_hub import hf_hub_download
 
-model = AutoModel.from_pretrained(repo_id)
-model = model.to(torch.device(device))
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+model_dir = os.path.dirname(model_file)
+
+tokenizer = DPRContextEncoderTokenizer.from_pretrained(model_dir)
+model = DPRContextEncoder.from_pretrained(model_dir)
+model = model.to(device)
 model.eval()
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-
-encoded_input = tokenizer(context_text, return_tensors="pt", truncation=True, padding=True)
-encoded_input = {key: value.to(torch.device(device)) for key, value in encoded_input.items()}
-
+inputs = tokenizer(question, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
-    outputs = model(**encoded_input)
+    outputs = model(**inputs)
 
-context_embedding = outputs.pooler_output.detach().cpu()
+embedding = outputs.pooler_output.detach().cpu().numpy()
 
-RESULT = {"context_embedding": context_embedding}
+RESULT = {"embedding": embedding}

@@ -1,0 +1,63 @@
+{% set repo_id = repo_id | default("apple/MobileCLIP-S1-OpenCLIP") %}
+{% set device = device | default("cuda:0") %}
+{% set image1 = image1 | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text_list = text_list | default(['a photo of a cat', 'a photo of two cats', 'a photo of a dog', 'a photo of a bird', 'a photo of a car']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image1 = "{{ image1 }}"
+text_list = {{ text_list }}
+
+import json
+from PIL import Image
+import torch
+from huggingface_hub import hf_hub_download
+import open_clip
+
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+model_cfg = cfg.get("model_cfg", {})
+preprocess_cfg = cfg.get("preprocess_cfg", {})
+model_name = model_cfg.get("model_name", "MobileCLIP-S1")
+
+model, _, preprocess = open_clip.create_model_and_transforms(
+    model_name,
+    pretrained=None,
+    force_quick_gelu=False,
+)
+
+state_dict = torch.load(weights_path, map_location="cpu")
+if isinstance(state_dict, dict) and "state_dict" in state_dict:
+    state_dict = state_dict["state_dict"]
+model.load_state_dict(state_dict, strict=True)
+model = model.to(device)
+model.eval()
+
+def load_image(path_or_url):
+    if str(path_or_url).startswith(("http://", "https://")):
+        import requests
+        from io import BytesIO
+        return Image.open(BytesIO(requests.get(path_or_url, timeout=30).content)).convert("RGB")
+    return Image.open(path_or_url).convert("RGB")
+
+image = load_image(image1)
+image_input = preprocess(image).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    tokenizer = open_clip.get_tokenizer(model_name)
+    text_tokens = tokenizer(text_list).to(device)
+    image_features = model.encode_image(image_input)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logit_scale = model.logit_scale.exp()
+    logits = logit_scale * image_features @ text_features.T
+    probs = logits.softmax(dim=-1).squeeze(0)
+
+RESULT = {
+    "classes": text_list,
+    "probabilities": probs.detach().cpu().tolist(),
+}

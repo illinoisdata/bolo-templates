@@ -1,37 +1,41 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("cnicu/t5-small-booksum") %}
-{% set input_text = input_text | default("The latest chapter details the protagonist's journey across distant lands, weaving in themes of resilience and wonder.") %}
-{% set prefix = prefix | default("summarize: ") %}
-{% set max_length = max_length | default(200) %}
-{% set min_length = min_length | default(30) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('summarize: The book follows a young protagonist who leaves home, faces challenges, learns from mentors and mistakes, and ultimately grows into a wiser, more capable person.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 input_text = "{{ input_text }}"
-prefix = "{{ prefix }}"
-max_length = {{ max_length }}
-min_length = {{ min_length }}
-num_beams = {{ num_beams }}
 
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spiece_model_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-prefixed_text = f"{prefix}{input_text}"
-inputs = tokenizer(prefixed_text, return_tensors="pt", truncation=True, max_length=512)
-input_tensors = {k: v.to(device) for k, v in inputs.items()}
+model_dir = os.path.dirname(weights_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
+model.to(device)
+model.eval()
 
-generated_tokens = model.generate(
-    **input_tensors,
-    max_length=max_length,
-    min_length=min_length,
-    num_beams=num_beams,
-    early_stopping=True,
-)
+inputs = tokenizer(input_text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-summary_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_length=200,
+        num_beams=4,
+        length_penalty=2.0,
+        no_repeat_ngram_size=3,
+        early_stopping=True,
+    )
 
-RESULT = {"summary": summary_text}
+generated_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}

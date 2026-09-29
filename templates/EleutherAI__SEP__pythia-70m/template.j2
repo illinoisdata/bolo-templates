@@ -1,0 +1,42 @@
+{% set repo_id = repo_id | default("EleutherAI/pythia-70m") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Hello, I am') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, GPTNeoXForCausalLM
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+# Load tokenizer and model
+
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    tokenizer_file=tokenizer_path,
+    tokenizer_config_file=tokenizer_config_path,
+    special_tokens_map_file=special_tokens_map_path,
+)
+
+model = GPTNeoXForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float16 if "cuda" in device else torch.float32,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated = model.generate(**inputs, max_new_tokens=20, do_sample=False)
+
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+RESULT = {"text": output_text}

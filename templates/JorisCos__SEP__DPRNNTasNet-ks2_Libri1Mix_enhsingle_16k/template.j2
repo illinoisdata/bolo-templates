@@ -1,0 +1,42 @@
+{% set repo_id = repo_id | default("JorisCos/DPRNNTasNet-ks2_Libri1Mix_enhsingle_16k") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set segment_length = segment_length | default(32000) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+segment_length = {{ segment_length }}
+
+import os
+import json
+import torch
+import soundfile as sf
+from huggingface_hub import hf_hub_download
+from asteroid.models import DPRNNTasNet
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+model = DPRNNTasNet.from_pretrained(weights_path)
+model = model.to(device)
+model.eval()
+
+if audio_path.startswith(("http://", "https://")):
+    import requests
+    from io import BytesIO
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    audio, sr = sf.read(BytesIO(audio_bytes), dtype="float32")
+else:
+    audio, sr = sf.read(audio_path, dtype="float32")
+
+if audio.ndim > 1:
+    audio = audio.mean(axis=1)
+
+waveform = torch.from_numpy(audio).float().unsqueeze(0).to(device)
+if waveform.shape[-1] < segment_length:
+    pad = segment_length - waveform.shape[-1]
+    waveform = torch.nn.functional.pad(waveform, (0, pad))
+
+with torch.no_grad():
+    est_sources = model(waveform)
+
+output_audio = est_sources.squeeze(0).detach().cpu().numpy()
+RESULT = {"sources": output_audio, "sample_rate": sr}

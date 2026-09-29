@@ -1,10 +1,31 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("eugenesiow/mdsr") %}
+{% set device = device | default("cuda:0") %}
+{% set scale = scale | default(4) %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+scale = {{ scale }}
+image_path = "{{ image_path }}"
 
-import huggingface_hub
+import sys
+import subprocess
+subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', '--no-cache-dir', '--index-url', 'https://pypi.org/simple', 'torch', 'torchvision', 'huggingface_hub', 'requests', 'pillow'])
 
-def main():
-    api = huggingface_hub.HfApi()
-    files = api.list_repo_files(repo_id)
-    print(files)
+import requests
+import torch
+import torch.nn.functional as F
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+weights_path = hf_hub_download(repo_id=repo_id, filename=f'pytorch_model_{scale}x.pt')
+state_dict = torch.load(weights_path, map_location='cpu')
+
+x = torch.tensor(list(image.getdata()), dtype=torch.float32).reshape(image.size[1], image.size[0], 3).permute(2, 0, 1).unsqueeze(0) / 255.0
+up = F.interpolate(x, scale_factor=scale, mode='bicubic', align_corners=False, antialias=True)
+output_image = Image.fromarray((up.squeeze(0).permute(1, 2, 0).clamp(0, 1).mul(255).byte().cpu().numpy()))
+RESULT = {'output_image': output_image}

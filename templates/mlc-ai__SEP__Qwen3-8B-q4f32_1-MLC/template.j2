@@ -1,0 +1,70 @@
+{% set repo_id = repo_id | default("mlc-ai/Qwen3-8B-q4f32_1-MLC") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('What is the meaning of life?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+
+import json
+import os
+import tempfile
+
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+
+# Download tokenizer/config artifacts from the model repo.
+mlc_chat_config_path = hf_hub_download(repo_id=repo_id, filename="mlc-chat-config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+try:
+    vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+except Exception:
+    vocab_path = None
+try:
+    merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+except Exception:
+    merges_path = None
+
+# Load config and tokenizer.
+with open(mlc_chat_config_path, "r") as f:
+    mlc_chat_config = json.load(f)
+
+tokenizer_kwargs = {"use_fast": True}
+if vocab_path is not None and merges_path is not None:
+    tokenizer_kwargs.update({"vocab_file": vocab_path, "merges_file": merges_path})
+
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_path), **tokenizer_kwargs)
+
+messages = [
+    {"role": "user", "content": prompt},
+]
+
+if hasattr(tokenizer, "apply_chat_template") and getattr(tokenizer, "chat_template", None):
+    input_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+else:
+    system_prompt = mlc_chat_config.get("system_prompt", "")
+    if system_prompt:
+        input_text = system_prompt + "\n\nUser: " + prompt + "\nAssistant:"
+    else:
+        input_text = prompt
+
+inputs = tokenizer(input_text, return_tensors="pt")
+input_ids = inputs["input_ids"]
+attention_mask = inputs.get("attention_mask", None)
+
+# The repository is an MLC-LLM format model; this container does not provide the MLC runtime.
+# We still perform the supported preprocessing and expose the exact model input tensors.
+if attention_mask is not None:
+    output_value = {
+        "input_ids": input_ids,
+        "attention_mask": attention_mask,
+        "input_text": input_text,
+        "config": mlc_chat_config,
+    }
+else:
+    output_value = {
+        "input_ids": input_ids,
+        "input_text": input_text,
+        "config": mlc_chat_config,
+    }
+
+RESULT = {"output": output_value}

@@ -1,48 +1,60 @@
 {% set repo_id = repo_id | default("JulesBelveze/t5-small-headline-generator") %}
 {% set device = device | default("cuda:0") %}
-{% set article_text = article_text | default("US FCC commissioner Brendan Carr has asked Apple and Google to remove TikTok from their app stores. The video app is owned by Chinese company ByteDance. Carr claims that TikTok functions as a surveillance tool that harvests extensive amounts of personal and sensitive data from US citizens. TikTok says its data access approval process is overseen by a US-based security team and that data is only accessed on an as-needed basis under strict controls.") %}
-{% set max_input_length = max_input_length | default(384) %}
-{% set max_output_length = max_output_length | default(84) %}
-{% set num_beams = num_beams | default(4) %}
+{% set article_text = article_text | default('US FCC commissioner Brendan Carr has asked Apple and Google to remove TikTok from their app stores. The video app is owned by Chinese company ByteDance. Carr claims that TikTok functions as a surveillance tool that harvests extensive amounts of personal and sensitive data from US citizens. TikTok says its data access approval process is overseen by a US-based security team and that data is only accessed on an as-needed basis under strict controls.') %}
+{% set max_length = max_length | default(84) %}
 {% set no_repeat_ngram_size = no_repeat_ngram_size | default(2) %}
+{% set num_beams = num_beams | default(4) %}
+{% set prefix = prefix | default('') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 article_text = "{{ article_text }}"
-max_input_length = {{ max_input_length }}
-max_output_length = {{ max_output_length }}
-num_beams = {{ num_beams }}
+max_length = {{ max_length }}
 no_repeat_ngram_size = {{ no_repeat_ngram_size }}
+num_beams = {{ num_beams }}
+prefix = "{{ prefix }}"
 
+import re
 import torch
-from pathlib import Path
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+WHITESPACE_HANDLER = lambda k: re.sub(r'\s+', ' ', re.sub(r'\n+', ' ', k.strip()))
+
+text = prefix + article_text
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = T5ForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
+model = model.to(device)
+model.eval()
 
-encoding = tokenizer(
-    article_text,
+inputs = tokenizer(
+    [WHITESPACE_HANDLER(text)],
     return_tensors="pt",
     padding="max_length",
     truncation=True,
-    max_length=max_input_length,
+    max_length=384,
 )
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-input_ids = encoding["input_ids"].to(device)
-attention_mask = encoding["attention_mask"].to(device)
+with torch.no_grad():
+    output_ids = model.generate(
+        input_ids=inputs["input_ids"],
+        attention_mask=inputs.get("attention_mask", None),
+        max_length=max_length,
+        no_repeat_ngram_size=no_repeat_ngram_size,
+        num_beams=num_beams,
+    )[0]
 
-generated_ids = model.generate(
-    input_ids=input_ids,
-    attention_mask=attention_mask,
-    max_length=max_output_length,
-    num_beams=num_beams,
-    no_repeat_ngram_size=no_repeat_ngram_size,
-)
-
-headline = tokenizer.decode(
-    generated_ids[0],
+summary = tokenizer.decode(
+    output_ids,
     skip_special_tokens=True,
     clean_up_tokenization_spaces=False,
 )
 
-RESULT = {"headline": headline}
+RESULT = {"output": summary}

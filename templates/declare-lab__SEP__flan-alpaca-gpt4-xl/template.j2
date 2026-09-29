@@ -1,37 +1,37 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("declare-lab/flan-alpaca-gpt4-xl") %}
-{% set prompt = prompt | default("Write a short email thanking a friend for sharing flan with an alpaca.") %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(1) %}
-{% set do_sample = do_sample | default(false) %}
-{% set temperature = temperature | default(1.0) %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Write an email about an alpaca that likes flan') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 prompt = "{{ prompt }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-do_sample = {{ "True" if do_sample else "False" }}
-temperature = {{ temperature }}
 
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-execution_device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+_ = hf_hub_download(repo_id=repo_id, filename="model-00001-of-00002.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="model-00002-of-00002.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(execution_device)
+model_dir = config_path.rsplit('/', 1)[0]
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    model_dir,
+    torch_dtype=torch.float16 if 'cuda' in device else torch.float32,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+model.eval()
 
 inputs = tokenizer(prompt, return_tensors="pt")
-inputs = {key: value.to(execution_device) for key, value in inputs.items()}
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(
-    **inputs,
-    max_length=max_length,
-    num_beams=num_beams,
-    do_sample=do_sample,
-    temperature=temperature,
-)
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_length=128, do_sample=True)
 
-generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
-RESULT = {"generated_text": generated_text}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+RESULT = {"generated_text": output_text}

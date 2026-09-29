@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("babylm/ltgbert-10m-2024") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+from transformers import pipeline
+import transformers.dynamic_module_utils as dynamic_module_utils
+import transformers.models.auto.configuration_auto as configuration_auto
+import transformers.models.auto.auto_factory as auto_factory
+import transformers.models.auto.modeling_auto as modeling_auto
+from transformers.modeling_utils import PreTrainedModel
+
+# Override trust_remote_code checks
+dynamic_module_utils.resolve_trust_remote_code = lambda *args, **kwargs: True
+configuration_auto.resolve_trust_remote_code = dynamic_module_utils.resolve_trust_remote_code
+auto_factory.resolve_trust_remote_code = dynamic_module_utils.resolve_trust_remote_code
+modeling_auto.resolve_trust_remote_code = dynamic_module_utils.resolve_trust_remote_code
+
+# Ensure all_tied_weights_keys property exists and returns a set
+if not hasattr(PreTrainedModel, "all_tied_weights_keys"):
+    PreTrainedModel.all_tied_weights_keys = property(lambda self: getattr(self, "_tied_weights_keys", None) or {})
+
+# Patch adjust_missing_and_unexpected_keys to handle list vs set
+_orig_adjust = PreTrainedModel._adjust_missing_and_unexpected_keys
+def _patched_adjust(self, loading_info):
+    if isinstance(self._keys_to_ignore_on_load_unexpected, list):
+        self._keys_to_ignore_on_load_unexpected = set(self._keys_to_ignore_on_load_unexpected)
+    return _orig_adjust(self, loading_info)
+PreTrainedModel._adjust_missing_and_unexpected_keys = _patched_adjust
+
+# Create pipeline and run inference
+pipe = pipeline(task=task, model=repo_id, device=device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

@@ -1,35 +1,49 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("KES/T5-KES") %}
-{% set text_input = text_input | default("I am lived with my parenmts ") %}
-{% set prefix = prefix | default("grammar: ") %}
+{% set device = device | default("cuda:0") %}
+{% set sentence = sentence | default('Wat iz your nam') %}
 {% set num_beams = num_beams | default(4) %}
-{% set max_length = max_length | default(512) %}
+{% set max_length = max_length | default(64) %}
+{% set min_length = min_length | default(1) %}
 repo_id = "{{ repo_id }}"
-device = {{ device | tojson }}
-text_input = {{ text_input | tojson }}
-prefix = {{ prefix | tojson }}
+device = "{{ device }}"
+sentence = "{{ sentence }}"
 num_beams = {{ num_beams }}
 max_length = {{ max_length }}
+min_length = {{ min_length }}
 
-from pathlib import Path
-
+import os
+import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-prefixed_input = prefix + text_input
-encoded_input = tokenizer(prefixed_input, truncation=True, return_tensors="pt")
-encoded_input = {key: value.to(device) for key, value in encoded_input.items()}
+_ = config_path, special_tokens_path, tokenizer_config_path, spiece_path
 
-generated_ids = model.generate(
-    **encoded_input,
-    num_beams=num_beams,
-    max_length=max_length,
-    early_stopping=True,
-)
-decoded_outputs = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-correction = decoded_outputs[0].strip() if decoded_outputs else ""
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_path), use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(os.path.dirname(model_path), local_files_only=True)
+model.to(device)
+model.eval()
 
-RESULT = {"correction": correction}
+inputs = tokenizer("grammar: " + sentence, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    output_ids = model.generate(
+        inputs["input_ids"],
+        attention_mask=inputs.get("attention_mask", None),
+        num_beams=num_beams,
+        max_length=max_length,
+        min_length=min_length,
+        early_stopping=True,
+    )
+
+correction = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
+output_text = "".join(correction).replace(" .", ".")
+
+RESULT = {"text": output_text}

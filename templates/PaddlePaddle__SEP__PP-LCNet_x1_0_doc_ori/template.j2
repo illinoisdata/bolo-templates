@@ -1,0 +1,29 @@
+{% set repo_id = repo_id | default("PaddlePaddle/PP-LCNet_x1_0_doc_ori") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+from urllib.parse import urlparse
+from io import BytesIO
+
+import numpy as np
+from PIL import Image
+from paddleocr import DocImgOrientationClassification
+
+img_source = image_path
+parsed = urlparse(img_source)
+if parsed.scheme in ("http", "https"):
+    import requests
+    img = np.array(Image.open(BytesIO(requests.get(img_source, timeout=30).content)).convert("RGB"))
+else:
+    img = np.array(Image.open(img_source).convert("RGB"))
+
+use_device = device if not str(device).startswith("cuda") else "cpu"
+model = DocImgOrientationClassification(model_name="PP-LCNet_x1_0_doc_ori", device=use_device)
+result = model.predict(input=img, batch_size=1)
+first = result[0] if isinstance(result, (list, tuple)) else next(iter(result))
+output = {"orientation": getattr(first, "label", None), "score": float(getattr(first, "score", 0.0))}
+
+RESULT = {"output": output}

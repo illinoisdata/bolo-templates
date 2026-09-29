@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("optimum/roberta-base-squad2") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default("Why is model conversion important?") %}
+{% set context = context | default("The option to convert models between FARM and transformers gives freedom to the user and let people easily switch between frameworks.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import numpy as np
+from transformers import AutoTokenizer
+from huggingface_hub import hf_hub_download
+import onnxruntime as ort
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.onnx")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_dir = tokenizer_json_path.rsplit("/", 1)[0]
+
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir, local_files_only=True)
+inputs = tokenizer(question, context, return_tensors="np", truncation=True)
+
+providers = ["CPUExecutionProvider"]
+if device.startswith("cuda") and "CUDAExecutionProvider" in ort.get_available_providers():
+    providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+session_options = ort.SessionOptions()
+session_options.intra_op_num_threads = 1
+session_options.inter_op_num_threads = 1
+session = ort.InferenceSession(model_path, sess_options=session_options, providers=providers)
+ort_inputs = {k: v.astype(np.int64) for k, v in inputs.items()}
+outputs = session.run(None, ort_inputs)
+start_logits, end_logits = outputs[0][0], outputs[1][0]
+start_idx = int(np.argmax(start_logits))
+end_idx = int(np.argmax(end_logits))
+if end_idx < start_idx:
+    end_idx = start_idx
+answer_ids = inputs["input_ids"][0][start_idx:end_idx + 1]
+answer = tokenizer.decode(answer_ids, skip_special_tokens=True).strip()
+
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx, "start_logits": start_logits, "end_logits": end_logits}

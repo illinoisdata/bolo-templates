@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("sileod/deberta-v3-large-tasksource-rlhf-reward-model") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set model = model | default(repo_id) %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+
+task = "{{ task }}"
+model = "{{ model }}"
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_prompt = "{{ input_prompt }}"
+
+import json
+
+from huggingface_hub import hf_hub_download
+from transformers import AutoConfig, AutoModelForSequenceClassification, AutoTokenizer, pipeline
+
+# Download and sanitize config to fix invalid id2label field
+config_path = hf_hub_download(repo_id, filename="config.json")
+with open(config_path, "r", encoding="utf-8") as config_file:
+    config_dict = json.load(config_file)
+
+model_type = config_dict.pop("model_type", None)
+label2id = config_dict.get("label2id")
+if label2id:
+    clean_id2label = {}
+    for label_name, label_index in label2id.items():
+        try:
+            index_key = int(label_index)
+        except (TypeError, ValueError):
+            index_key = label_index
+        clean_id2label[index_key] = str(label_name)
+else:
+    clean_id2label = None
+
+config_dict["id2label"] = clean_id2label
+config = AutoConfig.for_model(model_type, **config_dict)
+
+# Instantiate model/tokenizer using sanitized config
+model_instance = AutoModelForSequenceClassification.from_pretrained(model, config=config)
+# Avoid reloading config with invalid id2label in tokenizer
+tokenizer = AutoTokenizer.from_pretrained(model, config=config)
+
+pipe = pipeline(task=task, model=model_instance, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt)

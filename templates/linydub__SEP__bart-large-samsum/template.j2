@@ -1,29 +1,40 @@
 {% set repo_id = repo_id | default("linydub/bart-large-samsum") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = """Henry: Hey, is Nate coming over to watch the movie tonight?
-Kevin: Yea, he said he'll be arriving a bit later at around 7 since he gets off of work at 6. Have you taken out the garbage yet?
-Henry: Oh I forgot. I'll do that once I'm finished with my assignment for my math class.
-Kevin: Yea, you should take it out as soon as possible. And also, Nate is bringing his girlfriend.
-Henry: Nice, I'm really looking forward to seeing them again.""" %}
+{% set input_text = input_text | default("Henry: Hey, is Nate coming over to watch the movie tonight?\nKevin: Yea, he said he'll be arriving a bit later at around 7 since he gets off of work at 6. Have you taken out the garbage yet?\nHenry: Oh I forgot. I'll do that once I'm finished with my assignment for my math class.\nKevin: Yea, you should take it out as soon as possible. And also, Nate is bringing his girlfriend.\nHenry: Nice, I'm really looking forward to seeing them again.") %}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_text = {{ input_text | tojson }}
 
-repo_id = "{{ repo_id }}"
-device = "{{ device }}"
-input_text = """{{ input_text }}"""
-
+import os
 import torch
-from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+hf_hub_download(repo_id=repo_id, filename="vocab.json")
+hf_hub_download(repo_id=repo_id, filename="merges.txt")
+hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-# Pre-process input
-inputs = tokenizer(input_text, return_tensors="pt").to(device)
+repo_dir = os.path.dirname(_tokenizer_config_path)
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, local_files_only=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_dir, local_files_only=True)
+model.to(device)
+model.eval()
 
-# Run inference
-generated_ids = model.generate(**inputs)
+inputs = tokenizer(input_text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Post-process and build RESULT dict
-summary = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-RESULT = {"summary_text": summary}
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        num_beams=6,
+        max_new_tokens=90,
+        no_repeat_ngram_size=3,
+        early_stopping=True,
+    )
+
+summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"summary": summary}

@@ -1,65 +1,39 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("huawei-noah/TinyBERT_4L_zh") %}
-{% set text_input = text_input | default("今天天气[MASK]") %}
-{% set top_k = top_k | default(5) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('今天天气很好。') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-top_k = {{ top_k }}
+text = {{ text | tojson }}
 
 import json
-from pathlib import Path
-
+import os
 import torch
-from transformers import BertConfig, BertForMaskedLM, BertTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import BertTokenizer, BertModel
 
-device = torch.device(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-# Load tokenizer, config & model
-tokenizer = BertTokenizer.from_pretrained(repo_id)
-config = BertConfig.from_pretrained(repo_id)
-model = BertForMaskedLM.from_pretrained(repo_id, config=config).to(device)
+with open(config_path, "r", encoding="utf-8") as f:
+    config = json.load(f)
+
+tokenizer = BertTokenizer(vocab_file=vocab_path)
+model = BertModel.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-# Pre-process input
-encoded_inputs = tokenizer(text_input, return_tensors="pt")
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Run inference
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
+    outputs = model(**inputs)
+    last_hidden_state = outputs.last_hidden_state
+    pooled = last_hidden_state[:, 0, :]
+    embedding_norm = pooled.norm(dim=-1).detach().cpu().tolist()
+    token_count = int(inputs["input_ids"].shape[1])
 
-# Post-process & build RESULT dict
-input_ids = encoded_inputs["input_ids"]
-mask_token_id = tokenizer.mask_token_id
-logits = outputs.logits
-probabilities = torch.softmax(logits, dim=-1)
-predictions = []
-if mask_token_id is not None:
-    mask_positions = torch.nonzero(input_ids == mask_token_id, as_tuple=False)
-    vocab_size = probabilities.shape[-1]
-    per_mask_k = min(top_k, vocab_size)
-    for batch_index, sequence_index in mask_positions:
-        candidate_scores, candidate_indices = torch.topk(
-            probabilities[batch_index, sequence_index], k=per_mask_k
-        )
-        candidate_tokens = tokenizer.convert_ids_to_tokens(candidate_indices.tolist())
-        candidate_token_ids = candidate_indices.tolist()
-        score_values = candidate_scores.tolist()
-        candidates = [
-            {
-                "token": token,
-                "token_id": token_id,
-                "score": float(score),
-            }
-            for token, token_id, score in zip(candidate_tokens, candidate_token_ids, score_values)
-        ]
-        predictions.append(
-            {
-                "mask_index": int(sequence_index.item()),
-                "mask_token": tokenizer.mask_token,
-                "candidates": candidates,
-            }
-        )
-
-RESULT = {"predictions": predictions}
+RESULT = {
+    "embedding_norm": embedding_norm,
+    "token_count": token_count,
+}

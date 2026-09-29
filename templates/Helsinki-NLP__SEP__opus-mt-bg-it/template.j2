@@ -1,23 +1,30 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-bg-it") %}
 {% set device = device | default("cuda:0") %}
-{% set source_text = source_text | default("Здравейте! Как сте?") %}
-{% set max_length = max_length | default(128) %}
+{% set src_text = src_text | default('Здравейте, как сте?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_text = "{{ source_text }}"
-max_length = {{ max_length }}
+src_text = "{{ src_text }}"
 
-import os
+import torch
+from transformers import MarianMTModel, MarianTokenizer
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+tokenizer = MarianTokenizer(vocab=vocab_path, source_spm=source_spm_path, target_spm=target_spm_path, tokenizer_file=None)
+model = MarianMTModel.from_pretrained(repo_id, local_files_only=True)
+model.to(device)
+model.eval()
 
-tokenized_inputs = tokenizer(source_text, return_tensors="pt", padding=True)
-model_inputs = {key: tensor.to(device) for key, tensor in tokenized_inputs.items()}
+inputs = tokenizer(src_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, num_beams=4, max_length=128)
+output_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-generated_tokens = model.generate(**model_inputs, max_length=max_length)
-translation = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
-
-RESULT = {"translation": translation}
+RESULT = {"translation": output_text}

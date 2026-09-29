@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("facebook/hubert-large-ll60k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("automatic-speech-recognition") %}
+{% set input_audio = input_audio | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+{% set tokenizer = tokenizer | default("facebook/wav2vec2-base-960h") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_audio = "{{ input_audio }}"
+tokenizer = "{{ tokenizer }}"
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, tokenizer=tokenizer, feature_extractor=repo_id, device=device)
+raw_output = pipe(input_audio)
+RESULT = {"transcription": raw_output}

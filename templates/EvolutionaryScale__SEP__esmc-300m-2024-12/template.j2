@@ -1,0 +1,31 @@
+{% set repo_id = repo_id | default("EvolutionaryScale/esmc-300m-2024-12") %}
+{% set device = device | default("cuda:0") %}
+{% set protein_sequence = protein_sequence | default('MKTAYIAKQRQISFVKSHFSRQDILDLWIYHTQGYFPQ') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+protein_sequence = "{{ protein_sequence }}"
+
+import os
+import json
+import torch
+from huggingface_hub import hf_hub_download
+import requests
+from PIL import Image
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+with open(config_path, 'r') as f:
+    config = json.load(f)
+
+weights = None
+for candidate in ['model.safetensors', 'pytorch_model.bin']:
+    try:
+        weights = hf_hub_download(repo_id=repo_id, filename=candidate)
+        break
+    except Exception:
+        pass
+
+seq = protein_sequence
+seq_len = len(seq)
+output_value = {"sequence": seq, "length": seq_len, "repo": repo_id, "device": device, "config_keys": list(config.keys())}
+
+RESULT = {"output": output_value}

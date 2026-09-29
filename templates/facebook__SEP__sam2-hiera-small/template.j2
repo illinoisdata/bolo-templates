@@ -1,0 +1,15 @@
+{% set repo_id = repo_id | default("facebook/sam2-hiera-small") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("mask-generation") %}
+{% set input_data = input_data | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_data = "{{ input_data }}"
+
+from transformers import pipeline
+
+# Create the mask-generation pipeline and run inference
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = pipe(input_data)

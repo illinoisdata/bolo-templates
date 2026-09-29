@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("flair/chunk-english-fast") %}
+{% set device = device | default("cuda:0") %}
+{% set sentence_text = sentence_text | default('The happy man has been eating at the diner') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+sentence_text = "{{ sentence_text }}"
+
+import os
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from flair.data import Sentence
+from flair.models import SequenceTagger
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+tagger = SequenceTagger.load(weights_path)
+if device != "cpu":
+    tagger.to(torch.device(device))
+
+sentence = Sentence(sentence_text)
+tagger.predict(sentence)
+
+spans = [
+    {
+        "text": span.text,
+        "tags": {label.value: label.score for label in span.labels},
+    }
+    for span in sentence.get_spans("np")
+]
+
+RESULT = {"spans": spans, "sentence": sentence.to_plain_string()}

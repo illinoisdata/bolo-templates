@@ -1,28 +1,34 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("persiannlp/mt5-base-parsinlu-opus-translation_fa_en") %}
-{% set input_text = input_text | default("ستایش خدای را که پروردگار جهانیان است.") %}
-{% set generator_kwargs = generator_kwargs | default({"num_beams": 4, "max_length": 128}) %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default('ستایش خدای را که پروردگار جهانیان است.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-generator_kwargs = {{ generator_kwargs }}
+text_input = "{{ text_input }}"
 
-from pathlib import Path
+import torch
+from transformers import MT5ForConditionalGeneration, T5Tokenizer
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="spiece.model")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = MT5ForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
+tokenizer = T5Tokenizer.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-tokenizer_inputs = tokenizer(
-    input_text,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-)
-tokenizer_inputs = {key: tensor.to(device) for key, tensor in tokenizer_inputs.items()}
+inputs = tokenizer(text_input, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=64,
+        num_beams=4,
+        do_sample=False,
+    )
+output_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
-generated_tokens = model.generate(**tokenizer_inputs, **generator_kwargs)
-translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-
-RESULT = {"translations": translations}
+RESULT = {"translation": output_text}

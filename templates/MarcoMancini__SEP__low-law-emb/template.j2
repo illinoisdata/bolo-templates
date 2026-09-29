@@ -1,39 +1,45 @@
 {% set repo_id = repo_id | default("MarcoMancini/low-law-emb") %}
 {% set device = device | default("cuda:0") %}
-{% set sentences = sentences | default(["This is an example sentence for embedding.", "Each sentence is converted into a dense vector representation."]) %}
+{% set sentences = sentences | default(["This is an example sentence", "Each sentence is converted"]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-sentences = {{ sentences | tojson }}
+sentences = {{ sentences }}
 
-from pathlib import Path
-
-import numpy as np
+import os
 import torch
-from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModel
 
-torch_device = torch.device(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+try:
+    vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+except Exception:
+    vocab_path = None
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(torch_device)
+local_files = [weights_path, config_path, tokenizer_path]
+if vocab_path is not None:
+    local_files.append(vocab_path)
+model_dir = os.path.dirname(weights_path)
+
+# Load tokenizer/model from the downloaded repo snapshot directory
+# hf_hub_download returns local paths; use their directory directly.
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = AutoModel.from_pretrained(model_dir)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(
-    sentences,
-    padding=True,
-    truncation=True,
-    return_tensors="pt",
-)
-encoded_inputs = {key: value.to(torch_device) for key, value in encoded_inputs.items()}
+inputs = tokenizer(sentences, padding=True, truncation=True, return_tensors="pt", max_length=510)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
+    outputs = model(**inputs)
+    token_embeddings = outputs.last_hidden_state
+    attention_mask = inputs["attention_mask"].unsqueeze(-1).expand(token_embeddings.size()).float()
+    summed = torch.sum(token_embeddings * attention_mask, dim=1)
+    counts = torch.clamp(attention_mask.sum(dim=1), min=1e-9)
+    embeddings = summed / counts
+    embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
 
-hidden_states = outputs.last_hidden_state
-attention_mask = encoded_inputs["attention_mask"].unsqueeze(-1)
-masked_hidden_states = hidden_states * attention_mask
-sum_hidden = masked_hidden_states.sum(dim=1)
-mask_sum = attention_mask.sum(dim=1).clamp(min=1e-9)
-embeddings = sum_hidden / mask_sum
-embeddings = embeddings.cpu().numpy()
-
-RESULT = {"embeddings": embeddings}
+RESULT = {"embeddings": embeddings.cpu().tolist()}

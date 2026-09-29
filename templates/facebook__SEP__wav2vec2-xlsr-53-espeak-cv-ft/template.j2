@@ -1,0 +1,15 @@
+{% set repo_id = repo_id | default("facebook/wav2vec2-xlsr-53-espeak-cv-ft") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("automatic-speech-recognition") %}
+{% set input_data = input_data | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+
+repo_id = "{{ repo_id }}"
+task = "{{ task }}"
+device = "{{ device }}"
+input_data = "{{ input_data }}"
+
+from transformers import pipeline, Wav2Vec2CTCTokenizer
+
+ctc_tokenizer = Wav2Vec2CTCTokenizer.from_pretrained(repo_id)
+pipe = pipeline(task=task, model=repo_id, tokenizer=ctc_tokenizer, device=device)
+RESULT = pipe(input_data)

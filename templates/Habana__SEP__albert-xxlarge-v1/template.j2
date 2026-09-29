@@ -1,0 +1,24 @@
+{% set repo_id = repo_id | default("Habana/albert-xxlarge-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The capital of France is Paris.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AlbertConfig, AlbertForSequenceClassification
+import torch
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gaudi_config.json")
+tokenizer = AutoTokenizer.from_pretrained("albert-xxlarge-v1")
+config = AlbertConfig.from_pretrained("albert-xxlarge-v1", num_labels=2)
+model = AlbertForSequenceClassification.from_pretrained("albert-xxlarge-v1", config=config)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+RESULT = {"logits": outputs.logits.detach().cpu().tolist()}

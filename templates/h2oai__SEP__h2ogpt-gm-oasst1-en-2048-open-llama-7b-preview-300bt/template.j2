@@ -1,0 +1,23 @@
+{% set repo_id = repo_id | default("h2oai/h2ogpt-gm-oasst1-en-2048-open-llama-7b-preview-300bt") %}
+{% set task = task | default("text-generation") %}
+{% set model = model | default(repo_id) %}
+{% set device = device | default("cuda:0") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from h2oai_pipeline import H2OTextGenerationPipeline
+from transformers import pipeline
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    device=device,
+    pipeline_class=H2OTextGenerationPipeline,
+)
+
+prompt = input_prompt
+RESULT = pipe(prompt)

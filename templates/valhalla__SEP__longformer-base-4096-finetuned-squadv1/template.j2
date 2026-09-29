@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("valhalla/longformer-base-4096-finetuned-squadv1") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What has Huggingface done?') %}
+{% set context = context | default('Huggingface has democratized NLP. Huge thanks to Huggingface for this.') %}
+{% set max_length = max_length | default(512) %}
+{% set doc_stride = doc_stride | default(128) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+max_length = {{ max_length }}
+doc_stride = {{ doc_stride }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename='pytorch_model.bin')
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForQuestionAnswering.from_pretrained(repo_id)
+state_dict = torch.load(model_path, map_location='cpu')
+state_dict.pop('longformer.pooler.dense.weight', None)
+state_dict.pop('longformer.pooler.dense.bias', None)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+encoding = tokenizer(question, context, return_tensors='pt', truncation=True, max_length=max_length, stride=doc_stride)
+encoding = {k: v.to(device) for k, v in encoding.items()}
+with torch.no_grad():
+    outputs = model(**encoding)
+start_idx = int(torch.argmax(outputs.start_logits, dim=-1)[0].item())
+end_idx = int(torch.argmax(outputs.end_logits, dim=-1)[0].item())
+if end_idx < start_idx:
+    end_idx = start_idx
+answer = tokenizer.decode(encoding['input_ids'][0, start_idx:end_idx+1], skip_special_tokens=True).strip()
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx}

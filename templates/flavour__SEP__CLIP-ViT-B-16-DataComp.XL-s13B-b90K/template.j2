@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("flavour/CLIP-ViT-B-16-DataComp.XL-s13B-b90K") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set candidate_labels = candidate_labels | default(['playing music', 'playing sports']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+candidate_labels = {{ candidate_labels }}
+
+import os
+from PIL import Image
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import CLIPModel, CLIPProcessor
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_file = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+def load_image(path_or_url):
+    if isinstance(path_or_url, str) and path_or_url.startswith(("http://", "https://")):
+        from urllib.request import urlopen
+        return Image.open(urlopen(path_or_url)).convert("RGB")
+    return Image.open(path_or_url).convert("RGB")
+
+image = load_image(image_path)
+
+processor = CLIPProcessor.from_pretrained(os.path.dirname(processor_file))
+model = CLIPModel.from_pretrained(os.path.dirname(config_file), torch_dtype=torch.float16 if "cuda" in device else torch.float32)
+state_dict = model._load_state_dict_into_model(model_file, start_prefix="") if False else None
+from safetensors.torch import load_file
+state_dict = load_file(model_file, device="cpu")
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+inputs = processor(text=candidate_labels, images=image, return_tensors="pt", padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits_per_image = outputs.logits_per_image
+    probs = logits_per_image.softmax(dim=-1)[0].detach().cpu().tolist()
+
+RESULT = {"candidate_labels": candidate_labels, "probabilities": probs}

@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("charactr/vocos-encodec-24khz") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+{% set bandwidth_id = bandwidth_id | default(2) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+bandwidth_id = {{ bandwidth_id }}
+
+import torch
+import torchaudio
+from huggingface_hub import hf_hub_download
+from vocos import Vocos
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.yaml")
+
+vocos = Vocos.from_pretrained(repo_id)
+vocos = vocos.to(device)
+vocos.eval()
+
+if str(audio_path).startswith(("http://", "https://")):
+    y, sr = torchaudio.load(audio_path)
+else:
+    y, sr = torchaudio.load(audio_path)
+
+if y.size(0) > 1:
+    y = y.mean(dim=0, keepdim=True)
+y = torchaudio.functional.resample(y, orig_freq=sr, new_freq=24000)
+y = y.to(device)
+
+bandwidth_tensor = torch.tensor([bandwidth_id], device=device)
+with torch.no_grad():
+    y_hat = vocos(y, bandwidth_id=bandwidth_tensor)
+
+output_audio = y_hat.squeeze(0).detach().cpu()
+RESULT = {"audio": output_audio}

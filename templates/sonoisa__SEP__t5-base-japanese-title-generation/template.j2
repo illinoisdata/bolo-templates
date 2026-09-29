@@ -1,38 +1,39 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("sonoisa/t5-base-japanese-title-generation") %}
-{% set article_text = article_text | default("記事本文のサンプルです。日本語で書かれた記事の一部をここに置き換えて、モデルにタイトル生成を依頼します。") %}
-{% set tokenizer_max_length = tokenizer_max_length | default(512) %}
-{% set generation_max_length = generation_max_length | default(64) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set article = article | default('機械学習の最新動向について解説する記事です。Transformerや事前学習モデルの発展により、自然言語処理の性能は大きく向上しました。') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-article_text = """{{ article_text }}"""
-tokenizer_max_length = {{ tokenizer_max_length }}
-generation_max_length = {{ generation_max_length }}
-num_beams = {{ num_beams }}
+article = {{ article | tojson }}
 
-from pathlib import Path
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model_dir = os.path.dirname(config_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False, local_files_only=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir, local_files_only=True)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(
-    article_text,
-    return_tensors="pt",
-    truncation=True,
-    max_length=tokenizer_max_length,
-)
-inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+inputs = tokenizer(article, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(
-    **inputs,
-    max_length=generation_max_length,
-    num_beams=num_beams,
-    early_stopping=True,
-)
-generated_title = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=32,
+        num_beams=4,
+        length_penalty=1.0,
+        early_stopping=True,
+    )
 
-RESULT = {"generated_title": generated_title}
+title = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"title": title}

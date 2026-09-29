@@ -1,23 +1,35 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("akreal/tiny-random-t5") %}
-{% set input_text = input_text | default("Hello, my dog is cute") %}
-{% set max_length = max_length | default(20) %}
-{% set num_beams = num_beams | default(1) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('translate English to German: The house is wonderful.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text = "{{ text }}"
 
 import os
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+from transformers import T5ForConditionalGeneration, T5TokenizerFast
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 
-inputs = tokenizer(input_text, return_tensors="pt").to(device)
-outputs = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
-generated_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
+# Load tokenizer from the model repo if available; fallback to a standard tiny T5 tokenizer vocab via config-compatible defaults.
+# For this repo, use a basic T5 tokenizer initialization from pretrained tiny-random-t5 files if present.
+try:
+    tokenizer = T5TokenizerFast.from_pretrained(repo_id)
+except Exception:
+    tokenizer = T5TokenizerFast.from_pretrained("t5-small")
 
-RESULT = {"generated_text": generated_text}
+model = T5ForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=16)
+
+decoded = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
+
+RESULT = {"generated_text": decoded}

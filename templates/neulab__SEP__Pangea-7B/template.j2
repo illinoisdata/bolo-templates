@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("neulab/Pangea-7B") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('What is shown in the image?') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+image_path = "{{ image_path }}"
+
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from transformers import AutoProcessor, AutoModelForCausalLM
+
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+_ = hf_hub_download(repo_id=repo_id, filename="model-00001-of-00004.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+processor = AutoProcessor.from_pretrained(repo_id, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(repo_id, torch_dtype=torch.bfloat16, trust_remote_code=True)
+model.to(device)
+model.eval()
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+text = f"<image>\n{prompt}"
+inputs = processor(text=text, images=image, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.inference_mode():
+    generated_ids = model.generate(**inputs, max_new_tokens=128, do_sample=False)
+    generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"text": generated_text}

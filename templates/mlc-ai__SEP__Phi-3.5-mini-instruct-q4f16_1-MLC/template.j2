@@ -1,0 +1,14 @@
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("mlc-ai/Phi-3.5-mini-instruct-q4f16_1-MLC") %}
+{% set prompt = prompt | default('Write a short haiku about machine learning.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+from huggingface_hub import hf_hub_download
+import json
+
+config_path = hf_hub_download(repo_id=repo_id, filename="mlc-chat-config.json")
+config = json.load(open(config_path, "r"))
+
+RESULT = {"config": config, "prompt": prompt, "device": device, "repo_id": repo_id}

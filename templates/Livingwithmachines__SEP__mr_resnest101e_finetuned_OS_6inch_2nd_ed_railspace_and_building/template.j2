@@ -1,0 +1,74 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+{% set repo_id = repo_id | default("Livingwithmachines/mr_resnest101e_finetuned_OS_6inch_2nd_ed_railspace_and_building") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import json
+import os
+import urllib.parse
+from pathlib import Path
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from timm import create_model
+from timm.data import resolve_data_config, create_transform
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+model = create_model(
+    cfg.get("architecture", "resnest101e"),
+    pretrained=False,
+    num_classes=cfg.get("num_classes", 4),
+    in_chans=3,
+)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict)
+model.eval().to(device)
+
+pretrained_cfg = cfg.get("pretrained_cfg", {})
+data_config = resolve_data_config(
+    {
+        "input_size": pretrained_cfg.get("input_size", [3, 256, 256]),
+        "interpolation": pretrained_cfg.get("interpolation", "bilinear"),
+        "mean": pretrained_cfg.get("mean", [0.485, 0.456, 0.406]),
+        "std": pretrained_cfg.get("std", [0.229, 0.224, 0.225]),
+        "crop_pct": pretrained_cfg.get("crop_pct", 0.875),
+    },
+    model=model,
+)
+transform = create_transform(**data_config, is_training=False)
+
+if urllib.parse.urlparse(image_path).scheme in ("http", "https"):
+    from urllib.request import urlopen
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+input_tensor = transform(image).unsqueeze(0).to(device)
+with torch.no_grad():
+    logits = model(input_tensor)
+    probs = torch.softmax(logits, dim=-1)[0]
+
+label_map = {
+    0: "no",
+    1: "railspace",
+    2: "building",
+    3: "railspce & building",
+}
+
+top_prob, top_idx = torch.max(probs, dim=0)
+RESULT = {
+    "logits": logits.detach().cpu().numpy(),
+    "probabilities": probs.detach().cpu().numpy(),
+    "predicted_class": int(top_idx.item()),
+    "predicted_label": label_map[int(top_idx.item())],
+    "confidence": float(top_prob.item()),
+}

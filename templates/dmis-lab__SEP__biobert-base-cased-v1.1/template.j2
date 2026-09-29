@@ -1,48 +1,31 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("dmis-lab/biobert-base-cased-v1.1") %}
-{% set text = text | default("The patient was diagnosed with [MASK].") %}
-{% set top_k = top_k | default(5) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Biology researchers study gene expression in cancer cells.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-top_k = {{ top_k }}
-
-import json
-import os
 
 import torch
-from transformers import BertConfig, BertForMaskedLM, BertTokenizer
+from transformers import BertTokenizer, BertModel
+from huggingface_hub import hf_hub_download
 
-config = BertConfig.from_pretrained(repo_id)
-model = BertForMaskedLM.from_pretrained(repo_id, config=config)
-model = model.to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+tokenizer = BertTokenizer(vocab_file=vocab_path, do_lower_case=False)
+model = BertModel.from_pretrained(repo_id)
+model.to(device)
 model.eval()
 
-tokenizer = BertTokenizer.from_pretrained(repo_id, do_lower_case=False)
-
 inputs = tokenizer(text, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
-
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
     outputs = model(**inputs)
-logits = outputs.logits
 
-mask_token_id = tokenizer.mask_token_id
-mask_positions = (inputs["input_ids"][0] == mask_token_id).nonzero(as_tuple=True)[0]
-
-predictions = []
-for mask_index in mask_positions:
-    mask_logits = logits[0, mask_index]
-    topk = torch.topk(mask_logits, top_k)
-    probability = torch.softmax(mask_logits, dim=-1)
-    topk_probs = probability[topk.indices]
-    token_ids = topk.indices.tolist()
-    tokens = tokenizer.convert_ids_to_tokens(token_ids)
-    predictions.append({
-        "mask_position": int(mask_index.cpu().item()),
-        "token_ids": [int(token_id) for token_id in token_ids],
-        "tokens": tokens,
-        "scores": [float(score) for score in topk_probs.tolist()],
-    })
-
-RESULT = {"fill_mask": predictions}
+last_hidden_state = outputs.last_hidden_state
+pooler_output = getattr(outputs, "pooler_output", None)
+RESULT = {
+    "last_hidden_state": last_hidden_state,
+    "pooler_output": pooler_output,
+}

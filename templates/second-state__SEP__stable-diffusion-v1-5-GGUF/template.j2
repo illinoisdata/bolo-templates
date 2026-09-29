@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("second-state/stable-diffusion-v1-5-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('stable-diffusion-v1-5-pruned-emaonly-Q8_0.gguf') %}
+{% set prompt = prompt | default('A serene landscape painting of a futuristic city at sunset, highly detailed') %}
+{% set negative_prompt = negative_prompt | default('blurry, low quality, distorted') %}
+{% set num_inference_steps = num_inference_steps | default(20) %}
+{% set guidance_scale = guidance_scale | default(7.5) %}
+{% set height = height | default(512) %}
+{% set width = width | default(512) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+negative_prompt = "{{ negative_prompt }}"
+num_inference_steps = {{ num_inference_steps }}
+guidance_scale = {{ guidance_scale }}
+height = {{ height }}
+width = {{ width }}
+
+import os
+from pathlib import Path
+from PIL import Image
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+
+# GGUF repos require a runtime capable of consuming .gguf diffusion weights.
+# Here we perform a minimal, deterministic local verification by downloading the weight file.
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+RESULT = {"model_path": model_path, "exists": Path(model_path).exists()}

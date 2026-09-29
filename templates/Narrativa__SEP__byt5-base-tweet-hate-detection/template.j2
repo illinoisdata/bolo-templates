@@ -1,30 +1,31 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Narrativa/byt5-base-tweet-hate-detection") %}
-{% set tweet = tweet | default("@user black lives really matter?") %}
-{% set max_length = max_length | default(512) %}
+{% set device = device | default("cuda:0") %}
+{% set tweet = tweet | default('@user black lives really matter?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 tweet = "{{ tweet }}"
-max_length = {{ max_length }}
 
-from pathlib import Path
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-_tokenizer = AutoTokenizer.from_pretrained(repo_id)
-_model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+# weights are present in repo; prefer pytorch checkpoint
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
 
-_inputs = _tokenizer(
-    tweet,
-    return_tensors="pt",
-    padding="max_length",
-    truncation=True,
-    max_length=max_length,
-)
-_input_ids = _inputs.input_ids.to(device)
-_attention_mask = _inputs.attention_mask.to(device)
+model = T5ForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-_generated = _model.generate(input_ids=_input_ids, attention_mask=_attention_mask)
-_prediction = _tokenizer.decode(_generated[0], skip_special_tokens=True)
+inputs = tokenizer([tweet], padding='max_length', truncation=True, max_length=512, return_tensors='pt')
+input_ids = inputs.input_ids.to(device)
+attention_mask = inputs.attention_mask.to(device)
 
-RESULT = {"prediction": _prediction}
+with torch.no_grad():
+    output_ids = model.generate(input_ids=input_ids, attention_mask=attention_mask, max_new_tokens=8)
+
+predicted_label = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+RESULT = {"label": predicted_label}

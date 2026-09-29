@@ -1,48 +1,46 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
 {% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("microsoft/dit-base") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set mask_probability = mask_probability | default(0.15) %}
+{% set num_masked_patches = num_masked_patches | default(10) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-mask_probability = {{ mask_probability }}
+num_masked_patches = {{ num_masked_patches }}
 
 import os
-from io import BytesIO
-
-from PIL import Image
-import numpy as np
-import requests
 import torch
-from transformers import AutoImageProcessor, BeitForMaskedImageModeling
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from transformers import BeitForMaskedImageModeling, BeitImageProcessor
 
-processor = AutoImageProcessor.from_pretrained(repo_id)
-model = BeitForMaskedImageModeling.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+processor = BeitImageProcessor.from_pretrained(os.path.dirname(preprocessor_config_path))
+model = BeitForMaskedImageModeling.from_pretrained(repo_id, local_files_only=True)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
 model.eval()
 
-def _load_image(path: str) -> Image.Image:
-    if path.startswith("http://") or path.startswith("https://"):
-        response = requests.get(path, timeout=30)
-        response.raise_for_status()
-        return Image.open(BytesIO(response.content)).convert("RGB")
-    return Image.open(path).convert("RGB")
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
 
-image = _load_image(image_path)
-
-pixel_values = processor(images=image, return_tensors="pt").pixel_values
-num_patches = (int(model.config.image_size) // int(model.config.patch_size)) ** 2
-bool_masked_pos = torch.rand(1, num_patches, device=device) < mask_probability
+pixel_values = processor(images=image, return_tensors="pt").pixel_values.to(device)
+num_patches = (model.config.image_size // model.config.patch_size) ** 2
+bool_masked_pos = torch.zeros((1, num_patches), dtype=torch.bool, device=device)
+bool_masked_pos[:, :num_masked_patches] = True
 
 with torch.no_grad():
-    outputs = model(pixel_values.to(device), bool_masked_pos=bool_masked_pos)
-    logits = outputs.logits
-
-logits_cpu = logits.cpu()
-predicted_token_ids = logits_cpu.argmax(dim=-1)
-mask_positions = bool_masked_pos.cpu()
+    outputs = model(pixel_values=pixel_values, bool_masked_pos=bool_masked_pos)
 
 RESULT = {
-    "logits": logits_cpu,
-    "predicted_token_ids": predicted_token_ids,
-    "mask_positions": mask_positions,
+    "loss": outputs.loss.detach().cpu().item() if outputs.loss is not None else None,
+    "logits_shape": list(outputs.logits.shape),
+    "logits": outputs.logits.detach().cpu(),
 }

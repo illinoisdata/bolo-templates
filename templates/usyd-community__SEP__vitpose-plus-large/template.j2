@@ -1,10 +1,42 @@
-{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 {% set repo_id = repo_id | default("usyd-community/vitpose-plus-large") %}
+{% set device = device | default("cuda:0") %}
+{% set threshold = threshold | default(0.3) %}
+
 repo_id = "{{ repo_id }}"
-import inspect
-from transformers import image_utils
-print(image_utils.__name__)
-print(image_utils.__file__)
-print("has_inv", hasattr(image_utils, "inv"))
-source = inspect.getsource(image_utils)
-print(source[:500])
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+threshold = {{ threshold }}
+
+import torch
+from PIL import Image
+import requests
+from io import BytesIO
+from transformers import AutoProcessor, VitPoseForPoseEstimation
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(BytesIO(requests.get(image_path, stream=True).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processor = AutoProcessor.from_pretrained(repo_id)
+model = VitPoseForPoseEstimation.from_pretrained(repo_id).to(device)
+model.eval()
+
+boxes = torch.tensor([[0.0, 0.0, float(image.width), float(image.height)]], device=device)
+inputs = processor(image, boxes=[boxes.cpu().numpy()], return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+inputs["dataset_index"] = torch.tensor([0], device=device)
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+pose_results = processor.post_process_pose_estimation(outputs, boxes=[boxes.cpu().numpy()], threshold=threshold)
+people = pose_results[0]
+
+RESULT = {"pose_results": people}

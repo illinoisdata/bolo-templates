@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("google/vivit-b-16x2") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("video-classification") %}
+{% set video_path = video_path | default("/u/yunqili4/projects/ML-code-generation/data/video.avi") %}
+{% set max_frames = max_frames | default(32) %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+video_path = {{ video_path | tojson }}
+max_frames = {{ max_frames | tojson }}
+
+import cv2
+import numpy as np
+from transformers import pipeline
+
+def _load_video_frames(path: str):
+    capture = cv2.VideoCapture(path)
+    frames = []
+    while True:
+        success, frame = capture.read()
+        if not success:
+            break
+        frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    capture.release()
+    if not frames:
+        raise RuntimeError(f"No frames were read from {path}.")
+    return np.stack(frames)
+
+video_frames = _load_video_frames(video_path)
+
+num_frames = video_frames.shape[0]
+sample_count = min(num_frames, max_frames)
+sample_indices = np.linspace(0, num_frames - 1, num=sample_count, dtype=int)
+video_frames = video_frames[sample_indices]
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = pipe(video_frames)

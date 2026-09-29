@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("laion/CLIP-ViT-L-14-DataComp.XL-s13B-b90K") %}
+{% set device = device | default("cuda:0") %}
+{% set candidate_labels = candidate_labels | default(['playing music', 'playing sports']) %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+candidate_labels = {{ candidate_labels }}
+image_path = "{{ image_path }}"
+
+import torch
+import requests
+from PIL import Image
+from io import BytesIO
+import open_clip
+from huggingface_hub import hf_hub_download
+
+weight_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+preprocessor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+open_clip_config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model, _, preprocess = open_clip.create_model_and_transforms(
+    "ViT-L-14",
+    pretrained=None,
+    device=device,
+)
+state_dict = torch.load(weight_path, map_location="cpu")
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
+
+tokenizer = open_clip.get_tokenizer("ViT-L-14")
+image_tensor = preprocess(image).unsqueeze(0).to(device)
+text_tokens = tokenizer(candidate_labels).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_tensor)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logit_scale = model.logit_scale.exp()
+    logits_per_image = logit_scale * image_features @ text_features.t()
+    probs = logits_per_image.softmax(dim=1)[0].detach().cpu().tolist()
+
+RESULT = {"labels": candidate_labels, "probabilities": probs}

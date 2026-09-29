@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("rrivera1849/LUAR-MUD") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set batch_size = batch_size | default(1) %}
+{% set episode_length = episode_length | default(2) %}
+{% set sample_sentence = sample_sentence | default("A single example sentence suffices for this LUAR-MUD embedding test.") %}
+{% set max_length = max_length | default(64) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+batch_size = {{ batch_size }}
+episode_length = {{ episode_length }}
+sample_sentence = {{ sample_sentence | tojson }}
+max_length = {{ max_length }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device, trust_remote_code=True)
+
+episodes = [[sample_sentence for _ in range(episode_length)] for _ in range(batch_size)]
+flattened_episodes = [sentence for episode in episodes for sentence in episode]
+
+tokenized = pipe.tokenizer(
+    flattened_episodes,
+    padding="max_length",
+    truncation=True,
+    max_length=max_length,
+    return_tensors="pt",
+)
+tokenized["input_ids"] = tokenized["input_ids"].reshape(batch_size, episode_length, -1)
+tokenized["attention_mask"] = tokenized["attention_mask"].reshape(batch_size, episode_length, -1)
+
+pipe.preprocess = lambda *args, **kwargs: tokenized
+RESULT = pipe(flattened_episodes)

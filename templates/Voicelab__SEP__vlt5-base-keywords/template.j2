@@ -1,0 +1,27 @@
+{% set repo_id = repo_id | default("Voicelab/vlt5-base-keywords") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set no_repeat_ngram_size = no_repeat_ngram_size | default(3) %}
+{% set num_beams = num_beams | default(4) %}
+{% set input_text = input_text | default("An example input text for keyword generation.") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+no_repeat_ngram_size = {{ no_repeat_ngram_size | tojson }}
+num_beams = {{ num_beams | tojson }}
+input_text = {{ input_text | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(
+    task=task,
+    model=repo_id,
+    device=device,
+    no_repeat_ngram_size=no_repeat_ngram_size,
+    num_beams=num_beams,
+)
+
+raw_outputs = pipe(input_text)
+
+RESULT = {"outputs": raw_outputs}

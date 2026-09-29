@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("google/metricx-23-qe-xl-v2p0") %}
+{% set device = device | default("cuda:0") %}
+{% set source = source | default('This is a source sentence.') %}
+{% set hypothesis = hypothesis | default('This is a candidate translation.') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source = "{{ source }}"
+hypothesis = "{{ hypothesis }}"
+
+import json
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+
+weights_index_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin.index.json")
+with open(weights_index_path, "r") as f:
+    weight_map = json.load(f)["weight_map"]
+for shard_name in sorted(set(weight_map.values())):
+    hf_hub_download(repo_id=repo_id, filename=shard_name)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+repo_dir = os.path.dirname(weights_index_path)
+
+tokenizer = AutoTokenizer.from_pretrained("google/mt5-xl", use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_dir, config=config_path, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+prompt = f"source: {source} hypothesis: {hypothesis}"
+inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=1024)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=8, do_sample=False)
+
+prediction_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+try:
+    prediction = float(prediction_text.strip().split()[0])
+except Exception:
+    prediction = float('nan')
+
+RESULT = {"prediction": prediction, "prediction_text": prediction_text}

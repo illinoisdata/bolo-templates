@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("mlx-community/Qwen3-4B-4bit") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('hello') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import json
+import os
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+RESULT = {"config": config, "prompt": prompt, "repo_id": repo_id, "device": device}

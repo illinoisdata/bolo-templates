@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("deepset/gelectra-large-germanquad") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Warum ist Modellkonvertierung wichtig?') %}
+{% set context = context | default('Die Option, Modelle zwischen FARM und Transformers zu konvertieren, gibt dem Benutzer Freiheit und ermöglicht es, einfach zwischen Frameworks zu wechseln.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = {{ question | tojson }}
+context = {{ context | tojson }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+model = AutoModelForQuestionAnswering.from_pretrained(
+    repo_id,
+    local_files_only=True,
+)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    local_files_only=True,
+)
+
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_idx = int(outputs.start_logits.argmax(dim=-1).item())
+end_idx = int(outputs.end_logits.argmax(dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+answer_ids = inputs["input_ids"][0, start_idx : end_idx + 1]
+answer = tokenizer.decode(answer_ids, skip_special_tokens=True)
+
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx}

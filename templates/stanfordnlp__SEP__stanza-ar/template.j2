@@ -1,0 +1,66 @@
+{% set repo_id = repo_id | default("stanfordnlp/stanza-ar") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('هذا نص عربي للاختبار.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+from huggingface_hub import hf_hub_download
+import stanza
+
+model_files = {
+    'tokenize': 'models/tokenize/padt.pt',
+    'mwt': 'models/mwt/padt.pt',
+    'pos': 'models/pos/padt_nocharlm.pt',
+    'depparse': 'models/depparse/padt_nocharlm.pt',
+    'ner': 'models/ner/aqmar_nocharlm.pt',
+}
+local_paths = {k: hf_hub_download(repo_id=repo_id, filename=v) for k, v in model_files.items()}
+model_dir = os.path.dirname(local_paths['tokenize'])
+
+use_gpu = str(device).startswith('cuda')
+nlp = stanza.Pipeline(
+    lang='ar',
+    dir=model_dir,
+    processors='tokenize,mwt,pos,lemma,depparse,ner',
+    use_gpu=use_gpu,
+    tokenize_model_path=local_paths['tokenize'],
+    mwt_model_path=local_paths['mwt'],
+    pos_model_path=local_paths['pos'],
+    depparse_model_path=local_paths['depparse'],
+    ner_model_path=local_paths['ner'],
+    verbose=False,
+)
+
+doc = nlp(text)
+output = {
+    'sentences': [
+        {
+            'tokens': [token.text for token in sent.tokens],
+            'words': [
+                {
+                    'text': word.text,
+                    'lemma': word.lemma,
+                    'upos': word.upos,
+                    'xpos': word.xpos,
+                    'head': word.head,
+                    'deprel': word.deprel,
+                }
+                for word in sent.words
+            ],
+            'entities': [
+                {
+                    'text': ent.text,
+                    'type': ent.type,
+                    'start_char': ent.start_char,
+                    'end_char': ent.end_char,
+                }
+                for ent in sent.ents
+            ],
+        }
+        for sent in doc.sentences
+    ]
+}
+
+RESULT = {"output": output}

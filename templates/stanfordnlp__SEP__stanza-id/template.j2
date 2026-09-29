@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("stanfordnlp/stanza-id") %}
+{% set device = device | default("cuda:0") %}
+{% set model_name = model_name | default('gsd') %}
+{% set use_gpu = use_gpu | default(device != 'cpu') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+model_name = "{{ model_name }}"
+use_gpu = {{ 'True' if use_gpu else 'False' }}
+
+import stanza
+from huggingface_hub import hf_hub_download
+
+weights_tokenize = hf_hub_download(repo_id=repo_id, filename=f"models/tokenize/{model_name}.pt")
+weights_mwt = hf_hub_download(repo_id=repo_id, filename=f"models/mwt/{model_name}.pt")
+weights_pos = hf_hub_download(repo_id=repo_id, filename=f"models/pos/{model_name}_nocharlm.pt")
+
+stanza_dir = "/workspace/stanza_resources"
+processors = "tokenize,mwt,pos"
+text = "Saya suka mempelajari pemrosesan bahasa alami dengan Stanza."
+
+nlp = stanza.Pipeline(
+    lang="id",
+    processors=processors,
+    dir=stanza_dir,
+    tokenize_model_path=weights_tokenize,
+    mwt_model_path=weights_mwt,
+    pos_model_path=weights_pos,
+    use_gpu=use_gpu,
+    verbose=False,
+)
+
+doc = nlp(text)
+
+sentences = []
+for sent in doc.sentences:
+    tokens = []
+    for word in sent.words:
+        tokens.append({
+            "text": word.text,
+            "lemma": word.lemma,
+            "upos": word.upos,
+            "xpos": word.xpos,
+        })
+    sentences.append(tokens)
+
+RESULT = {"sentences": sentences}

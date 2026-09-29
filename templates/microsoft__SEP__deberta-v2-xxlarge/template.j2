@@ -1,0 +1,26 @@
+{% set repo_id = repo_id | default("microsoft/deberta-v2-xxlarge") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+
+# 1. Jinja variable defaults
+
+# 2. Python assignments
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+# 3. Imports
+from transformers import pipeline
+
+# 4. Load pipeline
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+# 5. Pre-process input
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+
+# 6. Inference
+# 7. Post-process & RESULT
+RESULT = pipe(text)

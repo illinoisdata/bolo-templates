@@ -1,0 +1,48 @@
+{% set repo_id = repo_id | default("nvidia/bigvgan_v2_22khz_80band_256x") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set use_cuda_kernel = use_cuda_kernel | default(false) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+use_cuda_kernel = {{ use_cuda_kernel }}
+
+import os
+import sys
+import json
+import torch
+import librosa
+import numpy as np
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+repo_dir = os.path.dirname(config_path)
+sys.path.insert(0, repo_dir)
+
+import bigvgan
+from importlib import util
+
+meldataset_path = hf_hub_download(repo_id=repo_id, filename='meldataset.py')
+meldataset_spec = util.spec_from_file_location('meldataset', meldataset_path)
+meldataset = util.module_from_spec(meldataset_spec)
+meldataset_spec.loader.exec_module(meldataset)
+get_mel_spectrogram = meldataset.get_mel_spectrogram
+
+weights_path = hf_hub_download(repo_id=repo_id, filename='bigvgan_generator.pt')
+model = bigvgan.BigVGAN._from_pretrained(model_id=repo_id, revision=None, cache_dir=None, force_download=False, local_files_only=False, token=None, use_cuda_kernel=use_cuda_kernel, proxies=None, resume_download=False)
+model.remove_weight_norm()
+model = model.eval().to(device)
+
+if str(audio_path).startswith(('http://', 'https://')):
+    wav, sr = librosa.load(audio_path, sr=model.h.sampling_rate, mono=True)
+else:
+    wav, sr = librosa.load(audio_path, sr=model.h.sampling_rate, mono=True)
+
+wav = torch.FloatTensor(wav).unsqueeze(0).to(device)
+mel = get_mel_spectrogram(wav, model.h).to(device)
+
+with torch.inference_mode():
+    wav_gen = model(mel)
+
+wav_gen_float = wav_gen.squeeze(0).detach().cpu().numpy()
+RESULT = {"waveform": wav_gen_float}

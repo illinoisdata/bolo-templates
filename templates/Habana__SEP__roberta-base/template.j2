@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("Habana/roberta-base") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The capital of France is <mask>.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import json
+import torch
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gaudi_config.json")
+with open(config_path, "r") as f:
+    gaudi_config = json.load(f)
+
+# This repo contains only GaudiConfig and no weights, so use the base RoBERTa model.
+model_id = "roberta-base"
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+model = AutoModelForMaskedLM.from_pretrained(model_id).to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+mask_token_id = tokenizer.mask_token_id
+mask_positions = (inputs["input_ids"] == mask_token_id).nonzero(as_tuple=False)
+mask_index = mask_positions[0, 1]
+mask_logits = logits[0, mask_index]
+values, indices = torch.topk(mask_logits, k=5)
+predicted_tokens = tokenizer.convert_ids_to_tokens(indices.tolist())
+
+RESULT = {
+    "gaudi_config": gaudi_config,
+    "top_tokens": predicted_tokens,
+    "top_token_ids": indices.tolist(),
+    "top_token_scores": values.tolist(),
+    "prediction": predicted_tokens[0],
+}

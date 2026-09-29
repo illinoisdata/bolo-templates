@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("5CD-AI/Vietnamese-Sentiment-visobert") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("sentiment-analysis") %}
+{% set input_prompt = input_prompt | default("Tôi yêu thích môi trường học tập tại trường đại học của mình.") %}
+{% set tokenizer_filename = tokenizer_filename | default("tokenizer.json") %}
+{% set bos_token = bos_token | default("<s>") %}
+{% set eos_token = eos_token | default("</s>") %}
+{% set unk_token = unk_token | default("<unk>") %}
+{% set pad_token = pad_token | default("<pad>") %}
+{% set cls_token = cls_token | default("<s>") %}
+{% set mask_token = mask_token | default("<mask>") %}
+{% set tokenizer_max_length = tokenizer_max_length | default(256) %}
+
+repo_id = {{ repo_id | tojson }}
+task = {{ task | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+tokenizer_filename = {{ tokenizer_filename | tojson }}
+bos_token = {{ bos_token | tojson }}
+eos_token = {{ eos_token | tojson }}
+unk_token = {{ unk_token | tojson }}
+pad_token = {{ pad_token | tojson }}
+cls_token = {{ cls_token | tojson }}
+mask_token = {{ mask_token | tojson }}
+tokenizer_max_length = {{ tokenizer_max_length }}
+
+from huggingface_hub import hf_hub_download
+from transformers import PreTrainedTokenizerFast, pipeline
+
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename=tokenizer_filename)
+
+tokenizer = PreTrainedTokenizerFast(
+    tokenizer_file=tokenizer_file,
+    bos_token=bos_token,
+    eos_token=eos_token,
+    unk_token=unk_token,
+    pad_token=pad_token,
+    cls_token=cls_token,
+    mask_token=mask_token,
+    model_max_length=tokenizer_max_length,
+)
+
+pipe = pipeline(
+    task=task,
+    model=repo_id,
+    tokenizer=tokenizer,
+    device=device,
+)
+
+RESULT = pipe(input_prompt)

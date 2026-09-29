@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("timm/resnet50d.ra2_in1k") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+{% set top_k = top_k | default(5) %}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+image_path = {{ image_path | tojson }}
+top_k = {{ top_k | tojson }}
+
+from PIL import Image
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+
+input_image = Image.open(image_path).convert("RGB")
+
+raw_outputs = pipe(input_image, top_k=top_k)
+
+RESULT = {"predictions": raw_outputs}

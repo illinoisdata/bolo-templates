@@ -1,0 +1,56 @@
+{% set repo_id = repo_id | default("timm/vit_large_patch14_clip_224.metaclip_2pt5b") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set labels = labels | default(['a photo of a cat', 'a photo of two cats', 'a dog', 'a car', 'a bicycle']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+labels = {{ labels }}
+
+import json
+from io import BytesIO
+
+import torch
+from safetensors.torch import load_file
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from timm.data import resolve_data_config, create_transform
+from timm.models import create_model
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+model = create_model(
+    cfg["architecture"],
+    pretrained=False,
+    num_classes=cfg.get("num_classes", 0),
+    global_pool=cfg.get("global_pool", "token"),
+)
+state_dict = load_file(weights_path, device="cpu")
+model.load_state_dict(state_dict, strict=False)
+model = model.to(device).eval()
+
+if isinstance(image_path, str) and image_path.startswith(("http://", "https://")):
+    import requests
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+config = resolve_data_config({}, model=model)
+transform = create_transform(**config, is_training=False)
+image_tensor = transform(image).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    logits = model(image_tensor)
+    probs = torch.softmax(logits, dim=-1)[0]
+    topk = min(5, probs.numel())
+    values, indices = torch.topk(probs, k=topk)
+
+RESULT = {
+    "logits": logits.detach().cpu().tolist(),
+    "top_indices": indices.detach().cpu().tolist(),
+    "top_probabilities": values.detach().cpu().tolist(),
+}

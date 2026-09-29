@@ -1,0 +1,44 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("mit-han-lab/dc-ae-f64c128-in-1.0") %}
+{% set image_size = image_size | default(512) %}
+{% set seed = seed | default(0) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+image_size = {{ image_size }}
+seed = {{ seed }}
+
+import os
+import torch
+import torchvision.transforms as transforms
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from efficientvit.ae_model_zoo import DCAE_HF
+from efficientvit.apps.utils.image import DMCrop
+
+weight_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+transform = transforms.Compose([
+    DMCrop(image_size),
+    transforms.ToTensor(),
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+])
+
+input_tensor = transform(image)[None]
+device_obj = torch.device(device)
+dc_ae = DCAE_HF.from_pretrained(repo_id).to(device_obj).eval()
+input_tensor = input_tensor.to(device_obj)
+latent = dc_ae.encode(input_tensor)
+reconstructed = dc_ae.decode(latent)
+output_image = reconstructed[0].detach().cpu().clamp(-1, 1) * 0.5 + 0.5
+
+RESULT = {"latent": latent.detach().cpu(), "reconstruction": output_image}

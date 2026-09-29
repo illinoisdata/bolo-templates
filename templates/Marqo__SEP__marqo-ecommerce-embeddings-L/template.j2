@@ -1,0 +1,30 @@
+{% set repo_id = repo_id | default("Marqo/marqo-ecommerce-embeddings-L") %}
+{% set device = device | default("cuda:0") %}
+{% set text_inputs = text_inputs | default(["dining chairs", "a laptop", "toothbrushes"]) %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_inputs = {{ text_inputs }}
+image_path = "{{ image_path }}"
+
+import torch
+import requests
+from PIL import Image
+import open_clip
+
+image = Image.open(image_path).convert("RGB") if not str(image_path).startswith(("http://", "https://")) else Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+
+model, _, preprocess_val = open_clip.create_model_and_transforms(f"hf-hub:{repo_id}")
+tokenizer = open_clip.get_tokenizer(f"hf-hub:{repo_id}")
+model = model.to(device)
+model.eval()
+
+image_tensor = preprocess_val(image).unsqueeze(0).to(device)
+text_tokens = tokenizer(text_inputs).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_tensor, normalize=True)
+    text_features = model.encode_text(text_tokens, normalize=True)
+    text_probs = (100.0 * image_features @ text_features.T).softmax(dim=-1)
+
+RESULT = {"text_probs": text_probs.cpu().numpy(), "image_features": image_features.cpu().numpy(), "text_features": text_features.cpu().numpy()}

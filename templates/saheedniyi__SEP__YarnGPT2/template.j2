@@ -1,55 +1,62 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("saheedniyi/YarnGPT2") %}
-{% set text = text | default("The election was won by businessman and politician, Moshood Abiola, but Babangida annulled the results, citing concerns over national security.") %}
-{% set temperature = temperature | default(0.7) %}
+{% set device = device | default("cuda:0") %}
+{% set text_prompt = text_prompt | default('The election was won by businessman and politician, Moshood Abiola, but Babangida annulled the results, citing concerns over national security.') %}
+{% set language = language | default('english') %}
+{% set speaker_name = speaker_name | default('idera') %}
 {% set max_new_tokens = max_new_tokens | default(256) %}
+{% set temperature = temperature | default(0.1) %}
 {% set repetition_penalty = repetition_penalty | default(1.1) %}
-{% set do_sample = do_sample | default(true) %}
+{% set sample_rate = sample_rate | default(24000) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = "{{ text }}"
-temperature = {{ temperature }}
+text_prompt = "{{ text_prompt }}"
+language = "{{ language }}"
+speaker_name = "{{ speaker_name }}"
 max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
 repetition_penalty = {{ repetition_penalty }}
-do_sample = {{ do_sample }}
+sample_rate = {{ sample_rate }}
 
-import json
-import os
 import torch
+from huggingface_hub import hf_hub_download
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# Load tokenizer and model with the requested device
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
-model = AutoModelForCausalLM.from_pretrained(repo_id)
-device_obj = torch.device(device if device else "cpu")
-model.to(device_obj)
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_file = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+    low_cpu_mem_usage=True,
+)
+model = model.to(device)
 model.eval()
 
-# Prepare input tokens for inference
-inputs = tokenizer(text, return_tensors="pt")
-inputs = {k: v.to(device_obj) for k, v in inputs.items()}
-prompt_length = inputs["input_ids"].shape[-1]
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+if tokenizer.pad_token_id is None:
+    tokenizer.pad_token = tokenizer.eos_token
 
-# Generate continuation
-with torch.inference_mode():
-    generated = model.generate(
+prompt = f"{language}: {speaker_name}: {text_prompt}"
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
         **inputs,
-        max_new_tokens=max_new_tokens,
+        do_sample=temperature > 0,
         temperature=temperature,
         repetition_penalty=repetition_penalty,
-        do_sample=do_sample,
+        max_new_tokens=max_new_tokens,
+        eos_token_id=tokenizer.eos_token_id,
         pad_token_id=tokenizer.eos_token_id,
     )
 
-generated_ids = generated[0]
-generated_ids_cpu = generated_ids.cpu()
-full_text = tokenizer.decode(generated_ids_cpu, skip_special_tokens=True).strip()
-continuation_ids = generated_ids_cpu[prompt_length:]
-continuation_text = tokenizer.decode(continuation_ids, skip_special_tokens=True).strip()
-generated_token_ids = generated_ids_cpu.tolist()
+text_output = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {
-    "generated_text": full_text,
-    "continuation_text": continuation_text,
-    "generated_token_ids": generated_token_ids,
-}
+RESULT = {"text": text_output}

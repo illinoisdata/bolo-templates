@@ -1,39 +1,24 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("eunsour/en-ko-transliterator") %}
-{% set input_text = input_text | default("transformer") %}
-{% set src_lang = src_lang | default("en") %}
-{% set tgt_lang = tgt_lang | default("ko") %}
-{% set max_length = max_length | default(64) %}
-{% set num_beams = num_beams | default(5) %}
+{% set device = device | default("cuda:0") %}
+{% set word = word|default('transformer') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-src_lang = "{{ src_lang }}"
-tgt_lang = "{{ tgt_lang }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+word = "{{ word }}"
 
-from pathlib import Path
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+model_checkpoint = repo_id
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
-tokenizer = AutoTokenizer.from_pretrained(repo_id, src_lang=src_lang, tgt_lang=tgt_lang)
+tokenizer = AutoTokenizer.from_pretrained(model_checkpoint, src_lang="en", tgt_lang="ko", use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_checkpoint)
+model.to(device)
+model.eval()
 
-encoded_inputs = tokenizer(
-    input_text,
-    return_tensors="pt",
-    truncation=True,
-    max_length=max_length,
-)
-encoded_inputs = {name: tensor.to(device) for name, tensor in encoded_inputs.items()}
+encoded_en = tokenizer(word, truncation=True, max_length=48, return_tensors="pt")
+encoded_en = {k: v.to(device) for k, v in encoded_en.items()}
+with torch.no_grad():
+    generated_tokens = model.generate(**encoded_en)
+result = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
-generated_tokens = model.generate(  # max_length and num_beams encourage quality generation
-    **encoded_inputs,
-    max_length=max_length,
-    num_beams=num_beams,
-)
-
-decoded_strings = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-
-RESULT = {"transliteration": decoded_strings}
+RESULT = {"output": result}

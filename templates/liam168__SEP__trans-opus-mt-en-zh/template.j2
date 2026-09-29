@@ -1,33 +1,25 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("liam168/trans-opus-mt-en-zh") %}
-{% set text_input = text_input | default("I like to study Data Science and Machine Learning.") %}
-{% set max_length = max_length | default(512) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('I like to study Data Science and Machine Learning.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-max_length = {{ max_length }}
+text = "{{ text }}"
 
-from pathlib import Path
+import torch
+from huggingface_hub import hf_hub_download
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-encoded_inputs = tokenizer(
-    text_input,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-    max_length=max_length,
-)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_length=400, num_beams=4)
+output = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-generated_tokens = model.generate(
-    **encoded_inputs,
-    max_length=max_length,
-    num_beams=4,
-)
-
-translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-
-RESULT = {"translations": translations}
+RESULT = {"translation_text": output}

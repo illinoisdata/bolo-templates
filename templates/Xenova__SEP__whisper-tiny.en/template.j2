@@ -1,0 +1,55 @@
+{% set repo_id = repo_id | default("Xenova/whisper-tiny.en") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set task = task | default('transcribe') %}
+{% set language = language | default('en') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+task = "{{ task }}"
+language = "{{ language }}"
+
+import os
+import numpy as np
+import torch
+import soundfile as sf
+from huggingface_hub import hf_hub_download
+from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+onnx_encoder_path = hf_hub_download(repo_id=repo_id, filename="onnx/encoder_model.onnx")
+processor = AutoProcessor.from_pretrained(os.path.dirname(preprocessor_config_path), local_files_only=True)
+model = AutoModelForSpeechSeq2Seq.from_pretrained("openai/whisper-tiny.en")
+model.to(device)
+model.eval()
+
+if audio_path.startswith(("http://", "https://")):
+    import requests
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    input_audio_path = "/tmp/input_audio.wav"
+    with open(input_audio_path, "wb") as f:
+        f.write(audio_bytes)
+else:
+    input_audio_path = audio_path
+
+audio, sampling_rate = sf.read(input_audio_path)
+if audio.ndim > 1:
+    audio = np.mean(audio, axis=1)
+if sampling_rate != 16000:
+    import librosa
+    audio = librosa.resample(audio.astype(np.float32), orig_sr=sampling_rate, target_sr=16000)
+    sampling_rate = 16000
+inputs = processor(audio, sampling_rate=sampling_rate, return_tensors="pt")
+input_features = inputs.input_features.to(device)
+forced_decoder_ids = processor.get_decoder_prompt_ids(language=language, task=task)
+with torch.no_grad():
+    generated_ids = model.generate(input_features, forced_decoder_ids=forced_decoder_ids)
+text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"text": text}

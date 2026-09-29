@@ -1,0 +1,31 @@
+{% set repo_id = repo_id | default("clue/albert_chinese_tiny") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('今天天气很好') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from transformers import BertTokenizer, AlbertForMaskedLM, AlbertConfig
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+tokenizer = BertTokenizer(vocab_file=vocab_path)
+config = AlbertConfig.from_json_file(config_path)
+model = AlbertForMaskedLM(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+state_dict = {k: v for k, v in state_dict.items() if not k.startswith("albert.pooler.")}
+model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+RESULT = {"logits": outputs.logits}

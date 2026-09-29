@@ -1,43 +1,36 @@
-{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
 {% set repo_id = repo_id | default("vikp/surya_layout2") %}
-{% set document_image_path = document_image_path | default('/u/yli77/projects/ML-code-generation/data/doc.jpeg') %}
+{% set device = device | default("cuda:0") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-document_image_path = "{{ document_image_path }}"
+image_path = "{{ image_path }}"
 
-import io
-from pathlib import Path
-
-import numpy as np
 import requests
-import torch
+from io import BytesIO
 from PIL import Image
-from transformers import AutoImageProcessor, AutoModelForSemanticSegmentation
+import torch
+from transformers import AutoImageProcessor, SegformerForSemanticSegmentation
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
-processor = AutoImageProcessor.from_pretrained(repo_id)
-model = AutoModelForSemanticSegmentation.from_pretrained(repo_id, ignore_mismatched_sizes=True)
-model.to(torch_device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+processor = AutoImageProcessor.from_pretrained(repo_id, local_files_only=True)
+model = SegformerForSemanticSegmentation.from_pretrained(repo_id, local_files_only=True, ignore_mismatched_sizes=True).to(device)
 model.eval()
 
-if document_image_path.lower().startswith(("http://", "https://")):
-    response = requests.get(document_image_path)
-    response.raise_for_status()
-    document_image = Image.open(io.BytesIO(response.content))
-else:
-    document_image = Image.open(document_image_path)
-document_image = document_image.convert("RGB")
-
-inputs = processor(images=document_image, return_tensors="pt")
-inputs = {key: value.to(torch_device) for key, value in inputs.items()}
+inputs = processor(images=image, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
     outputs = model(**inputs)
+    logits = outputs.logits
+    seg = logits.argmax(dim=1)
 
-segmentation_mask = processor.post_process_semantic_segmentation(
-    outputs,
-    target_sizes=[document_image.size[::-1]],
-)[0]
-segmentation_mask = segmentation_mask.cpu().numpy()
-
-RESULT = {"segmentation_mask": segmentation_mask}
+RESULT = {"segmentation": seg.detach().cpu().tolist(), "logits_shape": list(logits.shape)}

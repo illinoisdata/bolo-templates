@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("Intel/zoedepth-nyu-kitti") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("depth-estimation") %}
+{% set input_image_path = input_image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+repo_id = "{{ repo_id }}"
+task = "{{ task }}"
+device = "{{ device }}"
+input_image_path = "{{ input_image_path }}"
+
+import torchvision.transforms.functional as tvF
+from transformers.pipelines import depth_estimation
+depth_estimation.tvF = tvF
+
+from transformers import pipeline
+from PIL import Image
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+image = Image.open(input_image_path)
+
+RESULT = pipe(image)

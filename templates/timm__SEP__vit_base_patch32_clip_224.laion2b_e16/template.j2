@@ -1,0 +1,54 @@
+{% set repo_id = repo_id | default("timm/vit_base_patch32_clip_224.laion2b_e16") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set texts = texts | default(['a photo of a cat', 'a photo of a dog', 'a photo of a bird']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+texts = {{ texts }}
+
+import json
+import torch
+import requests
+from PIL import Image
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+from transformers import CLIPModel, CLIPProcessor
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+def load_image(path_or_url):
+    if str(path_or_url).startswith(("http://", "https://")):
+        response = requests.get(path_or_url, timeout=30)
+        response.raise_for_status()
+        return Image.open(BytesIO(response.content)).convert("RGB")
+    return Image.open(path_or_url).convert("RGB")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+model_id = cfg.get("hf_model_name", "openai/clip-vit-base-patch32")
+model = CLIPModel.from_pretrained(model_id)
+processor = CLIPProcessor.from_pretrained(model_id)
+
+state_dict = torch.load(weights_path, map_location="cpu")
+if isinstance(state_dict, dict) and "state_dict" in state_dict:
+    state_dict = state_dict["state_dict"]
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+image = load_image(image_path)
+inputs = processor(text=texts, images=image, return_tensors="pt", padding=True).to(device)
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits_per_image.softmax(dim=-1)
+    output = {
+        "texts": texts,
+        "probabilities": logits.squeeze(0).detach().cpu().tolist(),
+        "predicted_text": texts[int(logits.squeeze(0).argmax().item())],
+    }
+
+RESULT = {"output": output}

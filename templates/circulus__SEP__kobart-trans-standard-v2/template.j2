@@ -1,25 +1,37 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("circulus/kobart-trans-standard-v2") %}
-{% set text = text | default("안녕하세요. 이 문장을 영어로 번역해주세요.") %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('오늘 날씨가 정말 좋네요.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = "{{ text }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text = {{ text | tojson }}
 
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
 model.eval()
 
-with torch.no_grad():
-    inputs = tokenizer(text, return_tensors="pt").to(device)
-    generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
-    translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+if "eos_token_id" in tokenizer.special_tokens_map and tokenizer.eos_token_id is not None:
+    if inputs["input_ids"][0, -1].item() != tokenizer.eos_token_id:
+        eos = torch.tensor([[tokenizer.eos_token_id]], device=device, dtype=inputs["input_ids"].dtype)
+        inputs["input_ids"] = torch.cat([inputs["input_ids"], eos], dim=1)
+        if "attention_mask" in inputs:
+            am = torch.ones_like(eos, dtype=inputs["attention_mask"].dtype)
+            inputs["attention_mask"] = torch.cat([inputs["attention_mask"], am], dim=1)
 
-RESULT = {"translation": translation}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=32, num_beams=1)
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output": output_text}

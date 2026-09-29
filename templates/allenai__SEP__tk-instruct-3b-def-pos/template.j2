@@ -1,27 +1,43 @@
 {% set repo_id = repo_id | default("allenai/tk-instruct-3b-def-pos") %}
 {% set device = device | default("cuda:0") %}
-{% set instruction_text = instruction_text | default("Definition: return the currency of the given country. Now complete the following example - Input: India. Output:") %}
-{% set max_length = max_length | default(64) %}
+{% set prompt = prompt | default('Definition: return the currency of the given country. Input: India. Output:') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-instruction_text = "{{ instruction_text }}"
-max_length = {{ max_length }}
+prompt = {{ prompt | tojson }}
 
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-model_kwargs = {}
-if "cuda" in device:
-    model_kwargs["torch_dtype"] = torch.bfloat16
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, **model_kwargs).to(device)
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    use_fast=True,
+)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float16 if device.startswith("cuda") else torch.float32,
+)
+model.to(device)
+model.eval()
 
-inputs = tokenizer(instruction_text, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_tokens = model.generate(**inputs, max_length=max_length)
-generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_length={{ max_length | default(32) }},
+        num_beams={{ num_beams | default(1) }},
+        do_sample={{ do_sample | default(false) }},
+    )
 
-RESULT = {"generated_text": generated_text}
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"output": output_text}

@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("MykolaL/DelineateAnything") %}
+{% set device = device | default("cuda:0") %}
+{% set model_filename = model_filename | default('DelineateAnything.pt') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+model_filename = "{{ model_filename }}"
+
+import os
+from pathlib import Path
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from ultralytics import YOLO
+
+model_path = hf_hub_download(repo_id=repo_id, filename=model_filename)
+
+input_image = "/u/yunqili4/projects/ML-code-generation/data/image1.jpeg"
+if str(input_image).startswith(("http://", "https://")):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(input_image, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(input_image).convert("RGB")
+
+model = YOLO(model_path)
+results = model.predict(source=image, device=device, verbose=False)
+
+masks = []
+boxes = []
+for r in results:
+    if r.masks is not None:
+        masks.append(r.masks.data.detach().cpu().numpy())
+    if r.boxes is not None:
+        boxes.append(r.boxes.xyxy.detach().cpu().numpy())
+
+RESULT = {"masks": masks, "boxes": boxes}

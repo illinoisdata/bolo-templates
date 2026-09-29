@@ -1,0 +1,15 @@
+{% set repo_id = repo_id | default("refiners/sd15.juggernaut.reborn.text_encoder") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('A cinematic photo of a futuristic city at sunset, ultra detailed, photorealistic') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+from huggingface_hub import hf_hub_download
+import torch
+from safetensors.torch import load_file
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+state_dict = load_file(weights_path)
+output_keys = list(state_dict.keys())[:20]
+RESULT = {"keys": output_keys}

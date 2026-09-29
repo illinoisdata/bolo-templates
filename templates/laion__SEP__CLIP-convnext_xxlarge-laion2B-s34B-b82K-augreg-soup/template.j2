@@ -1,0 +1,56 @@
+{% set repo_id = repo_id | default("laion/CLIP-convnext_xxlarge-laion2B-s34B-b82K-augreg-soup") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set labels = labels | default(['a photo of a cat', 'a photo of a dog', 'a photo of a car']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+labels = {{ labels }}
+
+import json
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, '/workspace/.pip')
+os.environ['TRANSFORMERS_NO_TORCHVISION'] = '1'
+
+import requests
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+import open_clip
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+with open(config_path, 'r') as f:
+    cfg = json.load(f)
+
+model_name = cfg.get('model_cfg', {}).get('vision_cfg', {}).get('timm_model_name', 'convnext_xxlarge')
+preprocess = open_clip.image_transform(
+    cfg.get('model_cfg', {}).get('vision_cfg', {}).get('image_size', 256),
+    is_train=False,
+)
+model, _, _ = open_clip.create_model_and_transforms(model_name, pretrained=None)
+state_dict = torch.load(weights_path, map_location='cpu')
+model.load_state_dict(state_dict)
+model = model.to(device)
+model.eval()
+
+def load_image(path_or_url):
+    if path_or_url.startswith('http://') or path_or_url.startswith('https://'):
+        return Image.open(requests.get(path_or_url, stream=True, timeout=30).raw).convert('RGB')
+    return Image.open(path_or_url).convert('RGB')
+
+image = preprocess(load_image(image_path)).unsqueeze(0).to(device)
+text_tokens = open_clip.tokenize(labels).to(device)
+with torch.no_grad():
+    image_features = model.encode_image(image)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logits = 100.0 * image_features @ text_features.T
+    probs = logits.softmax(dim=-1)
+
+RESULT = {"labels": labels, "probabilities": probs.detach().cpu().numpy()}

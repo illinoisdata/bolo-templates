@@ -1,0 +1,68 @@
+{% set repo_id = repo_id | default("clw8998/semantic_model-for-EE5327701") %}
+{% set device = device | default("cuda:0") %}
+{% set text_inputs = text_inputs | default([
+  'GREEN 綠的 抗菌沐浴露 洋梨小蒼蘭',
+  'HAIR RECIPE 髮的食譜 清爽豐盈洗髮露 奇異果無花果',
+  '北海 鱈魚香絲',
+  'NONGSHIM 農心 辛拉麵 韓國境內版 120g'
+]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_inputs = {{ text_inputs }}
+
+import os
+import json
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from optimum.onnxruntime import ORTModelForFeatureExtraction
+
+runtime_device = "cpu"
+onnx_path = hf_hub_download(repo_id=repo_id, filename="model.onnx")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_path, "r", encoding="utf-8") as f:
+    config = json.load(f)
+
+model = ORTModelForFeatureExtraction.from_pretrained(
+    os.path.dirname(onnx_path),
+    file_name=os.path.basename(onnx_path),
+    config=config,
+)
+
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+token_to_id = {}
+with open(vocab_path, "r", encoding="utf-8") as vf:
+    for idx, token in enumerate(vf):
+        token_to_id[token.rstrip("\n")] = idx
+cls_id = token_to_id.get("[CLS]", 101)
+sep_id = token_to_id.get("[SEP]", 102)
+unk_id = token_to_id.get("[UNK]", 100)
+pad_id = token_to_id.get("[PAD]", 0)
+
+input_ids = []
+attention_masks = []
+for text in text_inputs:
+    tokens = text.strip().split()
+    ids = [cls_id] + [token_to_id.get(tok, unk_id) for tok in tokens] + [sep_id]
+    ids = ids[:128]
+    mask = [1] * len(ids)
+    if len(ids) < 128:
+        pad_len = 128 - len(ids)
+        ids = ids + [pad_id] * pad_len
+        mask = mask + [0] * pad_len
+    input_ids.append(ids)
+    attention_masks.append(mask)
+
+encoded_inputs = {
+    "input_ids": torch.tensor(input_ids, dtype=torch.long, device=runtime_device),
+    "attention_mask": torch.tensor(attention_masks, dtype=torch.long, device=runtime_device),
+    "token_type_ids": torch.zeros((len(text_inputs), 128), dtype=torch.long, device=runtime_device),
+}
+with torch.no_grad():
+    outputs = model(**encoded_inputs)
+    last_hidden_state = outputs["last_hidden_state"]
+    attention_mask = encoded_inputs["attention_mask"].unsqueeze(-1).type_as(last_hidden_state)
+    pooled = (last_hidden_state * attention_mask).sum(dim=1) / attention_mask.sum(dim=1).clamp(min=1.0)
+    embeddings = torch.nn.functional.normalize(pooled, p=2, dim=1)
+
+RESULT = {"embeddings": embeddings.detach().cpu().numpy().astype(np.float16)}

@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("nvidia/segformer-b0-finetuned-ade-512-512") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-segmentation") %}
+{% set input_image = input_image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_image = {{ input_image | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+preprocessed_input = input_image
+
+pipeline_output = pipe(preprocessed_input)
+
+RESULT = {"predictions": pipeline_output}

@@ -1,0 +1,55 @@
+{% set repo_id = repo_id | default("lightonai/LightOnOCR-1B-1025") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default("") %}
+{% set max_new_tokens = max_new_tokens | default(1024) %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/doc.jpeg") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+max_new_tokens = {{ max_new_tokens }}
+image_path = "{{ image_path }}"
+
+import torch
+from PIL import Image
+import requests
+from transformers import AutoProcessor, AutoModelForImageTextToText
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor = AutoProcessor.from_pretrained(repo_id)
+model = AutoModelForImageTextToText.from_pretrained(
+    repo_id,
+    dtype=torch.bfloat16,
+    local_files_only=True,
+)
+model = model.to(device)
+model.eval()
+
+if image_path.startswith(("http://", "https://")):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+conversation = [{"role": "user", "content": [{"type": "image", "url": image_path}]}]
+if question:
+    conversation[0]["content"].append({"type": "text", "text": question})
+
+inputs = processor.apply_chat_template(
+    conversation,
+    add_generation_prompt=True,
+    tokenize=True,
+    return_dict=True,
+    return_tensors="pt",
+)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+if "pixel_values" in inputs and inputs["pixel_values"].is_floating_point():
+    inputs["pixel_values"] = inputs["pixel_values"].to(dtype=torch.bfloat16)
+
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+
+generated_ids = output_ids[0, inputs["input_ids"].shape[1]:]
+output_text = processor.decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"text": output_text}

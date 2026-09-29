@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("mangoapps/fb_zeroshot_mnli_onnx") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("zero-shot-classification") %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+{% set candidate_labels = candidate_labels | default(["education", "technology", "science"]) %}
+{% set hypothesis_template = hypothesis_template | default("This example is about {}.") %}
+{% set onnx_file_name = onnx_file_name | default("model_optimized.onnx") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+candidate_labels = {{ candidate_labels | tojson }}
+hypothesis_template = {{ hypothesis_template | tojson }}
+onnx_file_name = {{ onnx_file_name | tojson }}
+
+from optimum.onnxruntime import ORTModelForSequenceClassification
+from transformers import AutoTokenizer, pipeline
+import onnxruntime as ort
+
+pipeline_device = -1
+if isinstance(device, str):
+    if device.startswith("cuda"):
+        parts = device.split(":")
+        pipeline_device = int(parts[-1]) if parts[-1].isdigit() else 0
+    elif device == "cpu":
+        pipeline_device = -1
+else:
+    pipeline_device = device if isinstance(device, int) else -1
+available_ort_providers = ort.get_available_providers()
+use_cuda_provider = pipeline_device >= 0 and "CUDAExecutionProvider" in available_ort_providers
+onnx_provider = "CUDAExecutionProvider" if use_cuda_provider else "CPUExecutionProvider"
+if not use_cuda_provider:
+    pipeline_device = -1
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+ort_model = ORTModelForSequenceClassification.from_pretrained(
+    repo_id,
+    provider=onnx_provider,
+    file_name=onnx_file_name,
+)
+pipe = pipeline(task=task, model=ort_model, tokenizer=tokenizer, device=pipeline_device)
+
+pipe_kwargs = {
+    "candidate_labels": candidate_labels,
+    "hypothesis_template": hypothesis_template,
+}
+
+RESULT = pipe(input_prompt, **pipe_kwargs)

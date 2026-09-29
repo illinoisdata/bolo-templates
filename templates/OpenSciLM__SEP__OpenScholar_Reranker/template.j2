@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("OpenSciLM/OpenScholar_Reranker") %}
+{% set device = device | default("cuda:0") %}
+{% set max_length = max_length | default(512) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+max_length = {{ max_length }}
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+sentencepiece_file = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+
+model_dir = os.path.dirname(model_file)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False)
+model = AutoModelForSequenceClassification.from_pretrained(model_dir, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+pairs = [
+    ("What is the main contribution of the paper?", "OpenScholar_Reranker is a fine-tuned version of bge-reranker-large for scientific literature synthesis."),
+    ("What model is this based on?", "OpenScholar_Reranker is a fine-tuned version of bge-reranker-large."),
+]
+
+inputs = tokenizer(
+    [p[0] for p in pairs],
+    [p[1] for p in pairs],
+    padding=True,
+    truncation=True,
+    max_length=max_length,
+    return_tensors="pt",
+)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    logits = model(**inputs).logits
+    scores = logits.squeeze(-1).detach().cpu().tolist()
+
+RESULT = {
+    "pairs": pairs,
+    "scores": scores,
+}

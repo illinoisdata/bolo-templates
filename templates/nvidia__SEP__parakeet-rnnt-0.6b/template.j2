@@ -1,0 +1,42 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set repo_id = repo_id | default("nvidia/parakeet-rnnt-0.6b") %}
+{% set device = device | default("cuda:0") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+max_new_tokens = {{ max_new_tokens }}
+
+import os
+import torch
+import librosa
+from huggingface_hub import hf_hub_download
+from transformers import AutoProcessor, AutoModel
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_file = hf_hub_download(repo_id=repo_id, filename="processor_config.json")
+_tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_generation_config_file = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+processor = AutoProcessor.from_pretrained(os.path.dirname(processor_file), local_files_only=True)
+model = AutoModel.from_pretrained(os.path.dirname(config_file), local_files_only=True, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+if str(audio_path).startswith(("http://", "https://")):
+    audio, sampling_rate = librosa.load(audio_path, sr=16000, mono=True)
+else:
+    audio, sampling_rate = librosa.load(audio_path, sr=16000, mono=True)
+
+inputs = processor(audio, sampling_rate=sampling_rate, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated = model.generate(input_features=inputs.get("input_features"), attention_mask=inputs.get("attention_mask"), max_new_tokens=max_new_tokens)
+
+transcription = generated[0] if isinstance(generated, (list, tuple)) else generated
+
+RESULT = {"text": transcription}

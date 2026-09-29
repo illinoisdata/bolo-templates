@@ -1,54 +1,35 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("squeezebert/squeezebert-uncased") %}
-{% set masked_text = masked_text | default("The quick brown fox jumps over the lazy [MASK].") %}
-{% set top_k = top_k | default(5) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The quick brown fox jumps over the lazy dog.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-masked_text = "{{ masked_text }}"
-top_k = {{ top_k }}
-
-import json
-import os
+text = "{{ text }}"
 
 import torch
-from transformers import AutoModelForMaskedLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForMaskedLM
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForMaskedLM.from_pretrained(repo_id)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(masked_text, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
     outputs = model(**inputs)
 
 logits = outputs.logits
-
-input_ids = inputs["input_ids"]
 mask_token_id = tokenizer.mask_token_id
-base_ids = input_ids.detach().clone().cpu()
-mask_positions = (base_ids[0] == mask_token_id).nonzero(as_tuple=True)[0].tolist()
+if mask_token_id is not None and (inputs["input_ids"] == mask_token_id).any():
+    mask_index = (inputs["input_ids"][0] == mask_token_id).nonzero(as_tuple=True)[0][0].item()
+else:
+    mask_index = 0
 
-predictions = []
-for mask_index in mask_positions:
-    mask_logits = logits[0, mask_index, :]
-    probabilities = torch.softmax(mask_logits, dim=-1)
-    topk_probs, topk_indices = torch.topk(probabilities, k=top_k)
-    tokens = tokenizer.convert_ids_to_tokens(topk_indices.tolist())
-    filled_texts = []
-    for candidate_id in topk_indices.tolist():
-        candidate_ids = base_ids.clone()
-        candidate_ids[0, mask_index] = candidate_id
-        filled_text = tokenizer.decode(candidate_ids[0], skip_special_tokens=True)
-        filled_texts.append(filled_text)
-    predictions.append(
-        {
-            "mask_index": mask_index,
-            "tokens": tokens,
-            "probabilities": [float(p) for p in topk_probs.tolist()],
-            "filled_texts": filled_texts,
-        }
-    )
+mask_logits = logits[0, mask_index]
+topk = torch.topk(mask_logits, k=5)
+top_tokens = tokenizer.convert_ids_to_tokens(topk.indices.tolist())
+top_scores = topk.values.tolist()
 
-RESULT = {"predictions": predictions}
+RESULT = {"top_tokens": top_tokens, "top_scores": top_scores, "logits_shape": list(logits.shape)}

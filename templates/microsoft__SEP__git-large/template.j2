@@ -1,44 +1,44 @@
 {% set repo_id = repo_id | default("microsoft/git-large") %}
 {% set device = device | default("cuda:0") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set max_length = max_length | default(20) %}
-{% set num_beams = num_beams | default(1) %}
-{% set num_return_sequences = num_return_sequences | default(1) %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set prompt = prompt | default('a photo of') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-num_return_sequences = {{ num_return_sequences }}
+prompt = "{{ prompt }}"
 
 import os
-from pathlib import Path
-import torch
-from transformers import AutoProcessor, AutoModelForCausalLM
-from PIL import Image
 import requests
-from io import BytesIO
+from PIL import Image
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoProcessor, AutoModelForCausalLM
 
-processor = AutoProcessor.from_pretrained(repo_id)
-model = AutoModelForCausalLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+processor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
 
-# Load image from URL or local path
 if image_path.startswith("http://") or image_path.startswith("https://"):
-    image = Image.open(BytesIO(requests.get(image_path).content)).convert("RGB")
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
 else:
     image = Image.open(image_path).convert("RGB")
 
-inputs = processor(images=image, return_tensors="pt")
+processor = AutoProcessor.from_pretrained(os.path.dirname(processor_config_path))
+model = AutoModelForCausalLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+state_dict = torch.load(weights_path, map_location="cpu")
+state_dict.pop("git.embeddings.position_ids", None)
+state_dict.pop("git.image_encoder.vision_model.embeddings.position_ids", None)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+inputs = processor(images=image, text=prompt, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_length=30, num_beams=3)
+output_text = processor.batch_decode(output_ids, skip_special_tokens=True)[0]
 
-generated_ids = model.generate(
-    pixel_values=inputs["pixel_values"],
-    max_length=max_length,
-    num_beams=num_beams,
-    num_return_sequences=num_return_sequences,
-    eos_token_id=processor.tokenizer.eos_token_id,
-)
-
-captions = processor.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-
-RESULT = {"captions": captions}
+RESULT = {"text": output_text}

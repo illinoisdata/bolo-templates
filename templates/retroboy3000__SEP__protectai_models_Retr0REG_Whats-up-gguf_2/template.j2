@@ -1,0 +1,24 @@
+{% set repo_id = repo_id | default("retroboy3000/protectai_models_Retr0REG_Whats-up-gguf_2") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('retr0reg.gguf') %}
+{% set prompt = prompt | default('What is the capital of France?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+llm = Llama(
+    model_path=model_path,
+    n_ctx=128,
+    n_threads=1,
+    n_gpu_layers=0,
+    verbose=False,
+)
+
+output = llm(prompt, max_tokens=16, temperature=0.0)
+RESULT = {"output": output}

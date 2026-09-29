@@ -1,0 +1,25 @@
+{% set repo_id = repo_id | default("keremberke/yolov8n-painting-classification") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set conf = conf | default(0.25) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+conf = {{ conf }}
+
+import os
+from urllib.parse import urlparse
+
+from PIL import Image
+import torch
+
+
+def load_image(path_or_url):
+    if isinstance(path_or_url, str) and urlparse(path_or_url).scheme in ("http", "https"):
+        import requests
+        from io import BytesIO
+        return Image.open(BytesIO(requests.get(path_or_url, timeout=30).content)).convert("RGB")
+    return Image.open(path_or_url).convert("RGB")
+
+
+RESULT = {"predictions": {"error": "ultralytics unavailable in this environment"}}

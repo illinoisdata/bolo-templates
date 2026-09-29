@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("MaziyarPanahi/NuExtract-1.5-smol-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('NuExtract-1.5-smol.Q4_K_M.gguf') %}
+{% set prompt = prompt | default('Extract all structured information from the following text as JSON.') %}
+{% set input_text = input_text | default('John Smith works at Acme Corp as a senior engineer in San Francisco.') %}
+{% set max_tokens = max_tokens | default(128) %}
+{% set temperature = temperature | default(0.0) %}
+{% set top_p = top_p | default(1.0) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+input_text = "{{ input_text }}"
+max_tokens = {{ max_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+
+import os
+import json
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+llm = Llama(
+    model_path=model_path,
+    n_ctx=2048,
+    n_threads=max(1, os.cpu_count() or 1),
+    n_gpu_layers=-1 if device.startswith('cuda') else 0,
+    verbose=False,
+)
+
+messages = [
+    {"role": "system", "content": "You are a precise information extraction system. Return only valid JSON."},
+    {"role": "user", "content": f"{prompt}\n\nText:\n{input_text}\n\nReturn JSON only."},
+]
+
+output = llm.create_chat_completion(
+    messages=messages,
+    temperature=temperature,
+    top_p=top_p,
+    max_tokens=max_tokens,
+)
+
+text = output["choices"][0]["message"]["content"]
+RESULT = {"output": text}

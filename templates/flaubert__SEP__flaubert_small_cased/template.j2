@@ -1,0 +1,24 @@
+{% set repo_id = repo_id | default("flaubert/flaubert_small_cased") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+from transformers import cache_utils
+
+if not hasattr(cache_utils.EncoderDecoderCache, "__getitem__"):
+    def _encoder_decoder_cache_getitem(self, idx):
+        return self
+
+    cache_utils.EncoderDecoderCache.__getitem__ = _encoder_decoder_cache_getitem
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

@@ -1,0 +1,26 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Anatomy-Medium-209M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("The patient complained of pain in the left ventricle region.") %}
+{% set labels = labels | default(["Anatomy"]) %}
+{% set threshold = threshold | default(0.5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+labels = {{ labels | tojson }}
+threshold = {{ threshold }}
+
+import json
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from gliner import GLiNER
+
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+
+device_obj = torch.device(device)
+model = GLiNER.from_pretrained(repo_id)
+model = model.to(device_obj)
+
+entities = model.predict_entities(text, labels, flat_ner=True, threshold=threshold)
+RESULT = {"entities": entities}

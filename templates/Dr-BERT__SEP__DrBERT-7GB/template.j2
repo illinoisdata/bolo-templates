@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("Dr-BERT/DrBERT-7GB") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set model = model | default(repo_id) %}
+{% set masked_prompt = masked_prompt | default("Le patient est atteint d'une {mask}.") %}
+
+repo_id = "{{ repo_id }}"
+model = "{{ model }}"
+task = "{{ task }}"
+device = "{{ device }}"
+masked_prompt = "{{ masked_prompt }}"
+
+# Patch CamembertTokenizer __init__ to support vocab dicts
+import transformers.models.camembert.tokenization_camembert as _camembert_module
+_orig_camembert_init = _camembert_module.CamembertTokenizer.__init__
+
+def _patched_camembert_init(self, *args, **kwargs):
+    vocab = kwargs.get("vocab")
+    if isinstance(vocab, dict):
+        sorted_vocab = sorted(vocab.items(), key=lambda kv: kv[1])
+        kwargs["vocab"] = [(token, float(weight)) for token, weight in sorted_vocab]
+    return _orig_camembert_init(self, *args, **kwargs)
+
+_camembert_module.CamembertTokenizer.__init__ = _patched_camembert_init
+
+from transformers import pipeline, AutoTokenizer
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(model, use_fast=True)
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+
+# Preprocess input
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+
+# Run inference
+RESULT = pipe(text)

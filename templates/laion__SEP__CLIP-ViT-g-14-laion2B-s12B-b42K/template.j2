@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("laion/CLIP-ViT-g-14-laion2B-s12B-b42K") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default("playing music, playing sports") %}
+{% set image_input = image_input | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+image_input = "{{ image_input }}"
+
+import os
+from io import BytesIO
+
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from transformers import CLIPModel, CLIPProcessor
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+if image_input.startswith("http://") or image_input.startswith("https://"):
+    import requests
+    image = Image.open(BytesIO(requests.get(image_input, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_input).convert("RGB")
+
+processor_dir = os.path.dirname(processor_config_path)
+model_dir = os.path.dirname(config_path)
+processor = CLIPProcessor.from_pretrained(processor_dir, local_files_only=True)
+model = CLIPModel.from_pretrained(model_dir, local_files_only=True)
+state_dict = torch.load(weights_path, map_location="cpu", weights_only=False)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+inputs = processor(text=[text_input], images=image, return_tensors="pt", padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits_per_image = outputs.logits_per_image
+    probabilities = logits_per_image.softmax(dim=-1)
+
+RESULT = {"logits_per_image": logits_per_image.detach().cpu().tolist(), "probabilities": probabilities.detach().cpu().tolist(), "text_input": [text_input]}

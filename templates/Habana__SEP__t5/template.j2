@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("Habana/t5") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The Eiffel Tower is located in Paris, France.') %}
+{% set max_new_tokens = max_new_tokens | default(16) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+max_new_tokens = {{ max_new_tokens }}
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gaudi_config.json")
+
+# Load a standard T5 model for inference; the repo itself provides Gaudi config only.
+tokenizer = AutoTokenizer.from_pretrained("t5-base")
+model = AutoModelForSeq2SeqLM.from_pretrained("t5-base")
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated = model.generate(**inputs, max_new_tokens=max_new_tokens)
+
+decoded = tokenizer.batch_decode(generated, skip_special_tokens=True)
+
+RESULT = {"generated_text": decoded, "gaudi_config_path": config_path}

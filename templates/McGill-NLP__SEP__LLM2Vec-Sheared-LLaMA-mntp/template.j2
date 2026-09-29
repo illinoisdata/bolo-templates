@@ -1,59 +1,53 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("McGill-NLP/LLM2Vec-Sheared-LLaMA-mntp") %}
-{% set text_left = text_left | default("How much protein should a female eat") %}
-{% set text_right = text_right | default("Definition of summit for English Language Learners.") %}
-{% set max_length = max_length | default(256) %}
+{% set device = device | default("cuda:0") %}
+{% set instruction = instruction | default('Given a web search query, retrieve relevant passages that answer the query:') %}
+{% set queries = queries | default([['Given a web search query, retrieve relevant passages that answer the query:', 'how much protein should a female eat'], ['Given a web search query, retrieve relevant passages that answer the query:', 'summit define']]) %}
+{% set documents = documents | default(['As a general guideline, the CDC\'s average requirement of protein for women ages 19 to 70 is 46 grams per day. But, as you can see from this chart, you\'ll need to increase that if you\'re expecting or training for a marathon. Check out the chart below to see how much protein you should be eating each day.', 'Definition of summit for English Language Learners. : 1  the highest point of a mountain : the top of a mountain. : 2  the highest level. : 3  a meeting or series of meetings between the leaders of two or more governments.']) %}
+{% set max_length = max_length | default(512) %}
+{% set pooling_mode = pooling_mode | default('mean') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_left = "{{ text_left }}"
-text_right = "{{ text_right }}"
+instruction = {{ instruction | tojson }}
+queries = {{ queries | tojson }}
+documents = {{ documents | tojson }}
 max_length = {{ max_length }}
+pooling_mode = {{ pooling_mode | tojson }}
 
-from pathlib import Path
-import json
-
+import os
 import torch
+import torch.nn.functional as F
+from huggingface_hub import hf_hub_download
 from transformers import AutoConfig, AutoModel, AutoTokenizer
-from peft import PeftModel
+import torch.distributed.tensor
+from llm2vec import LLM2Vec
 
-config = AutoConfig.from_pretrained(repo_id)
-base_model_id = config._name_or_path
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(base_model_id).to(device)
-model = PeftModel.from_pretrained(model, repo_id).to(device)
-model.eval()
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+modeling_path = hf_hub_download(repo_id=repo_id, filename="modeling_llama_encoder.py")
+attn_mask_utils_path = hf_hub_download(repo_id=repo_id, filename="attn_mask_utils.py")
+adapter_config_path = hf_hub_download(repo_id=repo_id, filename="adapter_config.json")
+adapter_weights_path = hf_hub_download(repo_id=repo_id, filename="adapter_model.safetensors")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_model_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.model")
 
-texts = [text_left, text_right]
-encoded_inputs = tokenizer(
-    texts,
-    padding=True,
-    truncation=True,
-    max_length=max_length,
-    return_tensors="pt",
-)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+model_dir = os.path.dirname(config_path)
 
-with torch.no_grad():
-    model_outputs = model(**encoded_inputs)
-    last_hidden_state = model_outputs.last_hidden_state
 
-attention_mask = encoded_inputs["attention_mask"]
-mask = attention_mask.unsqueeze(-1).to(dtype=last_hidden_state.dtype)
-sum_hidden = (last_hidden_state * mask).sum(dim=1)
-denominator = mask.sum(dim=1).clamp(min=1e-9)
-pooled_embeddings = sum_hidden / denominator
-normalized_embeddings = torch.nn.functional.normalize(pooled_embeddings, dim=1)
-similarity_matrix = torch.matmul(
-    normalized_embeddings, normalized_embeddings.transpose(0, 1)
-)
-similarity_matrix_list = similarity_matrix.cpu().tolist()
-cosine_similarity_between_first_two = (
-    float(similarity_matrix_list[0][1])
-    if len(similarity_matrix_list) > 1
-    else float(similarity_matrix_list[0][0])
-)
-RESULT = {
-    "cosine_similarity_between_first_two": cosine_similarity_between_first_two,
-    "pairwise_similarity_matrix": similarity_matrix_list,
-    "embeddings": pooled_embeddings.cpu().tolist(),
-}
+tokenizer = AutoTokenizer.from_pretrained(model_dir)
+config = AutoConfig.from_pretrained(model_dir, trust_remote_code=True)
+model = AutoModel.from_pretrained(
+    model_dir,
+    trust_remote_code=True,
+    config=config,
+    torch_dtype=torch.bfloat16,
+).to(device)
+
+l2v = LLM2Vec(model, tokenizer, pooling_mode=pooling_mode, max_length=max_length)
+q_reps = l2v.encode(queries)
+d_reps = l2v.encode(documents)
+q_reps_norm = F.normalize(q_reps, p=2, dim=1)
+d_reps_norm = F.normalize(d_reps, p=2, dim=1)
+cos_sim = torch.mm(q_reps_norm, d_reps_norm.transpose(0, 1))
+
+RESULT = {"cosine_similarity": cos_sim}

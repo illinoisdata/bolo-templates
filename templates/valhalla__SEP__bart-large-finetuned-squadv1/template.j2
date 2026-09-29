@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("valhalla/bart-large-finetuned-squadv1") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('What is BART?') %}
+{% set context = context | default('BART is a sequence-to-sequence model for natural language generation, translation, and comprehension. It was proposed in the paper BART: Denoising Sequence-to-Sequence Pre-training for Natural Language Generation, Translation, and Comprehension.') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import torch
+from transformers import AutoTokenizer, BartForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+# Derive tokenizer directory from a downloaded file path.
+import os
+model_dir = os.path.dirname(weights_path)
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir)
+model = BartForQuestionAnswering.from_pretrained(model_dir)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, context, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    start_idx = int(torch.argmax(outputs.start_logits, dim=-1).item())
+    end_idx = int(torch.argmax(outputs.end_logits, dim=-1).item())
+    if end_idx < start_idx:
+        end_idx = start_idx
+    answer_ids = inputs["input_ids"][0, start_idx:end_idx + 1]
+    answer = tokenizer.decode(answer_ids, skip_special_tokens=True).strip()
+
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx}

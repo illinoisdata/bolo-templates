@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("TheBloke/meditron-7B-AWQ") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set temperature = temperature | default(0.7) %}
+{% set top_p = top_p | default(0.95) %}
+{% set top_k = top_k | default(40) %}
+{% set repetition_penalty = repetition_penalty | default(1.1) %}
+
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+top_k = {{ top_k }}
+repetition_penalty = {{ repetition_penalty }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+
+from transformers import pipeline
+
+prompt = input_prompt
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    device=device,
+    max_new_tokens=max_new_tokens,
+    temperature=temperature,
+    top_p=top_p,
+    top_k=top_k,
+    repetition_penalty=repetition_penalty,
+)
+
+pipeline_output = pipe(prompt)
+
+generated_text = pipeline_output[0]["generated_text"]
+
+RESULT = {
+    "generated_text": generated_text,
+    "pipeline_output": pipeline_output,
+}

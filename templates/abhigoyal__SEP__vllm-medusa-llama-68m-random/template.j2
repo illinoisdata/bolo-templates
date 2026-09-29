@@ -1,19 +1,34 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("abhigoyal/vllm-medusa-llama-68m-random") %}
-{% set check_name = check_name | default("medusa") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hello, how are you?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-check_name = "{{ check_name }}"
+text = {{ text | tojson }}
 
-from pathlib import Path
-
+import os
+import json
 import torch
-import transformers
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
 
-exists = hasattr(transformers.models, check_name)
-found_items = []
-if exists:
-    module = getattr(transformers.models, check_name)
-    found_items = [name for name in dir(module) if name.endswith("Model")]
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 
-RESULT = {"exists": exists, "found_items": found_items}
+config = json.load(open(config_path))
+state_dict = load_file(weights_path)
+
+vocab_size = int(config["vocab_size"])
+input_ids = torch.arange(min(8, vocab_size), dtype=torch.long, device=device).unsqueeze(0)
+
+# Minimal inference-compatible inspection of the checkpoint tensors.
+param_shapes = {k: tuple(v.shape) for k, v in state_dict.items()}
+num_tensors = len(state_dict)
+num_parameters = int(sum(v.numel() for v in state_dict.values()))
+
+RESULT = {
+    "input_ids": input_ids,
+    "num_tensors": num_tensors,
+    "num_parameters": num_parameters,
+    "param_shapes": param_shapes,
+    "text": text,
+}

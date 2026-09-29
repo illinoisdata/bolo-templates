@@ -1,23 +1,31 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("circulus/canvers-ko2en-v1") %}
-{% set input_text = input_text | default("안녕하세요, 세계!") %}
-{% set max_length = max_length | default(256) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('이 문장을 영어로 번역해 주세요.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text = "{{ text }}"
 
-import os
-import torch
+from huggingface_hub import hf_hub_download
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-inputs = tokenizer(input_text, return_tensors="pt").to(device)
-generated_ids = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
-translation = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-RESULT = {"translation": translation}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=64)
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

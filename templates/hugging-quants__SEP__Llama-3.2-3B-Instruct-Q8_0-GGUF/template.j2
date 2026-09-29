@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("hugging-quants/Llama-3.2-3B-Instruct-Q8_0-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default("llama-3.2-3b-instruct-q8_0.gguf") %}
+{% set prompt = prompt | default("The meaning of life is") %}
+{% set max_tokens = max_tokens | default(64) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+max_tokens = {{ max_tokens }}
+
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+RESULT = {"output": weights_path}

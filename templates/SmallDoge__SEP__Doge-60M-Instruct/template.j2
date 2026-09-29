@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("SmallDoge/Doge-60M-Instruct") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Hi, how are you doing today?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import torch
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = weights_path
+_ = config_path
+
+RESULT = {"output": prompt}

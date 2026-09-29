@@ -1,37 +1,47 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("facebook/blenderbot-1B-distill") %}
-{% set user_text = user_text | default("Hello there! What would you like to discuss today?") %}
-{% set max_new_tokens = max_new_tokens | default(60) %}
-{% set temperature = temperature | default(0.7) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Hello! How are you doing today?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-user_text = "{{ user_text }}"
-max_new_tokens = {{ max_new_tokens }}
-temperature = {{ temperature }}
-num_beams = {{ num_beams }}
-
-import os
+prompt = {{ prompt | tojson }}
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import BlenderbotTokenizer, BlenderbotForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+repo_dir = hf_hub_download(repo_id=repo_id, filename='config.json').rsplit('/', 1)[0]
+_ = hf_hub_download(repo_id=repo_id, filename='pytorch_model.bin')
+_ = hf_hub_download(repo_id=repo_id, filename='tokenizer.json')
+_ = hf_hub_download(repo_id=repo_id, filename='tokenizer_config.json')
+_ = hf_hub_download(repo_id=repo_id, filename='special_tokens_map.json')
+_ = hf_hub_download(repo_id=repo_id, filename='vocab.json')
+_ = hf_hub_download(repo_id=repo_id, filename='merges.txt')
+_ = hf_hub_download(repo_id=repo_id, filename='added_tokens.json')
+_ = hf_hub_download(repo_id=repo_id, filename='generation_config.json')
 
-inputs = tokenizer(user_text, return_tensors="pt", truncation=True)
-inputs = {key: value.to(device) for key, value in inputs.items()}
+tokenizer = BlenderbotTokenizer.from_pretrained(repo_dir)
+model = BlenderbotForConditionalGeneration.from_pretrained(
+    repo_dir,
+    torch_dtype=torch.float16 if device.startswith('cuda') else torch.float32,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+model.eval()
 
-generate_kwargs = {
-    "max_new_tokens": max_new_tokens,
-    "num_beams": num_beams,
-    "temperature": temperature,
-    "early_stopping": True,
-    "pad_token_id": tokenizer.pad_token_id,
-}
+inputs = tokenizer([prompt], return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_tokens = model.generate(**inputs, **generate_kwargs)
-generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=60,
+        num_beams=10,
+        do_sample=False,
+        length_penalty=0.65,
+        no_repeat_ngram_size=3,
+        early_stopping=True,
+    )
 
-RESULT = {"generated_text": generated_text}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": output_text}

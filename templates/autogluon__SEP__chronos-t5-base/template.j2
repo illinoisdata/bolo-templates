@@ -1,33 +1,49 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("autogluon/chronos-t5-base") %}
-{% set input_text = input_text | default("Historical time series data points for forecasting guidance.") %}
-{% set max_length = max_length | default(64) %}
-{% set num_return_sequences = num_return_sequences | default(1) %}
+{% set device = device | default("cuda:0") %}
+{% set prediction_length = prediction_length | default(12) %}
+{% set num_samples = num_samples | default(20) %}
+{% set context_series = context_series | default([112,118,132,129,121,135,148,148,136,119,104,118,115,126,141,135,125,149,170,170,158,133,114,140]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-max_length = {{ max_length }}
-num_return_sequences = {{ num_return_sequences }}
+prediction_length = {{ prediction_length }}
+num_samples = {{ num_samples }}
+context_series = {{ context_series }}
 
-import torch
+import json
+import os
 from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
-device = torch.device(device)
+import numpy as np
+import pandas as pd
+import torch
+from huggingface_hub import hf_hub_download
+from chronos import ChronosPipeline
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
 
-inputs = tokenizer(input_text, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+pipeline = ChronosPipeline.from_pretrained(
+    repo_id,
+    device_map=device,
+    torch_dtype=torch.bfloat16 if "cuda" in device else torch.float32,
+)
 
-with torch.no_grad():
-    generated_tokens = model.generate(
-        **inputs,
-        max_length=max_length,
-        num_return_sequences=num_return_sequences,
-    )
+context = torch.tensor(context_series, dtype=torch.float32)
+forecast = pipeline.predict(
+    context,
+    prediction_length,
+    num_samples=num_samples,
+)
 
-forecasts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+forecast_np = forecast[0].detach().cpu().numpy()
+low, median, high = np.quantile(forecast_np, [0.1, 0.5, 0.9], axis=0)
 
-RESULT = {"forecasts": forecasts}
+RESULT = {
+    "forecast": forecast_np,
+    "low": low,
+    "median": median,
+    "high": high,
+    "context": context_series,
+    "prediction_length": prediction_length,
+}

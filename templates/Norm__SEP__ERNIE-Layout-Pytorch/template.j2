@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("Norm/ERNIE-Layout-Pytorch") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("What is the document about?") %}
+{% set doc_path = doc_path | default("/u/yunqili4/projects/ML-code-generation/data/doc.jpeg") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+doc_path = "{{ doc_path }}"
+
+import os
+import sys
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from transformers import AutoConfig, AutoModelForQuestionAnswering, AutoTokenizer
+from transformers.models.layoutlmv3 import LayoutLMv3ImageProcessor
+
+repo_local_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+repo_dir = os.path.dirname(repo_local_path)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+image = Image.open(doc_path).convert("RGB") if not str(doc_path).startswith(("http://", "https://")) else Image.open(__import__("urllib.request").request.urlopen(doc_path)).convert("RGB")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, use_fast=True)
+feature_extractor = LayoutLMv3ImageProcessor(apply_ocr=False)
+config = AutoConfig.from_pretrained(repo_dir)
+model = AutoModelForQuestionAnswering.from_config(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+# Construct a minimal valid layout-aware QA input
+words = [text]
+boxes = [[0, 0, 1000, 1000]]
+encoding = tokenizer(words, return_tensors="pt")
+encoding["bbox"] = torch.tensor([[boxes[0]]], dtype=torch.long)
+encoding["pixel_values"] = feature_extractor(images=image, return_tensors="pt")["pixel_values"]
+encoding = {k: v.to(device) for k, v in encoding.items()}
+
+with torch.no_grad():
+    outputs = model(**encoding)
+
+start_idx = int(outputs.start_logits.argmax(dim=-1).item())
+end_idx = int(outputs.end_logits.argmax(dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+answer = tokenizer.decode(encoding["input_ids"][0][start_idx:end_idx + 1], skip_special_tokens=True)
+
+RESULT = {"answer": answer, "start_index": start_idx, "end_index": end_idx}

@@ -1,0 +1,76 @@
+{% set data_files = data_files | default(['/u/yunqili4/projects/ML-code-generation/data/video.avi']) %}
+{% set input_indices = input_indices | default([0, 1, 2, 3, 4, 5]) %}
+{% set mask_ratio = mask_ratio | default(0.75) %}
+{% set repo_id = repo_id | default("ibm-nasa-geospatial/Prithvi-EO-1.0-100M") %}
+{% set device = device | default("cuda:0") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+data_files = {{ data_files }}
+input_indices = {{ input_indices }}
+mask_ratio = {{ mask_ratio }}
+
+import os
+import json
+import sys
+import torch
+import numpy as np
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="Prithvi_EO_V1_100M.pt")
+model_code_path = hf_hub_download(repo_id=repo_id, filename="prithvi_mae.py")
+repo_dir = os.path.dirname(model_code_path)
+sys.path.insert(0, repo_dir)
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+pretrained_cfg = cfg["pretrained_cfg"]
+
+from prithvi_mae import PrithviMAE
+
+model = PrithviMAE(**pretrained_cfg)
+state = torch.load(weights_path, map_location="cpu")
+if "model" in state:
+    state = state["model"]
+elif "state_dict" in state:
+    state = state["state_dict"]
+model.load_state_dict(state, strict=False)
+model.to(device)
+model.eval()
+
+frames = []
+for fp in data_files:
+    if isinstance(fp, str) and fp.startswith(("http://", "https://")):
+        raise ValueError("URL inputs are not supported for this model")
+    img = np.array(Image.open(fp))
+    if img.ndim == 2:
+        img = img[..., None]
+    if img.shape[-1] > max(input_indices) + 1:
+        img = img[..., input_indices]
+    img = img.astype(np.float32)
+    if img.shape[0] != pretrained_cfg["img_size"] or img.shape[1] != pretrained_cfg["img_size"]:
+        im = Image.fromarray(img.astype(np.uint8) if img.dtype != np.uint8 else img)
+        im = im.resize((pretrained_cfg["img_size"], pretrained_cfg["img_size"]))
+        img = np.array(im).astype(np.float32)
+        if img.ndim == 2:
+            img = img[..., None]
+    img = np.moveaxis(img, -1, 0)
+    frames.append(img)
+
+video = np.stack(frames, axis=1)
+if video.shape[0] < 6:
+    pad = np.zeros((6 - video.shape[0],) + video.shape[1:], dtype=video.dtype)
+    video = np.concatenate([video, pad], axis=0)
+video = (video - np.array(pretrained_cfg["mean"], dtype=np.float32)[:, None, None]) / np.array(pretrained_cfg["std"], dtype=np.float32)[:, None, None]
+video = torch.from_numpy(video).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    latent, pred, mask = model(video, mask_ratio=mask_ratio)
+
+RESULT = {
+    "latent": latent.detach().cpu(),
+    "prediction": pred.detach().cpu(),
+    "mask": mask.detach().cpu(),
+}

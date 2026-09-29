@@ -1,0 +1,54 @@
+{% set repo_id = repo_id | default("unsloth/Mistral-Small-Instruct-2409-bnb-4bit") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('How often does the letter r occur in Mistral?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    dtype=torch.bfloat16,
+    low_cpu_mem_usage=True,
+)
+model = model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+messages = [{"role": "user", "content": prompt}]
+encoded = tokenizer.apply_chat_template(
+    messages,
+    tokenize=True,
+    add_generation_prompt=True,
+    return_dict=True,
+    return_tensors="pt",
+)
+input_ids = encoded["input_ids"].to(device)
+attention_mask = encoded.get("attention_mask")
+if attention_mask is not None:
+    attention_mask = attention_mask.to(device)
+
+with torch.no_grad():
+    generated = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        max_new_tokens=64,
+        do_sample=False,
+        pad_token_id=tokenizer.eos_token_id,
+    )
+
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+RESULT = {"text": output_text}

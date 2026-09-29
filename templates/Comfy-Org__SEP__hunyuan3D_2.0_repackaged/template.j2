@@ -1,0 +1,38 @@
+{% set repo_id = repo_id | default("Comfy-Org/hunyuan3D_2.0_repackaged") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('a cute cat') %}
+{% set guidance_scale = guidance_scale | default(7.5) %}
+{% set num_inference_steps = num_inference_steps | default(20) %}
+{% set seed = seed | default(42) %}
+{% set quant_filename = quant_filename | default('split_files/hunyuan3d-dit-v2_fp16.safetensors') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+guidance_scale = {{ guidance_scale }}
+num_inference_steps = {{ num_inference_steps }}
+seed = {{ seed }}
+quant_filename = "{{ quant_filename }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+weights_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+state_dict = load_file(weights_path, device="cpu")
+
+first_key = next(iter(state_dict))
+output_value = {
+    "repo_id": repo_id,
+    "device": device,
+    "weights_file": os.path.basename(weights_path),
+    "num_tensors": len(state_dict),
+    "first_tensor_name": first_key,
+    "first_tensor_shape": list(state_dict[first_key].shape),
+    "prompt": prompt,
+    "guidance_scale": guidance_scale,
+    "num_inference_steps": num_inference_steps,
+    "seed": seed,
+}
+
+RESULT = {"output": output_value}

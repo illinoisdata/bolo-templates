@@ -1,0 +1,26 @@
+{% set repo_id = repo_id | default("onnx-community/gliner_multi-v2.1") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Steve Jobs founded Apple in Cupertino, California.') %}
+{% set labels = labels | default(['person', 'organization', 'location']) %}
+{% set threshold = threshold | default(0.5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+labels = {{ labels }}
+threshold = {{ threshold }}
+
+import json
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+gliner_config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+with open(gliner_config_path, "r") as f:
+    gliner_config = json.load(f)
+
+enc = tokenizer(text, return_tensors="np", truncation=True, max_length=gliner_config.get("max_len", 384))
+RESULT = {"input_ids_shape": enc["input_ids"].shape, "config": config, "gliner_config": gliner_config, "text": text, "labels": labels}

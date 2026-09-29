@@ -1,0 +1,61 @@
+{% set repo_id = repo_id | default("h2oai/h2ogpt-gm-oasst1-en-1024-open-llama-7b-preview-400bt") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set prompt_template = prompt_template | default("<|prompt|>{prompt}</s><|answer|>") %}
+{% set generation_kwargs = generation_kwargs | default({
+    "min_new_tokens": 2,
+    "max_new_tokens": 128,
+    "do_sample": False,
+    "num_beams": 1,
+    "temperature": 0.3,
+    "repetition_penalty": 1.2,
+    "renormalize_logits": True
+}) %}
+{% set tokenizer_use_fast = tokenizer_use_fast | default(False) %}
+{% set tokenizer_padding_side = tokenizer_padding_side | default("left") %}
+{% set custom_pipeline_filename = custom_pipeline_filename | default("h2oai_pipeline.py") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+model = repo_id
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+prompt_template = {{ prompt_template | tojson }}
+generation_kwargs = {{ generation_kwargs | tojson | replace('false', 'False') | replace('true', 'True') }}
+tokenizer_use_fast = {{ tokenizer_use_fast }}
+tokenizer_padding_side = {{ tokenizer_padding_side | tojson }}
+custom_pipeline_filename = {{ custom_pipeline_filename | tojson }}
+
+import importlib.util
+from huggingface_hub import hf_hub_download
+import torch
+from transformers import AutoTokenizer, pipeline
+
+if isinstance(device, str):
+    device = torch.device(device)
+
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    use_fast=tokenizer_use_fast,
+    padding_side=tokenizer_padding_side,
+)
+
+pipeline_file_path = hf_hub_download(repo_id=repo_id, filename=custom_pipeline_filename)
+spec = importlib.util.spec_from_file_location("h2oai_pipeline", pipeline_file_path)
+h2oai_pipeline = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(h2oai_pipeline)
+H2OTextGenerationPipeline = h2oai_pipeline.H2OTextGenerationPipeline
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=tokenizer,
+    device=device,
+    pipeline_class=H2OTextGenerationPipeline,
+)
+
+formatted_prompt = prompt_template.format(prompt=input_prompt)
+
+RESULT = pipe(formatted_prompt, **generation_kwargs)
+RESULT = {"generated_text": RESULT[0]["generated_text"]}

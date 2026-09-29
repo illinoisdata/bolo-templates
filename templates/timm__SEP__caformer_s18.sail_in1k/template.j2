@@ -1,0 +1,63 @@
+{% set repo_id = repo_id | default("timm/caformer_s18.sail_in1k") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set topk = topk | default(5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+topk = {{ topk }}
+
+import os
+import json
+import torch
+import timm
+from PIL import Image
+from urllib.parse import urlparse
+from urllib.request import urlopen
+from torchvision import transforms
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weight_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+if urlparse(image_path).scheme in ("http", "https"):
+    img = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    img = Image.open(image_path).convert("RGB")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+model = timm.create_model(repo_id.split("/")[-1], pretrained=False)
+state_dict = None
+if weight_path.endswith(".safetensors"):
+    from safetensors.torch import load_file
+    state_dict = load_file(weight_path, device="cpu")
+else:
+    state_dict = torch.load(weight_path, map_location="cpu")
+model.load_state_dict(state_dict)
+model.eval()
+model.to(device)
+
+pretrained_cfg = cfg["pretrained_cfg"]
+mean = pretrained_cfg["mean"]
+std = pretrained_cfg["std"]
+size = pretrained_cfg["input_size"][1]
+transform = transforms.Compose([
+    transforms.Resize(size, interpolation=transforms.InterpolationMode.BICUBIC),
+    transforms.CenterCrop(size),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=mean, std=std),
+])
+
+x = transform(img).unsqueeze(0).to(device)
+with torch.no_grad():
+    logits = model(x)
+    probs = torch.softmax(logits, dim=1)
+    values, indices = torch.topk(probs, k=topk, dim=1)
+
+RESULT = {
+    "logits": logits.detach().cpu(),
+    "probabilities": values.detach().cpu(),
+    "class_indices": indices.detach().cpu(),
+}

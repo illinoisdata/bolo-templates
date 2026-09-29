@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("alakxender/mms-tts-div-ft-spk01-m01") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-to-audio") -%}
+{% set model = model | default(repo_id) -%}
+{% set text_input = text_input | default("މޫސުން ވަރަށް ގޯސްވެ، ފުވައްމުލަކުން ފެށިގެން އައްޑުއަށް އޮރެންޖް އެލާޓް ނެރެފި") -%}
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+text_input = {{ text_input | tojson }}
+input_data = text_input
+
+import torch
+from transformers import pipeline
+from transformers.tokenization_utils_base import BatchEncoding
+
+_original_batchencoding_to = BatchEncoding.to
+
+def _batchencoding_to(self, device=None, *, non_blocking: bool = False, dtype=None):
+    encoding = self
+    if device is not None:
+        encoding = _original_batchencoding_to(self, device=device, non_blocking=non_blocking)
+    if dtype is not None:
+        converted = {}
+        for key, value in encoding.data.items():
+            if isinstance(value, torch.Tensor) and torch.is_floating_point(value):
+                converted[key] = value.to(dtype=dtype)
+            else:
+                converted[key] = value
+        encoding.data = converted
+    return encoding
+
+BatchEncoding.to = _batchencoding_to
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(input_data)

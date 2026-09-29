@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("state-spaces/mamba-2.8b-slimpj") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('The meaning of life is') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+
+import torch
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+state_dict = torch.load(weights_path, map_location=device)
+logits = {k: v.shape for k, v in state_dict.items() if hasattr(v, "shape")}
+RESULT = {"num_tensors": len(logits), "tensor_shapes": {k: list(v) for k, v in list(logits.items())[:5]}}

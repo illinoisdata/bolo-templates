@@ -1,26 +1,48 @@
 {% set repo_id = repo_id | default("uer/t5-small-chinese-cluecorpussmall") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("作为电子extra0的平台，京东绝对是领先者。如今的刘强extra1已经是身价过extra2的老板。") %}
+{% set text = text | default('中国的首都是extra0京') %}
 {% set max_length = max_length | default(50) %}
 {% set do_sample = do_sample | default(false) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
+text = "{{ text }}"
 max_length = {{ max_length }}
 do_sample = {{ do_sample }}
 
 import os
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import BertTokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model.to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
 
-inputs = tokenizer(input_text, return_tensors="pt")
+model = T5ForConditionalGeneration.from_pretrained(
+    os.path.dirname(config_path),
+    torch_dtype=torch.float32,
+    local_files_only=True,
+)
+tokenizer = BertTokenizer.from_pretrained(os.path.dirname(vocab_path), local_files_only=True)
+
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
 inputs.pop("token_type_ids", None)
-inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
-outputs = model.generate(**inputs, max_length=max_length, do_sample=do_sample)
-generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-RESULT = {"generated_text": generated_text}
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_length=max_length,
+        do_sample=do_sample,
+    )
+
+decoded = tokenizer.batch_decode(generated, skip_special_tokens=True)
+output_text = decoded[0] if decoded else ""
+
+RESULT = {"generated_text": output_text}

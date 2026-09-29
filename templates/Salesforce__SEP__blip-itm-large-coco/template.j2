@@ -1,34 +1,38 @@
 {% set repo_id = repo_id | default("Salesforce/blip-itm-large-coco") %}
 {% set device = device | default("cuda:0") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set question = question | default("A person holding a cat while sitting on a couch.") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set question = question | default('A woman and a dog sitting together in a beach.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
 question = "{{ question }}"
 
-import json
-from pathlib import Path
-
+import os
 import requests
 import torch
 from PIL import Image
 from transformers import BlipProcessor, BlipForImageTextRetrieval
+from huggingface_hub import hf_hub_download
 
-target_device = torch.device(device)
-
-processor = BlipProcessor.from_pretrained(repo_id)
-model = BlipForImageTextRetrieval.from_pretrained(repo_id).to(target_device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+processor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+model_dir = os.path.dirname(weights_path)
+processor_dir = os.path.dirname(processor_path)
+processor = BlipProcessor.from_pretrained(processor_dir)
+model = BlipForImageTextRetrieval.from_pretrained(model_dir)
+model = model.to(device)
 model.eval()
 
-if image_path.startswith("http://") or image_path.startswith("https://"):
+if image_path.startswith(("http://", "https://")):
     raw_image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
 else:
     raw_image = Image.open(image_path).convert("RGB")
 
-inputs = processor(raw_image, question, return_tensors="pt").to(target_device)
+inputs = processor(raw_image, question, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-itm_scores = model(**inputs)[0].detach().cpu().tolist()
-cosine_scores = model(**inputs, use_itm_head=False)[0].detach().cpu().tolist()
+with torch.no_grad():
+    itm_scores = model(**inputs)[0]
+    cosine_score = model(**inputs, use_itm_head=False)[0]
 
-RESULT = {"itm_scores": itm_scores, "cosine_scores": cosine_scores}
+RESULT = {"itm_scores": itm_scores.detach().cpu().tolist(), "cosine_score": cosine_score.detach().cpu().tolist()}

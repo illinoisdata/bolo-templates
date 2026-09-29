@@ -1,0 +1,66 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("bitfount/RETFound_MAE") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import json
+import os
+from pathlib import Path
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+import timm
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+img = image_path
+if isinstance(img, str) and img.startswith(("http://", "https://")):
+    from io import BytesIO
+    import requests
+    img = Image.open(BytesIO(requests.get(img, timeout=30).content)).convert("RGB")
+else:
+    img = Image.open(img).convert("RGB")
+
+pretrained_cfg = cfg.get("pretrained_cfg", None)
+model = timm.create_model(
+    cfg["architecture"],
+    pretrained=False,
+    num_classes=cfg.get("num_classes", 1000),
+    pretrained_cfg=pretrained_cfg,
+)
+state_dict = torch.load(weights_path, map_location="cpu")
+if isinstance(state_dict, dict) and "state_dict" in state_dict:
+    state_dict = state_dict["state_dict"]
+model.load_state_dict(state_dict, strict=True)
+model.to(device)
+model.eval()
+
+mean = pretrained_cfg.get("mean", [0.5, 0.5, 0.5]) if pretrained_cfg else [0.5, 0.5, 0.5]
+std = pretrained_cfg.get("std", [0.5, 0.5, 0.5]) if pretrained_cfg else [0.5, 0.5, 0.5]
+input_size = pretrained_cfg.get("input_size", [3, 224, 224]) if pretrained_cfg else [3, 224, 224]
+size = (input_size[1], input_size[2])
+img = img.resize(size, Image.BICUBIC)
+arr = np.asarray(img).astype(np.float32) / 255.0
+arr = (arr - np.array(mean, dtype=np.float32)) / np.array(std, dtype=np.float32)
+arr = np.transpose(arr, (2, 0, 1))[None, ...]
+inputs = torch.from_numpy(arr).to(device)
+
+with torch.no_grad():
+    logits = model(inputs)
+    probs = torch.softmax(logits, dim=-1)
+    top_prob, top_idx = torch.topk(probs, k=5, dim=-1)
+
+RESULT = {
+    "logits": logits.detach().cpu().numpy(),
+    "probabilities": probs.detach().cpu().numpy(),
+    "top5_indices": top_idx.detach().cpu().numpy(),
+    "top5_scores": top_prob.detach().cpu().numpy(),
+}

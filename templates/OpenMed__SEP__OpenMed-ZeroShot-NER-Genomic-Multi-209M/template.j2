@@ -1,0 +1,36 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Genomic-Multi-209M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("The BRCA2 gene is associated with hereditary breast cancer. Mutations in the CFTR gene cause cystic fibrosis. The APOE gene variant affects Alzheimer\'s disease risk.") %}
+{% set labels = labels | default(["Gene", "Genetic_Variant", "Disease"]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+labels = {{ labels | tojson }}
+
+import json
+from huggingface_hub import hf_hub_download
+from gliner import GLiNER
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+spm_path = hf_hub_download(repo_id=repo_id, filename="spm.model")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+model = GLiNER.from_pretrained(repo_id)
+model.to(device)
+
+entities = model.predict_entities(text, labels, flat_ner=True, threshold=0.3)
+output = []
+for ent in entities:
+    output.append({
+        "text": ent.get("text"),
+        "label": ent.get("label"),
+        "start": ent.get("start"),
+        "end": ent.get("end"),
+        "score": ent.get("score"),
+    })
+
+RESULT = {"entities": output}

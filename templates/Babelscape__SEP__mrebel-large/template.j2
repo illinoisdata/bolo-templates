@@ -1,142 +1,81 @@
 {% set repo_id = repo_id | default("Babelscape/mrebel-large") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("The Red Hot Chili Peppers were formed in Los Angeles by Kiedis, Flea, guitarist Hillel Slovak and drummer Jack Irons.") %}
-{% set src_lang = src_lang | default("en_XX") %}
-{% set tgt_lang = tgt_lang | default("<triplet>") %}
-{% set max_length = max_length | default(256) %}
-{% set num_beams = num_beams | default(3) %}
-{% set num_return_sequences = num_return_sequences | default(1) %}
-{% set length_penalty = length_penalty | default(0.0) %}
-{% set decoder_start_token_id = decoder_start_token_id | default(250058) %}
+{% set text = text | default("The Red Hot Chili Peppers were formed in Los Angeles by Kiedis, Flea, guitarist Hillel Slovak and drummer Jack Irons.") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = """{{ input_text }}"""
-src_lang = "{{ src_lang }}"
-tgt_lang = "{{ tgt_lang }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-num_return_sequences = {{ num_return_sequences }}
-length_penalty = {{ length_penalty }}
-decoder_start_token_id = {{ decoder_start_token_id }}
+text = {{ text | tojson }}
 
-import json
-import os
-from typing import Dict, List
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
-def extract_triplets_typed(text: str) -> List[Dict[str, str]]:
-    triplets: List[Dict[str, str]] = []
-    relation = ""
+def extract_triplets_typed(text):
+    triplets = []
+    relation = ''
     text = text.strip()
-    current = "x"
-    subject = ""
-    object_ = ""
-    object_type = ""
-    subject_type = ""
+    current = 'x'
+    subject, relation, object_, object_type, subject_type = '', '', '', '', ''
 
-    sanitized = (
-        text.replace("<s>", "")
-        .replace("<pad>", "")
-        .replace("</s>", "")
-        .replace("tp_XX", "")
-        .replace("__en__", "")
-    )
-
-    for token in sanitized.split():
+    for token in text.replace("<s>", "").replace("<pad>", "").replace("</s>", "").replace("tp_XX", "").replace("__en__", "").split():
         if token == "<triplet>" or token == "<relation>":
-            current = "t"
-            if relation != "":
-                triplets.append(
-                    {
-                        "head": subject.strip(),
-                        "head_type": subject_type,
-                        "type": relation.strip(),
-                        "tail": object_.strip(),
-                        "tail_type": object_type,
-                    }
-                )
-                relation = ""
-            subject = ""
+            current = 't'
+            if relation != '':
+                triplets.append({'head': subject.strip(), 'head_type': subject_type, 'type': relation.strip(), 'tail': object_.strip(), 'tail_type': object_type})
+                relation = ''
+            subject = ''
         elif token.startswith("<") and token.endswith(">"):
-            if current == "t" or current == "o":
-                current = "s"
-                if relation != "":
-                    triplets.append(
-                        {
-                            "head": subject.strip(),
-                            "head_type": subject_type,
-                            "type": relation.strip(),
-                            "tail": object_.strip(),
-                            "tail_type": object_type,
-                        }
-                    )
-                object_ = ""
+            if current == 't' or current == 'o':
+                current = 's'
+                if relation != '':
+                    triplets.append({'head': subject.strip(), 'head_type': subject_type, 'type': relation.strip(), 'tail': object_.strip(), 'tail_type': object_type})
+                object_ = ''
                 subject_type = token[1:-1]
             else:
-                current = "o"
+                current = 'o'
                 object_type = token[1:-1]
-                relation = ""
+                relation = ''
         else:
-            if current == "t":
-                subject += " " + token
-            elif current == "s":
-                object_ += " " + token
-            elif current == "o":
-                relation += " " + token
-    if subject != "" and relation != "" and object_ != "" and object_type != "" and subject_type != "":
-        triplets.append(
-            {
-                "head": subject.strip(),
-                "head_type": subject_type,
-                "type": relation.strip(),
-                "tail": object_.strip(),
-                "tail_type": object_type,
-            }
-        )
+            if current == 't':
+                subject += ' ' + token
+            elif current == 's':
+                object_ += ' ' + token
+            elif current == 'o':
+                relation += ' ' + token
+    if subject != '' and relation != '' and object_ != '' and object_type != '' and subject_type != '':
+        triplets.append({'head': subject.strip(), 'head_type': subject_type, 'type': relation.strip(), 'tail': object_.strip(), 'tail_type': object_type})
     return triplets
 
-tokenizer = AutoTokenizer.from_pretrained(
-    repo_id,
-    src_lang=src_lang,
-    tgt_lang=tgt_lang,
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+sentencepiece_path = hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32, local_files_only=True)
+model = model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, src_lang="en_XX", tgt_lang="tp_XX", local_files_only=True)
+
+model_inputs = tokenizer(text, max_length=256, padding=True, truncation=True, return_tensors="pt")
+model_inputs = {k: v.to(device) for k, v in model_inputs.items()}
+
+generated_tokens = model.generate(
+    model_inputs["input_ids"],
+    attention_mask=model_inputs["attention_mask"],
+    decoder_start_token_id=tokenizer.convert_tokens_to_ids("tp_XX"),
+    max_length=256,
+    length_penalty=0,
+    num_beams=3,
+    num_return_sequences=3,
+    forced_bos_token_id=None,
 )
-
-if hasattr(tokenizer, "set_src_lang_special_tokens"):
-    tokenizer.set_src_lang_special_tokens(src_lang)
-if hasattr(tokenizer, "src_lang"):
-    tokenizer.src_lang = src_lang
-
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
-
-model_inputs = tokenizer(
-    input_text,
-    max_length=max_length,
-    padding=True,
-    truncation=True,
-    return_tensors="pt",
-    src_lang=src_lang,
-    tgt_lang=tgt_lang,
-)
-
-input_ids = model_inputs["input_ids"].to(device)
-attention_mask = model_inputs["attention_mask"].to(device)
-
-generation_kwargs = {
-    "decoder_start_token_id": decoder_start_token_id,
-    "num_beams": num_beams,
-    "num_return_sequences": num_return_sequences,
-    "max_length": max_length,
-    "length_penalty": length_penalty,
-}
-
-generated_tokens = model.generate(input_ids, attention_mask=attention_mask, **generation_kwargs)
 
 decoded_preds = tokenizer.batch_decode(generated_tokens, skip_special_tokens=False)
+outputs = [extract_triplets_typed(sentence) for sentence in decoded_preds]
 
-parsed_triplets = [extract_triplets_typed(pred) for pred in decoded_preds]
-
-RESULT = {
-    "decoded_predictions": decoded_preds,
-    "typed_triplets": parsed_triplets,
-}
+RESULT = {"triplets": outputs}

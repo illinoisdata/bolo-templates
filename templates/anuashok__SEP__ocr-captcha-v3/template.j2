@@ -1,0 +1,47 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("anuashok/ocr-captcha-v3") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+from pathlib import Path
+from PIL import Image
+import torch
+from transformers import VisionEncoderDecoderModel, TrOCRProcessor
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+processor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+hf_hub_download(repo_id=repo_id, filename="vocab.json")
+hf_hub_download(repo_id=repo_id, filename="merges.txt")
+hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+hf_hub_download(repo_id=repo_id, filename="config.json")
+
+processor_dir = str(Path(processor_config_path).parent)
+model_dir = str(Path(model_path).parent)
+
+processor = TrOCRProcessor.from_pretrained(processor_dir, use_fast=False)
+model = VisionEncoderDecoderModel.from_pretrained(model_dir, local_files_only=True)
+model.to(device)
+model.eval()
+
+if str(image_path).startswith(("http://", "https://")):
+    image = Image.open(hf_hub_download(repo_id=repo_id, filename=image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+if image.mode == "RGBA":
+    background = Image.new("RGBA", image.size, (255, 255, 255))
+    image = Image.alpha_composite(background, image).convert("RGB")
+else:
+    image = image.convert("RGB")
+
+pixel_values = processor(images=image, return_tensors="pt").pixel_values.to(device)
+with torch.no_grad():
+    generated_ids = model.generate(pixel_values, num_beams=2)
+output_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"text": output_text}

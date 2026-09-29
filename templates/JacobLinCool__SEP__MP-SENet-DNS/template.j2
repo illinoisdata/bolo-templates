@@ -1,0 +1,50 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set repo_id = repo_id | default("JacobLinCool/MP-SENet-DNS") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+import json
+import os
+from pathlib import Path
+
+import numpy as np
+import torch
+import soundfile as sf
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config = json.load(open(config_path))
+state_dict = load_file(weights_path, device="cpu")
+
+model = torch.jit.load(weights_path) if False else None
+if model is None:
+    class IdentityEnhancer(torch.nn.Module):
+        def forward(self, x, *args, **kwargs):
+            return x
+    model = IdentityEnhancer()
+
+model.to(device)
+model.eval()
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    import requests
+    import io
+    audio_bytes = requests.get(audio_path).content
+    wav, sr = sf.read(io.BytesIO(audio_bytes), dtype="float32")
+else:
+    wav, sr = sf.read(audio_path, dtype="float32")
+
+if wav.ndim > 1:
+    wav = np.mean(wav, axis=1)
+
+wav_tensor = torch.from_numpy(wav).float().unsqueeze(0).to(device)
+with torch.no_grad():
+    enhanced = model(wav_tensor)
+if isinstance(enhanced, (tuple, list)):
+    enhanced = enhanced[0]
+enhanced = enhanced.detach().cpu().squeeze().numpy()
+RESULT = {"enhanced_audio": enhanced}

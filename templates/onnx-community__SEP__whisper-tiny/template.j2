@@ -1,0 +1,64 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set language = language | default('en') %}
+{% set task = task | default('transcribe') %}
+{% set repo_id = repo_id | default("onnx-community/whisper-tiny") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+language = "{{ language }}"
+task = "{{ task }}"
+
+import numpy as np
+import onnxruntime as ort
+import requests
+import soundfile as sf
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+from transformers import AutoProcessor
+
+onnx_encoder = hf_hub_download(repo_id=repo_id, filename="onnx/encoder_model.onnx")
+onnx_decoder = hf_hub_download(repo_id=repo_id, filename="onnx/decoder_model.onnx")
+processor = AutoProcessor.from_pretrained(repo_id)
+
+if audio_path.startswith(("http://", "https://")):
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    speech_array, sampling_rate = sf.read(BytesIO(audio_bytes))
+else:
+    speech_array, sampling_rate = sf.read(audio_path)
+
+if speech_array.ndim > 1:
+    speech_array = np.mean(speech_array, axis=1)
+
+if sampling_rate != 16000:
+    x_old = np.linspace(0.0, 1.0, num=speech_array.shape[0], endpoint=False)
+    x_new = np.linspace(0.0, 1.0, num=int(speech_array.shape[0] * 16000 / sampling_rate), endpoint=False)
+    speech_array = np.interp(x_new, x_old, speech_array).astype(np.float32)
+    sampling_rate = 16000
+
+inputs = processor(speech_array, sampling_rate=sampling_rate, return_tensors="np")
+
+providers = ["CUDAExecutionProvider", "CPUExecutionProvider"] if device.startswith("cuda") else ["CPUExecutionProvider"]
+so = ort.SessionOptions()
+so.intra_op_num_threads = 1
+so.inter_op_num_threads = 1
+encoder_session = ort.InferenceSession(onnx_encoder, sess_options=so, providers=providers)
+decoder_session = ort.InferenceSession(onnx_decoder, sess_options=so, providers=providers)
+
+encoder_outputs = encoder_session.run(None, {"input_features": inputs.input_features})[0]
+
+forced_decoder_ids = processor.get_decoder_prompt_ids(language=language, task=task)
+input_ids = np.array([[processor.tokenizer.bos_token_id]], dtype=np.int64)
+for _, token_id in forced_decoder_ids:
+    input_ids = np.concatenate([input_ids, np.array([[token_id]], dtype=np.int64)], axis=1)
+
+for _ in range(32):
+    logits = decoder_session.run(None, {"input_ids": input_ids, "encoder_hidden_states": encoder_outputs})[0]
+    next_token_id = int(np.argmax(logits[:, -1, :], axis=-1)[0])
+    input_ids = np.concatenate([input_ids, np.array([[next_token_id]], dtype=np.int64)], axis=1)
+    if next_token_id == processor.tokenizer.eos_token_id:
+        break
+
+text = processor.tokenizer.decode(input_ids[0], skip_special_tokens=True)
+
+RESULT = {"text": text}

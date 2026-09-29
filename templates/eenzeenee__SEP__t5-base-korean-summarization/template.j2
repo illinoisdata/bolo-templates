@@ -1,10 +1,36 @@
 {% set repo_id = repo_id | default("eenzeenee/t5-base-korean-summarization") %}
 {% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('summarize: 안녕하세요. 오늘은 인공지능 모델을 활용한 한국어 문서 요약 예시를 확인합니다. 이 문서는 모델이 긴 한국어 문장을 읽고 핵심 내용을 간단하게 요약하는지 평가하기 위한 것입니다. 여러 문장이 포함되어 있으며, 불필요한 반복 표현도 일부 들어 있습니다. 최종적으로 모델은 문장의 핵심만 추출해 짧고 자연스러운 한국어 요약문을 생성해야 합니다.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
+input_text = "{{ input_text }}"
 
-from huggingface_hub import HfApi
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-api = HfApi()
-print(api.list_repo_files(repo_id))
-print(api.list_repo_files("paust/pko-t5-base"))
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, local_files_only=True)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False, local_files_only=True)
+
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(input_text, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        num_beams=4,
+        do_sample=False,
+        max_length=64,
+        min_length=10,
+        early_stopping=True,
+    )
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True).strip()
+
+RESULT = {"summary": output_text}

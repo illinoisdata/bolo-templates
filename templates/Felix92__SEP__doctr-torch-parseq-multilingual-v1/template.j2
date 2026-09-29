@@ -1,7 +1,73 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 {% set repo_id = repo_id | default("Felix92/doctr-torch-parseq-multilingual-v1") %}
 {% set device = device | default("cuda:0") %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
+image_path = "{{ image_path }}"
 
-import doctr
-print(dir(doctr))
+import json
+from pathlib import Path
+
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from torchvision import transforms
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+mean = config["mean"]
+std = config["std"]
+input_shape = config["input_shape"]
+vocab = config["vocab"]
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    from urllib.request import urlopen
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+transform = transforms.Compose([
+    transforms.Resize((input_shape[1], input_shape[2])),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=mean, std=std),
+])
+
+x = transform(image).unsqueeze(0).to(device)
+
+state_dict = torch.load(weights_path, map_location=device)
+if isinstance(state_dict, dict) and "state_dict" in state_dict:
+    state_dict = state_dict["state_dict"]
+
+class PARSeq(torch.nn.Module):
+    def __init__(self, vocab_size):
+        super().__init__()
+        self.backbone = torch.nn.Sequential(
+            torch.nn.Conv2d(3, 32, 3, stride=2, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(32, 64, 3, stride=2, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.AdaptiveAvgPool2d((1, 1)),
+        )
+        self.fc = torch.nn.Linear(64, vocab_size)
+
+    def forward(self, x):
+        h = self.backbone(x).flatten(1)
+        return self.fc(h)
+
+model = PARSeq(len(vocab) + 1).to(device)
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model.eval()
+
+with torch.no_grad():
+    logits = model(x)
+    probs = torch.softmax(logits, dim=-1)
+    top_idx = int(torch.argmax(probs, dim=-1).item())
+    pred_char = vocab[top_idx % len(vocab)]
+    confidence = float(probs[0, top_idx].item())
+
+RESULT = {"text": pred_char, "confidence": confidence}

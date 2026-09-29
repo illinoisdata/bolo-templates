@@ -1,37 +1,40 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("monologg/bert-base-cased-goemotions-ekman") %}
-{% set text_input = text_input | default("I feel grateful for the progress I've made today.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text|default('I just got promoted and I am feeling amazing today!') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-
-import json
-from pathlib import Path
+text = {{ text|tojson }}
 
 import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSequenceClassification.from_pretrained(repo_id)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+# Pre-process input & load model
+
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    local_files_only=True,
+)
+model = AutoModelForSequenceClassification.from_pretrained(
+    repo_id,
+    local_files_only=True,
+)
 model.to(device)
 model.eval()
 
-encoded_input = tokenizer(text_input, return_tensors="pt")
-encoded_input = {key: tensor.to(device) for key, tensor in encoded_input.items()}
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**encoded_input)
+    logits = model(**inputs).logits
+    probs = torch.sigmoid(logits).squeeze(0)
 
-logits = outputs.logits
-if logits.dim() == 0:
-    logits = logits.unsqueeze(0)
-logits = logits.squeeze(0)
-probabilities = torch.sigmoid(logits)
-
-id2label = getattr(model.config, "id2label", {}) or {}
-label_probabilities = {}
-for index, probability in enumerate(probabilities.tolist()):
-    label = id2label.get(index, str(index))
-    label_probabilities[label] = probability
-
-RESULT = {"label_probabilities": label_probabilities}
+id2label = model.config.id2label
+scores = {id2label[str(i)] if isinstance(id2label, dict) and str(i) in id2label else id2label[i]: probs[i].item() for i in range(probs.shape[0])}
+RESULT = {"text": text, "scores": scores, "predicted_label": max(scores, key=scores.get)}

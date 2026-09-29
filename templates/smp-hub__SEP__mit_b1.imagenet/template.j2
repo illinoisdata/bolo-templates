@@ -1,0 +1,49 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("smp-hub/mit_b1.imagenet") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import json
+import requests
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from torchvision import transforms
+from safetensors.torch import load_file
+import segmentation_models_pytorch as smp
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert(cfg.get("input_space", "RGB"))
+else:
+    image = Image.open(image_path).convert(cfg.get("input_space", "RGB"))
+
+mean = cfg["mean"]
+std = cfg["std"]
+input_h, input_w = cfg["input_size"][1], cfg["input_size"][2]
+preprocess = transforms.Compose([
+    transforms.Resize((input_h, input_w)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=mean, std=std),
+])
+
+x = preprocess(image).unsqueeze(0)
+
+model = smp.Unet("mit_b1", encoder_weights=None, classes=1000, activation=None)
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
+model.eval()
+
+with torch.no_grad():
+    logits = model(x.to(device))
+    probs = torch.softmax(logits, dim=1)
+
+RESULT = {"output": probs.squeeze(0).detach().cpu().tolist()}

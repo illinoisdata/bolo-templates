@@ -1,0 +1,62 @@
+{% set repo_id = repo_id | default("segment-any-text/sat-3l") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("token-classification") %}
+{% set tokenizer_id = tokenizer_id | default("xlm-roberta-base") %}
+{% set config_id = config_id | default("xlm-roberta-base") %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+tokenizer_id = {{ tokenizer_id | tojson }}
+config_id = {{ config_id | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+import json
+
+from huggingface_hub import hf_hub_download
+from transformers import AutoConfig, pipeline
+
+config = AutoConfig.from_pretrained(config_id)
+config.architectures = ["XLMRobertaForTokenClassification"]
+
+config_path = hf_hub_download(repo_id=model, filename="config.json")
+with open(config_path, "r", encoding="utf-8") as f:
+    repo_config = json.load(f)
+
+id2label_map = repo_config.get("id2label")
+if id2label_map:
+    config.id2label = {int(k): v for k, v in id2label_map.items()}
+
+label2id_map = repo_config.get("label2id")
+if label2id_map:
+    config.label2id = {k: int(v) for k, v in label2id_map.items()}
+
+if hasattr(config, "label2id") and config.label2id:
+    config.num_labels = len(config.label2id)
+elif hasattr(config, "id2label") and config.id2label:
+    config.num_labels = len(config.id2label)
+
+pipeline_device = -1
+if isinstance(device, str):
+    if device.startswith("cuda"):
+        cuda_parts = device.split(":")
+        pipeline_device = int(cuda_parts[1]) if len(cuda_parts) > 1 and cuda_parts[1].isdigit() else 0
+    elif device.startswith("cpu"):
+        pipeline_device = -1
+    elif device.isdigit():
+        pipeline_device = int(device)
+    else:
+        pipeline_device = -1
+else:
+    pipeline_device = device
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=tokenizer_id,
+    config=config,
+    device=pipeline_device,
+)
+predictions = pipe(input_prompt)
+RESULT = {"outputs": predictions}

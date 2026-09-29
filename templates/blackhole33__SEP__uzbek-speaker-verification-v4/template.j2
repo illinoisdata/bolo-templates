@@ -1,0 +1,35 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set repo_id = repo_id | default("blackhole33/uzbek-speaker-verification-v4") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+import os
+import sys
+import types
+import requests
+from huggingface_hub import hf_hub_download
+
+sys.modules.setdefault('nv_one_logger', types.ModuleType('nv_one_logger'))
+sys.modules.setdefault('nv_one_logger.api', types.ModuleType('nv_one_logger.api'))
+config_mod = types.ModuleType('nv_one_logger.api.config')
+class OneLoggerConfig:
+    pass
+config_mod.OneLoggerConfig = OneLoggerConfig
+sys.modules['nv_one_logger.api.config'] = config_mod
+
+nemo_path = hf_hub_download(repo_id=repo_id, filename="uzbek-speaker-verification-v4.nemo")
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    audio_local_path = os.path.join(os.path.dirname(nemo_path), "input_audio.wav")
+    response = requests.get(audio_path, stream=True, timeout=30)
+    response.raise_for_status()
+    with open(audio_local_path, "wb") as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:
+                f.write(chunk)
+else:
+    audio_local_path = audio_path
+
+RESULT = {"model_path": nemo_path, "audio_path": audio_local_path}

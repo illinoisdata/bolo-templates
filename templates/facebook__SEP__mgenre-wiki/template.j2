@@ -1,27 +1,37 @@
-{% set device = device | default("cuda:0") %}
-{% set repo_id = repo_id | default("facebook/mgenre-wiki") %}
-{% set input_sentences = input_sentences | default(["[START] Einstein [END] era un fisico tedesco."]) %}
+{% set sentence = sentence | default('[START] Einstein [END] era un fisico tedesco.') %}
 {% set num_beams = num_beams | default(5) %}
 {% set num_return_sequences = num_return_sequences | default(5) %}
+{% set repo_id = repo_id | default("facebook/mgenre-wiki") %}
+{% set device = device | default("cuda:0") %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_sentences = {{ input_sentences }}
+sentence = {{ sentence | tojson }}
 num_beams = {{ num_beams }}
 num_return_sequences = {{ num_return_sequences }}
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-import os
+
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+model_dir = model_path.rsplit("/", 1)[0]
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
-model.eval()
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir, config=config_path).to(device).eval()
 
-encoded_inputs = tokenizer(input_sentences, return_tensors="pt", padding=True).to(device)
-outputs = model.generate(
-    **encoded_inputs,
-    num_beams=num_beams,
-    num_return_sequences=num_return_sequences,
-)
+inputs = tokenizer([sentence], return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_texts = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+with torch.no_grad():
+    outputs = model.generate(
+        **inputs,
+        num_beams=num_beams,
+        num_return_sequences=num_return_sequences,
+    )
 
-RESULT = {"generated_entities": generated_texts}
+predictions = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+
+RESULT = {"predictions": predictions}

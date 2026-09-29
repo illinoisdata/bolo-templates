@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("keremberke/yolov8s-pothole-segmentation") %}
+{% set device = device | default("cuda:0") %}
+{% set image = image | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set conf = conf | default(0.25) %}
+{% set iou = iou | default(0.45) %}
+{% set agnostic_nms = agnostic_nms | default(false) %}
+{% set max_det = max_det | default(1000) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image = "{{ image }}"
+conf = {{ conf }}
+iou = {{ iou }}
+agnostic_nms = {{ agnostic_nms }}
+max_det = {{ max_det }}
+
+import torch
+from PIL import Image
+from ultralytics import YOLO
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="best.pt")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+if isinstance(image, str) and image.startswith(("http://", "https://")):
+    image_input = image
+else:
+    image_input = Image.open(image).convert("RGB")
+
+model = YOLO(weights_path)
+model.to(device)
+model.overrides['conf'] = conf
+model.overrides['iou'] = iou
+model.overrides['agnostic_nms'] = agnostic_nms
+model.overrides['max_det'] = max_det
+
+results = model.predict(image_input, device=device, verbose=False)
+result = results[0]
+render = result.plot()
+
+RESULT = {"render": render, "boxes": result.boxes, "masks": result.masks}

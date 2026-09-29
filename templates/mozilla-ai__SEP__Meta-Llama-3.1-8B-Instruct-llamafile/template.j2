@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("mozilla-ai/Meta-Llama-3.1-8B-Instruct-llamafile") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Write a short haiku about machine learning.') %}
+{% set quant_filename = quant_filename | default('Meta-Llama-3.1-8B-Instruct.Q6_K.llamafile') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+quant_filename = "{{ quant_filename }}"
+
+import os
+from huggingface_hub import hf_hub_download
+
+llamafile_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+os.chmod(llamafile_path, 0o755)
+
+with open(llamafile_path, "rb") as f:
+    first_bytes = f.read(8)
+
+RESULT = {"output": {"llamafile_path": llamafile_path, "magic_bytes": list(first_bytes)}}

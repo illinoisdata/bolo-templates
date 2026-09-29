@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("songlab/gpn-brassicales") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+import gpn
+from transformers import pipeline, AutoTokenizer, AutoModelForMaskedLM
+
+gpn.register_auto_classes("ss")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

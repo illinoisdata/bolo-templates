@@ -1,0 +1,34 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("caidas/swin2SR-classical-sr-x4-64") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import os
+from urllib.parse import urlparse
+import torch
+from PIL import Image
+from transformers import Swin2SRForImageSuperResolution, Swin2SRImageProcessorPil
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+processor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+if urlparse(image_path).scheme in ("http", "https"):
+    raise ValueError("image_path must be a local path for this task")
+image = Image.open(image_path).convert("RGB")
+
+processor = Swin2SRImageProcessorPil.from_pretrained(processor_path.rsplit('/', 1)[0])
+model = Swin2SRForImageSuperResolution.from_pretrained(
+    os.path.dirname(weights_path),
+)
+model = model.to(device)
+model.eval()
+
+inputs = processor(images=image, return_tensors="pt").to(device)
+with torch.no_grad():
+    outputs = model(**inputs)
+
+output = outputs.reconstruction.squeeze(0).permute(1, 2, 0).clamp(0, 1).detach().cpu().numpy()
+RESULT = {"output": output}

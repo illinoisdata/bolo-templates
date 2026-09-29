@@ -1,45 +1,36 @@
 {% set repo_id = repo_id | default("sarvamai/sarvam-translate") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("Be the change you wish to see in the world.") %}
-{% set target_language = target_language | default("Hindi") %}
-{% set max_new_tokens = max_new_tokens | default(1024) %}
-{% set do_sample = do_sample | default(true) %}
-{% set temperature = temperature | default(0.01) %}
-{% set num_return_sequences = num_return_sequences | default(1) %}
+{% set tgt_lang = tgt_lang | default('Hindi') %}
+{% set input_txt = input_txt | default('Be the change you wish to see in the world.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
-target_language = "{{ target_language }}"
-max_new_tokens = {{ max_new_tokens }}
-do_sample = {{ do_sample }}
-temperature = {{ temperature }}
-num_return_sequences = {{ num_return_sequences }}
+tgt_lang = "{{ tgt_lang }}"
+input_txt = "{{ input_txt }}"
 
-from transformers import AutoTokenizer, AutoModelForCausalLM
 import os
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForCausalLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="model-00001-of-00002.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="model-00002-of-00002.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+model_dir = os.path.dirname(config_path)
 
-messages = [
-    {"role": "system", "content": f"Translate the text below to {target_language}."},
-    {"role": "user", "content": input_text},
-]
-input_prompt = tokenizer.apply_chat_template(
-    messages,
-    tokenize=False,
-    add_generation_prompt=True,
-)
+tokenizer = AutoTokenizer.from_pretrained(model_dir)
+model = AutoModelForCausalLM.from_pretrained(
+    model_dir,
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+).to(device)
 
-model_inputs = tokenizer([input_prompt], return_tensors="pt").to(device)
-generated_ids = model.generate(
-    **model_inputs,
-    max_new_tokens=max_new_tokens,
-    do_sample=do_sample,
-    temperature=temperature,
-    num_return_sequences=num_return_sequences,
-)
-output_ids = generated_ids[0][len(model_inputs.input_ids[0]):].tolist()
+prompt = f"Translate the following text to {tgt_lang}:\n{input_txt}\n"
+model_inputs = tokenizer([prompt], return_tensors="pt")
+model_inputs = {k: v.to(device) for k, v in model_inputs.items()}
+
+generated_ids = model.generate(**model_inputs, max_new_tokens=128, do_sample=False)
+output_ids = generated_ids[0][model_inputs["input_ids"].shape[1]:]
 output_text = tokenizer.decode(output_ids, skip_special_tokens=True)
 
 RESULT = {"translation": output_text}

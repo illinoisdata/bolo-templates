@@ -1,33 +1,43 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("prithivida/active_to_passive_styletransfer") %}
-{% set text_inputs = text_inputs | default("The committee approved the new policy yesterday.") %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The chef cooked the meal.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_inputs = "{{ text_inputs }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text = "{{ text }}"
 
-from pathlib import Path
+import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    repo_id,
+    device_map=None,
+    torch_dtype=torch.float32,
+    low_cpu_mem_usage=False,
+)
 model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(text_inputs, return_tensors="pt")
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
 
-generated_ids = model.generate(
-    **encoded_inputs,
-    max_length=max_length,
-    num_beams=num_beams,
-    early_stopping=True,
-)
+prompt = "convert to passive: " + text
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-decoded_outputs = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-generated_passive = decoded_outputs[0] if decoded_outputs else ""
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=64,
+        num_beams=4,
+        early_stopping=True,
+    )
+output = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-RESULT = {"generated_passive": generated_passive}
+RESULT = {"output": output}

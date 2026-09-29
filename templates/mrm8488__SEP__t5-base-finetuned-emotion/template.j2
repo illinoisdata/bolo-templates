@@ -1,29 +1,33 @@
 {% set repo_id = repo_id | default("mrm8488/t5-base-finetuned-emotion") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("I wish you were here but it is impossible") %}
-{% set max_length = max_length | default(2) %}
+{% set text = text | default('I wish you were here but it is impossible') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-max_length = {{ max_length }}
 
-import os
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-# Preprocess input
+_ = config_path, spiece_path, tokenizer_config_path, special_tokens_map_path, weights_path
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False, legacy=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
 inputs = tokenizer(text, return_tensors="pt")
-input_ids = inputs.input_ids.to(device)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Run inference
-output_ids = model.generate(input_ids=input_ids, max_length=max_length)
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_length=2)
 
-# Post-process and build RESULT
-decoded = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
-label = decoded[0]
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-RESULT = {"label": label}
+RESULT = {"output": output_text}

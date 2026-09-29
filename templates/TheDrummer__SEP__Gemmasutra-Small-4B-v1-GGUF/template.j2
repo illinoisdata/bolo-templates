@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("TheDrummer/Gemmasutra-Small-4B-v1-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default("Gemmasutra-Small-4B-v1a-Q4_K_M.gguf") %}
+{% set prompt = prompt | default("Write a short, cheerful greeting.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+# Device is kept as a required runtime variable; llama.cpp loads from the GGUF file.
+llm = Llama(
+    model_path=model_path,
+    n_ctx=512,
+    n_threads=max(1, os.cpu_count() or 1),
+    verbose=False,
+)
+
+response = llm(
+    prompt,
+    max_tokens=64,
+    temperature=0.7,
+    top_p=0.95,
+    stop=["</s>"]
+)
+
+output_text = response["choices"][0]["text"]
+
+RESULT = {"text": output_text}

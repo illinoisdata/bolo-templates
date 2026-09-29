@@ -1,38 +1,41 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("mrm8488/bert-small2bert-small-finetuned-cnn_daily_mail-summarization") %}
-{% set input_text = input_text | default("The CNN/DailyMail article describes daily news summaries that emphasize the most important sentences in a concise way.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The stock market rallied today as investors reacted positively to easing inflation data and stronger-than-expected corporate earnings. Analysts said the move could signal growing confidence in the economy, although some warned that volatility may return as central banks continue to weigh interest rate decisions.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
+text = "{{ text }}"
 
-torch_device = None
-
-from pathlib import Path
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import BertTokenizerFast, EncoderDecoderModel
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch_device)
+device_obj = torch.device(device)
+tokenizer = BertTokenizerFast(vocab_file=vocab_path, tokenizer_file=None)
+model = EncoderDecoderModel.from_pretrained(repo_id).to(device_obj)
+model.eval()
 
-model_inputs = tokenizer(
-    input_text,
-    padding="max_length",
-    truncation=True,
-    max_length=512,
-    return_tensors="pt",
-)
-model_inputs = {key: value.to(torch_device) for key, value in model_inputs.items()}
+inputs = tokenizer([text], padding="max_length", truncation=True, max_length=512, return_tensors="pt")
+input_ids = inputs.input_ids.to(device_obj)
+attention_mask = inputs.attention_mask.to(device_obj)
 
-generated_tokens = model.generate(
-    **model_inputs,
-    min_length=56,
-    max_length=142,
-    no_repeat_ngram_size=3,
-    length_penalty=2.0,
-    num_beams=4,
-)
-summary_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+with torch.no_grad():
+    output_ids = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        max_length=142,
+        min_length=56,
+        num_beams=4,
+        no_repeat_ngram_size=3,
+        length_penalty=2.0,
+        early_stopping=True,
+    )
 
-RESULT = {"summary": summary_text}
+summary = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"summary": summary}

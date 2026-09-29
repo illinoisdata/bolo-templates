@@ -1,21 +1,31 @@
 {% set repo_id = repo_id | default("czearing/story-to-title") %}
 {% set device = device | default("cuda:0") %}
-{% set story_text = story_text | default("A young screenwriter discovers a haunted notebook that writes award-winning film titles, yet each success comes at a personal cost.") %}
-{% set max_length = max_length | default(60) %}
-{% set num_beams = num_beams | default(4) %}
+{% set prompt = prompt | default('A young orphan discovers a hidden map that leads to a secret kingdom, where she must unite rival clans to prevent an ancient war.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-story_text = """{{ story_text }}"""
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-from pathlib import Path
+prompt = "{{ prompt }}"
+
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
-inputs = tokenizer(story_text, return_tensors="pt", truncation=True)
-inputs = {key: value.to(device) for key, value in inputs.items()}
-generated_ids = model.generate(**inputs, max_length=max_length, num_beams=num_beams, early_stopping=True)
-decoded_titles = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-generated_title = decoded_titles[0]
-RESULT = {"generated_title": generated_title}
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=24,
+        num_beams=4,
+        early_stopping=True,
+        no_repeat_ngram_size=3,
+    )
+
+title = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"title": title}

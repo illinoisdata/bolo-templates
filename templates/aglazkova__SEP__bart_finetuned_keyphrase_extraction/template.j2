@@ -1,27 +1,44 @@
 {% set repo_id = repo_id | default("aglazkova/bart_finetuned_keyphrase_extraction") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("In this paper, we investigate cross-domain limitations of keyphrase generation using the models for abstractive text summarization.") %}
+{% set text = text | default('In this paper, we investigate cross-domain limitations of keyphrase generation using the models for abstractive text summarization. We present an evaluation of BART fine-tuned for keyphrase generation across three types of texts, namely scientific texts from computer science and biomedical domains and news texts. We explore the role of transfer learning between different domains to improve the model performance on small text corpora.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import json
 import torch
-import os
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, BartConfig
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-# Pre-process input
-inputs = tokenizer(text, return_tensors="pt")
+with open(config_path, "r") as f:
+    config_dict = json.load(f)
+config = BartConfig.from_dict(config_dict)
+
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    tokenizer_file=tokenizer_json_path,
+    config=config,
+    tokenizer_config=tokenizer_config_path,
+    special_tokens_map_file=special_tokens_map_path,
+)
+model = AutoModelForSeq2SeqLM.from_config(config)
+state_dict = torch.load(model_path, map_location="cpu")
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Run inference
-outputs = model.generate(**inputs)
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, num_beams=4, max_length=64, no_repeat_ngram_size=3)
 
-# Post-process output
-generated_keyphrases = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+output_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-# Build RESULT dict
-RESULT = {"generated_keyphrases": generated_keyphrases}
+RESULT = {"keyphrases": output_text}

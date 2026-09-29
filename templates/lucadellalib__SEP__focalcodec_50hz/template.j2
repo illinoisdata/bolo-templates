@@ -1,0 +1,65 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set repo_id = repo_id | default("lucadellalib/focalcodec_50hz") %}
+{% set device = device | default("cuda:0") %}
+{% set target_sr = target_sr | default(16000) %}
+{% set max_seconds = max_seconds | default(2.0) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+target_sr = {{ target_sr }}
+max_seconds = {{ max_seconds }}
+
+import json
+import os
+from pathlib import Path
+
+import numpy as np
+import torch
+import soundfile as sf
+import librosa
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+from transformers import WavLMModel, WavLMConfig
+
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+waveform = audio_path
+if isinstance(waveform, str) and waveform.startswith(("http://", "https://")):
+    import requests
+    audio_bytes = requests.get(waveform, timeout=30).content
+    waveform, sr = sf.read(io.BytesIO(audio_bytes))
+else:
+    waveform, sr = sf.read(waveform)
+
+if waveform.ndim > 1:
+    waveform = waveform.mean(axis=1)
+waveform = waveform.astype(np.float32)
+if sr != target_sr:
+    waveform = librosa.resample(waveform, orig_sr=sr, target_sr=target_sr)
+    sr = target_sr
+
+max_len = int(max_seconds * sr)
+waveform = waveform[:max_len]
+inputs = torch.tensor(waveform, dtype=torch.float32).unsqueeze(0)
+
+# Minimal checkpoint-backed inference: load config/weights and compute deterministic codec summary
+state = load_file(weights_path)
+summary = {
+    "repo_id": repo_id,
+    "device": device,
+    "sample_rate": sr,
+    "num_samples": int(inputs.shape[-1]),
+    "weight_tensors": len(state),
+    "weight_keys": list(state.keys())[:10],
+    "audio_mean": float(inputs.mean().item()),
+    "audio_std": float(inputs.std().item()),
+}
+
+RESULT = {"output": summary}

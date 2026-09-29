@@ -1,0 +1,69 @@
+{% set repo_id = repo_id | default("ytu-ce-cosmos/turkish-colbert") %}
+{% set device = device | default("cuda:0") %}
+{% set query = query | default('Birden fazla Nobel Ödülü alan bilim insanı kimdir?') %}
+{% set docs = docs | default([
+    'Marie Curie, radyoaktivite üzerine yaptığı çalışmalarla bilim dünyasına büyük katkılar sağlamıştır. Polonyum ve radyum elementlerini keşfetmiştir. İki farklı dalda Nobel Ödülü alan ilk kişi olmuştur.',
+    'Isaac Newton, fizik ve matematik alanında yaptığı çalışmalarla bilinir. Yerçekimi teorisi ve hareket yasaları, bilim dünyasında çığır açmıştır. Ayrıca, matematiksel analiz üzerinde de önemli katkıları vardır.',
+    'Albert Einstein, izafiyet teorisini geliştirerek modern fiziğin temellerini atmıştır. 1921 yılında Nobel Fizik Ödülü\'nü kazanmıştır. Kütle-enerji eşitliği (E=mc²) onun en ünlü formülüdür.',
+    'Alexander Fleming, 1928 yılında penisilini keşfederek modern tıpta devrim yaratmıştır. Bu keşfi sayesinde 1945 yılında Nobel Tıp Ödülü kazanmıştır. Fleming\'in çalışmaları antibiyotiklerin gelişimine öncülük etmiştir.',
+    'Nikola Tesla, alternatif akım (AC) sistemini geliştirmiştir. Elektrik mühendisliği alanında devrim niteliğinde çalışmalar yapmıştır. Kablosuz enerji aktarımı üzerine projeleriyle tanınır.'
+]) %}
+{% set top_k = top_k | default(1) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query = "{{ query }}"
+docs = {{ docs }}
+top_k = {{ top_k }}
+
+import os
+import torch
+from safetensors.torch import load_file
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoConfig, BertModel
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+
+def turkish_lower(text):
+    return text.replace('I', 'ı').lower()
+
+query = turkish_lower(query)
+docs = [turkish_lower(doc) for doc in docs]
+
+config = AutoConfig.from_pretrained(os.path.dirname(config_path))
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_config_path))
+base_model = BertModel(config)
+state_dict = load_file(weights_path)
+base_model.load_state_dict(state_dict, strict=False)
+base_model.to(device)
+base_model.eval()
+
+max_query_len = 32
+max_doc_len = 256
+
+query_inputs = tokenizer(query, return_tensors='pt', truncation=True, max_length=max_query_len)
+query_input_ids = query_inputs['input_ids'].to(device)
+query_attention_mask = query_inputs['attention_mask'].to(device)
+query_emb = base_model(input_ids=query_input_ids, attention_mask=query_attention_mask).last_hidden_state
+query_mask = query_attention_mask.unsqueeze(-1).float()
+
+scores = []
+for doc in docs:
+    doc_inputs = tokenizer(doc, return_tensors='pt', truncation=True, max_length=max_doc_len)
+    doc_input_ids = doc_inputs['input_ids'].to(device)
+    doc_attention_mask = doc_inputs['attention_mask'].to(device)
+    doc_emb = base_model(input_ids=doc_input_ids, attention_mask=doc_attention_mask).last_hidden_state
+    sim = torch.einsum('bqd,bsd->bqs', query_emb, doc_emb)
+    sim = sim.max(dim=-1).values
+    sim = sim * query_mask.squeeze(-1)
+    score = sim.sum(dim=-1) / query_attention_mask.sum(dim=-1).clamp(min=1)
+    scores.append(score.item())
+
+ranked = sorted(zip(docs, scores), key=lambda x: x[1], reverse=True)
+RESULT = {"ranked_docs": ranked, "top_doc": ranked[:top_k]}

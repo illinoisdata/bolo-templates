@@ -1,0 +1,59 @@
+{% set repo_id = repo_id | default("laion/CLIP-ViT-B-32-DataComp.XL-s13B-b90K") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set candidate_labels = candidate_labels | default(['playing music', 'playing sports']) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+candidate_labels = {{ candidate_labels }}
+
+import json
+from pathlib import Path
+from urllib.parse import urlparse
+
+import requests
+import torch
+import open_clip
+from PIL import Image
+from safetensors.torch import load_file
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+model_cfg = config.get("model_cfg", config)
+model_name = model_cfg.get("vision_cfg", {}).get("timm_model_name") or model_cfg.get("model_name") or model_cfg.get("architecture")
+pretrained_cfg = model_cfg.get("preprocess_cfg", {})
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    img = Image.open(requests.get(image_path, stream=True, timeout=30).raw).convert("RGB")
+else:
+    img = Image.open(image_path).convert("RGB")
+
+model, _, preprocess = open_clip.create_model_and_transforms(
+    model_name="ViT-B-32",
+    pretrained=None,
+    device=device,
+)
+state_dict = load_file(weights_path, device="cpu")
+model.load_state_dict(state_dict, strict=True)
+model.to(device)
+model.eval()
+
+image = preprocess(img).unsqueeze(0).to(device)
+text = open_clip.tokenize(candidate_labels).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image)
+    text_features = model.encode_text(text)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logit_scale = model.logit_scale.exp()
+    logits = logit_scale * image_features @ text_features.T
+    probs = logits.softmax(dim=-1).squeeze(0)
+
+RESULT = {"labels": candidate_labels, "probabilities": probs.detach().cpu().tolist()}

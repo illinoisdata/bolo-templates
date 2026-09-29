@@ -1,24 +1,37 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("circulus/canvers-en2ko-v1") %}
-{% set src_text = src_text | default("This is a test sentence for English to Korean translation.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The service was excellent and the staff were very kind.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-src_text = "{{ src_text }}"
+text = "{{ text }}"
 
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, BartForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+# Load tokenizer and model
+_ = config_path, merges_path, vocab_path, special_tokens_path, tokenizer_config_path, generation_config_path
+
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(torch_device)
+model = BartForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(src_text, return_tensors="pt", padding=True)
-inputs = {key: value.to(torch_device) for key, value in encoded_inputs.items()}
-with torch.no_grad():
-    generated_ids = model.generate(**inputs, max_new_tokens=256)
-translated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-RESULT = {"translation": translated_text}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=64, num_beams=4)
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

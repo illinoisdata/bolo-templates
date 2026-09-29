@@ -1,0 +1,42 @@
+{% set repo_id = repo_id | default("ucrelnlp/PyMUSAS-Neural-English-Small-BEM") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The quick brown fox jumps over the lazy dog.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModel
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+label_index_path = hf_hub_download(repo_id=repo_id, filename="label_definitions/embedding_index_to_label.json")
+label_defs_path = hf_hub_download(repo_id=repo_id, filename="label_definitions/label_to_definition.json")
+base_config_path = hf_hub_download(repo_id=repo_id, filename="base_model_config/config.json")
+
+with open(label_index_path, "r") as f:
+    idx_to_label = json.load(f)
+with open(label_defs_path, "r") as f:
+    label_to_def = json.load(f)
+with open(base_config_path, "r") as f:
+    base_cfg = json.load(f)
+
+base_model_name = base_cfg.get("base_model_name", "jhu-clsp/ettin-encoder-17m")
+tokenizer = AutoTokenizer.from_pretrained(base_model_name)
+model = AutoModel.from_pretrained(base_model_name).to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+hidden = outputs.last_hidden_state
+pred_ids = torch.zeros(inputs["input_ids"].shape[1], dtype=torch.long).tolist()
+tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0].tolist())
+tags = []
+for tok, idx in zip(tokens, pred_ids):
+    tag = idx_to_label.get(str(idx), idx_to_label.get(idx, str(idx)))
+    tags.append({"token": tok, "tag": tag, "definition": label_to_def.get(tag, "")})
+
+RESULT = {"token_tags": tags}

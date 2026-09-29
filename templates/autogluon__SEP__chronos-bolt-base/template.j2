@@ -1,0 +1,23 @@
+{% set repo_id = repo_id | default("autogluon/chronos-bolt-base") %}
+{% set device = device | default("cuda:0") %}
+{% set prediction_length = prediction_length | default(12) %}
+{% set context = context | default([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prediction_length = {{ prediction_length }}
+context = {{ context }}
+
+import torch
+from safetensors.torch import load_file
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+state_dict = load_file(weights_path)
+keys = list(state_dict.keys())
+result = {
+    "num_tensors": len(keys),
+    "first_keys": keys[:10],
+    "context_len": len(context),
+    "prediction_length": prediction_length,
+}
+RESULT = {"output": result}

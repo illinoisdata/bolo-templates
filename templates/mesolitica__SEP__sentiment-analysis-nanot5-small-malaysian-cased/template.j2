@@ -1,0 +1,28 @@
+{% set repo_id = repo_id | default("mesolitica/sentiment-analysis-nanot5-small-malaysian-cased") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-classification") %}
+{% set model = model | default(repo_id) %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import AutoConfig, AutoTokenizer, T5ForSequenceClassification, pipeline
+
+tokenizer = AutoTokenizer.from_pretrained(model)
+config = AutoConfig.from_pretrained(model)
+if tokenizer.eos_token_id is not None:
+    config.eos_token_id = tokenizer.eos_token_id
+model = T5ForSequenceClassification.from_pretrained(model, config=config)
+
+eos_token = tokenizer.eos_token or ""
+if eos_token:
+    updated_prompt = input_prompt.rstrip()
+    if not updated_prompt.endswith(eos_token):
+        updated_prompt = f"{updated_prompt} {eos_token}"
+    input_prompt = updated_prompt
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(input_prompt)

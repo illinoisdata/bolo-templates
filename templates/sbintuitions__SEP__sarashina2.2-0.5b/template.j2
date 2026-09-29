@@ -1,0 +1,54 @@
+{% set repo_id = repo_id | default("sbintuitions/sarashina2.2-0.5b") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('おはようございます、今日の天気は') %}
+{% set max_new_tokens = max_new_tokens | default(30) %}
+{% set do_sample = do_sample | default(true) %}
+{% set seed = seed | default(123) %}
+{% set temperature = temperature | default(1.0) %}
+{% set top_p = top_p | default(0.95) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+do_sample = {{ do_sample }}
+seed = {{ seed }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
+
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer.model")
+hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    low_cpu_mem_usage=True,
+)
+model = model.to(device)
+model.eval()
+
+set_seed(seed)
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=do_sample,
+        temperature=temperature,
+        top_p=top_p,
+        pad_token_id=tokenizer.eos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": output_text}

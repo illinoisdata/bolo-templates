@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("angusleung100/bad-anatomy-realism-classifier") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-classification") %}
+{% set upstream_image_processor = upstream_image_processor | default("google/vit-base-patch16-224-in21k") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+task = "{{ task }}"
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+upstream_image_processor = "{{ upstream_image_processor }}"
+image_path = "{{ image_path }}"
+
+from transformers import pipeline, AutoImageProcessor
+
+processor = AutoImageProcessor.from_pretrained(upstream_image_processor)
+pipe = pipeline(task=task, model=repo_id, image_processor=processor, device=device)
+RESULT = pipe(image_path)

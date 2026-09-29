@@ -1,30 +1,39 @@
 {% set repo_id = repo_id | default("noamrot/FuseCap_Image_Captioning") %}
 {% set device = device | default("cuda:0") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set prompt = prompt | default("a picture of ") %}
-{% set num_beams = num_beams | default(3) %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set prompt_text = prompt_text | default('a picture of ') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-prompt = "{{ prompt }}"
-num_beams = {{ num_beams }}
+prompt_text = "{{ prompt_text }}"
 
-from transformers import BlipProcessor, BlipForConditionalGeneration
 import torch
-import requests
 from PIL import Image
-import os
+import requests
+from io import BytesIO
+from transformers import BlipProcessor, BlipForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
+weights_path = hf_hub_download(repo_id=repo_id, filename='pytorch_model.bin')
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
 processor = BlipProcessor.from_pretrained(repo_id)
-model = BlipForConditionalGeneration.from_pretrained(repo_id).to(device)
+model = BlipForConditionalGeneration.from_pretrained(
+    repo_id,
+    local_files_only=True,
+    torch_dtype=torch.float32,
+)
+model.to(device)
+model.eval()
 
-if image_path.startswith("http"):
-    raw_image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+if str(image_path).startswith('http://') or str(image_path).startswith('https://'):
+    raw_image = Image.open(BytesIO(requests.get(image_path, stream=True).content)).convert('RGB')
 else:
-    raw_image = Image.open(image_path).convert("RGB")
+    raw_image = Image.open(image_path).convert('RGB')
 
-inputs = processor(raw_image, prompt, return_tensors="pt").to(device)
-generated_ids = model.generate(**inputs, num_beams=num_beams)
-caption = processor.decode(generated_ids[0], skip_special_tokens=True)
+inputs = processor(raw_image, prompt_text, return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    out = model.generate(**inputs, num_beams=3)
+caption = processor.decode(out[0], skip_special_tokens=True)
 
-RESULT = {"generated_text": caption}
+RESULT = {"caption": caption}

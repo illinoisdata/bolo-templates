@@ -1,0 +1,57 @@
+{% set repo_id = repo_id | default("smp-hub/resnet50.imagenet") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set topk = topk | default(5) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+topk = {{ topk }}
+
+import json
+import os
+from pathlib import Path
+from urllib.parse import urlparse
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+import timm
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model = timm.create_model("resnet50", pretrained=False, num_classes=cfg.get("num_classes", 1000))
+state_dict = load_file(weights_path)
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model.eval()
+model.to(device)
+
+mean = torch.tensor(cfg["mean"], device=device).view(3, 1, 1)
+std = torch.tensor(cfg["std"], device=device).view(3, 1, 1)
+img = image.resize((cfg["input_size"][2], cfg["input_size"][1]))
+arr = np.asarray(img).astype("float32") / 255.0
+x = torch.from_numpy(arr).permute(2, 0, 1).to(device)
+x = (x - mean) / std
+x = x.unsqueeze(0)
+
+with torch.no_grad():
+    logits = model(x)
+    probs = torch.softmax(logits, dim=-1)[0]
+    values, indices = torch.topk(probs, k=topk)
+
+RESULT = {
+    "class_indices": indices.detach().cpu().tolist(),
+    "scores": values.detach().cpu().tolist(),
+}

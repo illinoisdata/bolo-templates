@@ -1,30 +1,37 @@
 {% set repo_id = repo_id | default("readerbench/RoBERT-base") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("Acesta este un exemplu de propoziție în limba română.") %}
+{% set text = text | default('exemplu de propoziție') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
+text = {{ text | tojson }}
 
-from pathlib import Path
-
+import os
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+model_path = hf_hub_download(repo_id=repo_id, filename='pytorch_model.bin')
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename='tokenizer_config.json')
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename='special_tokens_map.json')
+vocab_path = hf_hub_download(repo_id=repo_id, filename='vocab.txt')
+repo_dir = os.path.dirname(model_path)
 
-encoded_inputs = tokenizer(input_text, return_tensors="pt")
-encoded_inputs = {key: tensor.to(device) for key, tensor in encoded_inputs.items()}
-outputs = model(**encoded_inputs)
+_ = tokenizer_config_path, special_tokens_map_path, vocab_path
 
-last_hidden_state = outputs.last_hidden_state.detach().cpu()
-pooler_output = (
-    outputs.pooler_output.detach().cpu()
-    if outputs.pooler_output is not None
-    else None
-)
+run_device = device if (device.startswith('cuda') and torch.cuda.is_available()) else 'cpu'
+
+tokenizer = AutoTokenizer.from_pretrained(repo_dir, local_files_only=True)
+model = AutoModel.from_pretrained(repo_dir, local_files_only=True)
+model = model.to(run_device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors='pt')
+inputs = {k: v.to(run_device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
 
 RESULT = {
-    "last_hidden_state": last_hidden_state,
-    "pooler_output": pooler_output,
+    "last_hidden_state": outputs.last_hidden_state.detach().cpu().numpy(),
+    "pooler_output": outputs.pooler_output.detach().cpu().numpy() if outputs.pooler_output is not None else None,
 }

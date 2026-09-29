@@ -1,21 +1,40 @@
 {% set repo_id = repo_id | default("facebook/blenderbot-3B") %}
 {% set device = device | default("cuda:0") %}
-{% set prompt_text = prompt_text | default("Hello! How are you doing today?") %}
+{% set prompt = prompt | default('Hello, how are you doing today?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt_text = "{{ prompt_text }}"
+prompt = "{{ prompt }}"
 
-import os
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, BlenderbotForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+hf_hub_download(repo_id=repo_id, filename="vocab.json")
+hf_hub_download(repo_id=repo_id, filename="merges.txt")
+hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = BlenderbotForConditionalGeneration.from_pretrained(repo_id)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(prompt_text, return_tensors="pt")
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
-generated_tokens = model.generate(**encoded_inputs, max_new_tokens=60, num_beams=10, length_penalty=0.65, no_repeat_ngram_size=3, early_stopping=True)
-generated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-RESULT = {"generated_text": generated_text}
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_length=60,
+        num_beams=10,
+        length_penalty=0.65,
+        no_repeat_ngram_size=3,
+    )
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output": output_text}

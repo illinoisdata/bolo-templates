@@ -1,45 +1,46 @@
 {% set repo_id = repo_id | default("jjzha/jobspanbert-base-cased") %}
 {% set device = device | default("cuda:0") %}
-{% set mask_prompt = mask_prompt | default("JobSpanBERT specializes in extracting [MASK] from job postings.") %}
-{% set top_k = top_k | default(5) %}
-
+{% set text = text | default('The candidate should have strong Python and machine learning experience.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-mask_prompt = """{{ mask_prompt }}"""
-top_k = {{ top_k }}
+text = "{{ text }}"
 
-import json
-from pathlib import Path
-
+import os
 import torch
-from transformers import AutoModelForMaskedLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+local_dir = os.path.dirname(vocab_path)
+
+tokenizer = AutoTokenizer.from_pretrained(local_dir, use_fast=False)
+model = AutoModelForMaskedLM.from_pretrained(local_dir, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-# Preprocess input
-tokenizer_outputs = tokenizer(mask_prompt, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in tokenizer_outputs.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Run inference
 with torch.no_grad():
     outputs = model(**inputs)
+
 logits = outputs.logits
-
-# Post-process logits to obtain top-k predictions at the first mask token position
 mask_token_id = tokenizer.mask_token_id
-mask_positions = torch.where(inputs["input_ids"][0] == mask_token_id)[0]
-first_mask_index = mask_positions[0]
-logits_at_mask = logits[0, first_mask_index, :]
-topk = logits_at_mask.topk(top_k)
-probabilities = torch.softmax(logits_at_mask, dim=-1)[topk.indices].cpu().tolist()
-tracked_tokens = topk.indices.tolist()
+input_ids = inputs["input_ids"]
+mask_positions = (input_ids[0] == mask_token_id).nonzero(as_tuple=False).flatten()
+position = int(mask_positions[0].item()) if len(mask_positions) > 0 else input_ids.shape[1] - 1
+pred_logits = logits[0, position]
+topk = torch.topk(pred_logits, k=5)
+top_tokens = tokenizer.convert_ids_to_tokens(topk.indices.tolist())
+dist = torch.softmax(pred_logits, dim=-1)
 
-top_predictions = []
-for token_id, score in zip(tracked_tokens, probabilities):
-    decoded_token = tokenizer.decode([token_id]).strip()
-    top_predictions.append({"token": decoded_token, "score": score})
-
-RESULT = {"top_predictions": top_predictions}
+RESULT = {
+    "top_tokens": top_tokens,
+    "top_token_ids": topk.indices.tolist(),
+    "top_token_scores": topk.values.tolist(),
+    "predicted_distribution_max_prob": float(dist.max().item()),
+}

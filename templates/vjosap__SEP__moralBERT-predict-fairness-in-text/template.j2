@@ -1,0 +1,56 @@
+{% set repo_id = repo_id | default("vjosap/moralBERT-predict-fairness-in-text") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The company announced a new policy to ensure fair treatment for all employees.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+import json
+import torch
+import torch.nn.functional as F
+from safetensors.torch import load_file
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, BertConfig
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+model_config = BertConfig(
+    vocab_size=30522,
+    hidden_size=768,
+    num_hidden_layers=12,
+    num_attention_heads=12,
+    intermediate_size=3072,
+    num_labels=3,
+)
+if "moral_label" in cfg:
+    model_config.num_labels = int(cfg["moral_label"]) + 1
+
+state_dict = load_file(weights_path)
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(vocab_path), use_fast=True)
+model = AutoModelForSequenceClassification.from_config(model_config)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probs = F.softmax(logits, dim=-1)
+    pred_idx = int(torch.argmax(probs, dim=-1).item())
+
+RESULT = {
+    "text": text,
+    "logits": logits.detach().cpu().tolist(),
+    "probabilities": probs.detach().cpu().tolist(),
+    "predicted_label": pred_idx,
+}

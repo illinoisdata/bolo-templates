@@ -1,0 +1,103 @@
+{% set repo_id = repo_id | default("vjosap/moralBERT-predict-harm-in-text") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default('This action is morally wrong and harmful.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = "{{ text_input }}"
+
+import json
+import torch
+import torch.nn as nn
+from huggingface_hub import hf_hub_download
+from tokenizers import Tokenizer
+from safetensors.torch import load_file
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+moral_label = int(cfg.get("moral_label", 2))
+
+tokenizer = Tokenizer.from_file(tokenizer_json_path)
+state_dict = load_file(weights_path)
+
+vocab_size, hidden_size = state_dict["bert.embeddings.word_embeddings.weight"].shape
+num_layers = len({k.split('.')[3] for k in state_dict.keys() if k.startswith('bert.encoder.layer.')})
+num_heads = state_dict['bert.encoder.layer.0.attention.self.query.weight'].shape[0] // hidden_size
+intermediate_size = state_dict['bert.encoder.layer.0.intermediate.dense.weight'].shape[0]
+num_labels = state_dict['classifier.weight'].shape[0] if 'classifier.weight' in state_dict else 2
+
+class BertEmbeddings(nn.Module):
+    def __init__(self, vocab_size, hidden_size):
+        super().__init__()
+        self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
+        self.position_embeddings = nn.Embedding(512, hidden_size)
+        self.token_type_embeddings = nn.Embedding(2, hidden_size)
+        self.LayerNorm = nn.LayerNorm(hidden_size, eps=1e-12)
+        self.dropout = nn.Dropout(0.1)
+    def forward(self, input_ids, token_type_ids=None):
+        if token_type_ids is None:
+            token_type_ids = torch.zeros_like(input_ids)
+        seq_len = input_ids.size(1)
+        position_ids = torch.arange(seq_len, device=input_ids.device).unsqueeze(0).expand_as(input_ids)
+        x = self.word_embeddings(input_ids) + self.position_embeddings(position_ids) + self.token_type_embeddings(token_type_ids)
+        return self.dropout(self.LayerNorm(x))
+
+class BertLayer(nn.Module):
+    def __init__(self, hidden_size, num_heads, intermediate_size):
+        super().__init__()
+        self.attn = nn.MultiheadAttention(hidden_size, num_heads, batch_first=True)
+        self.attn_ln = nn.LayerNorm(hidden_size, eps=1e-12)
+        self.ff = nn.Sequential(nn.Linear(hidden_size, intermediate_size), nn.GELU(), nn.Linear(intermediate_size, hidden_size))
+        self.ff_ln = nn.LayerNorm(hidden_size, eps=1e-12)
+    def forward(self, x, attention_mask=None):
+        key_padding_mask = None if attention_mask is None else ~(attention_mask.bool())
+        attn_out, _ = self.attn(x, x, x, key_padding_mask=key_padding_mask, need_weights=False)
+        x = self.attn_ln(x + attn_out)
+        ff_out = self.ff(x)
+        x = self.ff_ln(x + ff_out)
+        return x
+
+class SimpleBertForSequenceClassification(nn.Module):
+    def __init__(self, vocab_size, hidden_size, num_layers, num_heads, intermediate_size, num_labels):
+        super().__init__()
+        self.embeddings = BertEmbeddings(vocab_size, hidden_size)
+        self.layers = nn.ModuleList([BertLayer(hidden_size, num_heads, intermediate_size) for _ in range(num_layers)])
+        self.pooler = nn.Linear(hidden_size, hidden_size)
+        self.pooler_act = nn.Tanh()
+        self.classifier = nn.Linear(hidden_size, num_labels)
+    def forward(self, input_ids, attention_mask=None, token_type_ids=None):
+        x = self.embeddings(input_ids, token_type_ids)
+        for layer in self.layers:
+            x = layer(x, attention_mask=attention_mask)
+        pooled = x[:, 0]
+        pooled = self.pooler_act(self.pooler(pooled))
+        logits = self.classifier(pooled)
+        return type('Out', (), {'logits': logits})
+
+model = SimpleBertForSequenceClassification(vocab_size, hidden_size, num_layers, num_heads, intermediate_size, num_labels)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+enc = tokenizer.encode(text_input)
+input_ids = torch.tensor([enc.ids], device=device)
+attention_mask = torch.tensor([enc.attention_mask], device=device)
+token_type_ids = torch.tensor([enc.type_ids], device=device)
+
+with torch.no_grad():
+    outputs = model(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids)
+    logits = outputs.logits
+    probs = torch.softmax(logits, dim=-1)
+    predicted_class_id = int(torch.argmax(probs, dim=-1).item())
+    moral_probability = float(probs[0, moral_label].item()) if moral_label < probs.shape[-1] else float(probs.max(dim=-1).values.item())
+
+RESULT = {
+    "logits": logits.detach().cpu().tolist(),
+    "probabilities": probs.detach().cpu().tolist(),
+    "predicted_class_id": predicted_class_id,
+    "moral_label": int(moral_label),
+    "moral_probability": moral_probability,
+}

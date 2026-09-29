@@ -1,0 +1,32 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("fal/AuraSR-v2") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+import json
+from pathlib import Path
+from io import BytesIO
+from PIL import Image
+import requests
+import torch
+from huggingface_hub import hf_hub_download
+from aura_sr import AuraSR
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    response = requests.get(image_path)
+    image = Image.open(BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+image = image.resize((256, 256))
+
+model = AuraSR.from_pretrained(repo_id)
+upscaled_image = model.upscale_4x_overlapped(image)
+
+RESULT = {"upscaled_image": upscaled_image}

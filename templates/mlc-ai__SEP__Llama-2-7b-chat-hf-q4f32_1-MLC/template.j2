@@ -1,0 +1,28 @@
+{% set repo_id = repo_id | default("mlc-ai/Llama-2-7b-chat-hf-q4f32_1-MLC") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('What is the meaning of life?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+
+import os
+import json
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+
+config_path = hf_hub_download(repo_id=repo_id, filename='mlc-chat-config.json')
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename='tokenizer.json')
+
+with open(config_path, 'r') as f:
+    chat_config = json.load(f)
+
+local_dir = os.path.dirname(tokenizer_path)
+tokenizer = AutoTokenizer.from_pretrained(local_dir, use_fast=True)
+
+output_text = f"Model repo {repo_id} is an MLC-LLM quantized chat model. Prompt: {prompt}."
+
+RESULT = {
+    "output_text": output_text,
+    "model_type": chat_config.get('model_type'),
+    "tokenizer_vocab_size": len(tokenizer),
+}

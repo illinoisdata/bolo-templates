@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("flair/ner-english-ontonotes-large") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("On September 1st George won 1 dollar while watching Game of Thrones.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+import sys
+import subprocess
+
+from huggingface_hub import hf_hub_download
+
+try:
+    import flair
+except Exception:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "flair"])
+    import flair
+
+from flair.data import Sentence
+from flair.models import SequenceTagger
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+sentence = Sentence(text)
+
+tagger = SequenceTagger.load(weights_path)
+try:
+    tagger.to(device)
+except Exception:
+    pass
+
+tagger.predict(sentence)
+
+entities = []
+for span in sentence.get_spans("ner"):
+    label = span.get_label("ner")
+    entities.append({
+        "text": span.text,
+        "label": label.value,
+        "score": label.score,
+        "start_pos": span.start_position,
+        "end_pos": span.end_position,
+    })
+
+RESULT = {"entities": entities, "sentence": sentence.to_dict(tag_type="ner")}

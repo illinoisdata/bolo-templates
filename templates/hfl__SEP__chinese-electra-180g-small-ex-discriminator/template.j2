@@ -1,16 +1,21 @@
 {% set repo_id = repo_id | default("hfl/chinese-electra-180g-small-ex-discriminator") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("这是一个示例句子，用于测试模型的推理。") %}
+{% set text = text | default('今天天气很好，我们去公园散步。') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
-from transformers import AutoTokenizer, AutoModelForPreTraining
 import torch
-import os
+from transformers import AutoTokenizer, ElectraForPreTraining
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = ElectraForPreTraining.from_pretrained(repo_id)
 model.to(device)
 model.eval()
 
@@ -19,8 +24,12 @@ inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
     outputs = model(**inputs)
+    logits = outputs.logits
+    probabilities = torch.sigmoid(logits)
+    prediction = torch.argmax(logits, dim=-1)
 
-tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
-probabilities = torch.sigmoid(outputs.logits)[0].cpu().tolist()
-
-RESULT = {"tokens": tokens, "probabilities": probabilities}
+RESULT = {
+    "logits": logits.detach().cpu().tolist(),
+    "probabilities": probabilities.detach().cpu().tolist(),
+    "prediction": prediction.detach().cpu().tolist(),
+}

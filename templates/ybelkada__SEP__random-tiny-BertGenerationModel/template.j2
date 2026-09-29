@@ -1,0 +1,112 @@
+{% set repo_id = repo_id | default("ybelkada/random-tiny-BertGenerationModel") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set model = model | default(repo_id) %}
+{% set input_prompt = input_prompt | default("The quick brown fox jumps over the lazy dog.") %}
+
+repo_id = {{ repo_id | tojson }}
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+import torch
+from transformers import AutoConfig, pipeline
+
+config = AutoConfig.from_pretrained(model)
+
+class SimpleTokenizer:
+    def __init__(self, vocab_size, bos_token_id, eos_token_id, pad_token_id, model_max_length):
+        self.vocab_size = vocab_size
+        self.bos_token_id = bos_token_id
+        self.eos_token_id = eos_token_id
+        self.pad_token_id = pad_token_id
+        self.model_max_length = model_max_length
+        self.padding_side = "right"
+        self.pad_token = "[PAD]"
+        self.bos_token = "[BOS]"
+        self.eos_token = "[EOS]"
+
+    def _map_char(self, char):
+        safe_range = max(1, self.vocab_size - 3)
+        return 3 + (ord(char) % safe_range)
+
+    def _is_special(self, token_id):
+        return token_id in {self.pad_token_id, self.bos_token_id, self.eos_token_id}
+
+    def _encode_single(self, text, max_length):
+        tokens = [self.bos_token_id]
+        for char in text:
+            if len(tokens) >= max_length - 1:
+                break
+            tokens.append(self._map_char(char))
+        tokens.append(self.eos_token_id)
+        if len(tokens) > max_length:
+            tokens = tokens[:max_length]
+            tokens[-1] = self.eos_token_id
+        return tokens
+
+    def _pad_sequence(self, sequence, pad_length):
+        if pad_length is None:
+            return sequence
+        if len(sequence) >= pad_length:
+            return sequence[:pad_length]
+        return sequence + [self.pad_token_id] * (pad_length - len(sequence))
+
+    def _build_attention_mask(self, sequence, pad_length):
+        if pad_length is None:
+            return [1] * len(sequence)
+        length = min(len(sequence), pad_length)
+        mask = [1] * length
+        if pad_length > len(sequence):
+            mask += [0] * (pad_length - len(sequence))
+        return mask
+
+    def __call__(self, texts, return_tensors=None, padding=True, truncation=True, max_length=None, **kwargs):
+        if not isinstance(texts, (list, tuple)):
+            texts = [texts]
+        max_length = max_length or self.model_max_length
+        encoded = [self._encode_single(text, max_length) for text in texts]
+        pad_length = max_length if padding else None
+        sequences = [self._pad_sequence(seq, pad_length) for seq in encoded]
+        attention_masks = [self._build_attention_mask(seq, pad_length) for seq in encoded]
+        if return_tensors == "pt":
+            sequences = torch.tensor(sequences, dtype=torch.long)
+            attention_masks = torch.tensor(attention_masks, dtype=torch.long)
+        return {"input_ids": sequences, "attention_mask": attention_masks}
+
+    def _decode_token(self, token_id):
+        if self._is_special(token_id):
+            return ""
+        return chr(33 + ((token_id - 3) % 94))
+
+    def batch_decode(self, sequences, skip_special_tokens=True, clean_up_tokenization_spaces=True):
+        decoded = []
+        for seq in sequences:
+            tokens = [
+                self._decode_token(tok)
+                for tok in seq
+                if not (skip_special_tokens and self._is_special(tok))
+            ]
+            decoded.append("".join(tokens))
+        return decoded
+
+    def decode(self, token_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True):
+        return self.batch_decode(
+            [token_ids],
+            skip_special_tokens=skip_special_tokens,
+            clean_up_tokenization_spaces=clean_up_tokenization_spaces,
+        )[0]
+
+tokenizer = SimpleTokenizer(
+    vocab_size=config.vocab_size,
+    bos_token_id=getattr(config, "bos_token_id", 2) or 2,
+    eos_token_id=getattr(config, "eos_token_id", 1) or 1,
+    pad_token_id=getattr(config, "pad_token_id", 0) or 0,
+    model_max_length=getattr(config, "max_position_embeddings", getattr(config, "max_length", 512)),
+)
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+
+prompt = input_prompt
+RESULT = pipe(prompt)

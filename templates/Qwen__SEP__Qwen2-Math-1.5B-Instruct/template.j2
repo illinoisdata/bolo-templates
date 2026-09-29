@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("Qwen/Qwen2-Math-1.5B-Instruct") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Find the value of x that satisfies the equation 4x+5 = 6x+7.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+weight_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    local_files_only=True,
+)
+model.to(device)
+model.eval()
+
+# Ensure tokenizer loads from local snapshot files.
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    local_files_only=True,
+)
+
+messages = [
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user", "content": prompt},
+]
+text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = tokenizer(text, return_tensors="pt").to(device)
+
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=256, do_sample=False)
+
+output_ids = generated_ids[0, inputs["input_ids"].shape[1]:]
+response = tokenizer.decode(output_ids, skip_special_tokens=True)
+
+RESULT = {"response": response}

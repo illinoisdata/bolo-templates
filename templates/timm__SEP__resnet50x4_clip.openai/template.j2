@@ -1,0 +1,52 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set candidate_labels = candidate_labels | default(['a photo of a cat', 'a photo of two cats', 'a photo of a dog', 'a photo of a car', 'a photo of a bird']) %}
+{% set repo_id = repo_id | default("timm/resnet50x4_clip.openai") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+candidate_labels = {{ candidate_labels }}
+
+import json
+import requests
+import torch
+import timm
+from PIL import Image
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+from timm.data import resolve_data_config, create_transform
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+with open(config_path, 'r') as f:
+    cfg = json.load(f)
+
+model = timm.create_model(
+    cfg['architecture'],
+    pretrained=False,
+    num_classes=cfg.get('num_classes', 0),
+    global_pool=cfg.get('global_pool', 'avg'),
+)
+state_dict_path = hf_hub_download(repo_id=repo_id, filename='pytorch_model.bin')
+state_dict = torch.load(state_dict_path, map_location='cpu')
+model.load_state_dict(state_dict, strict=False)
+model.eval().to(device)
+
+transform = create_transform(**resolve_data_config({}, model=model), is_training=False)
+image_tensor = transform(image).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    outputs = model(image_tensor)
+    probs = torch.softmax(outputs, dim=-1)
+    top_prob, top_idx = probs.max(dim=-1)
+
+RESULT = {
+    'logits': outputs.detach().cpu().tolist(),
+    'probabilities': probs.detach().cpu().tolist(),
+    'top_index': int(top_idx.item()),
+    'top_probability': float(top_prob.item()),
+}

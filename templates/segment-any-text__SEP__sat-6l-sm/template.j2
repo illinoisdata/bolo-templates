@@ -1,0 +1,24 @@
+{% set repo_id = repo_id | default("segment-any-text/sat-6l-sm") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set input_text = input_text | default("Segment any Text is a new paper. It sets the standard for sentence boundaries and it is very <mask>.") %}
+{% set base_model = base_model | default("xlm-roberta-base") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+base_model = {{ base_model | tojson }}
+input_text = {{ input_text | tojson }}
+
+from transformers import pipeline, AutoConfig, AutoTokenizer
+
+config = AutoConfig.from_pretrained(base_model)
+tokenizer = AutoTokenizer.from_pretrained(base_model, use_fast=True)
+pipe = pipeline(task=task, model=repo_id, config=config, tokenizer=tokenizer, device=device)
+
+# Pre-process input
+data = input_text
+# Run inference
+raw_outputs = pipe(data)
+# Post-process & build RESULT dict
+RESULT = {"outputs": raw_outputs}

@@ -1,0 +1,54 @@
+{% set repo_id = repo_id | default("Kaze-droid/event-extraction-tagger") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The city council approved the new transit plan after weeks of debate, and residents celebrated the decision.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+# Load tokenizer/model directly from downloaded files' directory
+import os
+model_dir = os.path.dirname(model_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = AutoModelForTokenClassification.from_pretrained(model_dir)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    logits = model(**inputs).logits
+pred_ids = logits.argmax(dim=-1)[0].tolist()
+tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
+labels = [model.config.id2label[str(i)] if str(i) in model.config.id2label else model.config.id2label[i] for i in pred_ids]
+
+entities = []
+current = None
+for tok, lab in zip(tokens, labels):
+    if tok in [tokenizer.cls_token, tokenizer.sep_token, tokenizer.pad_token]:
+        continue
+    if lab == "B-event":
+        if current:
+            entities.append(current)
+        current = tok.replace("##", "")
+    elif lab == "I-event" and current is not None:
+        current += tok.replace("##", "")
+    else:
+        if current:
+            entities.append(current)
+            current = None
+if current:
+    entities.append(current)
+
+RESULT = {"tokens": tokens, "labels": labels, "entities": entities}

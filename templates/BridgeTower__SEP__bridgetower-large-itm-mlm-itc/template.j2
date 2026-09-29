@@ -1,7 +1,0 @@
-{% set device = device | default("cuda:0") %}
-{% set repo_id = repo_id | default("BridgeTower/bridgetower-large-itm-mlm-itc") %}
-from pathlib import Path
-import os
-import transformers.models.bridgetower as bridgetower
-print(bridgetower.__file__)
-print(os.listdir(Path(bridgetower.__file__).resolve().parent))

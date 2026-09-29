@@ -1,28 +1,27 @@
 {% set repo_id = repo_id | default("soheeyang/rdr-ctx_encoder-single-nq-base") %}
 {% set device = device | default("cuda:0") %}
-{% set context_text = context_text | default("A passage describing the Retriever context for Natural Questions") %}
+{% set text = text | default('context comes here') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-context_text = "{{ context_text }}"
+text = "{{ text }}"
 
-from pathlib import Path
-
-import numpy as np
 import torch
-from transformers import DPRContextEncoder, AutoTokenizer
+from transformers import AutoTokenizer, DPRContextEncoder
+from huggingface_hub import hf_hub_download
 
-model_device = torch.device(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
 model = DPRContextEncoder.from_pretrained(repo_id)
-model = model.to(model_device)
+model = model.to(device)
 model.eval()
 
-tokenized_inputs = tokenizer(context_text, return_tensors="pt", truncation=True, padding=True)
-inputs = {key: value.to(model_device) for key, value in tokenized_inputs.items()}
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
     outputs = model(**inputs)
+    embedding = outputs.pooler_output
 
-context_embedding = outputs.pooler_output.detach().cpu()
-
-RESULT = {"context_embedding": context_embedding}
+RESULT = {"pooler_output": embedding.detach().cpu().tolist()}

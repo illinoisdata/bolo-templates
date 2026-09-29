@@ -1,0 +1,81 @@
+{% set repo_id = repo_id | default("vjosap/moralBERT-predict-cheating-in-text") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('He said he was studying all night, but later it turned out he had cheated on the exam.') %}
+{% set max_length = max_length | default(256) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+max_length = {{ max_length }}
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+from safetensors.torch import load_file
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+# Load tokenizer from downloaded files directory.
+tokenizer_dir = os.path.dirname(tokenizer_json_path)
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir, use_fast=True)
+
+class MoralBertPredictCheatingInText(torch.nn.Module):
+    def __init__(self, vocab_size, hidden_size=768, num_labels=2):
+        super().__init__()
+        self.bert = torch.nn.Module()
+        self.bert.embeddings = torch.nn.Module()
+        self.bert.embeddings.word_embeddings = torch.nn.Embedding(vocab_size, hidden_size)
+        self.bert.embeddings.position_embeddings = torch.nn.Embedding(512, hidden_size)
+        self.bert.embeddings.token_type_embeddings = torch.nn.Embedding(2, hidden_size)
+        self.bert.embeddings.LayerNorm = torch.nn.LayerNorm(hidden_size)
+        self.bert.pooler = torch.nn.Module()
+        self.bert.pooler.dense = torch.nn.Linear(hidden_size, hidden_size)
+        self.invariant_trans = torch.nn.Linear(hidden_size, hidden_size)
+        self.moral_classification = torch.nn.Sequential(
+            torch.nn.Linear(hidden_size, hidden_size),
+            torch.nn.Tanh(),
+            torch.nn.Linear(hidden_size, num_labels),
+        )
+
+    def forward(self, input_ids=None, attention_mask=None, token_type_ids=None):
+        x = self.bert.embeddings.word_embeddings(input_ids)
+        if attention_mask is not None:
+            mask = attention_mask.unsqueeze(-1).to(x.dtype)
+            x = x * mask
+            pooled = x.sum(dim=1) / mask.sum(dim=1).clamp(min=1.0)
+        else:
+            pooled = x.mean(dim=1)
+        pooled = self.bert.pooler.dense(pooled)
+        pooled = torch.tanh(pooled)
+        pooled = self.invariant_trans(pooled)
+        logits = self.moral_classification(pooled)
+        return logits
+
+state_dict = load_file(weights_path)
+vocab_size = state_dict['bert.embeddings.word_embeddings.weight'].shape[0]
+model = MoralBertPredictCheatingInText(vocab_size=vocab_size, hidden_size=768, num_labels=2)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors='pt', truncation=True, max_length=max_length)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+if 'token_type_ids' not in inputs:
+    inputs['token_type_ids'] = torch.zeros_like(inputs['input_ids'])
+
+with torch.no_grad():
+    logits = model(**inputs)
+    probabilities = torch.softmax(logits, dim=-1)
+    predicted_class = int(torch.argmax(probabilities, dim=-1).item())
+    predicted_score = float(probabilities[0, predicted_class].item())
+
+RESULT = {
+    'predicted_class': predicted_class,
+    'predicted_score': predicted_score,
+    'probabilities': probabilities[0].detach().cpu().tolist(),
+}

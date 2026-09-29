@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("mozilla-ai/TinyLlama-1.1B-Chat-v1.0-llamafile") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('TinyLlama-1.1B-Chat-v1.0.Q4_K_M.llamafile') %}
+{% set prompt = prompt | default('How many helicopters can a human eat in one sitting?') %}
+{% set system_message = system_message | default('You are a friendly chatbot who always responds in the style of a pirate.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+system_message = "{{ system_message }}"
+
+from huggingface_hub import hf_hub_download
+import os
+import subprocess
+import tempfile
+
+llamafile_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+messages = [
+    {"role": "system", "content": system_message},
+    {"role": "user", "content": prompt},
+]
+chat_prompt = (
+    f"<|im_start|>system\n{messages[0]['content']}<|im_end|>\n"
+    f"<|im_start|>user\n{messages[1]['content']}<|im_end|>\n"
+    f"<|im_start|>assistant\n"
+)
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    os.chmod(llamafile_path, 0o755)
+    proc = subprocess.run(
+        ["bash", llamafile_path, "--help"],
+        cwd=tmpdir,
+        capture_output=True,
+        text=True,
+    )
+    output = proc.stdout if proc.stdout else proc.stderr
+
+RESULT = {"output": output, "prompt": chat_prompt, "model_file": llamafile_path}

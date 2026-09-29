@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Organism-Medium-209M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("Caenorhabditis elegans is a model organism for genetic studies.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from gliner import GLiNER
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+
+device_t = torch.device(device if (device.startswith("cuda") and torch.cuda.is_available()) or device == "cpu" else "cpu")
+model = GLiNER.from_pretrained(repo_id)
+model = model.to(device_t)
+
+labels = ["SPECIES"]
+entities = model.predict_entities(text, labels, flat_ner=True, threshold=0.5)
+
+RESULT = {"entities": entities}

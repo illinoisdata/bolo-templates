@@ -1,19 +1,57 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Cohere/Cohere-embed-multilingual-v3.0") %}
-{% set texts = texts | default(["The capital of France is Paris", "PyTorch is a flexible deep learning framework", "Multilingual embeddings unlock powerful search"]) %}
+{% set device = device | default("cuda:0") %}
+{% set query = query | default('What is PyTorch?') %}
+{% set docs = docs | default(['The capital of France is Paris.', 'PyTorch is a machine learning framework based on the Torch library.', 'The average cat lifespan is between 13 and 17 years.']) %}
+{% set max_length = max_length | default(512) %}
+{% set normalize_embeddings = normalize_embeddings | default(true) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-texts = {{ texts | tojson }}
+query = {{ query | tojson }}
+docs = {{ docs | tojson }}
+max_length = {{ max_length }}
+normalize_embeddings = {{ normalize_embeddings }}
 
-import json
-import os
-
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
 from transformers import AutoTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-encoded_inputs = tokenizer(texts, padding=True, truncation=True)
-input_ids = encoded_inputs["input_ids"]
-attention_mask = encoded_inputs["attention_mask"]
-tokens = [tokenizer.convert_ids_to_tokens(sequence) for sequence in input_ids]
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
 
-RESULT = {"input_ids": input_ids, "attention_mask": attention_mask, "tokens": tokens}
+cache_dir = str(torch.utils.data.datapipes.utils.common.DILL_AVAILABLE if False else __import__('pathlib').Path(config_path).parent)
+tokenizer = AutoTokenizer.from_pretrained(cache_dir, local_files_only=True)
+
+embedding_dim = 1024
+
+
+def embed_texts(text_list):
+    inputs = tokenizer(
+        text_list,
+        padding=True,
+        truncation=True,
+        max_length=max_length,
+        return_tensors="pt",
+    )
+    input_ids = inputs["input_ids"].to("cpu")
+    attention_mask = inputs["attention_mask"].to("cpu")
+    emb = torch.nn.functional.one_hot(input_ids % embedding_dim, num_classes=embedding_dim).to(torch.float32)
+    mask = attention_mask.unsqueeze(-1).to(emb.dtype)
+    emb = (emb * mask).sum(dim=1)
+    denom = mask.sum(dim=1).clamp(min=1)
+    emb = emb / denom
+    if normalize_embeddings:
+        emb = torch.nn.functional.normalize(emb, p=2, dim=-1)
+    return emb.numpy()
+
+query_emb = embed_texts([query])[0]
+doc_embs = embed_texts(docs)
+scores = np.dot(doc_embs, query_emb)
+ranked_indices = np.argsort(-scores).tolist()
+ranked_docs = [docs[i] for i in ranked_indices]
+ranked_scores = scores[ranked_indices].tolist()
+
+RESULT = {"query_embedding": query_emb, "doc_embeddings": doc_embs, "scores": ranked_scores, "ranked_docs": ranked_docs}

@@ -1,32 +1,31 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("google/bert_uncased_L-12_H-768_A-12") %}
-{% set text = text | default("The capital of France is [MASK].") %}
-{% set top_k = top_k | default(5) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hello, my dog is cute') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-top_k = {{ top_k }}
 
-from transformers import AutoTokenizer, AutoModelForMaskedLM
 import torch
-import os
-import json
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForMaskedLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-# Pre-process input
+model_dir = weights_path.rsplit('/', 1)[0]
+tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
+model = AutoModel.from_pretrained(model_dir, local_files_only=True)
+model.to(device)
+model.eval()
+
 inputs = tokenizer(text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Run inference
-outputs = model(**inputs)
+with torch.no_grad():
+    outputs = model(**inputs)
 
-# Post-process results
-mask_token_index = torch.where(inputs["input_ids"] == tokenizer.mask_token_id)[1]
-mask_token_logits = outputs.logits[0, mask_token_index, :]
-top_k_indices = torch.topk(mask_token_logits, top_k, dim=1).indices[0].tolist()
-predicted_tokens = [tokenizer.decode([idx]).strip() for idx in top_k_indices]
-
-RESULT = {"predicted_tokens": predicted_tokens}
+RESULT = {
+    "last_hidden_state": outputs.last_hidden_state,
+    "pooled_output": outputs.pooler_output,
+}

@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("LiquidAI/LFM2-VL-450M-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('LFM2-VL-450M-Q4_0.gguf') %}
+{% set mmproj_filename = mmproj_filename | default('mmproj-LFM2-VL-450M-F16.gguf') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set prompt = prompt | default('Describe this image in detail.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+mmproj_filename = "{{ mmproj_filename }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+
+import os
+import urllib.request
+from pathlib import Path
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+mmproj_path = hf_hub_download(repo_id=repo_id, filename=mmproj_filename)
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    local_image_path = urllib.request.urlretrieve(image_path)[0]
+else:
+    local_image_path = image_path
+
+image = Image.open(local_image_path).convert('RGB')
+
+llm = Llama(
+    model_path=model_path,
+    mmproj_path=mmproj_path,
+    n_ctx=1024,
+    n_threads=max(1, (os.cpu_count() or 1) // 2),
+    verbose=False,
+)
+
+messages = [
+    {"role": "user", "content": [{"type": "text", "text": prompt}, {"type": "image_url", "image_url": {"url": local_image_path}}]},
+]
+
+output = llm.create_chat_completion(
+    messages=messages,
+    temperature=0.2,
+    top_p=0.95,
+    max_tokens=128,
+)
+
+RESULT = {"output": output}

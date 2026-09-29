@@ -1,26 +1,35 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-tc-big-fr-en") %}
 {% set device = device | default("cuda:0") %}
-{% set text_inputs = text_inputs | default(["J'ai adoré l'Angleterre.", "C'était la seule chose à faire."]) %}
+{% set src_text = src_text | default(["J'ai adoré l'Angleterre.", "C'était la seule chose à faire."]) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_inputs = {{ text_inputs | tojson }}
+src_text = {{ src_text | tojson }}
 
+import os
 import torch
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import MarianMTModel, MarianTokenizer
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-torch_device = torch.device(device)
-model = model.to(torch_device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+_ = (config_path, tokenizer_config_path, special_tokens_map_path, vocab_path, source_spm_path, target_spm_path)
+
+tokenizer = MarianTokenizer.from_pretrained(repo_id)
+model = MarianMTModel.from_pretrained(repo_id, torch_dtype=torch.float16 if torch.cuda.is_available() and str(device).startswith("cuda") else None)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(text_inputs, return_tensors="pt", padding=True, truncation=True)
-inputs = {k: v.to(torch_device) for k, v in inputs.items()}
+inputs = tokenizer(src_text, return_tensors="pt", padding=True, truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    generated_tokens = model.generate(**inputs)
+    generated_tokens = model.generate(**inputs, num_beams=4)
 
-translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-
-RESULT = {"translations": translations}
+translated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+RESULT = {"translations": translated_text}

@@ -1,0 +1,35 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set repo_id = repo_id | default("SungBeom/stt_kr_conformer_ctc_medium") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+input_text = "{{ input_text }}"
+
+import torch
+from huggingface_hub import hf_hub_download
+import librosa
+import nemo.collections.asr as nemo_asr
+
+model_file = hf_hub_download(repo_id=repo_id, filename="stt_kr_conformer_ctc_medium.nemo")
+model = nemo_asr.models.EncDecCTCModel.restore_from(model_file)
+model = model.to(device)
+model.eval()
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    audio, sr = librosa.load(BytesIO(audio_bytes), sr=16000)
+else:
+    audio, sr = librosa.load(audio_path, sr=16000)
+
+signal = torch.tensor(audio, dtype=torch.float32).unsqueeze(0).to(device)
+signal_length = torch.tensor([signal.shape[1]], dtype=torch.long, device=device)
+
+with torch.no_grad():
+    log_probs, encoded_len, greedy_predictions = model.forward(input_signal=signal, input_signal_length=signal_length)
+    transcription = model.decoding.ctc_decoder_predictions_tensor(greedy_predictions)[0]
+
+RESULT = {"text": transcription}

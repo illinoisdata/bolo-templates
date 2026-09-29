@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("nvidia/quality-classifier-deberta") %}
+{% set device = device | default("cuda:0") %}
+{% set text_samples = text_samples | default([".?@fdsa Low quality text.", "This sentence is ok."]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_samples = {{ text_samples }}
+
+import json
+import torch
+from torch import nn
+from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download, PyTorchModelHubMixin
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+def load_config_dict(path):
+    with open(path, "r") as f:
+        return json.load(f)
+
+config_dict = load_config_dict(config_path)
+
+class QualityModel(nn.Module, PyTorchModelHubMixin):
+    def __init__(self, config):
+        super().__init__()
+        self.model = AutoModel.from_pretrained(config["base_model"])
+        self.dropout = nn.Dropout(config["fc_dropout"])
+        self.fc = nn.Linear(self.model.config.hidden_size, len(config["id2label"]))
+
+    def forward(self, input_ids, attention_mask):
+        features = self.model(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
+        dropped = self.dropout(features)
+        outputs = self.fc(dropped.float())
+        return torch.softmax(outputs[:, 0, :], dim=1)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = QualityModel.from_pretrained(repo_id).to(device)
+model.eval()
+
+inputs = tokenizer(text_samples, return_tensors="pt", padding="longest", truncation=True, max_length=1024).to(device)
+outputs = model(inputs["input_ids"], inputs["attention_mask"])
+predicted_classes = torch.argmax(outputs, dim=1)
+predicted_domains = [config_dict["id2label"][str(class_idx.item())] for class_idx in predicted_classes.cpu()]
+
+RESULT = {"predicted_labels": predicted_domains}

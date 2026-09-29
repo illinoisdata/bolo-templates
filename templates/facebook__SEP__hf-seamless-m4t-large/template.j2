@@ -1,26 +1,39 @@
+{% set text = text|default('Hello, my dog is cute') %}
+{% set src_lang = src_lang|default('eng') %}
+{% set tgt_lang = tgt_lang|default('fra') %}
+{% set generate_speech = generate_speech|default(false) %}
 {% set repo_id = repo_id | default("facebook/hf-seamless-m4t-large") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("Hello, my dog is cute") %}
-{% set src_lang = src_lang | default("eng") %}
-{% set tgt_lang = tgt_lang | default("rus") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
+text = "{{ text }}"
 src_lang = "{{ src_lang }}"
 tgt_lang = "{{ tgt_lang }}"
+generate_speech = {{ generate_speech }}
 
-import os
-import numpy as np
-import soundfile as sf
 import torch
 from transformers import AutoProcessor, SeamlessM4TModel
+from huggingface_hub import hf_hub_download
 
-processor = AutoProcessor.from_pretrained(repo_id)
-model = SeamlessM4TModel.from_pretrained(repo_id).to(device)
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+processor = AutoProcessor.from_pretrained(repo_id, use_fast=False)
+model = SeamlessM4TModel.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-inputs = processor(text=input_text, src_lang=src_lang, return_tensors="pt")
-inputs = {k: v.to(device) for k, v in inputs.items()}
+inputs = processor(text=text, src_lang=src_lang, return_tensors="pt")
+inputs = {k: v.to(device) if hasattr(v, "to") else v for k, v in inputs.items()}
+with torch.no_grad():
+    output = model.generate(**inputs, tgt_lang=tgt_lang, generate_speech=generate_speech)
 
-audio_array = model.generate(**inputs, tgt_lang=tgt_lang)[0].cpu().numpy().squeeze()
+if generate_speech:
+    output_value = output[0].detach().cpu().numpy().squeeze()
+else:
+    output_value = str(output[0])
 
-RESULT = {"audio": audio_array}
+RESULT = {"output": output_value}

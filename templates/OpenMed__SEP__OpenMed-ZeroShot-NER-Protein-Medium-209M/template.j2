@@ -1,0 +1,26 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Protein-Medium-209M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("The Maillard reaction is responsible for the browning of many foods.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+from huggingface_hub import hf_hub_download
+from gliner import GLiNER
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+spm_path = hf_hub_download(repo_id=repo_id, filename="spm.model")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+model = GLiNER.from_pretrained(repo_id, cache_dir=os.path.dirname(weights_path))
+model.to(device)
+
+labels = ["protein", "protein_complex", "protein_enum", "protein_family_or_group", "protein_variant"]
+entities = model.predict_entities(text, labels, flat_ner=True, threshold=0.5)
+
+RESULT = {"entities": entities}

@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("stefan-it/flair-distilbert-ner-germeval14") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Hugging Face ist eine französische Firma mit Sitz in New York.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+from flair.data import Sentence
+from flair.models import SequenceTagger
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+local_dir = os.path.dirname(weights_path)
+
+model = SequenceTagger.load(weights_path)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained("distilbert-base-german-cased", use_fast=True)
+
+sentence = Sentence(text)
+with torch.no_grad():
+    model.predict(sentence)
+
+entities = []
+for span in sentence.get_spans("ner"):
+    entities.append({"text": span.text, "label": span.get_label("ner").value, "score": span.score})
+
+RESULT = {"entities": entities}

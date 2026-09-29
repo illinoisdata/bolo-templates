@@ -1,25 +1,46 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-fr-es") %}
-{% set text = text | default("Ceci est une phrase d'exemple.") %}
-{% set max_length = max_length | default(512) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Bonjour, comment allez-vous ?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = "{{ text }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text = {{ text | tojson }}
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import torch
 from pathlib import Path
+import subprocess
+import sys
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+import torch
+from huggingface_hub import snapshot_download
 
-inputs = tokenizer(text, return_tensors="pt", padding=True)
-inputs = {k: v.to(device) for k, v in inputs.items()}
+repo_dir = snapshot_download(repo_id=repo_id, allow_patterns=["source.spm", "target.spm", "pytorch_model.bin"])
 
-generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
-translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+try:
+    import sentencepiece as spm
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "sentencepiece"])
+    import sentencepiece as spm
 
-RESULT = {"translations": translations}
+sp = spm.SentencePieceProcessor()
+sp.Load(str(Path(repo_dir) / "source.spm"))
+input_ids = sp.EncodeAsIds(text)
+if sp.bos_id() >= 0:
+    input_ids = [sp.bos_id()] + input_ids
+if sp.eos_id() >= 0:
+    input_ids = input_ids + [sp.eos_id()]
+
+state_dict = torch.load(str(Path(repo_dir) / "pytorch_model.bin"), map_location="cpu")
+
+try:
+    from transformers import MarianMTModel
+    net = MarianMTModel.from_pretrained(repo_id).to(device)
+    net.eval()
+    inputs = torch.tensor([input_ids], device=device)
+    with torch.no_grad():
+        output_ids = net.generate(inputs, num_beams=4, max_new_tokens=64)
+    tsp = spm.SentencePieceProcessor()
+    tsp.Load(str(Path(repo_dir) / "target.spm"))
+    translated_text = tsp.DecodeIds(output_ids[0].tolist())
+except ImportError:
+    translated_text = ""
+
+RESULT = {"translation": translated_text}

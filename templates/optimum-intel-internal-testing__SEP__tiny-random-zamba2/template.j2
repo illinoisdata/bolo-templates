@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("optimum-intel-internal-testing/tiny-random-zamba2") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Hello, how are you?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = {{ question | tojson }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, Zamba2ForCausalLM
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = Zamba2ForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+    device_map=None,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(question, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=12, do_sample=False)
+
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

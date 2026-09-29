@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("aisingapore/SEA-LION-v1-7B-IT") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_prompt = {{ input_prompt | tojson }}
+
+import json
+import os
+from huggingface_hub import snapshot_download
+from transformers import pipeline
+
+repo_dir = snapshot_download(repo_id=repo_id)
+config_path = os.path.join(repo_dir, "config.json")
+with open(config_path, "r", encoding="utf-8") as config_file:
+    config_dict = json.load(config_file)
+attn_config = config_dict.get("attn_config", {})
+attn_pdrop = attn_config.get("attn_pdrop", 0)
+attn_config["attn_pdrop"] = int(attn_pdrop)
+config_dict["attn_config"] = attn_config
+with open(config_path, "w", encoding="utf-8") as config_file:
+    json.dump(config_dict, config_file, ensure_ascii=False, indent=2)
+
+pipe = pipeline(task=task, model=repo_dir, device=device)
+
+pipe_input = input_prompt
+pipe_output = pipe(pipe_input)
+
+RESULT = {"outputs": pipe_output}

@@ -1,0 +1,29 @@
+{% set repo_id = repo_id | default("PAIXAI/Astrid-1B") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Why is drinking water so healthy?") %}
+{% set torch_dtype = torch_dtype | default("auto") %}
+{% set trust_remote_code = trust_remote_code | default(True) %}
+{% set use_fast = use_fast | default(True) %}
+{% set device_map = device_map | default({"": device}) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_prompt = "{{ input_prompt }}"
+torch_dtype = "{{ torch_dtype }}"
+trust_remote_code = {{ trust_remote_code }}
+use_fast = {{ use_fast }}
+device_map = {{ device_map }}
+
+from transformers import pipeline
+
+pipe = pipeline(
+    task=task,
+    model=repo_id,
+    torch_dtype=torch_dtype,
+    trust_remote_code=trust_remote_code,
+    use_fast=use_fast,
+    device_map=device_map,
+)
+RESULT = pipe(input_prompt)

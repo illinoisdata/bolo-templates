@@ -1,0 +1,15 @@
+{% set repo_id = repo_id | default("facebook/sam2.1-hiera-large") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("mask-generation") %}
+{% set input_image = input_image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+# Python variable assignments
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_image = {{ input_image | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(input_image)

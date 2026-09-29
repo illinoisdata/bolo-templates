@@ -1,45 +1,45 @@
 {% set repo_id = repo_id | default("timm/vit_base_patch32_clip_224.openai") %}
 {% set device = device | default("cuda:0") %}
-{% set image_path = image_path | default('/u/yli77/projects/ML-code-generation/data/image1.jpeg') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text_input = text_input | default('a photo of a cat') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-
-from io import BytesIO
-from pathlib import Path
-from urllib.parse import urlparse
-from urllib.request import urlopen
+text_input = "{{ text_input }}"
 
 import torch
+import numpy as np
 from PIL import Image
-from transformers import AutoImageProcessor, AutoModelForImageClassification
-import json
+from timm.data import resolve_model_data_config, create_transform
+from timm.models import create_model
+from huggingface_hub import hf_hub_download
 
-processor = AutoImageProcessor.from_pretrained(repo_id)
-model = AutoModelForImageClassification.from_pretrained(repo_id).to(device)
-model.eval()
-
-parsed_image_path = urlparse(image_path)
-if parsed_image_path.scheme in {"http", "https"}:
-    with urlopen(image_path) as response:
-        buffer = BytesIO(response.read())
-    image = Image.open(buffer)
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert('RGB')
 else:
-    image = Image.open(image_path)
-image = image.convert("RGB")
+    image = Image.open(image_path).convert('RGB')
 
-inputs = processor(images=image, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+weight_path = hf_hub_download(repo_id=repo_id, filename='open_clip_pytorch_model.bin')
+model = create_model('vit_base_patch32_clip_224.openai', pretrained=False, num_classes=0)
+state_dict = torch.load(weight_path, map_location='cpu')
+if isinstance(state_dict, dict) and 'state_dict' in state_dict:
+    state_dict = state_dict['state_dict']
+model.load_state_dict(state_dict, strict=False)
+model.eval().to(device)
+
+config = resolve_model_data_config(model)
+transform = create_transform(**config, is_training=False)
+image_tensor = transform(image).unsqueeze(0).to(device)
 
 with torch.no_grad():
-    outputs = model(**inputs)
-
-logits = outputs.logits
-probabilities = torch.softmax(logits, dim=1)
-predicted_class_index = int(torch.argmax(probabilities, dim=1)[0])
+    image_features = model(image_tensor)
+    image_features = torch.nn.functional.normalize(image_features, dim=-1)
+    self_similarity = (image_features @ image_features.T)
 
 RESULT = {
-    "logits": logits.detach().cpu().tolist(),
-    "probabilities": probabilities.detach().cpu().tolist(),
-    "predicted_class_index": predicted_class_index,
+    'image_features': image_features.detach().cpu().numpy(),
+    'self_similarity': self_similarity.detach().cpu().numpy(),
+    'text_input': text_input,
 }

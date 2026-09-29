@@ -1,34 +1,37 @@
 {% set repo_id = repo_id | default("circulus/kobart-trans-informal-v2") %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("안녕하세요! 오늘 하루가 어떠신가요?") %}
-{% set max_new_tokens = max_new_tokens | default(64) %}
-{% set num_beams = num_beams | default(4) %}
+{% set text = text | default('안녕하세요. 오늘 날씨가 참 좋네요.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
-max_new_tokens = {{ max_new_tokens }}
-num_beams = {{ num_beams }}
+text = "{{ text }}"
 
 import os
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, BartForConditionalGeneration, BartConfig
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+model_dir = os.path.dirname(model_path)
+config = BartConfig.from_json_file(config_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = BartForConditionalGeneration.from_pretrained(model_dir, config=config)
 model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(text_input, return_tensors="pt", truncation=True)
-encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
-
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
     generated_ids = model.generate(
-        **encoded_inputs,
-        max_new_tokens=max_new_tokens,
-        num_beams=num_beams,
+        **inputs,
+        max_new_tokens=64,
+        num_beams=5,
+        early_stopping=True,
     )
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-generated_text = generated_texts[0] if generated_texts else ""
-
-RESULT = {"generated_text": generated_text}
+RESULT = {"output": output_text}

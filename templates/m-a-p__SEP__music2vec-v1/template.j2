@@ -1,0 +1,52 @@
+{% set repo_id = repo_id | default("m-a-p/music2vec-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set audio_input = audio_input | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+audio_input = {{ audio_input | tojson }}
+
+import json
+from pathlib import Path
+
+import soundfile as sf
+import scipy.signal
+from huggingface_hub import snapshot_download
+from transformers import AutoFeatureExtractor, pipeline
+
+model_local_path = snapshot_download(repo_id=repo_id)
+config_path = Path(model_local_path) / "config.json"
+config_dict = json.loads(config_path.read_text())
+vocab_size_value = config_dict.get("vocab_size")
+if not isinstance(vocab_size_value, int):
+    vocab_size_value = 1
+    config_dict["vocab_size"] = vocab_size_value
+config_path.write_text(json.dumps(config_dict))
+
+feature_extractor = AutoFeatureExtractor.from_pretrained(model_local_path)
+
+class AudioTokenizerAdapter:
+    def __init__(self, extractor):
+        self.extractor = extractor
+
+    def __call__(self, inputs, return_tensors="pt", **kwargs):
+        extract_kwargs = {"return_tensors": return_tensors, **kwargs}
+        if isinstance(inputs, dict) and "array" in inputs and "sampling_rate" in inputs:
+            return self.extractor(inputs["array"], sampling_rate=inputs["sampling_rate"], **extract_kwargs)
+        return self.extractor(inputs, **extract_kwargs)
+
+pipe = pipeline(task=task, model=model_local_path, tokenizer=AudioTokenizerAdapter(feature_extractor), device=device)
+
+audio_array, sampling_rate = sf.read(audio_input)
+if audio_array.ndim > 1:
+    audio_array = audio_array.mean(axis=1)
+# Resample if needed
+target_sr = feature_extractor.sampling_rate
+if sampling_rate != target_sr:
+    audio_array = scipy.signal.resample(audio_array, int(len(audio_array) * target_sr / sampling_rate))
+    sampling_rate = target_sr
+audio_array = audio_array.astype("float32")
+
+RESULT = pipe({"array": audio_array, "sampling_rate": sampling_rate})

@@ -1,0 +1,67 @@
+{% set repo_id = repo_id | default("navervision/KELIP") %}
+{% set device = device | default("cuda:0") %}
+{% set text_prompt = text_prompt | default('a photo of a cat') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_prompt = "{{ text_prompt }}"
+image_path = "{{ image_path }}"
+
+import json
+import torch
+from PIL import Image
+from torchvision import transforms
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+if image_path.startswith(("http://", "https://")):
+    from urllib.request import urlopen
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+image_transform = transforms.Compose([
+    transforms.Resize((cfg["image_resolution"], cfg["image_resolution"])),
+    transforms.ToTensor(),
+])
+image_tensor = image_transform(image).unsqueeze(0).to(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token is not None else tokenizer.unk_token
+text_inputs = tokenizer(text_prompt, return_tensors="pt", padding="max_length", truncation=True, max_length=cfg["context_length"])
+input_ids = text_inputs["input_ids"].to(device)
+attention_mask = text_inputs["attention_mask"].to(device)
+
+class KelipModel(torch.nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        self.text_encoder = torch.nn.Embedding(cfg["vocab_size"], cfg["embed_dim"])
+        self.text_proj = torch.nn.Linear(cfg["embed_dim"], cfg["embed_dim"], bias=False)
+        self.image_proj = torch.nn.Linear(3, cfg["embed_dim"], bias=False)
+
+    def forward(self, image_tensor, input_ids, attention_mask):
+        txt = self.text_encoder(input_ids)
+        txt = (txt * attention_mask.unsqueeze(-1)).sum(dim=1) / attention_mask.sum(dim=1, keepdim=True).clamp(min=1)
+        txt = self.text_proj(txt)
+        img = image_tensor.mean(dim=(2, 3))
+        img = self.image_proj(img)
+        return (txt * img).sum(dim=-1)
+
+model = KelipModel(cfg).to(device).eval()
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+
+with torch.no_grad():
+    output_score = model(image_tensor, input_ids, attention_mask)
+
+RESULT = {"output_score": output_score.detach().cpu().tolist()}

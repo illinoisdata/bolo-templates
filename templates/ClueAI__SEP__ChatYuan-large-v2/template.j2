@@ -1,25 +1,46 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("ClueAI/ChatYuan-large-v2") %}
-{% set text = text | default("你好") %}
-{% set max_length = max_length | default(250) %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('你好') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
 {% set temperature = temperature | default(0.7) %}
-{% set top_p = top_p | default(1) %}
+{% set top_p = top_p | default(1.0) %}
+{% set do_sample = do_sample | default(true) %}
+{% set context = context | default('') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = "{{ text }}"
-max_length = {{ max_length }}
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
 temperature = {{ temperature }}
 top_p = {{ top_p }}
+do_sample = {{ do_sample }}
+context = "{{ context }}"
 
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-from pathlib import Path
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True)
 model.to(device)
+model.eval()
 
-inputs = tokenizer(text, return_tensors="pt", truncation=True).to(device)
-outputs = model.generate(**inputs, max_length=max_length, do_sample=True, temperature=temperature, top_p=top_p)
-result_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
-RESULT = {"generated_text": result_text}
+def preprocess(text):
+    return text.replace("\n", "\\n").replace("\t", "\\t")
+
+def postprocess(text):
+    return text.replace("\\n", "\n").replace("\\t", "\t").replace("%20", "  ")
+
+input_text = f"{context}\n用户：{prompt}\n小元：".strip()
+input_text = preprocess(input_text)
+inputs = tokenizer(input_text, return_tensors="pt", truncation=True, padding=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        do_sample=do_sample,
+        temperature=temperature,
+        top_p=top_p,
+        num_beams=1,
+    )
+output_text = postprocess(tokenizer.decode(generated[0], skip_special_tokens=True))
+RESULT = {"output": output_text}

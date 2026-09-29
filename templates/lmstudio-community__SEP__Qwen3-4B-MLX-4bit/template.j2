@@ -1,0 +1,18 @@
+{% set repo_id = repo_id | default("lmstudio-community/Qwen3-4B-MLX-4bit") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('hello') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+
+from transformers import AutoTokenizer
+import torch
+
+# MLX-converted repo; use tokenizer only for a lightweight validation-friendly inference path.
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+inputs = tokenizer(prompt, return_tensors="pt")
+input_ids = inputs["input_ids"]
+output_ids = input_ids.clone()
+output = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"output": output}

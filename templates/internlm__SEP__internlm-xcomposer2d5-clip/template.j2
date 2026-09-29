@@ -1,0 +1,23 @@
+{% set repo_id = repo_id | default("internlm/internlm-xcomposer2d5-clip") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-feature-extraction") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+image_path = {{ image_path | tojson }}
+
+from transformers import pipeline
+
+# Load processor & model
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+# Pre-process input
+input_data = image_path
+
+# Run inference
+raw_output = pipe(input_data)
+
+# Post-process & build RESULT dict
+RESULT = {"features": raw_output}

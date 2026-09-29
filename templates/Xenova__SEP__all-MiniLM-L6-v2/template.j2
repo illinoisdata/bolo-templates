@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("Xenova/all-MiniLM-L6-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set model_file = model_file | default('onnx/model.onnx') %}
+{% set texts = texts | default(['The quick brown fox jumps over the lazy dog.', 'A second sentence for embedding extraction.']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+model_file = "{{ model_file }}"
+texts = {{ texts }}
+
+import os
+import json
+import torch
+import onnxruntime as ort
+from huggingface_hub import hf_hub_download
+from tokenizers import Tokenizer
+
+weights_path = hf_hub_download(repo_id=repo_id, filename=model_file)
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+
+tokenizer = Tokenizer.from_file(tokenizer_path)
+texts_enc = tokenizer.encode_batch(texts)
+max_len = max(len(enc.ids) for enc in texts_enc)
+input_ids = []
+attention_mask = []
+for enc in texts_enc:
+    ids = enc.ids + [0] * (max_len - len(enc.ids))
+    mask = [1] * len(enc.ids) + [0] * (max_len - len(enc.ids))
+    input_ids.append(ids)
+    attention_mask.append(mask)
+input_ids = torch.tensor(input_ids, dtype=torch.int64, device=device)
+attention_mask = torch.tensor(attention_mask, dtype=torch.int64, device=device)
+
+session = ort.InferenceSession(weights_path, providers=["CPUExecutionProvider"], sess_options=ort.SessionOptions())
+token_type_ids = torch.zeros_like(input_ids)
+inputs = {
+    session.get_inputs()[0].name: input_ids.cpu().numpy(),
+    session.get_inputs()[1].name: attention_mask.cpu().numpy(),
+    session.get_inputs()[2].name: token_type_ids.cpu().numpy(),
+}
+outputs = session.run(None, inputs)
+last_hidden_state = torch.tensor(outputs[0], device=device)
+mask = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
+summed = torch.sum(last_hidden_state * mask, dim=1)
+counts = torch.clamp(mask.sum(dim=1), min=1e-9)
+embeddings = summed / counts
+
+RESULT = {"embeddings": embeddings.cpu().numpy().tolist()}

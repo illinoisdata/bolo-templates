@@ -1,0 +1,55 @@
+{% set repo_id = repo_id | default("nyust-eb210/braslab-bert-drcd-384") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('鴻海科技集團是由臺灣企業家郭台銘創辦的跨國企業，總部位於臺灣新北市土城區，主要生產地則在中國大陸，以富士康做為商標名稱。其專注於電子產品的代工服務，研發生產精密電氣元件、機殼、準系統、系統組裝、光通訊元件、液晶顯示件等3C產品上、下游產品及服務。') %}
+{% set query = query | default('鴻海集團總部位於哪裡？') %}
+{% set max_length = max_length | default(384) %}
+{% set doc_stride = doc_stride | default(128) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+query = "{{ query }}"
+max_length = {{ max_length }}
+doc_stride = {{ doc_stride }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+model_dir = __import__('os').path.dirname(weights_path)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True)
+model = AutoModelForQuestionAnswering.from_pretrained(model_dir).to(device)
+model.eval()
+
+inputs = tokenizer(
+    query,
+    text,
+    return_tensors="pt",
+    truncation=True,
+    max_length=max_length,
+    stride=doc_stride,
+    return_overflowing_tokens=False,
+)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_idx = int(torch.argmax(outputs.start_logits, dim=-1).item())
+end_idx = int(torch.argmax(outputs.end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+
+input_ids = inputs["input_ids"][0, start_idx:end_idx + 1]
+answer = tokenizer.decode(input_ids, skip_special_tokens=True).replace(" ", "")
+
+start_probs = torch.softmax(outputs.start_logits, dim=-1)
+end_probs = torch.softmax(outputs.end_logits, dim=-1)
+confidence = float((start_probs.max() + end_probs.max()) / 2)
+
+RESULT = {"answer": answer, "confidence": confidence}

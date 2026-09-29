@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("facebook/sam-vit-base") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("mask-generation") %}
+{% set points_per_batch = points_per_batch | default(256) %}
+{% set image = image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+points_per_batch = {{ points_per_batch }}
+image = "{{ image }}"
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device, points_per_batch=points_per_batch)
+RESULT = pipe(image, points_per_batch=points_per_batch)

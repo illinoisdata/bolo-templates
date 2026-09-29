@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("lmstudio-community/NuExtract-v1.5-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('NuExtract-v1.5-Q4_K_M.gguf') %}
+{% set json_template = json_template | default('{"name": "", "email": "", "phone": ""}') %}
+{% set input_text = input_text | default('Extract the following fields from the text and return only valid JSON matching the template: ' ~ json_template ~ '\n\nText: John Doe can be reached at john.doe@example.com or +1-555-123-4567.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+json_template = {{ json_template | tojson }}
+input_text = {{ input_text | tojson }}
+
+import os
+import re
+import json
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+llm = Llama(
+    model_path=model_path,
+    n_ctx=4096,
+    n_threads=max(1, os.cpu_count() or 1),
+    n_gpu_layers=-1 if str(device).startswith('cuda') else 0,
+    verbose=False,
+)
+
+prompt = (
+    "You are a precise information extraction system.\n"
+    f"Return only JSON that matches this template exactly:\n{json_template}\n\n"
+    f"Input text:\n{input_text}\n"
+)
+
+response = llm(
+    prompt,
+    max_tokens=512,
+    temperature=0.0,
+    top_p=1.0,
+    stop=["```", "</s>"]
+)
+
+text = response["choices"][0]["text"].strip()
+match = re.search(r'\{.*\}', text, flags=re.S)
+if match:
+    text = match.group(0)
+
+try:
+    output = json.loads(text)
+except Exception:
+    output = {"raw_text": text}
+
+RESULT = {"output": output}

@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("alsgyu/sentiment-analysis-fine-tuned-model") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('이 영화는 정말 최고였어요. 감동적이고 재미있었습니다.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+_tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+with open(config_path, "r", encoding="utf-8") as f:
+    config = json.load(f)
+
+# Load tokenizer and model directly from the Hub files.
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForSequenceClassification.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=300)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    probabilities = torch.softmax(outputs.logits, dim=-1)[0]
+    predicted_id = int(torch.argmax(probabilities).item())
+    predicted_label = model.config.id2label.get(str(predicted_id), model.config.id2label.get(predicted_id, str(predicted_id)))
+
+RESULT = {
+    "text": text,
+    "predicted_label": predicted_label,
+    "predicted_id": predicted_id,
+    "probabilities": probabilities.detach().cpu().tolist(),
+}

@@ -1,19 +1,47 @@
 {% set repo_id = repo_id | default("syssec-utd/py310-pylingual-v1-statement") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("The quick brown fox jumps over the lazy dog.") %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set num_beams = num_beams | default(4) %}
+{% set input_text = input_text | default('def add(a, b):\n    return a + b\n') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
+input_text = {{ input_text | tojson }}
 
-import os
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_file = hf_hub_download(repo_id=repo_id, filename="merges.txt")
 
-inputs = tokenizer(input_text, return_tensors="pt").to(device)
-outputs = model.generate(**inputs)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+    device_map=None,
+)
+tokenizer = AutoTokenizer.from_pretrained(
+    repo_id,
+    use_fast=True,
+)
 
-generated_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
-RESULT = {"generated_text": generated_text}
+inputs = tokenizer(input_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+model = model.to(device)
+model.eval()
+
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+    )
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

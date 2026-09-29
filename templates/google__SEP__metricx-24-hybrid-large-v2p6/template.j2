@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("google/metricx-24-hybrid-large-v2p6") %}
+{% set device = device | default("cuda:0") %}
+{% set source_text = source_text | default('The cat is on the mat.') %}
+{% set reference_text = reference_text | default('The cat sits on the mat.') %}
+{% set hypothesis_text = hypothesis_text | default('The cat is on the mat.') %}
+{% set use_reference = use_reference | default(true) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+source_text = "{{ source_text }}"
+reference_text = "{{ reference_text }}"
+hypothesis_text = "{{ hypothesis_text }}"
+use_reference = {{ use_reference }}
+
+import torch
+from transformers import AutoTokenizer, MT5Config, MT5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+config = MT5Config.from_json_file(config_path)
+model = MT5ForConditionalGeneration(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=True)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+model.to(device)
+model.eval()
+
+if use_reference:
+    input_text = f"source: {source_text} reference: {reference_text} translation: {hypothesis_text}"
+else:
+    input_text = f"source: {source_text} translation: {hypothesis_text}"
+
+inputs = tokenizer(input_text, return_tensors="pt", truncation=True).to(device)
+with torch.no_grad():
+    decoder_input_ids = torch.tensor([[model.config.decoder_start_token_id]], device=device)
+    output = model(input_ids=inputs["input_ids"], attention_mask=inputs.get("attention_mask"), decoder_input_ids=decoder_input_ids)
+score_value = float(output.logits.mean().detach().cpu().item())
+
+RESULT = {"score": score_value}

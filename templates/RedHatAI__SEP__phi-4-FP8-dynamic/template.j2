@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("RedHatAI/phi-4-FP8-dynamic") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Give me a short introduction to large language models.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+index_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    low_cpu_mem_usage=True,
+    trust_remote_code=False,
+)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+if tokenizer.pad_token_id is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+inputs = tokenizer(prompt, return_tensors="pt").to(device)
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_new_tokens=64,
+        do_sample=False,
+        use_cache=True,
+    )
+
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": output_text}

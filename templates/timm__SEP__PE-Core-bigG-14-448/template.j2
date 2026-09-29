@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("timm/PE-Core-bigG-14-448") %}
+{% set device = device | default("cuda:0") %}
+{% set labels_list = labels_list | default(["a dog", "a cat", "a donut", "a beignet"]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+labels_list = {{ labels_list }}
+
+import json
+import torch
+from PIL import Image
+from urllib.request import urlopen
+from huggingface_hub import hf_hub_download
+import open_clip
+
+_ = hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+with open(config_path, "r") as f:
+    model_cfg = json.load(f)
+model_name = "PE-Core-bigG-14-448"
+
+model, _, preprocess = open_clip.create_model_and_transforms(
+    model_name=model_name,
+    pretrained="",
+    precision="fp32",
+)
+state_dict = torch.load(hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin"), map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+tokenizer = open_clip.get_tokenizer(model_name)
+
+image_input = "/u/yunqili4/projects/ML-code-generation/data/image1.jpeg"
+if isinstance(image_input, str) and image_input.startswith(("http://", "https://")):
+    image = Image.open(urlopen(image_input)).convert("RGB")
+else:
+    image = Image.open(image_input).convert("RGB")
+image = preprocess(image).unsqueeze(0).to(device)
+
+text = tokenizer(labels_list, context_length=model.context_length).to(device)
+model = model.to(device)
+model.eval()
+
+with torch.no_grad():
+    image_features = model.encode_image(image, normalize=True)
+    text_features = model.encode_text(text, normalize=True)
+    text_probs = (100.0 * image_features @ text_features.T).softmax(dim=-1)
+
+zipped_list = list(zip(labels_list, [100 * round(p.item(), 3) for p in text_probs[0]]))
+RESULT = {"label_probabilities": zipped_list}

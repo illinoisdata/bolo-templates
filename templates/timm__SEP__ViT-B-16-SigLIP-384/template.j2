@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("timm/ViT-B-16-SigLIP-384") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set labels_list = labels_list | default(['a dog', 'a cat', 'a donut', 'a beignet']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+labels_list = {{ labels_list }}
+
+import torch
+import torch.nn.functional as F
+from PIL import Image
+from io import BytesIO
+from urllib.request import urlopen
+from huggingface_hub import hf_hub_download
+from open_clip import create_model_and_transforms, get_tokenizer
+
+weights_path = hf_hub_download(repo_id=repo_id, filename='open_clip_model.safetensors')
+config_path = hf_hub_download(repo_id=repo_id, filename='open_clip_config.json')
+_ = config_path
+
+model, _, preprocess = create_model_and_transforms('ViT-B-16-SigLIP-384', pretrained=weights_path, device=device)
+model.eval()
+tokenizer = get_tokenizer('hf-hub:' + repo_id)
+
+if str(image_path).startswith(("http://", "https://")):
+    image = Image.open(BytesIO(urlopen(image_path).read())).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+image_tensor = preprocess(image).unsqueeze(0).to(device)
+text = tokenizer(labels_list, context_length=model.context_length)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_tensor)
+    text_features = model.encode_text(text.to(device))
+    image_features = F.normalize(image_features, dim=-1)
+    text_features = F.normalize(text_features, dim=-1)
+    logits = image_features @ text_features.T
+    logits = logits * model.logit_scale.exp()
+    if getattr(model, "logit_bias", None) is not None:
+        logits = logits + model.logit_bias
+    text_probs = torch.sigmoid(logits)
+
+output = [{"label": label, "score": float(score)} for label, score in zip(labels_list, text_probs[0].tolist())]
+
+RESULT = {"output": output}

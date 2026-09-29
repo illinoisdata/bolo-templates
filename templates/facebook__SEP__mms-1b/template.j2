@@ -1,56 +1,36 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("facebook/mms-1b") %}
-{% set audio_path = audio_path | default('/u/yli77/projects/ML-code-generation/data/audio.wav') %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set target_sr = target_sr | default(16000) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
+target_sr = {{ target_sr }}
 
 import os
-from io import BytesIO
-
-import numpy as np
-import requests
-import soundfile as sf
 import torch
-import torchaudio.functional as F
-from transformers import AutoFeatureExtractor, AutoModelForPreTraining
+import librosa
+from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2ForPreTraining
+from huggingface_hub import hf_hub_download
 
-feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+
+feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(os.path.dirname(preprocessor_path))
+model = Wav2Vec2ForPreTraining.from_pretrained(os.path.dirname(weights_path), config=config_path)
+model.to(device)
 model.eval()
 
-def _load_audio(path: str):
-    if path.startswith("http://") or path.startswith("https://"):
-        response = requests.get(path)
-        response.raise_for_status()
-        data, sampling_rate = sf.read(BytesIO(response.content))
-    else:
-        data, sampling_rate = sf.read(path)
-    if data.ndim > 1:
-        data = data.mean(axis=1)
-    return data, sampling_rate
+if audio_path.startswith(("http://", "https://")):
+    waveform, sr = librosa.load(audio_path, sr=target_sr)
+else:
+    waveform, sr = librosa.load(audio_path, sr=target_sr)
 
-audio_data, sampling_rate = _load_audio(audio_path)
-if sampling_rate != feature_extractor.sampling_rate:
-    audio_tensor = torch.tensor(audio_data, dtype=torch.float32)
-    audio_data = F.resample(audio_tensor, orig_freq=sampling_rate, new_freq=feature_extractor.sampling_rate).numpy()
-    sampling_rate = feature_extractor.sampling_rate
-
-inputs = feature_extractor(
-    audio_data,
-    sampling_rate=sampling_rate,
-    return_tensors="pt",
-    padding=True,
-)
-inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs = feature_extractor(waveform, sampling_rate=sr, return_tensors="pt", padding=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
     outputs = model(**inputs)
 
-processed_outputs = {}
-for key, value in outputs.__dict__.items():
-    if isinstance(value, torch.Tensor):
-        processed_outputs[key] = value.detach().cpu().numpy()
-    else:
-        processed_outputs[key] = value
-RESULT = {"model_outputs": processed_outputs}
+RESULT = {"loss": outputs.loss, "projected_states": outputs.projected_states, "codevector_perplexity": outputs.codevector_perplexity}

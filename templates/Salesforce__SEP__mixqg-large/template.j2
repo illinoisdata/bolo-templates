@@ -1,8 +1,8 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Salesforce/mixqg-large") %}
+{% set device = device | default("cuda:0") %}
 {% set context = context | default("In the late 17th century, Robert Boyle proved that air is necessary for combustion.") %}
 {% set answer = answer | default("Robert Boyle") %}
-{% set max_length = max_length | default(64) %}
+{% set max_length = max_length | default(32) %}
 {% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
@@ -11,23 +11,26 @@ answer = "{{ answer }}"
 max_length = {{ max_length }}
 num_beams = {{ num_beams }}
 
-import os
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-def format_inputs(context: str, answer: str) -> str:
-    return f"{answer}\n{context}"
-
-text = format_inputs(context, answer)
+text = f"{answer} \n {context}"
 inputs = tokenizer(text, return_tensors="pt")
-input_ids = inputs.input_ids.to(device)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_length=max_length,
+        num_beams=num_beams,
+    )
+output = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
-generated_ids = model.generate(input_ids, max_length=max_length, num_beams=num_beams)
-outputs = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-generated_question = outputs[0] if outputs else ""
-
-RESULT = {"generated_question": generated_question}
+RESULT = {"output": output}

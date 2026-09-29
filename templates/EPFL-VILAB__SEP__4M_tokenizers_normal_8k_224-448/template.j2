@@ -1,0 +1,23 @@
+{% set repo_id = repo_id | default("EPFL-VILAB/4M_tokenizers_normal_8k_224-448") %}
+{% set device = device | default("cuda:0") %}
+{% set input_image = input_image | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_image = "{{ input_image }}"
+
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+import requests
+from io import BytesIO
+
+if isinstance(input_image, str) and input_image.startswith(("http://", "https://")):
+    image = Image.open(BytesIO(requests.get(input_image, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(input_image).convert("RGB")
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+state_dict = torch.load(weights_path, map_location="cpu") if weights_path.endswith(".pt") else None
+
+RESULT = {"config_path": config_path, "weights_path": weights_path, "image_size": image.size}

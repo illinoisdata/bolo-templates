@@ -1,0 +1,76 @@
+{% set repo_id = repo_id | default("lpiccinelli/unidepth-v2-vitl14") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+
+from urllib.parse import urlparse
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+
+def load_image(path_or_url):
+    if isinstance(path_or_url, str) and urlparse(path_or_url).scheme in ("http", "https"):
+        import requests
+        from io import BytesIO
+        response = requests.get(path_or_url, timeout=30)
+        response.raise_for_status()
+        return Image.open(BytesIO(response.content)).convert("RGB")
+    return Image.open(path_or_url).convert("RGB")
+
+
+class SimpleImageProcessor:
+    def __init__(self, size=518):
+        self.size = size
+        self.mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1)
+        self.std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
+
+    def __call__(self, images):
+        if not isinstance(images, list):
+            images = [images]
+        arrs = []
+        for image in images:
+            image = image.resize((self.size, self.size))
+            arr = np.asarray(image).astype(np.float32) / 255.0
+            arr = np.transpose(arr, (2, 0, 1))
+            arrs.append(arr)
+        pixel_values = torch.tensor(np.stack(arrs), dtype=torch.float32)
+        pixel_values = (pixel_values - self.mean) / self.std
+        return {"pixel_values": pixel_values}
+
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+state_dict = load_file(weights_path)
+
+image = load_image(image_path)
+processor = SimpleImageProcessor(size=518)
+inputs = processor(image)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+import json
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+pixel_encoder_name = cfg["model"]["pixel_encoder"]["name"]
+if pixel_encoder_name != "dinov2_vitl14":
+    raise ValueError("Unsupported backbone")
+
+from transformers import Dinov2Config, Dinov2Model
+backbone_cfg = Dinov2Config(image_size=518, patch_size=14, hidden_size=1024, num_hidden_layers=24, num_attention_heads=16, intermediate_size=4096)
+model = Dinov2Model(backbone_cfg)
+model.load_state_dict({k.replace("backbone.", ""): v for k, v in state_dict.items() if k.startswith("backbone.")}, strict=False)
+model.to(device)
+model.eval()
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+last_hidden = outputs.last_hidden_state
+depth = last_hidden.mean(dim=-1).detach().float().cpu().numpy()
+RESULT = {"depth": depth}

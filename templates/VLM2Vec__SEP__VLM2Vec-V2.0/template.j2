@@ -1,0 +1,62 @@
+{% set repo_id = repo_id | default("VLM2Vec/VLM2Vec-V2.0") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-text-to-text") %}
+{% set input_image = input_image | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+{% set input_prompt = input_prompt | default("Describe this image") %}
+{% set base_model_name_or_path = base_model_name_or_path | default("Qwen/Qwen2-VL-2B-Instruct") %}
+{% set peft_model_id = peft_model_id | default(repo_id) %}
+
+repo_id = "{{ repo_id }}"
+task = "{{ task }}"
+device = "{{ device }}"
+input_image = "{{ input_image }}"
+input_prompt = "{{ input_prompt }}"
+base_model_name_or_path = "{{ base_model_name_or_path }}"
+peft_model_id = "{{ peft_model_id }}"
+
+import torch
+from peft import PeftConfig, PeftModel
+from transformers import AutoModelForImageTextToText, AutoProcessor, pipeline
+
+processor = AutoProcessor.from_pretrained(peft_model_id)
+peft_config = PeftConfig.from_pretrained(peft_model_id)
+base_model_name_or_path = getattr(peft_config, "base_model_name_or_path", base_model_name_or_path)
+
+base_model = AutoModelForImageTextToText.from_pretrained(
+    base_model_name_or_path,
+    torch_dtype=torch.bfloat16,
+)
+model = PeftModel.from_pretrained(base_model, peft_model_id, torch_dtype=torch.bfloat16)
+model.eval()
+model = model.to(device)
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    processor=processor,
+    tokenizer=processor.tokenizer,
+    image_processor=processor.image_processor,
+    device=device,
+)
+
+processor = pipe.processor if pipe.processor is not None else pipe.tokenizer
+
+template = getattr(processor, "chat_template", None)
+if template is None and hasattr(processor, "tokenizer"):
+    template = getattr(processor.tokenizer, "chat_template", None)
+
+has_chat_template = template is not None
+
+if has_chat_template:
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image", "image": input_image},
+                {"type": "text", "text": input_prompt},
+            ],
+        },
+    ]
+    RESULT = pipe(text=messages)
+else:
+    RESULT = pipe(input_image, text=input_prompt)

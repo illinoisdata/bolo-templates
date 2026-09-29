@@ -1,39 +1,32 @@
 {% set repo_id = repo_id | default("google/pix2struct-textcaps-base") %}
 {% set device = device | default("cuda:0") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set prompt_text = prompt_text | default("") %}
-{% set max_patches = max_patches | default(None) %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-image_path = {{ image_path | tojson }}
-prompt_text = {{ prompt_text | tojson }}
-max_patches = {{ max_patches }}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set prompt_text = prompt_text | default('A picture of') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+prompt_text = "{{ prompt_text }}"
 
 import os
-from pathlib import Path
-
 import requests
-import torch
 from PIL import Image
+import torch
 from transformers import Pix2StructForConditionalGeneration, Pix2StructProcessor
+
+if image_path.startswith('http://') or image_path.startswith('https://'):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert('RGB')
+else:
+    image = Image.open(image_path).convert('RGB')
 
 processor = Pix2StructProcessor.from_pretrained(repo_id)
 model = Pix2StructForConditionalGeneration.from_pretrained(repo_id).to(device)
 
-if image_path.startswith("http://") or image_path.startswith("https://"):
-    response = requests.get(image_path, stream=True)
-    image = Image.open(response.raw).convert("RGB")
-else:
-    image = Image.open(image_path).convert("RGB")
+inputs = processor(images=image, text=prompt_text, return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-processor_inputs = {"images": image, "return_tensors": "pt"}
-if prompt_text:
-    processor_inputs["text"] = prompt_text
-if max_patches is not None:
-    processor_inputs["max_patches"] = max_patches
+with torch.no_grad():
+    predictions = model.generate(**inputs, max_new_tokens=32)
 
-inputs = processor(**processor_inputs).to(device)
-outputs = model.generate(**inputs)
-captions = [processor.decode(seq.cpu(), skip_special_tokens=True) for seq in outputs]
+output_text = processor.decode(predictions[0], skip_special_tokens=True)
 
-RESULT = {"captions": captions}
+RESULT = {"output_text": output_text}

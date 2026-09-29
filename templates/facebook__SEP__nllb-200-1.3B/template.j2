@@ -1,20 +1,46 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("facebook/nllb-200-1.3B") %}
-{% set src_text = src_text | default("Hello world") %}
-{% set src_lang = src_lang | default("eng_Latn") %}
-{% set tgt_lang = tgt_lang | default("fra_Latn") %}
-{% set max_new_tokens = max_new_tokens | default(60) %}
+{% set device = device | default("cuda:0") %}
+{% set source_text = source_text | default('Hello, how are you?') %}
+{% set source_lang = source_lang | default('eng_Latn') %}
+{% set target_lang = target_lang | default('fra_Latn') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set num_beams = num_beams | default(4) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-src_text = "{{ src_text }}"
-src_lang = "{{ src_lang }}"
-tgt_lang = "{{ tgt_lang }}"
+source_text = {{ source_text | tojson }}
+source_lang = {{ source_lang | tojson }}
+target_lang = {{ target_lang | tojson }}
 max_new_tokens = {{ max_new_tokens }}
-from pathlib import Path
-import sys
-from transformers import NllbTokenizer, AutoModelForSeq2SeqLM
+num_beams = {{ num_beams }}
 
-tokenizer = NllbTokenizer.from_pretrained(repo_id, src_lang=src_lang, tgt_lang=tgt_lang)
-print(tokenizer.__class__)
-print(dir(tokenizer))
-sys.exit(0)
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+hf_hub_download(repo_id=repo_id, filename="sentencepiece.bpe.model")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+tokenizer.src_lang = source_lang
+inputs = tokenizer(source_text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+forced_bos_token_id = tokenizer.convert_tokens_to_ids(target_lang)
+
+with torch.no_grad():
+    generated_tokens = model.generate(
+        **inputs,
+        forced_bos_token_id=forced_bos_token_id,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+    )
+translated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+
+RESULT = {"translation_text": translated_text}

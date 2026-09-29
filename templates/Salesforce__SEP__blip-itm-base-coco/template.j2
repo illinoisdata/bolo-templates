@@ -1,41 +1,41 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Salesforce/blip-itm-base-coco") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set prompt = prompt | default("A woman and a dog sitting together in a beach.") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set question = question | default('A woman and a dog sitting together in a beach.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-prompt = "{{ prompt }}"
+question = "{{ question }}"
 
-from pathlib import Path
-from urllib.parse import urlparse
-import json
+import os
+from io import BytesIO
 import requests
 import torch
 from PIL import Image
-from transformers import AutoProcessor, BlipForImageTextRetrieval
+from transformers import BlipProcessor, BlipForImageTextRetrieval
 
-processor = AutoProcessor.from_pretrained(repo_id)
-model = BlipForImageTextRetrieval.from_pretrained(repo_id).to(device)
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+processor = BlipProcessor.from_pretrained(os.path.dirname(preprocessor_path))
+model = BlipForImageTextRetrieval.from_pretrained(os.path.dirname(config_path), local_files_only=True)
+state_dict = torch.load(model_path, map_location="cpu")
+state_dict.pop("text_encoder.embeddings.position_ids", None)
+model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
 model.eval()
 
-is_url = urlparse(image_path).scheme in {"http", "https"}
-raw_image = (
-    Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
-    if is_url
-    else Image.open(Path(image_path)).convert("RGB")
-)
-encoded_inputs = processor(raw_image, prompt, return_tensors="pt")
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+if image_path.startswith(("http://", "https://")):
+    raw_image = Image.open(BytesIO(requests.get(image_path, stream=True).content)).convert("RGB")
+else:
+    raw_image = Image.open(image_path).convert("RGB")
 
+inputs = processor(raw_image, question, return_tensors="pt").to(device)
 with torch.no_grad():
-    itm_outputs = model(**encoded_inputs)
-    cosine_outputs = model(**encoded_inputs, use_itm_head=False)
+    itm_scores = model(**inputs)[0]
+    cosine_score = model(**inputs, use_itm_head=False)[0]
 
-itm_scores = itm_outputs[0]
-cosine_score = cosine_outputs[0]
-
-RESULT = {
-    "itm_scores": itm_scores.cpu().tolist(),
-    "cosine_score": cosine_score.cpu().tolist(),
-}
+RESULT = {"itm_scores": itm_scores.detach().cpu().tolist(), "cosine_score": cosine_score.detach().cpu().tolist()}

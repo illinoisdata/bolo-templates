@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("depth-anything/DA3-BASE") %}
+{% set device = device | default("cuda:0") %}
+{% set image1 = image1 | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set image2 = image2 | default('/u/yunqili4/projects/ML-code-generation/data/image2.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image1 = "{{ image1 }}"
+image2 = "{{ image2 }}"
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+
+if image1.startswith(("http://", "https://")):
+    import requests
+    from io import BytesIO
+    image1_obj = Image.open(BytesIO(requests.get(image1, timeout=30).content)).convert("RGB")
+else:
+    image1_obj = Image.open(image1).convert("RGB")
+
+if image2.startswith(("http://", "https://")):
+    import requests
+    from io import BytesIO
+    image2_obj = Image.open(BytesIO(requests.get(image2, timeout=30).content)).convert("RGB")
+else:
+    image2_obj = Image.open(image2).convert("RGB")
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+RESULT = {
+    "config_path": config_path,
+    "weights_path": weights_path,
+    "image1_size": image1_obj.size,
+    "image2_size": image2_obj.size,
+}

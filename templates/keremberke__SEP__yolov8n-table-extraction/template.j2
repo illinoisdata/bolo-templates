@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("keremberke/yolov8n-table-extraction") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+{% set conf = conf | default(0.25) %}
+{% set iou = iou | default(0.45) %}
+{% set agnostic_nms = agnostic_nms | default(false) %}
+{% set max_det = max_det | default(1000) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+conf = {{ conf }}
+iou = {{ iou }}
+agnostic_nms = {{ agnostic_nms }}
+max_det = {{ max_det }}
+
+from PIL import Image
+import requests
+import torch
+from huggingface_hub import hf_hub_download
+from ultralytics import YOLO
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="best.pt")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+if isinstance(image_path, str) and image_path.startswith(("http://", "https://")):
+    response = requests.get(image_path, stream=True, timeout=30)
+    response.raise_for_status()
+    image = Image.open(response.raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model = YOLO(weights_path)
+model.to(device)
+model.overrides['conf'] = conf
+model.overrides['iou'] = iou
+model.overrides['agnostic_nms'] = agnostic_nms
+model.overrides['max_det'] = max_det
+
+results = model.predict(source=image, device=device, verbose=False)
+result = results[0]
+boxes = result.boxes
+labels = []
+if boxes is not None and boxes.cls is not None:
+    for cls_id in boxes.cls.tolist():
+        labels.append(model.names[int(cls_id)])
+
+RESULT = {
+    "boxes": boxes,
+    "labels": labels,
+    "result": result,
+}

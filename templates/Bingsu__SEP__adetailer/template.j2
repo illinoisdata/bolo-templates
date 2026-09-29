@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("Bingsu/adetailer") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set model_filename = model_filename | default('face_yolov8n.pt') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+model_filename = "{{ model_filename }}"
+
+import os
+from pathlib import Path
+from urllib.parse import urlparse
+
+import cv2
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from ultralytics import YOLO
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model_path = hf_hub_download(repo_id=repo_id, filename=model_filename)
+model = YOLO(model_path)
+
+results = model.predict(source=image, device=device, verbose=False)
+annotated = results[0].plot()
+annotated = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
+output_image = Image.fromarray(annotated)
+boxes = results[0].boxes
+confidences = boxes.conf.detach().cpu().tolist() if boxes is not None and boxes.conf is not None else []
+classes = boxes.cls.detach().cpu().tolist() if boxes is not None and boxes.cls is not None else []
+xyxy = boxes.xyxy.detach().cpu().tolist() if boxes is not None and boxes.xyxy is not None else []
+
+RESULT = {"image": output_image, "confidences": confidences, "classes": classes, "boxes": xyxy}

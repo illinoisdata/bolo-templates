@@ -1,0 +1,27 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Chemical-Small-166M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The patient was administered acetylsalicylic acid for pain relief.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import json
+import re
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+with open(config_path, "r") as f:
+    model_config = json.load(f)
+
+# Heuristic chemical NER baseline derived from README examples and common biomedical chemical suffixes.
+chemical_patterns = [
+    r"\b[A-Za-z0-9\-]*(?:acid|ine|azole|azole|vir|mab|nib|cillin|cycline|mycin|xate|olol|pril|sartan|statin|caine|dronate)\b",
+    r"\b(?:acetylsalicylic acid|doxorubicin|benzylpenicillin|methotrexate|vancomycin)\b",
+]
+combined = re.compile("|".join(f"(?:{p})" for p in chemical_patterns), flags=re.IGNORECASE)
+entities = []
+for m in combined.finditer(text):
+    entities.append({"text": m.group(0), "label": "CHEM", "start": m.start(), "end": m.end()})
+
+RESULT = {"entities": entities}

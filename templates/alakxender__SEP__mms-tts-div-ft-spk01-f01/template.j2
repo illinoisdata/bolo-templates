@@ -1,0 +1,29 @@
+{% set repo_id = repo_id | default("alakxender/mms-tts-div-ft-spk01-f01") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-to-audio") -%}
+{% set model = model | default(repo_id) -%}
+{% set input_data = input_data | default("މޫސުން ވަރަށް ގޯސްވެ، ފުވައްމުލަކުން ފެށިގެން އައްޑުއަށް އޮރެންޖް އެލާޓް ނެރެފި") -%}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_data = {{ input_data | tojson }}
+
+# Monkey-patch BatchEncoding.to to ignore dtype argument
+from transformers.tokenization_utils_base import BatchEncoding
+_orig_to = BatchEncoding.to
+
+def _patched_to(self, device=None, *args, **kwargs):
+    kwargs.pop("dtype", None)
+    return _orig_to(self, device, *args, **kwargs)
+
+BatchEncoding.to = _patched_to
+
+# Suppress transformers warnings
+import logging
+logging.getLogger("transformers").setLevel(logging.ERROR)
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(input_data)

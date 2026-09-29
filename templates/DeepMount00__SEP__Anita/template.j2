@@ -1,50 +1,40 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("DeepMount00/Anita") %}
-{% set sentences = [
-    "Cosa faceva ogni sera Luca?",
-    "Un cane felice corre nel parco, la coda ondeggiante al vento. Ogni erba, ogni farfalla, un'avventura. Occhi scintillanti, lingua penzolante, esplora gioiosamente, amato e coccolato dal suo fedele compagno umano. Insieme, condividono un legame indissolubile, tessuto di corse, giochi e affetto incondizionato.",
-    "In un piccolo paesino circondato da colline verdeggianti e campi fioriti viveva una persona il cui sorriso era capace di illuminare la giornata più grigia. Questa persona, di nome Luca, aveva trovato la chiave della felicità nelle piccole gioie quotidiane: il profumo del caffè al mattino, il suono ridente dei bambini che giocavano in piazza, il tramonto che dipingeva il cielo di arancione e viola ogni sera."
-] %}
-
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Cosa faceva ogni sera Luca?') %}
+{% set sentences = sentences | default(['Cosa faceva ogni sera Luca?', 'Un cane felice corre nel parco, la coda ondeggiante al vento. Ogni erba, ogni farfalla, un\'avventura. Occhi scintillanti, lingua penzolante, esplora gioiosamente, amato e coccolato dal suo fedele compagno umano. Insieme, condividono un legame indissolubile, tessuto di corse, giochi e affetto incondizionato.', 'In un piccolo paesino circondato da colline verdeggianti e campi fioriti viveva una persona il cui sorriso era capace di illuminare la giornata più grigia. Questa persona, di nome Luca, aveva trovato la chiave della felicità nelle piccole gioie quotidiane: il profumo del caffè al mattino, il suono ridente dei bambini che giocavano in piazza, il tramonto che dipingeva il cielo di arancione e viola ogni sera.']) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
+question = "{{ question }}"
 sentences = {{ sentences }}
 
-import numpy as np
 import torch
-from pathlib import Path
-from transformers import AutoModel, AutoTokenizer
+import torch.nn.functional as F
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id)
-model = model.to(device)
+model = AutoModel.from_pretrained(repo_id, torch_dtype=torch.float32, trust_remote_code=False)
+model.to(device)
 model.eval()
 
-# Pre-process inputs
-encoded_inputs = tokenizer(
-    sentences,
-    return_tensors="pt",
-    padding=True,
-    truncation=True,
-    max_length=512,
-)
-encoded_inputs = {key: tensor.to(device) for key, tensor in encoded_inputs.items()}
-
-# Run inference
+encoded = tokenizer([question] + sentences[1:], return_tensors="pt", padding=True, truncation=True, max_length=512)
+encoded = {k: v.to(device) for k, v in encoded.items()}
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
+    outputs = model(**encoded)
+    token_embeddings = outputs.last_hidden_state
+    attention_mask = encoded["attention_mask"].unsqueeze(-1).type_as(token_embeddings)
+    sentence_embeddings = (token_embeddings * attention_mask).sum(dim=1) / attention_mask.sum(dim=1).clamp(min=1e-9)
+    sentence_embeddings = F.normalize(sentence_embeddings, p=2, dim=1)
+    query_embedding = sentence_embeddings[0:1]
+    context_embeddings = sentence_embeddings[1:]
+    similarities = torch.matmul(query_embedding, context_embeddings.transpose(0, 1)).squeeze(0)
+    best_idx = torch.argmax(similarities).item()
 
-# Post-process outputs
-embeddings = outputs.pooler_output
-embeddings = embeddings.detach().to("cpu")
-normalized_embeddings = embeddings / embeddings.norm(dim=1, keepdim=True)
-similarity_matrix = torch.matmul(normalized_embeddings, normalized_embeddings.T)
-
-embeddings_np = embeddings.numpy()
-similarity_matrix_np = similarity_matrix.numpy()
-
-RESULT = {
-    "embeddings": embeddings_np,
-    "similarity_matrix": similarity_matrix_np,
-}
+RESULT = {"best_match_sentence": sentences[best_idx + 1], "similarities": similarities.detach().cpu().tolist(), "query": question}

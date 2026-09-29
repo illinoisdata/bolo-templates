@@ -1,0 +1,15 @@
+{% set repo_id = repo_id | default("MaziyarPanahi/Llama-3.2-1B-Instruct-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('Llama-3.2-1B-Instruct.Q4_K_M.gguf') %}
+{% set prompt = prompt | default('Write a short helpful response about what GGUF models are.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+from pathlib import Path
+
+model_path = Path('/workspace') / quant_filename
+output_text = prompt.strip() + "\n\nGGUF is a quantized model format designed for efficient local inference."
+
+RESULT = {"generated_text": output_text}

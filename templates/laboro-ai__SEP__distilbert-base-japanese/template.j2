@@ -1,40 +1,37 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("laboro-ai/distilbert-base-japanese") %}
-{% set text = text | default("これは日本語で書かれた短いテキストです。") %}
-{% set max_length = max_length | default(128) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("今日はいい天気です。") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-max_length = {{ max_length }}
 
 import torch
-from pathlib import Path
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-device = torch.device(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+spiece_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+# Load tokenizer and model from the downloaded local files
+_ = config_path
+_ = tokenizer_config_path
+_ = special_tokens_map_path
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModel.from_pretrained(repo_id)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(
-    text,
-    return_tensors="pt",
-    padding="longest",
-    truncation=True,
-    max_length=max_length,
-)
-encoded_inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
+    outputs = model(**inputs)
 
-last_hidden_state = outputs.last_hidden_state.detach().cpu()
-cls_embedding = last_hidden_state[:, 0, :].clone()
-mean_embedding = last_hidden_state.mean(dim=1)
+last_hidden_state = outputs.last_hidden_state
+pooler_output = getattr(outputs, "pooler_output", None)
 
-RESULT = {
-    "last_hidden_state": last_hidden_state,
-    "cls_embedding": cls_embedding,
-    "mean_embedding": mean_embedding,
-}
+RESULT = {"last_hidden_state": last_hidden_state, "pooler_output": pooler_output}

@@ -1,38 +1,32 @@
 {% set repo_id = repo_id | default("microsoft/codereviewer") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("Review the following Python function for potential issues and improvements.") %}
-{% set max_length = max_length | default(512) %}
-{% set generation_max_length = generation_max_length | default(256) %}
-{% set num_beams = num_beams | default(4) %}
+{% set text_input = text_input | default("summarize: def add(a, b):\n    return a + b\n\n# review: consider adding type hints and a docstring") %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = """{{ input_text }}"""
-max_length = {{ max_length }}
-generation_max_length = {{ generation_max_length }}
-num_beams = {{ num_beams }}
+text_input = {{ text_input | tojson }}
 
-import os
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model.to(device)
+model.eval()
 
-encoded = tokenizer(
-    input_text,
-    padding="longest",
-    truncation=True,
-    max_length=max_length,
-    return_tensors="pt",
-)
-encoded = {key: value.to(device) for key, value in encoded.items()}
+inputs = tokenizer(text_input, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=64, num_beams=4)
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-generated = model.generate(
-    **encoded,
-    max_new_tokens=generation_max_length,
-    num_beams=num_beams,
-    early_stopping=True,
-)
-review_text = tokenizer.decode(generated[0], skip_special_tokens=True)
-
-RESULT = {"code_review": review_text}
+RESULT = {"output": output_text}

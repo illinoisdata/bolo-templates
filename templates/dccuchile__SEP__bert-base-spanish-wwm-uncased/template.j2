@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("dccuchile/bert-base-spanish-wwm-uncased") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Madrid es la {mask} de España.") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+import torch
+from transformers import pipeline
+
+
+def _resolve_pipeline_device(device_str: str) -> int:
+    normalized = device_str.strip().lower()
+    if normalized.startswith("cpu"):
+        return -1
+    if normalized.startswith("cuda"):
+        if not torch.cuda.is_available():
+            return -1
+        parts = normalized.split(":")
+        if len(parts) == 1 or parts[1] == "":
+            return 0
+        return int(parts[1])
+    return -1
+
+pipeline_device = _resolve_pipeline_device(device)
+
+pipe = pipeline(task=task, model=repo_id, device=pipeline_device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

@@ -1,0 +1,41 @@
+{% set repo_id = repo_id | default("aisquared/dlite-v2-124m") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set model = model | default(repo_id) %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you today?") %}
+{% set repo_path = repo_path | default("/workspace/repo_copy") %}
+{% set added_tokens_path = added_tokens_path | default("/workspace/repo_copy/added_tokens.json") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+repo_path = {{ repo_path | tojson }}
+added_tokens_path = {{ added_tokens_path | tojson }}
+
+import json
+import sys
+from transformers import AutoTokenizer, pipeline
+
+if repo_path not in sys.path:
+    sys.path.insert(0, repo_path)
+from instruct_pipeline import InstructionTextGenerationPipeline
+
+with open(added_tokens_path, "r", encoding="utf-8") as added_tokens_file:
+    added_tokens = list(json.load(added_tokens_file).keys())
+
+tokenizer = AutoTokenizer.from_pretrained(model, padding_side="left", use_fast=True)
+if added_tokens:
+    tokenizer.add_special_tokens({"additional_special_tokens": added_tokens})
+if not hasattr(tokenizer, "additional_special_tokens"):
+    tokenizer.additional_special_tokens = added_tokens
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=tokenizer,
+    device=device,
+    pipeline_class=InstructionTextGenerationPipeline,
+)
+
+RESULT = pipe(input_prompt)

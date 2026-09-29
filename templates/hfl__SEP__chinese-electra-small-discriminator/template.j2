@@ -1,32 +1,37 @@
 {% set repo_id = repo_id | default("hfl/chinese-electra-small-discriminator") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default(text if text is defined else "我爱自然语言处理。") %}
-{% set threshold = threshold | default(threshold if threshold is defined else 0.5) %}
+{% set text = text | default('今天天气很好，我们一起去公园散步。') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
-threshold = {{ threshold }}
 
 import os
-import json
 import torch
 from transformers import AutoTokenizer, AutoModelForPreTraining
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+if not os.path.exists(tokenizer_path):
+    tokenizer_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_path), use_fast=True)
+model = AutoModelForPreTraining.from_pretrained(os.path.dirname(weights_path), local_files_only=True)
+model.to(device)
 model.eval()
 
 inputs = tokenizer(text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
-
 with torch.no_grad():
     outputs = model(**inputs)
-logits = outputs.logits
-probabilities = torch.sigmoid(logits)
-predictions = probabilities > threshold
+
+sequence_logits = outputs.logits
+mlm_logits = getattr(outputs, "prediction_logits", None)
+if mlm_logits is None:
+    mlm_logits = sequence_logits
 
 RESULT = {
-    "logits": logits.cpu().tolist(),
-    "probabilities": probabilities.cpu().tolist(),
-    "predictions": predictions.cpu().tolist(),
+    "sequence_logits": sequence_logits.detach().cpu(),
+    "prediction_logits": mlm_logits.detach().cpu(),
 }

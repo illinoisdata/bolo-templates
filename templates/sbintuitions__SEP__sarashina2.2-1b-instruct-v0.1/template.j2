@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("sbintuitions/sarashina2.2-1b-instruct-v0.1") %}
+{% set device = device | default("cuda:0") %}
+{% set max_new_tokens = max_new_tokens | default(50) %}
+{% set do_sample = do_sample | default(true) %}
+{% set num_return_sequences = num_return_sequences | default(3) %}
+{% set seed = seed | default(123) %}
+{% set user_input = user_input | default([{"role": "user", "content": "こんにちは。あなたの名前を教えて"}]) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+max_new_tokens = {{ max_new_tokens }}
+do_sample = {{ do_sample }}
+num_return_sequences = {{ num_return_sequences }}
+seed = {{ seed }}
+user_input = {{ user_input }}
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, set_seed
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model-00001-of-00001.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.model")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+generation_config_file = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+index_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+chat_pipeline = pipeline("text-generation", model=model, tokenizer=tokenizer, device=0 if str(device).startswith("cuda") else -1)
+set_seed(seed)
+responses = chat_pipeline(
+    user_input,
+    max_new_tokens=max_new_tokens,
+    do_sample=do_sample,
+    num_return_sequences=num_return_sequences,
+)
+
+output = [response["generated_text"] for response in responses]
+
+RESULT = {"output": output}

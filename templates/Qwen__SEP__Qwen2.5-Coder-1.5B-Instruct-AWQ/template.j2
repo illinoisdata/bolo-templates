@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("Qwen/Qwen2.5-Coder-1.5B-Instruct-AWQ") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_prompt = "{{ input_prompt }}"
+
+from transformers import pipeline
+
+# Load the pipeline
+pipe = pipeline(task=task, model=repo_id, device=device)
+
+# Run inference
+outputs = pipe(input_prompt)
+
+# Build the result dict
+RESULT = {"outputs": outputs}

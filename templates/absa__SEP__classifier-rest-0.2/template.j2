@@ -1,8 +1,0 @@
-{% set device = device | default("cuda:0") %}
-{% set repo_id = repo_id | default("absa/classifier-rest-0.2") %}
-repo_id = "{{ repo_id }}"
-
-from huggingface_hub import list_repo_files
-
-files = list_repo_files(repo_id)
-print(files)

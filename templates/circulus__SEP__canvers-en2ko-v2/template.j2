@@ -1,33 +1,31 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("circulus/canvers-en2ko-v2") %}
-{% set source_text = source_text | default(["Translate this English sentence to Korean."]) %}
-{% set max_length = max_length | default(128) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('I love this product. It works very well.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-source_text = {{ source_text }}
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text = "{{ text }}"
 
-import os
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
 
-inputs = tokenizer(source_text, return_tensors="pt", padding=True, truncation=True)
-inputs = {key: value.to(device) for key, value in inputs.items()}
 
-generated_tokens = model.generate(
-    input_ids=inputs["input_ids"],
-    attention_mask=inputs.get("attention_mask"),
-    max_length=max_length,
-    num_beams=num_beams,
-    early_stopping=True,
-)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-RESULT = {"translations": translations}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=64)
+
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

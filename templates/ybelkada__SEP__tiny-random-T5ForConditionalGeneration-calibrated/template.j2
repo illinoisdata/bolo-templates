@@ -1,23 +1,32 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("ybelkada/tiny-random-T5ForConditionalGeneration-calibrated") %}
-{% set prompt = prompt | default("translate English to German: The house is wonderful.") %}
-{% set max_new_tokens = max_new_tokens | default(32) %}
+{% set device = device | default("cuda:0") %}
+{% set max_new_tokens = max_new_tokens | default(8) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
 max_new_tokens = {{ max_new_tokens }}
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-import os
 import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+)
+model.to(device)
+model.eval()
 
-inputs = tokenizer(prompt, return_tensors="pt")
+input_text = "Translate English to English: The tiny model is running successfully."
+inputs = tokenizer(input_text, return_tensors="pt")
 inputs = {k: v.to(device) for k, v in inputs.items()}
-outputs = model.generate(**inputs, max_new_tokens=max_new_tokens)
-translations = tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
-RESULT = {"translations": translations}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+
+action = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+RESULT = {"output": action}

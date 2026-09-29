@@ -1,0 +1,47 @@
+{% set repo_id = repo_id | default("shunk031/aesthetics-predictor-v1-vit-large-patch14") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("image-feature-extraction") %}
+{% set image_path = image_path | default("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg") %}
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+image_path = {{ image_path | tojson }}
+
+from transformers import pipeline
+from transformers.models.clip.configuration_clip import CLIPVisionConfig
+from transformers.models.auto.auto_factory import _BaseAutoModelClass
+
+# patch CLIPVisionConfig to accept positional args
+_orig_clipvision_init = CLIPVisionConfig.__init__
+_arg_names = [
+    "hidden_size",
+    "intermediate_size",
+    "projection_dim",
+    "num_hidden_layers",
+    "num_attention_heads",
+    "num_channels",
+    "image_size",
+    "patch_size",
+    "hidden_act",
+    "layer_norm_eps",
+    "attention_dropout",
+    "initializer_range",
+    "initializer_factor",
+]
+def _patched_clipvision_init(self, *args, **kwargs):
+    if args:
+        kwargs_from_args = dict(zip(_arg_names, args))
+        kwargs = {**kwargs_from_args, **kwargs}
+    if "initializer_factor" in kwargs:
+        kwargs["initializer_factor"] = float(kwargs["initializer_factor"])
+    return _orig_clipvision_init(self, **kwargs)
+CLIPVisionConfig.__init__ = _patched_clipvision_init
+
+# patch register to skip config_class mismatch check
+_orig_register = _BaseAutoModelClass.register
+def _patched_register(cls, config_class, model_class, exist_ok=False):
+    return cls._model_mapping.register(config_class, model_class, exist_ok=exist_ok)
+_BaseAutoModelClass.register = classmethod(_patched_register)
+
+pipe = pipeline(task=task, model=repo_id, device=device, trust_remote_code=True)
+RESULT = pipe(image_path)

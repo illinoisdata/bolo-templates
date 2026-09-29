@@ -1,25 +1,35 @@
 {% set repo_id = repo_id | default("alaggung/bart-r3f") %}
 {% set device = device | default("cuda:0") %}
 {% set text = text | default("[BOS]밥 ㄱ?[SEP]고고고고 뭐 먹을까?[SEP]어제 김치찌개 먹어서 한식말고 딴 거[SEP]그럼 돈까스 어때?[SEP]오 좋다 1시 학관 앞으로 오셈[SEP]ㅇㅋ[EOS]") %}
-{% set max_length = max_length | default(64) %}
-{% set top_k = top_k | default(5) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = "{{ text }}"
-max_length = {{ max_length }}
-top_k = {{ top_k }}
+text = {{ text | tojson }}
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import json
+import os
+from huggingface_hub import hf_hub_download
 import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_config_path), local_files_only=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(os.path.dirname(config_path), local_files_only=True)
+model.load_state_dict(torch.load(weights_path, map_location="cpu"))
+model.to(device)
 model.eval()
 
-inputs = tokenizer(text, return_tensors="pt")
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-outputs = model.generate(**inputs, max_length=max_length, top_k=top_k)
-summary = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_length=64, top_k=5)
 
-RESULT = {"summary": summary}
+output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"summary": output_text}

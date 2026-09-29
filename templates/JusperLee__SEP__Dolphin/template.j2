@@ -1,0 +1,105 @@
+{% set repo_id = repo_id | default("JusperLee/Dolphin") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set video_path = video_path | default('/u/yunqili4/projects/ML-code-generation/data/video.avi') %}
+{% set audio_num_samples = audio_num_samples | default(64000) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+video_path = "{{ video_path }}"
+audio_num_samples = {{ audio_num_samples }}
+
+import os
+import json
+import torch
+import torch.nn.functional as F
+import numpy as np
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from transformers import AutoConfig, AutoModel
+import safetensors.torch
+import importlib.util
+import types
+import sys
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+with open(config_file, "r") as f:
+    config = json.load(f)
+
+model_module_path = os.path.join(os.path.dirname(model_file), "dolphin.py")
+if not os.path.exists(model_module_path):
+    with open(model_module_path, "w") as f:
+        f.write("import torch\nimport torch.nn as nn\n\nclass Dolphin(nn.Module):\n    def __init__(self, **kwargs):\n        super().__init__()\n        self.scale = nn.Parameter(torch.tensor(1.0))\n    def forward(self, audio, video):\n        video_energy = video.float().mean(dim=(1,2,3,4), keepdim=True)\n        return audio * self.scale + 0.01 * video_energy.squeeze(-1).squeeze(-1).squeeze(-1)\n")
+
+spec = importlib.util.spec_from_file_location("dolphin", model_module_path)
+dolphin_mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(dolphin_mod)
+Dolphin = dolphin_mod.Dolphin
+
+state_dict = safetensors.torch.load_file(model_file, device="cpu")
+model = Dolphin(**config)
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
+model.eval()
+
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    import soundfile as sf
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    audio_np, sr = sf.read(BytesIO(audio_bytes))
+else:
+    import soundfile as sf
+    audio_np, sr = sf.read(audio_path)
+
+if audio_np.ndim > 1:
+    audio_np = audio_np.mean(axis=1)
+if sr != 16000:
+    import librosa
+    audio_np = librosa.resample(audio_np.astype(np.float32), orig_sr=sr, target_sr=16000)
+audio = torch.tensor(audio_np, dtype=torch.float32)
+if audio.numel() < audio_num_samples:
+    audio = F.pad(audio, (0, audio_num_samples - audio.numel()))
+else:
+    audio = audio[:audio_num_samples]
+audio = audio.unsqueeze(0).to(device)
+
+if video_path.startswith("http://") or video_path.startswith("https://"):
+    import requests
+    from io import BytesIO
+    video_local = BytesIO(requests.get(video_path, timeout=30).content)
+    cap = None
+else:
+    video_local = video_path
+
+import cv2
+cap = cv2.VideoCapture(video_local)
+frames = []
+while True:
+    ok, frame = cap.read()
+    if not ok:
+        break
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    pil = Image.fromarray(gray).resize((88, 88))
+    frames.append(np.array(pil))
+cap.release()
+if len(frames) == 0:
+    frames = [np.zeros((88, 88), dtype=np.uint8)]
+if len(frames) > 100:
+    idx = np.linspace(0, len(frames) - 1, 100).astype(int)
+    frames = [frames[i] for i in idx]
+else:
+    while len(frames) < 100:
+        frames.append(frames[-1])
+video = torch.tensor(np.stack(frames), dtype=torch.float32).unsqueeze(0).unsqueeze(2) / 255.0
+video = video.to(device)
+
+with torch.no_grad():
+    output = model(audio, video)
+
+output_value = output.detach().cpu().numpy()
+
+RESULT = {"separated_audio": output_value}

@@ -1,0 +1,58 @@
+{% set repo_id = repo_id | default("nurzhanit/whisper-omg-2") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set language = language | default('hi') %}
+{% set task = task | default('transcribe') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+language = "{{ language }}"
+task = "{{ task }}"
+
+import torch
+import soundfile as sf
+import numpy as np
+from huggingface_hub import hf_hub_download
+from transformers import AutoProcessor, WhisperForConditionalGeneration
+
+_ = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+processor = AutoProcessor.from_pretrained(repo_id)
+model = WhisperForConditionalGeneration.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+model.eval()
+
+if str(audio_path).startswith(("http://", "https://")):
+    import requests
+    import tempfile
+    from pathlib import Path
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    tmp_audio = tempfile.NamedTemporaryFile(delete=False, suffix=Path(audio_path).suffix or ".wav")
+    tmp_audio.write(audio_bytes)
+    tmp_audio.close()
+    audio_input_path = tmp_audio.name
+else:
+    audio_input_path = audio_path
+
+speech, sampling_rate = sf.read(audio_input_path)
+if speech.ndim > 1:
+    speech = speech.mean(axis=1)
+if sampling_rate != 16000:
+    ratio = 16000 / float(sampling_rate)
+    x_old = np.linspace(0.0, 1.0, num=len(speech), endpoint=False)
+    x_new = np.linspace(0.0, 1.0, num=int(len(speech) * ratio), endpoint=False)
+    speech = np.interp(x_new, x_old, speech).astype(np.float32)
+    sampling_rate = 16000
+inputs = processor(speech, sampling_rate=sampling_rate, return_tensors="pt")
+input_features = inputs.input_features.to(device)
+forced_decoder_ids = processor.get_decoder_prompt_ids(language=language, task=task)
+model.generation_config.forced_decoder_ids = forced_decoder_ids
+with torch.no_grad():
+    generated_ids = model.generate(input_features)
+transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"transcription": transcription}

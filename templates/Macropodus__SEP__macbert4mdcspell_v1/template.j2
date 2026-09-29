@@ -1,0 +1,59 @@
+{% set repo_id = repo_id | default("Macropodus/macbert4mdcspell_v1") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('真麻烦你了。希望你们好好的跳无') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+import torch
+from transformers import BertTokenizer, BertForMaskedLM
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+if not os.path.exists(tokenizer_path):
+    tokenizer_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+model_dir = os.path.dirname(weights_path)
+
+# Load tokenizer and model from downloaded files
+try:
+    tokenizer = BertTokenizer.from_pretrained(model_dir)
+except Exception:
+    tokenizer = BertTokenizer(vocab_file=tokenizer_path)
+model = BertForMaskedLM.from_pretrained(model_dir, local_files_only=True)
+model.to(device)
+model.eval()
+
+inputs = tokenizer([text], return_tensors="pt", padding=True, truncation=True, max_length=512)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+input_ids = inputs["input_ids"][0]
+logits = outputs.logits[0]
+pred_ids = torch.argmax(logits, dim=-1)
+input_tokens = tokenizer.convert_ids_to_tokens(input_ids)
+pred_tokens = tokenizer.convert_ids_to_tokens(pred_ids)
+
+source = text
+corrected_chars = []
+errors = []
+for idx, ch in enumerate(source):
+    tok_idx = idx + 1
+    if tok_idx < len(pred_tokens):
+        pred_tok = pred_tokens[tok_idx]
+        pred_char = tokenizer.convert_tokens_to_string([pred_tok]).replace(" ", "")
+        if pred_char and pred_char != ch:
+            corrected_chars.append(pred_char)
+            errors.append([ch, pred_char, idx])
+        else:
+            corrected_chars.append(ch)
+    else:
+        corrected_chars.append(ch)
+
+corrected_text = "".join(corrected_chars)
+RESULT = {"source": source, "target": corrected_text, "errors": errors}

@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("facebook/wav2vec2-large-100k-voxpopuli") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("automatic-speech-recognition") %}
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+{% set tokenizer_model = tokenizer_model | default("facebook/wav2vec2-base-960h") %}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+audio_path = {{ audio_path | tojson }}
+tokenizer = {{ tokenizer_model | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+transcription = pipe(audio_path)
+RESULT = {"transcription": transcription}

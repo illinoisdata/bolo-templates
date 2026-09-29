@@ -1,0 +1,45 @@
+{% set repo_id = repo_id | default("bibabobbb/kronons-eth-recent-new-long-lbk") %}
+{% set device = device | default("cuda:0") %}
+{% set seed = seed | default(0) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+seed = {{ seed }}
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+
+torch.manual_seed(seed)
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+class KrononsModel(torch.nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        d_model = int(cfg["d_model"])
+        n_layers = int(cfg["n_layers"])
+        layers = []
+        for i in range(max(1, n_layers)):
+            layers.append(torch.nn.Linear(d_model, d_model))
+            if i != n_layers - 1:
+                layers.append(torch.nn.ReLU())
+        self.net = torch.nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.net(x)
+
+model = KrononsModel(config).to(device)
+model.eval()
+
+x = torch.zeros(1, int(config["d_model"]), device=device)
+with torch.no_grad():
+    y = model(x)
+
+RESULT = {
+    "output": y.detach().cpu().numpy().tolist(),
+}

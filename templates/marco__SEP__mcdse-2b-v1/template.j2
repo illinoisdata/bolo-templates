@@ -1,0 +1,67 @@
+{% set repo_id = repo_id | default("marco/mcdse-2b-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set query_text = query_text | default('What is shown in this image?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+query_text = "{{ query_text }}"
+
+import math
+import os
+from PIL import Image
+import torch
+from transformers import AutoProcessor, Qwen2VLForConditionalGeneration
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_file = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_file = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+
+min_pixels = 1 * 28 * 28
+max_pixels = 960 * 28 * 28
+
+processor = AutoProcessor.from_pretrained(
+    os.path.dirname(preprocessor_file),
+    min_pixels=min_pixels,
+    max_pixels=max_pixels,
+)
+
+model = Qwen2VLForConditionalGeneration.from_pretrained(
+    os.path.dirname(model_file),
+    torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
+    device_map=None,
+    attn_implementation="eager",
+).eval()
+model.to(device)
+model.padding_side = "left"
+processor.tokenizer.padding_side = "left"
+
+if isinstance(image_path, str) and image_path.startswith(("http://", "https://")):
+    from urllib.request import urlopen
+    image = Image.open(urlopen(image_path)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+document_prompt = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>What is shown in this image?<|im_end|>\n<|endoftext|>"
+
+inputs = processor(
+    text=[document_prompt],
+    images=[image],
+    videos=None,
+    padding="longest",
+    return_tensors="pt",
+)
+inputs = {k: v.to(device) if hasattr(v, 'to') else v for k, v in inputs.items()}
+
+with torch.no_grad():
+    output = model(**inputs, return_dict=True, output_hidden_states=True)
+
+embeddings = output.hidden_states[-1][:, -1]
+output_value = torch.nn.functional.normalize(embeddings[:, :1536].float(), p=2, dim=-1).detach().cpu().numpy()
+
+RESULT = {"embeddings": output_value}

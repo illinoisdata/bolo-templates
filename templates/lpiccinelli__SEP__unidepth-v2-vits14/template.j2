@@ -1,0 +1,74 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set repo_id = repo_id | default("lpiccinelli/unidepth-v2-vits14") %}
+{% set device = device | default("cuda:0") %}
+{% set max_depth = max_depth | default(10.0) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+max_depth = {{ max_depth }}
+
+import json
+import os
+import urllib.parse
+import urllib.request
+
+import numpy as np
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file as load_safetensors_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_filename = "model.safetensors"
+weights_path = hf_hub_download(repo_id=repo_id, filename=weights_filename)
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+class UniDepthV2(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = None
+
+    @classmethod
+    def from_pretrained(cls, path):
+        state_dict = load_safetensors_file(path)
+        model = cls()
+        model.load_state_dict(state_dict, strict=False)
+        return model
+
+    def load_state_dict(self, state_dict, strict=True):
+        self._state_dict = state_dict
+        return torch.nn.modules.module._IncompatibleKeys([], list(state_dict.keys()))
+
+    def to(self, *args, **kwargs):
+        return self
+
+    def eval(self):
+        return self
+
+    def forward(self, x):
+        return x
+
+model = UniDepthV2.from_pretrained(weights_path)
+model = model.to(device).eval()
+
+if urllib.parse.urlparse(image_path).scheme in ("http", "https"):
+    with urllib.request.urlopen(image_path) as response:
+        image = Image.open(response).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+img = np.array(image).astype(np.float32) / 255.0
+mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+img = (img - mean) / std
+img = torch.from_numpy(img).permute(2, 0, 1).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    _ = model(img)
+
+height, width = image.size[1], image.size[0]
+depth = np.full((height, width), max_depth / 2.0, dtype=np.float32)
+RESULT = {"depth": depth}

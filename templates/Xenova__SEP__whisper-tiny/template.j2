@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("Xenova/whisper-tiny") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set language = language | default('en') %}
+{% set task = task | default('transcribe') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+language = "{{ language }}"
+task = "{{ task }}"
+
+import numpy as np
+import torch
+import requests
+import soundfile as sf
+from io import BytesIO
+from transformers import AutoProcessor, WhisperForConditionalGeneration
+
+processor = AutoProcessor.from_pretrained("openai/whisper-tiny")
+model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-tiny")
+model.to(device)
+model.eval()
+
+if audio_path.startswith('http://') or audio_path.startswith('https://'):
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    waveform, sampling_rate = sf.read(BytesIO(audio_bytes))
+else:
+    waveform, sampling_rate = sf.read(audio_path)
+
+if waveform.ndim > 1:
+    waveform = np.mean(waveform, axis=1)
+if waveform.dtype != np.float32:
+    waveform = waveform.astype(np.float32)
+if sampling_rate != 16000:
+    import librosa
+    waveform = librosa.resample(waveform, orig_sr=sampling_rate, target_sr=16000)
+    sampling_rate = 16000
+
+inputs = processor(audio=waveform, sampling_rate=sampling_rate, return_tensors="pt")
+input_features = inputs.input_features.to(device)
+forced_decoder_ids = processor.get_decoder_prompt_ids(language=language, task=task)
+with torch.no_grad():
+    generated_ids = model.generate(input_features=input_features, forced_decoder_ids=forced_decoder_ids)
+    transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"text": transcription}

@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("imageomics/bioclip-2") %}
+{% set device = device | default("cuda:0") %}
+{% set text_prompts = text_prompts | default(['a bird', 'a fish', 'a flower', 'a fungus', 'an insect']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_prompts = {{ text_prompts }}
+
+import torch
+import open_clip
+from huggingface_hub import hf_hub_download
+from PIL import Image
+
+_ = hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+
+image_path = "/u/yunqili4/projects/ML-code-generation/data/image1.jpeg"
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    import requests
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model, _, preprocess_val = open_clip.create_model_and_transforms(
+    model_name="hf-hub:" + repo_id,
+    pretrained="hf-hub:" + repo_id,
+    device="cpu",
+)
+model = model.to(device)
+model.eval()
+
+tokenizer = open_clip.get_tokenizer("hf-hub:" + repo_id)
+
+image_input = preprocess_val(image).unsqueeze(0).to(device)
+text_tokens = tokenizer(text_prompts).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_input)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logit_scale = model.logit_scale.exp()
+    logits = logit_scale * image_features @ text_features.T
+    probs = logits.softmax(dim=-1).squeeze(0)
+    top_idx = int(torch.argmax(probs).item())
+
+RESULT = {
+    "image_text_probs": probs.detach().cpu().tolist(),
+    "top_prompt": text_prompts[top_idx],
+    "top_score": float(probs[top_idx].item()),
+}

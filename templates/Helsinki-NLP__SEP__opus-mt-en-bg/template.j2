@@ -1,21 +1,25 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-en-bg") %}
 {% set device = device | default("cuda:0") %}
-{% set target_lang = target_lang | default("bul") %}
-{% set source_text = source_text | default("Hello, world!") %}
+{% set text = text | default('This is a test sentence for translation.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-target_lang = "{{ target_lang }}"
-source_text = "{{ source_text }}"
+text = "{{ text }}"
 
+import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-from pathlib import Path
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+hf_hub_download(repo_id=repo_id, filename="config.json")
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-full_text = f">>{target_lang}<< {source_text}"
-encoded_inputs = tokenizer(full_text, return_tensors="pt").to(device)
-generated_tokens = model.generate(**encoded_inputs)
-translations = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-
-RESULT = {"translation": translations[0]}
+inputs = tokenizer([">>bg<< " + text], return_tensors="pt", padding=True, truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, num_beams=4, max_length=128)
+output_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+RESULT = {"translation": output_text}

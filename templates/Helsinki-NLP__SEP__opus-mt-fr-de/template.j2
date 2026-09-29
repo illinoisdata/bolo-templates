@@ -1,27 +1,41 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-fr-de") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("Ceci est un exemple de phrase en français.") %}
+{% set text = text | default('Bonjour, comment allez-vous ?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = "{{ input_text }}"
+text = "{{ text }}"
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from pathlib import Path
 import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model.to(torch.device(device))
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+source_spm = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+model_dir = str(Path(weights_path).parent)
+
+tokenizer = AutoTokenizer.from_pretrained(
+    model_dir,
+    use_fast=False,
+    source_spm=source_spm,
+    target_spm=target_spm,
+    vocab=vocab_path,
+)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
+model.to(device)
 model.eval()
 
-# Pre-process input
-inputs = tokenizer(input_text, return_tensors="pt")
-inputs = inputs.to(torch.device(device))
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Inference
-generated_tokens = model.generate(**inputs)
+with torch.no_grad():
+    generated_tokens = model.generate(**inputs, num_beams=4, max_length=64)
 
-# Post-process
-output_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 
-RESULT = {"translation_text": output_text}
+RESULT = {"translation": translation}

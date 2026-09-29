@@ -1,29 +1,39 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("mrm8488/t5-base-finetuned-common_gen") %}
-{% set prompt = prompt | default("tree plant ground hole dig") %}
-{% set max_length = max_length | default(64) %}
-{% set num_beams = num_beams | default(4) %}
-{% set num_return_sequences = num_return_sequences | default(1) %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('tree plant ground hole dig') %}
+{% set max_length = max_length | default(32) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
+input_text = "{{ input_text }}"
 max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-num_return_sequences = {{ num_return_sequences }}
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-import os
 
-_tokenizer = AutoTokenizer.from_pretrained(repo_id)
-_model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-_model = _model.to(device)
-_model.eval()
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-_inputs = _tokenizer(prompt, return_tensors="pt")
-_inputs = {key: value.to(device) for key, value in _inputs.items()}
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+spiece_model_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-_generated = _model.generate(**_inputs, max_length=max_length, num_beams=num_beams, num_return_sequences=num_return_sequences)
-_decoded = _tokenizer.batch_decode(
-    _generated, skip_special_tokens=True, clean_up_tokenization_spaces=True
-)
+model_dir = weights_path.rsplit('/', 1)[0]
 
-RESULT = {"generated_sentences": _decoded}
+tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+features = tokenizer(input_text, return_tensors="pt")
+features = {k: v.to(device) for k, v in features.items()}
+
+with torch.no_grad():
+    output_ids = model.generate(
+        input_ids=features["input_ids"],
+        attention_mask=features["attention_mask"],
+        max_length=max_length,
+    )
+
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": output_text}

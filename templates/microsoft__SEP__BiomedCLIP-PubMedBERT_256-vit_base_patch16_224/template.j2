@@ -1,0 +1,51 @@
+{% set repo_id = repo_id | default("microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set candidate_labels = candidate_labels | default(['adenocarcinoma histopathology', 'squamous cell carcinoma histopathology']) %}
+{% set prompt_template = prompt_template | default('this is a photo of ') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+candidate_labels = {{ candidate_labels | tojson }}
+prompt_template = "{{ prompt_template }}"
+
+import json
+from io import BytesIO
+from pathlib import Path
+
+import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from open_clip import create_model_from_pretrained, get_tokenizer
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+def load_image(path_or_url):
+    if str(path_or_url).startswith(("http://", "https://")):
+        from urllib.request import urlopen
+        return Image.open(BytesIO(urlopen(path_or_url).read())).convert("RGB")
+    return Image.open(path_or_url).convert("RGB")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+model_name = "biomedclip_local"
+preprocess_cfg = config["preprocess_cfg"]
+model, preprocess = create_model_from_pretrained(
+    f"hf-hub:{repo_id}",
+)
+
+tokenizer = get_tokenizer(f"hf-hub:{repo_id}")
+model.to(device)
+model.eval()
+
+image = preprocess(load_image(image_path)).unsqueeze(0).to(device)
+texts = tokenizer([prompt_template + label for label in candidate_labels], context_length=256).to(device)
+
+with torch.no_grad():
+    image_features, text_features, logit_scale = model(image, texts)
+    logits = (logit_scale * image_features @ text_features.t()).softmax(dim=-1)
+    scores = logits[0].detach().cpu().tolist()
+
+RESULT = {"labels": candidate_labels, "scores": scores, "top_label": candidate_labels[int(torch.tensor(scores).argmax().item())]}

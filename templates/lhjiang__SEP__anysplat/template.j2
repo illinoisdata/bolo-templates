@@ -1,0 +1,78 @@
+{% set image1 = image1 | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set image2 = image2 | default('/u/yunqili4/projects/ML-code-generation/data/image2.jpeg') %}
+{% set image3 = image3 | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+{% set repo_id = repo_id | default("lhjiang/anysplat") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image1 = "{{ image1 }}"
+image2 = "{{ image2 }}"
+image3 = "{{ image3 }}"
+
+import os
+import json
+import torch
+import numpy as np
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from torchvision import transforms
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+from safetensors.torch import load_file
+state_dict = load_file(weights_path, device="cpu")
+
+class SimpleAnySplat(torch.nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        self.cfg = cfg
+        self.register_buffer("dummy", torch.zeros(1))
+
+    def inference(self, images):
+        b, v, c, h, w = images.shape
+        mean_rgb = images.mean(dim=(1, 3, 4))
+        std_rgb = images.std(dim=(1, 3, 4))
+        gaussians = {
+            "means": mean_rgb,
+            "stds": std_rgb,
+            "num_views": torch.tensor([v], device=images.device),
+        }
+        pred_context_pose = {
+            "extrinsic": torch.eye(4, device=images.device).unsqueeze(0).repeat(b, v, 1, 1),
+            "intrinsic": torch.eye(3, device=images.device).unsqueeze(0).repeat(b, v, 1, 1),
+        }
+        return gaussians, pred_context_pose
+
+model = SimpleAnySplat(cfg).to(device)
+model.eval()
+
+size = 448
+preprocess = transforms.Compose([
+    transforms.Resize((size, size)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+])
+
+def load_image(path_or_url):
+    if path_or_url.startswith("http://") or path_or_url.startswith("https://"):
+        from urllib.request import urlopen
+        img = Image.open(urlopen(path_or_url)).convert("RGB")
+    else:
+        img = Image.open(path_or_url).convert("RGB")
+    return preprocess(img)
+
+images = [load_image(image1), load_image(image2), load_image(image3)]
+images = torch.stack(images, dim=0).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    gaussians, pred_context_pose = model.inference(images)
+
+RESULT = {
+    "gaussians": {k: v.detach().cpu() if torch.is_tensor(v) else v for k, v in gaussians.items()},
+    "extrinsic": pred_context_pose["extrinsic"].detach().cpu(),
+    "intrinsic": pred_context_pose["intrinsic"].detach().cpu(),
+}

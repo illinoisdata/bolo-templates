@@ -1,0 +1,44 @@
+{% set repo_id = repo_id | default("RedHatAI/phi-4-quantized.w4a16") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Write a short introduction to large language models.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_index_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors.index.json")
+model_1_path = hf_hub_download(repo_id=repo_id, filename="model-00001-of-00002.safetensors")
+model_2_path = hf_hub_download(repo_id=repo_id, filename="model-00002-of-00002.safetensors")
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+)
+model.to(device)
+model.eval()
+
+messages = [
+    {"role": "user", "content": prompt},
+]
+chat_text = tokenizer.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+inputs = tokenizer(chat_text, return_tensors="pt")
+input_ids = inputs["input_ids"].to(device)
+
+with torch.no_grad():
+    generated = model.generate(
+        input_ids=input_ids,
+        max_new_tokens=128,
+        do_sample=False,
+        pad_token_id=tokenizer.eos_token_id,
+    )
+
+output_text = tokenizer.decode(generated[0][input_ids.shape[-1]:], skip_special_tokens=True)
+
+RESULT = {"text": output_text}

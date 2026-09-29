@@ -1,0 +1,15 @@
+{% set repo_id = repo_id | default("unsloth/Qwen3-4B-Thinking-2507-unsloth-bnb-4bit") %}
+{% set device = device | default("cuda:0") %}
+{%- set task = task | default("text-generation") -%}
+{%- set prompt = prompt | default("Hello, my name is Eric, how are you?") -%}
+{%- set max_new_tokens = max_new_tokens | default(128) -%}
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+prompt = {{ prompt | tojson }}
+max_new_tokens = {{ max_new_tokens }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(prompt, max_new_tokens=max_new_tokens)

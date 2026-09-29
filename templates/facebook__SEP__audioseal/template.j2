@@ -1,0 +1,62 @@
+{% set repo_id = repo_id | default("facebook/audioseal") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set message_bits = message_bits | default(16) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+message_bits = {{ message_bits }}
+
+import os
+import wave
+import numpy as np
+import torch
+from audioseal import AudioSeal
+
+
+def load_wav(path):
+    if isinstance(path, str) and path.startswith(("http://", "https://")):
+        raise ValueError("URL loading is not supported for audio inputs in this environment")
+    with wave.open(path, 'rb') as wf:
+        sr = wf.getframerate()
+        n_channels = wf.getnchannels()
+        sampwidth = wf.getsampwidth()
+        n_frames = wf.getnframes()
+        frames = wf.readframes(n_frames)
+    if sampwidth == 2:
+        dtype = np.int16
+        scale = 32768.0
+    elif sampwidth == 4:
+        dtype = np.int32
+        scale = 2147483648.0
+    else:
+        raise ValueError(f'Unsupported sample width: {sampwidth}')
+    audio = np.frombuffer(frames, dtype=dtype).astype(np.float32) / scale
+    audio = audio.reshape(-1, n_channels).T
+    wav = torch.from_numpy(audio).unsqueeze(0)
+    return wav, sr
+
+
+wav, sr = load_wav(audio_path)
+wav = wav.to(device)
+
+model = AudioSeal.load_generator("audioseal_wm_16bits")
+model = model.to(device)
+model.eval()
+
+detector = AudioSeal.load_detector("audioseal_detector_16bits")
+detector = detector.to(device)
+detector.eval()
+
+message = torch.zeros((wav.shape[0], message_bits), device=device, dtype=torch.long)
+watermark = model.get_watermark(wav, sr, message=message)
+watermarked_audio = wav + watermark
+
+result, decoded_message = detector.detect_watermark(watermarked_audio, sr)
+
+RESULT = {
+    "watermarked_audio": watermarked_audio.detach().cpu(),
+    "watermark": watermark.detach().cpu(),
+    "detection_result": result.detach().cpu() if torch.is_tensor(result) else result,
+    "decoded_message": decoded_message.detach().cpu() if torch.is_tensor(decoded_message) else decoded_message,
+}

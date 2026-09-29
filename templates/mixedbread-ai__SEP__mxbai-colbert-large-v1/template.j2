@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("mixedbread-ai/mxbai-colbert-large-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set text_a = text_a | default('Who wrote \'To Kill a Mockingbird\'?') %}
+{% set text_b = text_b | default('') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_a = "{{ text_a }}"
+text_b = "{{ text_b }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModel
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+# Load tokenizer and model from local files.
+tokenizer = AutoTokenizer.from_pretrained(os.path.dirname(tokenizer_path), local_files_only=True)
+model = AutoModel.from_pretrained(os.path.dirname(model_path), local_files_only=True, torch_dtype=torch.float16)
+model.to(device)
+model.eval()
+
+inputs_a = tokenizer(text_a, return_tensors="pt", padding=True, truncation=True)
+inputs_a = {k: v.to(device) for k, v in inputs_a.items()}
+with torch.no_grad():
+    outputs_a = model(**inputs_a)
+    emb_a = outputs_a.last_hidden_state
+
+if text_b:
+    inputs_b = tokenizer(text_b, return_tensors="pt", padding=True, truncation=True)
+    inputs_b = {k: v.to(device) for k, v in inputs_b.items()}
+    with torch.no_grad():
+        outputs_b = model(**inputs_b)
+        emb_b = outputs_b.last_hidden_state
+    output = {
+        "embedding_a": emb_a.detach().cpu(),
+        "embedding_b": emb_b.detach().cpu(),
+    }
+else:
+    output = {
+        "embedding": emb_a.detach().cpu(),
+    }
+
+RESULT = {"output": output}

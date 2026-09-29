@@ -1,25 +1,33 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-no-de") %}
 {% set device = device | default("cuda:0") %}
-{% set src_texts = src_texts | default(["Dette er en test."]) %}
+{% set text = text | default('Hallo Welt!') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-src_texts = {{ src_texts }}
+text = {{ text | tojson }}
 
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import MarianMTModel, MarianTokenizer
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
 
-# Pre-process input texts
-inputs = tokenizer(src_texts, return_tensors="pt", padding=True).to(device)
+_tokenizer_dir = __import__('os').path.dirname(tokenizer_config_path)
 
-# Run inference
-generated_ids = model.generate(**inputs)
+tokenizer = MarianTokenizer.from_pretrained(_tokenizer_dir)
+model = MarianMTModel.from_pretrained(_tokenizer_dir)
+model.to(device)
+model.eval()
 
-# Post-process outputs
-translations = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+inputs = tokenizer([text], return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, num_beams=6)
+output = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-# Build result dict
-RESULT = {"translations": translations}
+RESULT = {"translation": output}

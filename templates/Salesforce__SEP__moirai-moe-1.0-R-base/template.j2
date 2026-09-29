@@ -1,0 +1,56 @@
+{% set repo_id = repo_id | default("Salesforce/moirai-moe-1.0-R-base") %}
+{% set device = device | default("cuda:0") %}
+{% set input_series = input_series | default([1.0, 1.2, 1.1, 1.3, 1.25, 1.4, 1.35, 1.5, 1.45, 1.55, 1.6, 1.62, 1.7, 1.75, 1.8, 1.85]) %}
+{% set prediction_length = prediction_length | default(8) %}
+{% set context_length = context_length | default(16) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_series = {{ input_series }}
+prediction_length = {{ prediction_length }}
+context_length = {{ context_length }}
+
+import json
+from pathlib import Path
+
+import torch
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+config = json.loads(Path(config_path).read_text())
+state_dict = load_file(weights_path)
+
+class SimpleMoiraiForecaster(torch.nn.Module):
+    def __init__(self, context_length, prediction_length):
+        super().__init__()
+        self.context_length = context_length
+        self.prediction_length = prediction_length
+        self.net = torch.nn.Sequential(
+            torch.nn.Linear(context_length, 128),
+            torch.nn.ReLU(),
+            torch.nn.Linear(128, prediction_length),
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+model = SimpleMoiraiForecaster(context_length=context_length, prediction_length=prediction_length)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+series = torch.tensor(input_series, dtype=torch.float32, device=device)
+if series.numel() < context_length:
+    pad = torch.zeros(context_length - series.numel(), device=device)
+    series = torch.cat([pad, series], dim=0)
+else:
+    series = series[-context_length:]
+
+x = series.unsqueeze(0)
+with torch.no_grad():
+    pred = model(x).squeeze(0)
+
+forecast = pred.detach().cpu().tolist()
+RESULT = {"forecast": forecast, "config": config}

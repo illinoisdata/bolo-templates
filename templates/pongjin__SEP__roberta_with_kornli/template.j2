@@ -1,0 +1,72 @@
+{% set repo_id = repo_id | default("pongjin/roberta_with_kornli") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("zero-shot-classification") %}
+{% set input_prompt = input_prompt | default("배당락 D-1 코스피, 2330선 상승세...외인·기관 사자") %}
+{% set candidate_labels = candidate_labels | default(["외환", "환율", "경제", "금융", "부동산", "주식"]) %}
+{% set hypothesis_template = hypothesis_template | default("이는 {}에 관한 것이다.") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+candidate_labels = {{ candidate_labels | tojson }}
+hypothesis_template = {{ hypothesis_template | tojson }}
+model = repo_id
+
+from transformers import AutoTokenizer, pipeline
+from transformers.pipelines.base import ArgumentHandler
+
+tokenizer = AutoTokenizer.from_pretrained(model)
+
+class CustomZeroShotClassificationArgumentHandler(ArgumentHandler):
+    def __init__(self, tokenizer):
+        self.tokenizer = tokenizer
+
+    def _parse_labels(self, labels):
+        if isinstance(labels, str):
+            labels = [label.strip() for label in labels.split(",")]
+        return labels
+
+    def __call__(self, sequences, labels, hypothesis_template, **kwargs):
+        parsed_labels = self._parse_labels(labels)
+        sequence_list = sequences if isinstance(sequences, list) else [sequences]
+        if len(parsed_labels) == 0 or len(sequence_list) == 0:
+            raise ValueError("You must include at least one label and at least one sequence.")
+        if hypothesis_template.format(parsed_labels[0]) == hypothesis_template:
+            raise ValueError(
+                (
+                    'The provided hypothesis_template "{}" was not able to be formatted with the target labels. '
+                    "Make sure the passed template includes formatting syntax such as '{}' where the label should go."
+                ).format(hypothesis_template, "{}")
+            )
+        sequence_pairs = []
+        for sequence in sequence_list:
+            for label in parsed_labels:
+                sequence_pairs.append(
+                    f"{sequence} {self.tokenizer.sep_token} {hypothesis_template.format(label)}"
+                )
+        return sequence_pairs, sequence_list
+
+if device.startswith("cuda"):
+    parts = device.split(":")
+    device_identifier = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
+elif device == "cpu":
+    device_identifier = -1
+elif device.isdigit():
+    device_identifier = int(device)
+else:
+    device_identifier = -1
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=tokenizer,
+    device=device_identifier,
+    args_parser=CustomZeroShotClassificationArgumentHandler(tokenizer=tokenizer),
+)
+
+RESULT = pipe(
+    input_prompt,
+    candidate_labels=candidate_labels,
+    hypothesis_template=hypothesis_template,
+)

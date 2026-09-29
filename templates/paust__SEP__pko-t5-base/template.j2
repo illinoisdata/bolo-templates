@@ -1,33 +1,31 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("paust/pko-t5-base") %}
-{% set input_texts = input_texts | default(['qa question: 당신의 이름은 무엇인가요?']) %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('qa question: 당신의 이름은 무엇인가요?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_texts = {{ input_texts }}
+question = "{{ question }}"
 
-import os
 import torch
-import tokenizers.models as tokenizers_models
-
-_original_unigram = tokenizers_models.Unigram
-
-def _dict_safe_unigram(vocab, *args, **kwargs):
-    if isinstance(vocab, dict):
-        vocab = list(vocab.items())
-    return _original_unigram(vocab, *args, **kwargs)
-
-tokenizers_models.Unigram = _dict_safe_unigram
-
 from transformers import T5TokenizerFast, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
 
-tokenizer = T5TokenizerFast.from_pretrained(repo_id)
-model = T5ForConditionalGeneration.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-encoded = tokenizer(input_texts, return_tensors="pt", padding=True)
-input_ids = encoded.input_ids.to(device)
-attention_mask = encoded.attention_mask.to(device)
+_tokenizer = T5TokenizerFast(tokenizer_file=tokenizer_json_path)
+model = T5ForConditionalGeneration.from_pretrained(repo_id, local_files_only=True)
+model.to(device)
+model.eval()
 
-generated_ids = model.generate(input_ids=input_ids, attention_mask=attention_mask)
-generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+inputs = _tokenizer([question], return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-RESULT = {"generated_texts": generated_texts}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, max_new_tokens=16)
+
+output_text = _tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

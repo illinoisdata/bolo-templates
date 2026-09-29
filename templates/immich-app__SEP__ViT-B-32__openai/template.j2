@@ -1,0 +1,72 @@
+{% set repo_id = repo_id | default("immich-app/ViT-B-32__openai") %}
+{% set device = device | default("cuda:0") %}
+{% set text_input = text_input | default('a photo of a cat') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_input = {{ text_input | tojson }}
+image_path = {{ image_path | tojson }}
+
+import json
+from io import BytesIO
+from urllib.parse import urlparse
+
+import numpy as np
+from PIL import Image
+from huggingface_hub import hf_hub_download
+import onnxruntime as ort
+from transformers import CLIPTokenizerFast
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+text_model_path = hf_hub_download(repo_id=repo_id, filename="textual/model.onnx")
+visual_model_path = hf_hub_download(repo_id=repo_id, filename="visual/model.onnx")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="textual/tokenizer.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="textual/merges.txt")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="textual/vocab.json")
+_ = hf_hub_download(repo_id=repo_id, filename="textual/special_tokens_map.json")
+_ = hf_hub_download(repo_id=repo_id, filename="textual/tokenizer_config.json")
+
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+context_length = cfg["text_cfg"]["context_length"]
+image_size = cfg["vision_cfg"]["image_size"]
+
+if image_path.startswith(("http://", "https://")):
+    import requests
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+image = image.resize((image_size, image_size))
+image_arr = np.asarray(image).astype(np.float32) / 255.0
+image_arr = (image_arr - np.array([0.48145466, 0.4578275, 0.40821073], dtype=np.float32)) / np.array([0.26862954, 0.26130258, 0.27577711], dtype=np.float32)
+image_arr = np.transpose(image_arr, (2, 0, 1))[None, ...]
+
+_tokenizer = CLIPTokenizerFast(tokenizer_file=tokenizer_json_path, vocab_file=vocab_path, merges_file=merges_path)
+text_tokens = _tokenizer(text_input, padding="max_length", truncation=True, max_length=context_length, return_tensors="np")
+input_ids = text_tokens["input_ids"].astype(np.int32)
+attention_mask = text_tokens["attention_mask"].astype(np.int32)
+
+providers = ["CPUExecutionProvider"]
+text_sess = ort.InferenceSession(text_model_path, providers=providers, sess_options=ort.SessionOptions())
+vision_sess = ort.InferenceSession(visual_model_path, providers=providers, sess_options=ort.SessionOptions())
+
+text_inputs = {text_sess.get_inputs()[0].name: input_ids}
+for inp in text_sess.get_inputs()[1:]:
+    if inp.name == "attention_mask":
+        text_inputs[inp.name] = attention_mask
+    elif inp.shape and len(inp.shape) == 2:
+        text_inputs[inp.name] = attention_mask
+    else:
+        text_inputs[inp.name] = input_ids
+text_embedding = text_sess.run(None, text_inputs)[0]
+image_embedding = vision_sess.run(None, {vision_sess.get_inputs()[0].name: image_arr})[0]
+
+text_embedding = np.asarray(text_embedding)
+image_embedding = np.asarray(image_embedding)
+text_embedding = text_embedding / np.linalg.norm(text_embedding, axis=-1, keepdims=True)
+image_embedding = image_embedding / np.linalg.norm(image_embedding, axis=-1, keepdims=True)
+similarity = (image_embedding * text_embedding).sum(axis=-1)
+
+RESULT = {"image_embedding": image_embedding, "text_embedding": text_embedding, "similarity": similarity}

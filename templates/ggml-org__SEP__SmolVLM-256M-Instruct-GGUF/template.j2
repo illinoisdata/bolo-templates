@@ -1,0 +1,56 @@
+{% set repo_id = repo_id | default("ggml-org/SmolVLM-256M-Instruct-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('SmolVLM-256M-Instruct-Q8_0.gguf') %}
+{% set mmproj_filename = mmproj_filename | default('mmproj-SmolVLM-256M-Instruct-Q8_0.gguf') %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set prompt = prompt | default('Describe the image in detail.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+mmproj_filename = "{{ mmproj_filename }}"
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
+
+import os
+import torch
+import requests
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from transformers import AutoProcessor, AutoTokenizer, AutoModelForImageTextToText
+
+weights_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+mmproj_path = hf_hub_download(repo_id=repo_id, filename=mmproj_filename)
+
+base_model_id = "HuggingFaceTB/SmolVLM-256M-Instruct"
+processor = AutoProcessor.from_pretrained(base_model_id)
+tokenizer = AutoTokenizer.from_pretrained(base_model_id, use_fast=True)
+model = AutoModelForImageTextToText.from_pretrained(
+    base_model_id,
+    torch_dtype=torch.float16 if "cuda" in device else torch.float32,
+)
+model.to(device)
+model.eval()
+
+if str(image_path).startswith(("http://", "https://")):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+messages = [
+    {
+        "role": "user",
+        "content": [
+            {"type": "image", "image": image},
+            {"type": "text", "text": prompt},
+        ],
+    }
+]
+
+inputs = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=True, return_dict=True, return_tensors="pt")
+inputs = {k: v.to(device) if hasattr(v, "to") else v for k, v in inputs.items()}
+
+with torch.no_grad():
+    generated = model.generate(**inputs, max_new_tokens=64)
+
+output_text = processor.batch_decode(generated, skip_special_tokens=True)[0]
+RESULT = {"output_text": output_text}

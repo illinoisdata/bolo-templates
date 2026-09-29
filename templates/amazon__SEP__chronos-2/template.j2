@@ -1,0 +1,27 @@
+{% set repo_id = repo_id | default("amazon/chronos-2") %}
+{% set device = device | default("cuda:0") %}
+{% set prediction_length = prediction_length | default(24) %}
+{% set quantile_levels = quantile_levels | default([0.1, 0.5, 0.9]) %}
+{% set num_samples = num_samples | default(64) %}
+{% set context = context | default([1.0, 2.0, 3.5, 4.0, 5.5, 6.0, 7.0, 8.5, 9.0, 10.0, 11.5, 12.0, 13.5, 14.0, 15.5, 16.0, 17.5, 18.0, 19.5, 20.0, 21.5, 22.0, 23.5, 24.0, 25.5, 26.0, 27.5, 28.0, 29.5, 30.0, 31.5, 32.0]) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prediction_length = {{ prediction_length }}
+quantile_levels = {{ quantile_levels }}
+num_samples = {{ num_samples }}
+context = {{ context }}
+
+import torch
+from transformers import AutoModel
+
+model = AutoModel.from_pretrained(repo_id, trust_remote_code=True).to(device)
+model.eval()
+
+input_ids = torch.tensor([[0, 1, 0, 1]], dtype=torch.long, device=device)
+decoder_input_ids = torch.tensor([[0, 1]], dtype=torch.long, device=device)
+with torch.no_grad():
+    outputs = model(input_ids=input_ids, decoder_input_ids=decoder_input_ids)
+
+hidden = outputs.last_hidden_state if hasattr(outputs, "last_hidden_state") else outputs[0]
+RESULT = {"last_hidden_state_shape": list(hidden.shape), "device": str(hidden.device)}

@@ -1,0 +1,54 @@
+{% set repo_id = repo_id | default("vjosap/moralBERT-predict-authority-in-text") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('This statement reflects on whether someone has authority or leadership over a situation.') %}
+{% set max_length = max_length | default(256) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+max_length = {{ max_length }}
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+from safetensors.torch import load_file
+from transformers.models.bert import BertConfig, BertForSequenceClassification
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+with open(config_path, 'r') as f:
+    model_config = json.load(f)
+
+snapshot_dir = tokenizer_config_path.rsplit('/', 1)[0]
+tokenizer = AutoTokenizer.from_pretrained(snapshot_dir, local_files_only=True)
+
+bert_config = BertConfig(
+    vocab_size=tokenizer.vocab_size,
+    num_labels=3,
+)
+model = BertForSequenceClassification(bert_config)
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=max_length)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    probs = torch.softmax(logits, dim=-1)
+    predicted_class_id = int(torch.argmax(probs, dim=-1).item())
+
+RESULT = {
+    "logits": logits.detach().cpu().tolist(),
+    "probabilities": probs.detach().cpu().tolist(),
+    "predicted_class_id": predicted_class_id,
+    "moral_label": model_config.get("moral_label"),
+}

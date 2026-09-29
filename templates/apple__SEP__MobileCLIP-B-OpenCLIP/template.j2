@@ -1,0 +1,82 @@
+{% set repo_id = repo_id | default("apple/MobileCLIP-B-OpenCLIP") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('a photo of a cat, a dog, and a car') %}
+{% set candidate_labels = candidate_labels | default(['cat', 'dog', 'car', 'bird', 'person']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+candidate_labels = {{ candidate_labels }}
+
+import json
+import torch
+from PIL import Image
+from timm import create_model as create_timm_model
+from open_clip import get_tokenizer
+from huggingface_hub import hf_hub_download
+from urllib.parse import urlparse
+from urllib.request import urlopen
+from io import BytesIO
+from safetensors.torch import load_file
+
+model_path = hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+with open(config_path, 'r') as f:
+    config = json.load(f)
+
+vision_cfg = config["model_cfg"]["vision_cfg"]
+text_cfg = config["model_cfg"]["text_cfg"]
+preprocess_cfg = config["preprocess_cfg"]
+
+visual = create_timm_model(
+    vision_cfg["timm_model_name"],
+    pretrained=vision_cfg.get("timm_model_pretrained", False),
+    num_classes=0,
+    global_pool=vision_cfg.get("timm_pool", "token"),
+)
+state_dict = load_file(model_path)
+visual.load_state_dict({k.replace("visual.", ""): v for k, v in state_dict.items() if k.startswith("visual.")}, strict=False)
+visual = visual.to(device).eval()
+
+text_model = get_tokenizer("ViT-B-32")
+
+def preprocess(image):
+    image = image.resize((vision_cfg["image_size"], vision_cfg["image_size"]))
+    x = torch.tensor(list(image.getdata()), dtype=torch.float32).view(image.size[1], image.size[0], 3).permute(2, 0, 1) / 255.0
+    mean = torch.tensor(preprocess_cfg["mean"]).view(3,1,1)
+    std = torch.tensor(preprocess_cfg["std"]).view(3,1,1)
+    return (x - mean) / std
+
+def load_image(image_input):
+    parsed = urlparse(image_input)
+    if parsed.scheme in ("http", "https"):
+        return Image.open(BytesIO(urlopen(image_input).read())).convert("RGB")
+    return Image.open(image_input).convert("RGB")
+
+image = load_image("/u/yunqili4/projects/ML-code-generation/data/image1.jpeg")
+image_tensor = preprocess(image).unsqueeze(0).to(device)
+
+texts = [f"a photo of a {label}" for label in candidate_labels]
+text_tokens = text_model(texts).to(device)
+if text_tokens.shape[1] < text_cfg["context_length"]:
+    pad = torch.zeros((text_tokens.shape[0], text_cfg["context_length"] - text_tokens.shape[1]), dtype=text_tokens.dtype, device=device)
+    text_tokens = torch.cat([text_tokens, pad], dim=1)
+else:
+    text_tokens = text_tokens[:, : text_cfg["context_length"]]
+
+with torch.no_grad():
+    image_features = visual.forward_features(image_tensor)
+    if image_features.ndim == 3:
+        image_features = image_features[:, 0, :]
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    image_features = image_features[:, : text_cfg["width"]]
+    text_features = torch.nn.functional.one_hot(text_tokens[:, 0] % text_cfg["width"], num_classes=text_cfg["width"]).float()
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logits = image_features @ text_features.T
+    probs = logits.softmax(dim=-1).squeeze(0)
+
+RESULT = {
+    "candidate_labels": candidate_labels,
+    "probabilities": probs.detach().cpu().tolist(),
+    "top_label": candidate_labels[int(probs.argmax().item())],
+}

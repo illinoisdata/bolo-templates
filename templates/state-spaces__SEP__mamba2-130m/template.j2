@@ -1,0 +1,39 @@
+{% set repo_id = repo_id | default("state-spaces/mamba2-130m") %}
+{% set device = device | default("cuda:0") %}
+{% set max_new_tokens = max_new_tokens | default(20) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+max_new_tokens = {{ max_new_tokens }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import GPT2Config, GPT2LMHeadModel
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+state_dict = torch.load(weights_path, map_location="cpu")
+vocab_size = state_dict["lm_head.weight"].shape[0]
+config = GPT2Config(
+    vocab_size=vocab_size,
+    n_embd=768,
+    n_layer=24,
+    n_head=12,
+    n_positions=2048,
+    n_ctx=2048,
+    bos_token_id=0,
+    eos_token_id=0,
+)
+model = GPT2LMHeadModel(config)
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+prompt = "Hello, my name is"
+input_ids = torch.tensor([[15496, 11, 616, 1438, 318]], device=device)
+
+with torch.no_grad():
+    generated = model.generate(input_ids, max_new_tokens=max_new_tokens, do_sample=False, pad_token_id=0)
+
+output_text = generated[0].tolist()
+RESULT = {"generated_ids": output_text}

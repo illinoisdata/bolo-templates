@@ -1,0 +1,69 @@
+{% set repo_id = repo_id | default("facebook/wav2vec2-base-100k-voxpopuli") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("automatic-speech-recognition") -%}
+{% set model = model | default(repo_id) -%}
+{% set input_data = input_data | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") -%}
+{% set vocab_file = vocab_file | default("/workspace/wav2vec2_vocab.json") %}
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_data = {{ input_data | tojson }}
+vocab_file = {{ vocab_file | tojson }}
+
+import json
+import torch
+from transformers import Wav2Vec2CTCTokenizer, pipeline
+
+vocab = {
+    "|": 0,
+    "a": 1,
+    "b": 2,
+    "c": 3,
+    "d": 4,
+    "e": 5,
+    "f": 6,
+    "g": 7,
+    "h": 8,
+    "i": 9,
+    "j": 10,
+    "k": 11,
+    "l": 12,
+    "m": 13,
+    "n": 14,
+    "o": 15,
+    "p": 16,
+    "q": 17,
+    "r": 18,
+    "s": 19,
+    "t": 20,
+    "u": 21,
+    "v": 22,
+    "w": 23,
+    "x": 24,
+    "y": 25,
+    "z": 26,
+    "'": 27,
+    ".": 28,
+    ",": 29,
+    "[UNK]": 30,
+    "[PAD]": 31,
+}
+
+with open(vocab_file, "w", encoding="utf-8") as writer:
+    json.dump(vocab, writer, ensure_ascii=False)
+
+tokenizer = Wav2Vec2CTCTokenizer(
+    vocab_file=vocab_file,
+    unk_token="[UNK]",
+    pad_token="[PAD]",
+    word_delimiter_token="|",
+)
+
+execution_device = device
+if isinstance(device, str) and device.startswith("cuda") and not torch.cuda.is_available():
+    execution_device = "cpu"
+elif isinstance(device, int) and device >= 0 and not torch.cuda.is_available():
+    execution_device = -1
+
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=execution_device)
+RESULT = pipe(input_data)

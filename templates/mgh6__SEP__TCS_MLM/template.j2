@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("mgh6/TCS_MLM") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") -%}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") -%}
+{% set tokenizer_repo = tokenizer_repo | default("facebook/esm2_t12_35M_UR50D") -%}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+tokenizer_repo = {{ tokenizer_repo | tojson }}
+model = repo_id
+
+from transformers import AutoTokenizer, pipeline
+
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_repo)
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

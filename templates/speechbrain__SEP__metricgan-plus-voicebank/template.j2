@@ -1,0 +1,37 @@
+{% set repo_id = repo_id | default("speechbrain/metricgan-plus-voicebank") %}
+{% set device = device | default("cuda:0") %}
+{% set noisy_path = noisy_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set sample_rate = sample_rate | default(16000) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+noisy_path = "{{ noisy_path }}"
+sample_rate = {{ sample_rate }}
+
+import os
+from pathlib import Path
+import torch
+from speechbrain.inference.enhancement import SpectralMaskEnhancement
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="enhance_model.ckpt")
+_hparams_path = hf_hub_download(repo_id=repo_id, filename="hyperparams.yaml")
+
+savedir = str(Path(weights_path).parent / "speechbrain_enhancement")
+os.makedirs(savedir, exist_ok=True)
+
+model = SpectralMaskEnhancement.from_hparams(
+    source=repo_id,
+    savedir=savedir,
+    run_opts={"device": device},
+)
+
+if str(noisy_path).startswith(("http://", "https://")):
+    noisy = model.load_audio(noisy_path)
+else:
+    noisy = model.load_audio(noisy_path)
+
+noisy = noisy.unsqueeze(0)
+lengths = torch.tensor([1.0], device=noisy.device)
+enhanced = model.enhance_batch(noisy.to(device), lengths=lengths)
+
+RESULT = {"enhanced_audio": enhanced.squeeze(0).detach().cpu()}

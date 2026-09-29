@@ -1,0 +1,34 @@
+{% set repo_id = repo_id | default("hugging-quants/Llama-3.2-3B-Instruct-Q4_K_M-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default("llama-3.2-3b-instruct-q4_k_m.gguf") %}
+{% set prompt = prompt | default("Write a short greeting from Llama.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+
+if not hasattr(torch.ops, "llama_cpp"):
+    RESULT = {"output_text": "llama-cpp-python is not available in this environment."}
+else:
+    from llama_cpp import Llama
+    llm = Llama(
+        model_path=model_path,
+        n_ctx=2048,
+        n_threads=os.cpu_count() or 1,
+        n_gpu_layers=-1 if str(device).startswith("cuda") else 0,
+        verbose=False,
+    )
+    result = llm(
+        prompt,
+        max_tokens=64,
+        temperature=0.7,
+        top_p=0.9,
+    )
+    output_text = result["choices"][0]["text"]
+    RESULT = {"output_text": output_text}

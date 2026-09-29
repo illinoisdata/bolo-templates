@@ -1,52 +1,45 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("timm/vit_large_patch14_clip_224.openai") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set prompts = prompts | default(["a photo of a cat", "a photo of a dog", "a photo of an astronaut"]) %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-prompts = {{ prompts }}
 
 import json
-from io import BytesIO
-from pathlib import Path
-
-import requests
 import torch
+import timm
 from PIL import Image
-from transformers import CLIPModel, CLIPProcessor
+from urllib.parse import urlparse
+from huggingface_hub import hf_hub_download
+from timm.data import resolve_data_config
+from timm.data.transforms_factory import create_transform
+from safetensors.torch import load_file
 
-processor = CLIPProcessor.from_pretrained(repo_id)
-model = CLIPModel.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+model_path = hf_hub_download(repo_id=repo_id, filename='open_clip_model.safetensors')
 
-if image_path.startswith("http://") or image_path.startswith("https://"):
-    response = requests.get(image_path)
-    image = Image.open(BytesIO(response.content)).convert("RGB")
+with open(config_path, 'r') as f:
+    cfg = json.load(f)
+
+model = timm.create_model('vit_large_patch14_clip_224.openai', pretrained=False)
+state_dict = load_file(model_path, device='cpu')
+model.load_state_dict(state_dict, strict=False)
+model.eval().to(device)
+
+if urlparse(image_path).scheme in ('http', 'https'):
+    import requests
+    from io import BytesIO
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert('RGB')
 else:
-    image = Image.open(image_path).convert("RGB")
+    image = Image.open(image_path).convert('RGB')
 
-inputs = processor(text=prompts, images=image, return_tensors="pt", padding=True)
-inputs = inputs.to(device)
+config = resolve_data_config({}, model=model)
+transform = create_transform(**config, is_training=False)
+image_tensor = transform(image).unsqueeze(0).to(device)
 
 with torch.no_grad():
-    outputs = model(**inputs)
-
-logits_per_image = outputs.logits_per_image
-probabilities = logits_per_image.softmax(dim=1)
-logits_cpu = logits_per_image.detach().cpu().tolist()
-probabilities_cpu = probabilities.detach().cpu().tolist()
-predictions = []
-for prompt, logit_value, probability_value in zip(prompts, logits_cpu[0], probabilities_cpu[0]):
-    predictions.append(
-        {
-            "prompt": prompt,
-            "logit": logit_value,
-            "probability": probability_value,
-        }
-    )
+    output = model(image_tensor)
 
 RESULT = {
-    "logits_per_image": logits_cpu,
-    "probabilities_per_image": probabilities_cpu,
-    "predictions": predictions,
+    'output': output.detach().cpu(),
 }

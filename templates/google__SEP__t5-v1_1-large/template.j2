@@ -1,26 +1,37 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("google/t5-v1_1-large") %}
-{% set input_text = input_text | default("translate English to German: The quick brown fox jumps over the lazy dog.") %}
-{% set max_new_tokens = max_new_tokens | default(64) %}
-{% set output_filename = output_filename | default("generated_text.txt") %}
+{% set device = device | default("cuda:0") %}
+{% set input_text = input_text | default('summarize: The quick brown fox jumps over the lazy dog. This sentence contains every letter of the English alphabet and is often used as a typing exercise.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-input_text = """{{ input_text }}"""
-max_new_tokens = {{ max_new_tokens }}
-output_filename = "{{ output_filename }}"
+input_text = {{ input_text | tojson }}
 
-from pathlib import Path
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
 inputs = tokenizer(input_text, return_tensors="pt")
-inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_new_tokens=32,
+        num_beams=4,
+        do_sample=False,
+    )
 
-generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+decoded = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-RESULT = {"generated_text": generated_text}
+RESULT = {"text": decoded}

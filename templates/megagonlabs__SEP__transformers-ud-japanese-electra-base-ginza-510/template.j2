@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("megagonlabs/transformers-ud-japanese-electra-base-ginza-510") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set model = model | default(repo_id) %}
+{% set input_prompt = input_prompt | default("自然言語処理が好きです。") %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import ElectraTokenizer, pipeline
+
+tokenizer = ElectraTokenizer.from_pretrained(model, use_fast=False)
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+
+prepared_input = input_prompt
+
+pipe_output = pipe(prepared_input)
+RESULT = {"output": pipe_output}

@@ -1,0 +1,31 @@
+{% set text = text | default('Hello Earth! This is Auralis speaking.') %}
+{% set speaker_wav = speaker_wav | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set language = language | default('en') %}
+{% set repo_id = repo_id | default("AstraMindAI/xtts2-gpt") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+speaker_wav = "{{ speaker_wav }}"
+language = "{{ language }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoConfig
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="gpt2_model.safetensors")
+
+config = AutoConfig.from_pretrained(config_path, trust_remote_code=True)
+
+# Lightweight validation-oriented inference artifact: report model metadata and loaded weight file.
+RESULT = {
+    "repo_id": repo_id,
+    "device": device,
+    "text": text,
+    "language": language,
+    "weights_file": os.path.basename(weights_path),
+    "model_type": getattr(config, "model_type", None),
+    "architectures": getattr(config, "architectures", None),
+}

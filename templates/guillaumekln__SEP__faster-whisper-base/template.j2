@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("guillaumekln/faster-whisper-base") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('') %}
+{% set language = language | default('en') %}
+{% set beam_size = beam_size | default(1) %}
+{% set vad_filter = vad_filter | default(false) %}
+{% set temperature = temperature | default(0.0) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+language = "{{ language }}"
+beam_size = {{ beam_size }}
+vad_filter = {{ vad_filter }}
+temperature = {{ temperature }}
+
+from huggingface_hub import hf_hub_download
+from faster_whisper import WhisperModel
+import os
+
+audio_path = "/u/yunqili4/projects/ML-code-generation/data/audio.wav"
+if isinstance(audio_path, str) and audio_path.startswith(("http://", "https://")):
+    input_audio = audio_path
+else:
+    input_audio = audio_path
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.bin")
+_ = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="vocabulary.txt")
+
+whisper_device = "cpu"
+compute_type = "int8"
+model = WhisperModel(os.path.dirname(model_path), device=whisper_device, compute_type=compute_type)
+
+segments, info = model.transcribe(
+    input_audio,
+    language=language if language else None,
+    beam_size=beam_size,
+    vad_filter=vad_filter,
+    temperature=temperature,
+)
+text = "".join(segment.text for segment in segments)
+RESULT = {"text": text, "language": info.language, "language_probability": info.language_probability}

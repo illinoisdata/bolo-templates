@@ -1,44 +1,60 @@
 {% set repo_id = repo_id | default("kriton/greek-text-summarization") %}
 {% set device = device | default("cuda:0") %}
-{% set article %}
-Στη ΔΕΘ πρόκειται να ανακοινωθεί και με τον πλέον επίσημο τρόπο το Food Pass - το τρίτο επίδομα που εξετάζει η κυβέρνηση έπειτα από τις επιδοτήσει σε καύσιμα και ηλεκτρικό ρεύμα.
-Η επιταγή ακρίβειας για τρόφιμα θα δοθεί εφάπαξ σε οικογένειες, που πληρούν συγκεκριμένα κριτήρια, με στόχο να στηριχτούν όσοι πλήττονται περισσότερο από την αύξηση του πληθωρισμού και την ακρίβεια, όπως: χαμηλοσυνταξιούχοι, άνεργοι και ευάλωτες κοινωνικές ομάδες.
-{% endset %}
+{% set article = article | default('Στη ΔΕΘ πρόκειται να ανακοινωθεί και με τον πλέον επίσημο τρόπο το Food Pass - το τρίτο επίδομα που εξετάσει η κυβέρνηση έπειτα από τις επιδοτήσει σε καύσιμα και ηλεκτρικό ρεύμα. Η επιταγή ακρίβειας για τρόφιμα θα δοθεί εφάπαξ σε οικογένειες, που πληρούν συγκεκριμένα κριτήρια, με στόχο να στηριχτούν όσοι πλήττονται περισσότερο από την αύξηση του πληθωρισμού και την ακρίβεια, όπως: χαμηλοσυνταξιούχοι, άνεργοι και ευάλωτες κοινωνικές ομάδες.') %}
+{% set max_input_length = max_input_length | default(1024) %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set num_beams = num_beams | default(8) %}
+{% set length_penalty = length_penalty | default(3.0) %}
+{% set repetition_penalty = repetition_penalty | default(3.0) %}
 
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-article = """{{ article }}"""
+article = "{{ article }}"
+max_input_length = {{ max_input_length }}
+max_new_tokens = {{ max_new_tokens }}
+num_beams = {{ num_beams }}
+length_penalty = {{ length_penalty }}
+repetition_penalty = {{ repetition_penalty }}
 
-import os
+from pathlib import Path
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+spiece_model_path = hf_hub_download(repo_id=repo_id, filename="spiece.model")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-# Pre-process input
+model_dir = str(Path(weights_path).parent)
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
+model.to(device)
+model.eval()
+
 inputs = tokenizer(
-    article,
+    "summarize: " + article,
     return_tensors="pt",
-    max_length=1024,
+    max_length=max_input_length,
     truncation=True,
     padding="max_length",
 )
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Run inference
-outputs = model.generate(
-    inputs["input_ids"],
-    attention_mask=inputs.get("attention_mask"),
-    max_length=512,
-    min_length=130,
-    length_penalty=3.0,
-    num_beams=8,
-    early_stopping=True,
-    repetition_penalty=3.0,
-)
+with torch.no_grad():
+    output_ids = model.generate(
+        inputs["input_ids"],
+        attention_mask=inputs.get("attention_mask", None),
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+        length_penalty=length_penalty,
+        repetition_penalty=repetition_penalty,
+        early_stopping=True,
+    )
 
-# Post-process and build RESULT dict
-summary = tokenizer.decode(outputs[0], skip_special_tokens=True)
+summary = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
 RESULT = {"summary": summary}

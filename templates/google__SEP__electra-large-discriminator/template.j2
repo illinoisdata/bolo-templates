@@ -1,0 +1,34 @@
+{% set repo_id = repo_id | default("google/electra-large-discriminator") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("The quick brown fox fake over the lazy dog") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import torch
+from transformers import ElectraForPreTraining, ElectraTokenizerFast
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+# Load tokenizer and model directly from the downloaded repo files.
+tokenizer = ElectraTokenizerFast(vocab_file=vocab_path, tokenizer_file=tokenizer_path, tokenizer_config_file=tokenizer_config_path)
+model = ElectraForPreTraining.from_pretrained(repo_id, local_files_only=True)
+model = model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits if hasattr(outputs, "logits") else outputs[0]
+    token_ids = inputs["input_ids"][0].detach().cpu().tolist()
+    tokens = tokenizer.convert_ids_to_tokens(token_ids)
+    token_predictions = torch.round(torch.sigmoid(logits[0])).detach().cpu().tolist()
+
+RESULT = {"tokens": tokens, "predictions": token_predictions, "logits": logits.detach().cpu().tolist()}

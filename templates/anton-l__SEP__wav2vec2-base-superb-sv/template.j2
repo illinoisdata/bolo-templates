@@ -1,0 +1,17 @@
+{% set repo_id = repo_id | default("anton-l/wav2vec2-base-superb-sv") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("audio-classification") %}
+{% set model = model | default(repo_id) %}
+{% set audio_path = audio_path | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+{% set inference_kwargs = inference_kwargs | default({"top_k": 1}) %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+audio_path = {{ audio_path | tojson }}
+device = {{ device | tojson }}
+inference_kwargs = {{ inference_kwargs | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(audio_path, **inference_kwargs)

@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("QuantFactory/Qwen2.5-1.5B-Instruct-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('Qwen2.5-1.5B-Instruct.Q4_K_M.gguf') %}
+{% set prompt = prompt | default('Give me a short introduction to large language models.') %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+max_new_tokens = {{ max_new_tokens }}
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+weights_path = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+model_dir = os.path.dirname(weights_path)
+
+tokenizer = AutoTokenizer.from_pretrained(
+    "Qwen/Qwen2.5-1.5B-Instruct",
+    trust_remote_code=True,
+    use_fast=False,
+)
+model = AutoModelForCausalLM.from_pretrained(
+    model_dir,
+    local_files_only=True,
+    trust_remote_code=True,
+    gguf_file=weights_path,
+    dtype=torch.float16 if 'cuda' in device else torch.float32,
+)
+
+messages = [
+    {"role": "system", "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."},
+    {"role": "user", "content": prompt},
+]
+text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = tokenizer(text, return_tensors="pt")
+target_device = device if torch.cuda.is_available() and str(device).startswith("cuda") else "cpu"
+inputs = {k: v.to(target_device) for k, v in inputs.items()}
+model = model.to(target_device)
+
+with torch.no_grad():
+    generated = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
+
+input_len = inputs["input_ids"].shape[-1]
+output_ids = generated[0, input_len:]
+output_text = tokenizer.decode(output_ids, skip_special_tokens=True)
+
+RESULT = {"text": output_text}

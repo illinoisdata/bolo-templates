@@ -1,0 +1,53 @@
+{% set repo_id = repo_id | default("apple/MobileCLIP-B-LT-OpenCLIP") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text_prompt = text_prompt | default('a photo of a cat') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text_prompt = "{{ text_prompt }}"
+
+import requests
+from PIL import Image
+import torch
+import open_clip
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_model.safetensors")
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+model, _, preprocess = open_clip.create_model_and_transforms(
+    'ViT-B-16',
+    pretrained=None,
+    device=device,
+)
+from safetensors.torch import load_file
+state_dict = load_file(weights_path, device='cpu')
+if isinstance(state_dict, dict) and 'state_dict' in state_dict:
+    state_dict = state_dict['state_dict']
+if isinstance(state_dict, dict) and all(k.startswith('module.') for k in list(state_dict.keys())[:5]):
+    state_dict = {k.replace('module.', '', 1): v for k, v in state_dict.items()}
+model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
+model.eval()
+
+image_input = preprocess(image).unsqueeze(0).to(device)
+text_tokens = open_clip.tokenize([text_prompt]).to(device)
+
+with torch.no_grad():
+    image_features = model.encode_image(image_input)
+    text_features = model.encode_text(text_tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logit_scale = model.logit_scale.exp()
+    logits_per_image = logit_scale * image_features @ text_features.T
+    probabilities = logits_per_image.softmax(dim=-1)
+
+RESULT = {
+    "logits_per_image": logits_per_image.detach().cpu().tolist(),
+    "probabilities": probabilities.detach().cpu().tolist(),
+}

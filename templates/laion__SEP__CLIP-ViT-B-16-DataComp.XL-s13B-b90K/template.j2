@@ -1,0 +1,51 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set candidate_labels = candidate_labels | default(['playing music', 'playing sports']) %}
+{% set repo_id = repo_id | default("laion/CLIP-ViT-B-16-DataComp.XL-s13B-b90K") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+candidate_labels = {{ candidate_labels }}
+
+import torch
+import open_clip
+from PIL import Image
+from urllib.parse import urlparse
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="open_clip_pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="open_clip_config.json")
+
+def _load_image(path_or_url):
+    if urlparse(path_or_url).scheme in ("http", "https"):
+        import requests
+        return Image.open(requests.get(path_or_url, stream=True).raw).convert("RGB")
+    return Image.open(path_or_url).convert("RGB")
+
+with open(config_path, "r") as f:
+    config = __import__("json").load(f)
+model_cfg = config.get("model_cfg", {})
+pretrained_cfg = config.get("preprocess_cfg", {})
+
+model, _, preprocess = open_clip.create_model_and_transforms(
+    model_cfg.get("model_name", "ViT-B-16"),
+    pretrained=None,
+    device=device,
+    **model_cfg,
+)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
+model.eval()
+
+image = preprocess(_load_image(image_path)).unsqueeze(0).to(device)
+tokens = open_clip.tokenize(candidate_labels).to(device)
+with torch.no_grad():
+    image_features = model.encode_image(image)
+    text_features = model.encode_text(tokens)
+    image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    logits = (100.0 * image_features @ text_features.T).softmax(dim=-1).squeeze(0)
+
+output = {label: float(score) for label, score in zip(candidate_labels, logits.detach().cpu().tolist())}
+RESULT = {"output": output}

@@ -1,0 +1,78 @@
+{% set repo_id = repo_id | default("bibabobbb/kronons-token-eth-recent-new-long-lbk") %}
+{% set device = device | default("cuda:0") %}
+{% set input_tensor = input_tensor | default([[0.0, 1.0, 0.0, 1.0, 0.0, 1.0]]) %}
+{% set batch_size = batch_size | default(1) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+input_tensor = {{ input_tensor }}
+batch_size = {{ batch_size }}
+
+import json
+import os
+import torch
+from safetensors.torch import load_file
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+class KrononsModel(torch.nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        d_in = cfg["d_in"]
+        d_model = cfg["d_model"]
+        ff_dim = cfg["ff_dim"]
+        n_heads = cfg["n_heads"]
+        n_enc_layers = cfg["n_enc_layers"]
+        n_dec_layers = cfg["n_dec_layers"]
+        attn_dropout_p = cfg["attn_dropout_p"]
+        ffn_dropout_p = cfg["ffn_dropout_p"]
+        resid_dropout_p = cfg["resid_dropout_p"]
+
+        self.input_proj = torch.nn.Linear(d_in, d_model)
+        enc_layer = torch.nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=n_heads,
+            dim_feedforward=ff_dim,
+            dropout=ffn_dropout_p,
+            batch_first=True,
+            activation="gelu",
+        )
+        self.encoder = torch.nn.TransformerEncoder(enc_layer, num_layers=n_enc_layers)
+        dec_layer = torch.nn.TransformerDecoderLayer(
+            d_model=d_model,
+            nhead=n_heads,
+            dim_feedforward=ff_dim,
+            dropout=attn_dropout_p,
+            batch_first=True,
+            activation="gelu",
+        )
+        self.decoder = torch.nn.TransformerDecoder(dec_layer, num_layers=n_dec_layers)
+        self.output_proj = torch.nn.Linear(d_model, d_in)
+        self.dropout = torch.nn.Dropout(resid_dropout_p)
+
+    def forward(self, x):
+        h = self.input_proj(x)
+        mem = self.encoder(h)
+        out = self.decoder(h, mem)
+        out = self.dropout(out)
+        return self.output_proj(out)
+
+model = KrononsModel(config).to(device)
+state_dict = load_file(weights_path)
+model.load_state_dict(state_dict, strict=False)
+model.eval()
+
+x = torch.tensor(input_tensor, dtype=torch.float32, device=device)
+if x.ndim == 2:
+    x = x.unsqueeze(0)
+if x.shape[-1] != config["d_in"]:
+    raise ValueError(f"Expected last dim {config['d_in']}, got {x.shape[-1]}")
+
+with torch.no_grad():
+    output = model(x)
+
+RESULT = {"output": output.detach().cpu().numpy().tolist()}

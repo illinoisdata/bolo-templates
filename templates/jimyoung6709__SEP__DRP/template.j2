@@ -1,0 +1,111 @@
+{% set repo_id = repo_id | default("jimyoung6709/DRP") %}
+{% set device = device | default("cuda:0") %}
+{% set current_angles = current_angles | default([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]) %}
+{% set delta_angles = delta_angles | default([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]) %}
+{% set goal_angles = goal_angles | default([0.1, -0.1, 0.05, 0.0, 0.02, -0.02, 0.03]) %}
+{% set scene_points = scene_points | default([[0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.0, 0.1, 0.0], [0.0, 0.0, 0.1]]) %}
+{% set robot_points = robot_points | default([[0.0, 0.0, 0.0], [0.05, 0.0, 0.0], [0.0, 0.05, 0.0]]) %}
+{% set chunk_size = chunk_size | default(10) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+current_angles = {{ current_angles }}
+delta_angles = {{ delta_angles }}
+goal_angles = {{ goal_angles }}
+scene_points = {{ scene_points }}
+robot_points = {{ robot_points }}
+chunk_size = {{ chunk_size }}
+
+import os
+import json
+import torch
+import torch.nn as nn
+from huggingface_hub import hf_hub_download
+
+class PointNetEncoder(nn.Module):
+    def __init__(self, num_output_tokens, hidden_dim=128):
+        super().__init__()
+        self.proj = nn.Sequential(
+            nn.Linear(3, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+        )
+        self.token_proj = nn.Linear(hidden_dim, num_output_tokens * hidden_dim)
+        self.num_output_tokens = num_output_tokens
+        self.hidden_dim = hidden_dim
+
+    def forward(self, x):
+        if x.dim() == 2:
+            x = x.unsqueeze(0)
+        feat = self.proj(x)
+        pooled = feat.max(dim=1).values
+        tokens = self.token_proj(pooled).view(pooled.shape[0], self.num_output_tokens, self.hidden_dim)
+        return tokens
+
+class StateEncoder(nn.Module):
+    def __init__(self, input_dim, hidden_dims, out_dim):
+        super().__init__()
+        layers = []
+        d = input_dim
+        for h in hidden_dims:
+            layers += [nn.Linear(d, h), nn.ReLU()]
+            d = h
+        layers.append(nn.Linear(d, out_dim))
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, x):
+        if x.dim() == 1:
+            x = x.unsqueeze(0)
+        return self.net(x).unsqueeze(1)
+
+class DRPModel(nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        hidden_dim = cfg["hidden_dim"]
+        self.scene_enc = PointNetEncoder(cfg["pcd_encoders_cfg"]["scene_pcd"]["num_output_tokens"], hidden_dim)
+        self.robot_enc = PointNetEncoder(cfg["pcd_encoders_cfg"]["robot_pcd"]["num_output_tokens"], hidden_dim)
+        self.current_enc = StateEncoder(7, [128, 256], hidden_dim)
+        self.delta_enc = StateEncoder(7, [128, 256], hidden_dim)
+        self.goal_enc = StateEncoder(7, [128, 256], hidden_dim)
+        self.head = nn.Sequential(
+            nn.Linear(hidden_dim * (128 + 16 + 3), 256),
+            nn.ReLU(),
+            nn.Linear(256, 7),
+        )
+
+    def forward(self, scene_points, robot_points, current_angles, delta_angles, goal_angles):
+        scene_tok = self.scene_enc(scene_points).flatten(1)
+        robot_tok = self.robot_enc(robot_points).flatten(1)
+        cur = self.current_enc(current_angles).flatten(1)
+        dlt = self.delta_enc(delta_angles).flatten(1)
+        goal = self.goal_enc(goal_angles).flatten(1)
+        x = torch.cat([scene_tok, robot_tok, cur, dlt, goal], dim=-1)
+        return self.head(x)
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+with open(config_path, "r") as f:
+    cfg = json.load(f)
+
+model = DRPModel(cfg)
+state = torch.load(weights_path, map_location="cpu")
+if isinstance(state, dict) and "state_dict" in state:
+    state = state["state_dict"]
+missing, unexpected = model.load_state_dict(state, strict=False)
+model.to(device)
+model.eval()
+
+scene_points_t = torch.tensor(scene_points, dtype=torch.float32, device=device)
+robot_points_t = torch.tensor(robot_points, dtype=torch.float32, device=device)
+current_angles_t = torch.tensor(current_angles, dtype=torch.float32, device=device)
+delta_angles_t = torch.tensor(delta_angles, dtype=torch.float32, device=device)
+goal_angles_t = torch.tensor(goal_angles, dtype=torch.float32, device=device)
+
+with torch.no_grad():
+    output = model(scene_points_t, robot_points_t, current_angles_t, delta_angles_t, goal_angles_t)
+    if cfg.get("normalize_action", False) and "action_std" in cfg:
+        action_std = torch.tensor(cfg["action_std"], dtype=torch.float32, device=device)
+        output = output * action_std
+
+RESULT = {"action": output.detach().cpu().tolist()}

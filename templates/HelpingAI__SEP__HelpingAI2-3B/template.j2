@@ -1,0 +1,77 @@
+{% set repo_id = repo_id | default("HelpingAI/HelpingAI2-3B") %}
+{% set device = device | default("cuda:0") %}
+{% set max_new_tokens = max_new_tokens | default(64) %}
+{% set temperature = temperature | default(0.6) %}
+{% set top_p = top_p | default(0.9) %}
+{% set do_sample = do_sample | default(true) %}
+{% set system_prompt = system_prompt | default("You are HelpingAI, an emotional AI. Always answer my questions in the HelpingAI style.") %}
+{% set user_prompt = user_prompt | default("GIVE ME YOUR INTRO") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+max_new_tokens = {{ max_new_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+do_sample = {{ do_sample }}
+system_prompt = {{ system_prompt | tojson }}
+user_prompt = {{ user_prompt | tojson }}
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model-00001-of-00002.safetensors")
+weights_path_2 = hf_hub_download(repo_id=repo_id, filename="model-00002-of-00002.safetensors")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float16 if "cuda" in device else torch.float32,
+    device_map=None,
+    low_cpu_mem_usage=True,
+)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+chat = [
+    {"role": "system", "content": system_prompt},
+    {"role": "user", "content": user_prompt},
+]
+
+inputs = tokenizer.apply_chat_template(
+    chat,
+    add_generation_prompt=True,
+    return_tensors="pt",
+)
+if hasattr(inputs, "input_ids"):
+    input_ids = inputs.input_ids.to(device)
+    attention_mask = getattr(inputs, "attention_mask", None)
+    if attention_mask is not None:
+        attention_mask = attention_mask.to(device)
+else:
+    input_ids = inputs.to(device)
+    attention_mask = None
+
+with torch.no_grad():
+    outputs = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        max_new_tokens=max_new_tokens,
+        do_sample=do_sample,
+        temperature=temperature,
+        top_p=top_p,
+        pad_token_id=tokenizer.pad_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+response = outputs[0][input_ids.shape[-1]:]
+text = tokenizer.decode(response, skip_special_tokens=True)
+
+RESULT = {"text": text}

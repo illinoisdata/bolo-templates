@@ -1,57 +1,44 @@
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
 {% set repo_id = repo_id | default("usyd-community/vitpose-plus-huge") %}
 {% set device = device | default("cuda:0") %}
-{% set image_path = image_path | default("/u/yli77/projects/ML-code-generation/data/image1.jpeg") %}
-{% set boxes = boxes | default([]) %}
-{% set threshold = threshold | default(0.3) %}
-{% set dataset_index = dataset_index | default(0) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 image_path = "{{ image_path }}"
-boxes = {{ boxes }}
-threshold = {{ threshold }}
-dataset_index = {{ dataset_index }}
 
-from PIL import Image
 import requests
 import torch
+from PIL import Image
 from transformers import AutoProcessor, VitPoseForPoseEstimation
-import builtins
-import numpy.linalg as _linalg
-import scipy.ndimage as _ndimage
+import scipy.ndimage
+import transformers.models.vitpose.image_processing_pil_vitpose as vitpose_pil
+vitpose_pil.affine_transform = scipy.ndimage.affine_transform
 
-# Monkey-patch missing functions for transformers preprocessing
-builtins.inv = _linalg.inv
-builtins.affine_transform = _ndimage.affine_transform
-
-# Initialize device and load model & processor
-device = torch.device(device)
-processor = AutoProcessor.from_pretrained(repo_id)
-model = VitPoseForPoseEstimation.from_pretrained(repo_id).to(device)
-
-# Load image from local path or URL
 if image_path.startswith("http://") or image_path.startswith("https://"):
-    image = Image.open(requests.get(image_path, stream=True).raw)
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
 else:
-    image = Image.open(image_path)
+    image = Image.open(image_path).convert("RGB")
 
-# Default to full image bounding box if no boxes provided
-if not boxes:
-    boxes = [[[0, 0, image.width, image.height]]]
+processor = AutoProcessor.from_pretrained(repo_id)
+model = VitPoseForPoseEstimation.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-# Pre-process input and run inference
-inputs = processor(images=image, boxes=boxes, return_tensors="pt").to(device)
-dataset_index_tensor = torch.full(
-    (inputs["pixel_values"].shape[0],),
-    dataset_index,
-    dtype=torch.long,
-    device=device,
-)
+boxes = [[[0.0, 0.0, float(image.width), float(image.height)]]]
+inputs = processor(image, boxes=boxes, return_tensors="pt").to(device)
+inputs["dataset_index"] = torch.zeros((inputs["pixel_values"].shape[0],), dtype=torch.long, device=device)
 with torch.no_grad():
-    outputs = model(**inputs, dataset_index=dataset_index_tensor)
+    outputs = model(**inputs)
 
-# Post-process pose estimation results
-pose_results = processor.post_process_pose_estimation(outputs, boxes=boxes, threshold=threshold)
-pose_result = pose_results[0]
+pose_results = processor.post_process_pose_estimation(outputs, boxes=boxes, threshold=0.3)
+image_pose_result = pose_results[0]
+result_people = []
+for person_pose in image_pose_result:
+    person = {
+        "keypoints": person_pose["keypoints"].detach().cpu().numpy().tolist(),
+        "labels": person_pose["labels"].detach().cpu().numpy().tolist(),
+        "scores": person_pose["scores"].detach().cpu().numpy().tolist(),
+    }
+    result_people.append(person)
 
-# Build the RESULT dict
-RESULT = {"poses": pose_result}
+RESULT = {"pose_results": result_people}

@@ -1,0 +1,30 @@
+{% set repo_id = repo_id | default("anferico/bert-for-patents") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("fill-mask") %}
+{% set masked_prompt = masked_prompt | default("Paris is the {mask} of France.") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+masked_prompt = {{ masked_prompt | tojson }}
+
+import json
+import os
+
+from huggingface_hub import snapshot_download
+from transformers import pipeline
+
+model_repo_dir = snapshot_download(repo_id)
+config_path = os.path.join(model_repo_dir, "config.json")
+with open(config_path, "r+", encoding="utf-8") as config_file:
+    config_data = json.load(config_file)
+    if config_data.get("model_type") != "bert":
+        config_data["model_type"] = "bert"
+        config_file.seek(0)
+        json.dump(config_data, config_file)
+        config_file.truncate()
+
+pipe = pipeline(task=task, model=model_repo_dir, tokenizer=model_repo_dir, device=device)
+mask_token = pipe.tokenizer.mask_token
+text = masked_prompt.replace("{mask}", mask_token)
+RESULT = pipe(text)

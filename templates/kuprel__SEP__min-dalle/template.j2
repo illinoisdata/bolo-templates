@@ -1,49 +1,57 @@
-{% set prompt = prompt | default("A serene digital painting of a futuristic city skyline at sunset") %}
-{% set grid_size = grid_size | default(4) %}
+{% set repo_id = repo_id | default("kuprel/min-dalle") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('an oil painting of a futuristic city at sunset') %}
+{% set seed = seed | default(-1) %}
+{% set grid_size = grid_size | default(3) %}
+{% set is_seamless = is_seamless | default(False) %}
 {% set temperature = temperature | default(1.0) %}
 {% set top_k = top_k | default(256) %}
-{% set supercondition_factor = supercondition_factor | default(32) %}
-{% set seed = seed | default(-1) %}
-{% set is_seamless = is_seamless | default(False) %}
-{% set device = device | default("cuda:0") %}
-{% set repo_id = repo_id | default("kuprel/min-dalle") %}
+{% set supercondition_factor = supercondition_factor | default(16) %}
+{% set is_verbose = is_verbose | default(False) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
+text = "{{ text }}"
+seed = {{ seed }}
 grid_size = {{ grid_size }}
+is_seamless = {{ is_seamless }}
 temperature = {{ temperature }}
 top_k = {{ top_k }}
 supercondition_factor = {{ supercondition_factor }}
-seed = {{ seed }}
-is_seamless = {{ "True" if is_seamless else "False" }}
-models_root_dir = "./" + repo_id.replace("/", "_") + "_models"
+is_verbose = {{ is_verbose }}
 
-from pathlib import Path
-
+import os
 import torch
+from PIL import Image
+from huggingface_hub import hf_hub_download
 from min_dalle import MinDalle
 
-min_dalle_device = "cuda" if device.startswith("cuda") else "cpu"
-models_root_path = Path(models_root_dir)
-models_root_path.mkdir(parents=True, exist_ok=True)
+# Download model files
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+encoder_path = hf_hub_download(repo_id=repo_id, filename="encoder.pt")
+decoder_path = hf_hub_download(repo_id=repo_id, filename="decoder.pt")
+detoker_path = hf_hub_download(repo_id=repo_id, filename="detoker.pt")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+models_root = os.path.dirname(config_path)
 
+# Load model and run inference
 model = MinDalle(
-    models_root=str(models_root_path),
+    models_root=models_root,
+    device=device,
     dtype=torch.float32,
-    device=min_dalle_device,
     is_mega=True,
-    is_reusable=True,
+    is_reusable=False,
 )
 
 image = model.generate_image(
-    text=prompt,
+    text=text,
     seed=seed,
     grid_size=grid_size,
     is_seamless=is_seamless,
     temperature=temperature,
     top_k=top_k,
     supercondition_factor=supercondition_factor,
-    is_verbose=False,
+    is_verbose=is_verbose,
 )
 
 RESULT = {"image": image}

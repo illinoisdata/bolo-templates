@@ -1,20 +1,37 @@
 {% set repo_id = repo_id | default("charsiu/g2p_multilingual_byT5_tiny_16_layers_100") %}
 {% set device = device | default("cuda:0") %}
-{% set input_text = input_text | default("Convert this text to grapheme-to-phoneme output") %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-input_text = {{ input_text | tojson }}
+{% set text = text | default('hello') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
 
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+# Tokenizer and model loading
+# ByT5Tokenizer is compatible with AutoTokenizer for this checkpoint.
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.float32,
+)
+model.to(device)
 model.eval()
 
-inputs = tokenizer(input_text, return_tensors="pt").to(device)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_ids = model.generate(**inputs)
-generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=64,
+        num_beams=1,
+    )
 
-RESULT = {"predicted_text": generated_text}
+output_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+RESULT = {"output": output_text}

@@ -1,30 +1,31 @@
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-en-hu") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("Hello, world!") %}
-{% set max_length = max_length | default(512) %}
-{% set num_beams = num_beams | default(4) %}
+{% set text = text | default('The quick brown fox jumps over the lazy dog.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = "{{ text }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+text = {{ text | tojson }}
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
-import os
+from huggingface_hub import hf_hub_download
+from transformers import MarianMTModel, MarianTokenizer
 
-# Load model and tokenizer
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(torch.device(device))
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
 
-# Preprocess input
-inputs = tokenizer(text, return_tensors="pt", padding=True)
-inputs = {k: v.to(torch.device(device)) for k, v in inputs.items()}
+tokenizer = MarianTokenizer(vocab=vocab_path, source_spm=source_spm_path, target_spm=target_spm_path, tokenizer_file=None)
+model = MarianMTModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-# Run inference
-generated_tokens = model.generate(**inputs, max_length=max_length, num_beams=num_beams)
+inputs = tokenizer([text], return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-# Post-process output
-translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, num_beams=4, max_length=128)
+translation = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 RESULT = {"translation": translation}

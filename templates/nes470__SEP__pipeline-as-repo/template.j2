@@ -1,0 +1,29 @@
+{% set repo_id = repo_id | default("nes470/pipeline-as-repo") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('Who is the German physicist best known for relativity?') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+
+import pickle
+import gzip
+from pathlib import Path
+
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename='processed_tfidf_wiki_page_text_model.pkl')
+with open(model_path, 'rb') as f:
+    model_obj = pickle.load(f)
+
+if isinstance(model_obj, dict):
+    if 'model' in model_obj:
+        model = model_obj['model']
+    elif 'clf' in model_obj:
+        model = model_obj['clf']
+    else:
+        model = next(iter(model_obj.values()))
+else:
+    model = model_obj
+
+output = {'model_type': type(model).__name__}
+RESULT = {"output": output}

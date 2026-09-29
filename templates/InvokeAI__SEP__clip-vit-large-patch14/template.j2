@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("InvokeAI/clip-vit-large-patch14") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text1 = text1 | default('a photo of a cat') %}
+{% set text2 = text2 | default('a photo of a dog') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text1 = "{{ text1 }}"
+text2 = "{{ text2 }}"
+
+import requests
+import torch
+from PIL import Image
+from io import BytesIO
+from huggingface_hub import hf_hub_download
+from transformers import CLIPModel, CLIPTokenizer, CLIPImageProcessor
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+image_processor = CLIPImageProcessor(image_mean=[0.48145466, 0.4578275, 0.40821073], image_std=[0.26862954, 0.26130258, 0.27577711], size={"shortest_edge": 224}, crop_size={"height": 224, "width": 224})
+tokenizer = CLIPTokenizer.from_pretrained(repo_id, local_files_only=True)
+model = CLIPModel.from_pretrained(repo_id, local_files_only=True, torch_dtype=torch.float32).to(device)
+model.eval()
+
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(BytesIO(requests.get(image_path, timeout=30).content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+inputs = tokenizer([text1, text2], return_tensors="pt", padding=True)
+image_inputs = image_processor(images=image, return_tensors="pt")
+inputs.update(image_inputs)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits_per_image = outputs.logits_per_image.squeeze(0)
+    probs = logits_per_image.softmax(dim=0)
+
+RESULT = {
+    "texts": [text1, text2],
+    "logits_per_image": logits_per_image.detach().cpu().tolist(),
+    "probabilities": probs.detach().cpu().tolist(),
+}

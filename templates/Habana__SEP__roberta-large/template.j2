@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("Habana/roberta-large") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The quick brown fox jumps over the lazy dog.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import json
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+import torch
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gaudi_config.json")
+with open(config_path, "r") as f:
+    gaudi_config = json.load(f)
+
+# Load tokenizer/model from the base model referenced by this Gaudi config.
+base_model_id = gaudi_config.get("model_name_or_path", "roberta-large")
+
+tokenizer = AutoTokenizer.from_pretrained(base_model_id)
+model = AutoModelForMaskedLM.from_pretrained(base_model_id)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+mask_token_id = tokenizer.mask_token_id
+if mask_token_id is not None and (inputs["input_ids"] == mask_token_id).any():
+    mask_index = (inputs["input_ids"] == mask_token_id).nonzero(as_tuple=False)[0, 1]
+    pred_id = int(logits[0, mask_index].argmax(-1).item())
+    predicted_token = tokenizer.decode([pred_id])
+else:
+    pred_id = int(logits[0, -1].argmax(-1).item())
+    predicted_token = tokenizer.decode([pred_id])
+
+RESULT = {
+    "logits": logits.detach().cpu().tolist(),
+    "predicted_token": predicted_token,
+}

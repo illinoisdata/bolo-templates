@@ -1,29 +1,21 @@
 {% set repo_id = repo_id | default("jplu/tiny-tf-bert-random") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("The quick brown fox jumps over the lazy dog.") %}
+{% set text = text | default('Hello world!') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = "{{ text }}"
+text = {{ text | tojson }}
 
-import os
 import numpy as np
-import torch
-from transformers import AutoConfig, AutoModel, AutoTokenizer
+from transformers import AutoTokenizer, AutoConfig, AutoModelForMaskedLM
+from huggingface_hub import hf_hub_download
 
-# Load config and initialize model with random weights
-config = AutoConfig.from_pretrained(repo_id)
-model = AutoModel.from_config(config).to(device)
-model.eval()
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="tf_model.h5")
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
+config = AutoConfig.from_pretrained(config_path)
+model = AutoModelForMaskedLM.from_config(config)
 
-encoded_inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=64)
-encoded_inputs = {key: tensor.to(device) for key, tensor in encoded_inputs.items()}
-
-with torch.no_grad():
-    outputs = model(**encoded_inputs)
-
-last_hidden_state = outputs.last_hidden_state
-result_tensor = last_hidden_state.detach().cpu()
-
-RESULT = {"last_hidden_state": result_tensor}
+inputs = tokenizer(text, return_tensors="pt")
+outputs = model(**inputs)
+RESULT = {"logits": outputs.logits.detach().cpu().numpy()}

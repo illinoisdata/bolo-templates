@@ -1,0 +1,66 @@
+{% set repo_id = repo_id | default("PatrickHaller/hgrn2_pile_10M_distill_babylm") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Hello, my name is') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import os
+import json
+import torch
+from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
+
+repo_id = repo_id
+
+def load_module_from_path(path, module_name):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+modeling_path = hf_hub_download(repo_id=repo_id, filename="modeling_hgrn2.py")
+configuration_path = hf_hub_download(repo_id=repo_id, filename="configuration_hgrn2.py")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+config_module = load_module_from_path(configuration_path, "configuration_hgrn2")
+modeling_module = load_module_from_path(modeling_path, "modeling_hgrn2")
+
+with open(config_path, "r") as f:
+    config_dict = json.load(f)
+config = config_module.HGRN2Config.from_dict(config_dict)
+for k, v in {"fuse_norm": False, "fuse_cross_entropy": True, "fuse_linear_cross_entropy": False, "fuse_swiglu": False, "fuse_linear": False, "fuse_rms_norm": False, "attnres_block_size": None, "fuse_short_conv": False, "fuse_conv1d": False, "fuse_hidden_states": False}.items():
+    if not hasattr(config, k):
+        setattr(config, k, v)
+
+# Patch imported class references for dynamic modules if needed.
+HGRN2ForCausalLM = modeling_module.HGRN2ForCausalLM
+
+try:
+    tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+except Exception:
+    tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=False)
+
+model = HGRN2ForCausalLM(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+model_state = model.state_dict()
+filtered_state_dict = {}
+for k, v in state_dict.items():
+    if k in model_state and model_state[k].shape == v.shape:
+        filtered_state_dict[k] = v
+model.load_state_dict(filtered_state_dict, strict=False)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated = model.generate(**inputs, max_new_tokens=20, do_sample=False, pad_token_id=tokenizer.eos_token_id)
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": output_text}

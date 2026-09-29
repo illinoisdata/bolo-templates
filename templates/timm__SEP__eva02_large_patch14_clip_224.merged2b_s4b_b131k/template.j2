@@ -1,0 +1,68 @@
+{% set repo_id = repo_id | default("timm/eva02_large_patch14_clip_224.merged2b_s4b_b131k") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set text_prompt = text_prompt | default('a photo of a cat') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+text_prompt = "{{ text_prompt }}"
+
+import json
+import torch
+from PIL import Image
+from urllib.parse import urlparse
+from huggingface_hub import hf_hub_download
+from timm import create_model
+import open_clip
+import safetensors.torch
+
+
+def load_image(path_or_url):
+    if urlparse(path_or_url).scheme in ('http', 'https'):
+        import requests
+        from io import BytesIO
+        return Image.open(BytesIO(requests.get(path_or_url, timeout=30).content)).convert('RGB')
+    return Image.open(path_or_url).convert('RGB')
+
+
+config_path = hf_hub_download(repo_id=repo_id, filename='open_clip_config.json')
+with open(config_path, 'r') as f:
+    config = json.load(f)
+model_cfg = config['model_cfg']
+preprocess_cfg = config['preprocess_cfg']
+
+weights_path = hf_hub_download(repo_id=repo_id, filename='open_clip_model.safetensors')
+model = create_model(
+    model_cfg['vision_cfg']['timm_model_name'],
+    pretrained=False,
+    num_classes=0,
+)
+state_dict = safetensors.torch.load_file(weights_path)
+if isinstance(state_dict, dict):
+    for k in list(state_dict.keys()):
+        if k.startswith('visual.'):
+            state_dict[k[len('visual.'):]] = state_dict.pop(k)
+        elif k.startswith('module.visual.'):
+            state_dict[k[len('module.visual.'):]] = state_dict.pop(k)
+        elif k.startswith('image_encoder.'):
+            state_dict[k[len('image_encoder.'):]] = state_dict.pop(k)
+        elif k.startswith('visual.trunk.'):
+            state_dict[k[len('visual.trunk.'):]] = state_dict.pop(k)
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
+model = model.to(device)
+model.eval()
+
+preprocess = open_clip.image_transform(
+    image_size=model_cfg['vision_cfg']['image_size'],
+    is_train=False,
+    mean=preprocess_cfg['mean'],
+    std=preprocess_cfg['std'],
+)
+
+image = load_image(image_path)
+image_tensor = preprocess(image).unsqueeze(0).to(device)
+
+with torch.no_grad():
+    image_features = model(image_tensor)
+
+RESULT = {"image_embedding": image_features.squeeze().detach().cpu().tolist(), "text_prompt": text_prompt}

@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("pysentimiento/bertweet-pt-sentiment") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('isto é bonito') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import os
+import torch
+
+from transformers import RobertaTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+repo_dir = os.path.dirname(config_path)
+
+tokenizer = RobertaTokenizer.from_pretrained(repo_dir, local_files_only=True)
+model = AutoModelForSequenceClassification.from_pretrained(repo_dir, local_files_only=True)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    logits = model(**inputs).logits
+    probs = torch.softmax(logits, dim=-1).squeeze(0)
+
+id2label = model.config.id2label
+pred_idx = int(torch.argmax(probs).item())
+pred_label = id2label[pred_idx]
+result_probs = {id2label[int(i)]: float(probs[i].detach().cpu().item()) for i in range(probs.shape[0])}
+
+RESULT = {"label": pred_label, "probas": result_probs}

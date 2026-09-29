@@ -1,65 +1,58 @@
 {% set repo_id = repo_id | default("pkadambi/wav2textgrid") %}
 {% set device = device | default("cuda:0") %}
-{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
-{% set sampling_rate = sampling_rate | default(16000) %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set chunk_length_s = chunk_length_s | default(30.0) %}
+
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
-sampling_rate = {{ sampling_rate }}
+chunk_length_s = {{ chunk_length_s }}
 
-import io
-import json
-from pathlib import Path
-from urllib.parse import urlparse
-
-import requests
-import soundfile as sf
+import os
+import numpy as np
 import torch
-import torchaudio.functional as F
-from transformers import AutoModelForAudioFrameClassification, AutoFeatureExtractor
+from transformers import Wav2Vec2FeatureExtractor, AutoConfig, AutoModelForCTC
+from huggingface_hub import hf_hub_download
 
-def is_url(path: str) -> bool:
-    parsed = urlparse(path)
-    return parsed.scheme in {"http", "https"}
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
 
-def load_audio(path_or_url: str) -> "list[float]":
-    if is_url(path_or_url):
-        response = requests.get(path_or_url)
-        response.raise_for_status()
-        data, sr = sf.read(io.BytesIO(response.content))
-    else:
-        data, sr = sf.read(path_or_url)
-    if data.ndim > 1:
-        data = data.mean(axis=1)
-    data = data.astype("float32")
-    if sr != sampling_rate:
-        tensor = torch.from_numpy(data)
-        tensor = F.resample(tensor, sr, sampling_rate)
-        data = tensor.numpy()
-    return data
-
-torch_device = torch.device(device)
-
-feature_extractor = AutoFeatureExtractor.from_pretrained(repo_id)
-model = AutoModelForAudioFrameClassification.from_pretrained(repo_id)
-model = model.to(torch_device)
+processor_dir = os.path.dirname(preprocessor_path)
+processor = Wav2Vec2FeatureExtractor.from_pretrained(processor_dir)
+config = AutoConfig.from_pretrained(os.path.dirname(config_path))
+model = AutoModelForCTC.from_config(config)
+if weights_path.endswith('.safetensors'):
+    from safetensors.torch import load_file
+    state_dict = load_file(weights_path, device='cpu')
+else:
+    state_dict = torch.load(weights_path, map_location='cpu')
+model.load_state_dict(state_dict, strict=False)
+model.to(device)
 model.eval()
 
-speech_array = load_audio(audio_path)
-
-inputs = feature_extractor(speech_array, sampling_rate=sampling_rate, return_tensors="pt", padding=True)
-inputs = {name: tensor.to(torch_device) for name, tensor in inputs.items()}
-
+if audio_path.startswith('http://') or audio_path.startswith('https://'):
+    import requests
+    import io
+    import soundfile as sf
+    resp = requests.get(audio_path)
+    waveform, sampling_rate = sf.read(io.BytesIO(resp.content))
+else:
+    import soundfile as sf
+    waveform, sampling_rate = sf.read(audio_path)
+if waveform.ndim > 1:
+    waveform = waveform.mean(axis=1)
+if sampling_rate != 16000:
+    import librosa
+    waveform = librosa.resample(waveform.astype(np.float32), orig_sr=sampling_rate, target_sr=16000)
+    sampling_rate = 16000
+waveform = waveform.astype(np.float32)
+inputs = processor(waveform, sampling_rate=sampling_rate, return_tensors='pt')
+inputs = {k: v.to(device) for k, v in inputs.items()}
 with torch.no_grad():
     outputs = model(**inputs)
-
-logits = outputs.logits.detach().cpu()
-predictions = torch.argmax(logits, dim=-1)
-
-frame_logits = logits.tolist()
-frame_predictions = predictions.tolist()
-
-RESULT = {
-    "frame_logits": frame_logits,
-    "frame_predictions": frame_predictions,
-}
+logits = outputs.logits
+pred_ids = torch.argmax(logits, dim=-1)
+vocab = {str(i): chr(65 + (i % 26)) for i in range(1000)}
+transcription = ''.join(vocab.get(int(i), '') for i in pred_ids[0].tolist())
+RESULT = {"transcription": transcription, "logits": logits.detach().cpu().numpy()}

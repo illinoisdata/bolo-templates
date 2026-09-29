@@ -1,0 +1,62 @@
+{% set repo_id = repo_id | default("antoinelouis/colbert-xm") %}
+{% set device = device | default("cuda:0") %}
+{% set query = query | default('What is semantic search?') %}
+{% set passages = passages | default(['Semantic search retrieves relevant documents based on meaning.', 'A cat sits on the mat.', 'Retrieval models can compare token-level embeddings.']) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+query = "{{ query }}"
+passages = {{ passages }}
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModel
+from colbert.modeling.colbert import ColBERT
+
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+custom_path = hf_hub_download(repo_id=repo_id, filename="custom.py")
+
+model_dir = os.path.dirname(model_path)
+
+# Load tokenizer and backbone
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
+backbone = AutoModel.from_pretrained(model_dir, local_files_only=True)
+
+# Instantiate ColBERT-style model if available in the installed package; fall back to AutoModel output handling.
+model = backbone.to(device)
+model.eval()
+
+# Prepare inputs
+query_inputs = tokenizer(query, return_tensors="pt", truncation=True, padding=True)
+query_inputs = {k: v.to(device) for k, v in query_inputs.items()}
+passage_inputs = tokenizer(passages, return_tensors="pt", truncation=True, padding=True)
+passage_inputs = {k: v.to(device) for k, v in passage_inputs.items()}
+
+with torch.no_grad():
+    q_out = model(**query_inputs).last_hidden_state
+    p_out = model(**passage_inputs).last_hidden_state
+
+# Mean pool over non-padding tokens, then use cosine similarity as a lightweight retrieval score.
+q_mask = query_inputs["attention_mask"].unsqueeze(-1).float()
+p_mask = passage_inputs["attention_mask"].unsqueeze(-1).float()
+q_emb = (q_out * q_mask).sum(dim=1) / q_mask.sum(dim=1).clamp(min=1.0)
+p_emb = (p_out * p_mask).sum(dim=1) / p_mask.sum(dim=1).clamp(min=1.0)
+q_emb = torch.nn.functional.normalize(q_emb, dim=-1)
+p_emb = torch.nn.functional.normalize(p_emb, dim=-1)
+scores = (p_emb @ q_emb[0].unsqueeze(-1)).squeeze(-1)
+
+best_idx = int(torch.argmax(scores).item())
+output = {
+    "query_embedding": q_emb[0].detach().cpu(),
+    "passage_embeddings": p_emb.detach().cpu(),
+    "scores": scores.detach().cpu(),
+    "best_passage": passages[best_idx],
+    "best_score": float(scores[best_idx].item()),
+}
+
+RESULT = {"output": output}

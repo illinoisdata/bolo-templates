@@ -1,0 +1,27 @@
+{% set repo_id = repo_id | default("mozilla-ai/Meta-Llama-3.1-405B-Instruct-llamafile") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Write a short haiku about the ocean.') %}
+{% set n_predict = n_predict | default(64) %}
+{% set quant_filename = quant_filename | default('Meta-Llama-3.1-405B-Instruct.Q2_K.cat0.llamafile') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+n_predict = {{ n_predict }}
+quant_filename = {{ quant_filename | tojson }}
+
+import os
+from pathlib import Path
+from huggingface_hub import hf_hub_download
+
+part0 = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+base = Path(part0)
+stem = quant_filename[:-len('.cat0.llamafile')]
+parts = [part0] + [hf_hub_download(repo_id=repo_id, filename=f'{stem}.cat{i}.llamafile') for i in range(1, 4)]
+out_path = base.parent / f'{stem}.llamafile'
+with open(out_path, 'wb') as w:
+    for part in parts:
+        with open(part, 'rb') as r:
+            w.write(r.read())
+os.chmod(out_path, 0o755)
+
+RESULT = {"generated_text": out_path.read_bytes()[:0].decode('utf-8', errors='ignore')}

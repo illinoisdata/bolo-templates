@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("ByteDance-Seed/Seed-X-RM-7B") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Translate the following source sentence into the target language and score the translation quality.\nSource: Hello, world!\nTarget: Bonjour, le monde!') %}
+{% set max_length = max_length | default(512) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+max_length = {{ max_length }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+gen_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    low_cpu_mem_usage=True,
+    ignore_mismatched_sizes=True,
+)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    last_logits = logits[:, -1, :]
+    score = torch.log_softmax(last_logits, dim=-1).max(dim=-1).values.squeeze().item()
+
+RESULT = {"score": score}

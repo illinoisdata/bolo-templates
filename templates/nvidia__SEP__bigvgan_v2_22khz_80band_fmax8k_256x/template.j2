@@ -1,0 +1,49 @@
+{% set repo_id = repo_id | default("nvidia/bigvgan_v2_22khz_80band_fmax8k_256x") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set use_cuda_kernel = use_cuda_kernel | default(false) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+use_cuda_kernel = {{ use_cuda_kernel }}
+
+import sys
+from pathlib import Path
+
+import torch
+import librosa
+import numpy as np
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+repo_root = Path(config_path).parent
+sys.path.insert(0, str(repo_root))
+
+from bigvgan import BigVGAN
+from meldataset import get_mel_spectrogram
+
+if audio_path.startswith('http://') or audio_path.startswith('https://'):
+    import soundfile as sf
+    import io
+    import requests
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    wav, sr = sf.read(io.BytesIO(audio_bytes))
+    if wav.ndim > 1:
+        wav = np.mean(wav, axis=1)
+else:
+    wav, sr = librosa.load(audio_path, sr=None, mono=True)
+
+model = BigVGAN.from_pretrained(repo_id, use_cuda_kernel=use_cuda_kernel)
+model.remove_weight_norm()
+model = model.eval().to(device)
+
+wav = librosa.resample(wav.astype(np.float32), orig_sr=sr, target_sr=model.h.sampling_rate)
+wav = torch.FloatTensor(wav).unsqueeze(0).to(device)
+mel = get_mel_spectrogram(wav, model.h).to(device)
+
+with torch.inference_mode():
+    wav_gen = model(mel)
+
+output = wav_gen.squeeze(0).detach().cpu().numpy()
+
+RESULT = {"audio": output}

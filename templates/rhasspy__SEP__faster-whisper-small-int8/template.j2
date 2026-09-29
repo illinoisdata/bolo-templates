@@ -1,9 +1,69 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("rhasspy/faster-whisper-small-int8") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set language = language | default('en') %}
+{% set task = task | default('transcribe') %}
+{% set beam_size = beam_size | default(1) %}
+{% set vad_filter = vad_filter | default(false) %}
+{% set temperature = temperature | default(0.0) %}
 repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+language = "{{ language }}"
+task = "{{ task }}"
+beam_size = {{ beam_size }}
+vad_filter = {{ vad_filter }}
+temperature = {{ temperature }}
 
-import huggingface_hub as hf
+from pathlib import Path
+import torch
+import librosa
+from huggingface_hub import hf_hub_download
+from faster_whisper import WhisperModel
 
-files = hf.list_repo_files(repo_id)
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.bin")
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="vocabulary.txt")
 
-RESULT = {"files": files}
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    raise ValueError("URL audio input is not supported in this environment")
+else:
+    input_audio_path = audio_path
+
+model_dir = str(Path(weights_path).parent)
+
+if device.startswith("cuda") and torch.cuda.is_available():
+    ctranslate_device = "cuda"
+else:
+    ctranslate_device = "cpu"
+
+compute_type = "int8"
+model = WhisperModel(model_dir, device=ctranslate_device, compute_type=compute_type)
+
+audio, sr = librosa.load(input_audio_path, sr=16000, mono=True)
+segments, info = model.transcribe(
+    audio,
+    language=language,
+    task=task,
+    beam_size=beam_size,
+    vad_filter=vad_filter,
+    temperature=temperature,
+)
+
+segment_list = []
+texts = []
+for seg in segments:
+    segment_list.append({
+        "start": float(seg.start),
+        "end": float(seg.end),
+        "text": seg.text,
+    })
+    texts.append(seg.text)
+
+transcript = "".join(texts).strip()
+RESULT = {
+    "text": transcript,
+    "segments": segment_list,
+    "language": info.language,
+    "language_probability": float(info.language_probability),
+}

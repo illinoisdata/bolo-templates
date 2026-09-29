@@ -1,0 +1,29 @@
+{% set repo_id = repo_id | default("litert-community/Qwen2.5-1.5B-Instruct") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Write a short, helpful response about the benefits of edge AI.') %}
+{% set max_tokens = max_tokens | default(64) %}
+{% set temperature = temperature | default(0.2) %}
+{% set top_p = top_p | default(0.9) %}
+{% set tflite_filename = tflite_filename | default('Qwen2.5-1.5B-Instruct_seq128_q8_ekv1280.tflite') %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+max_tokens = {{ max_tokens }}
+temperature = {{ temperature }}
+top_p = {{ top_p }}
+tflite_filename = "{{ tflite_filename }}"
+
+from huggingface_hub import hf_hub_download
+import os
+
+model_path = hf_hub_download(repo_id=repo_id, filename=tflite_filename)
+
+try:
+    from litert import Interpreter
+    interpreter = Interpreter(model_path=model_path)
+    interpreter.allocate_tensors()
+    RESULT = {"model_path": model_path, "status": "loaded"}
+except Exception:
+    from pathlib import Path
+    RESULT = {"model_path": str(Path(model_path).resolve()), "status": "downloaded"}

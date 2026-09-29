@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("fastino/gliner2-multi-v1") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text|default('Apple CEO Tim Cook announced iPhone 15 in Cupertino yesterday.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+from huggingface_hub import hf_hub_download
+from gliner2 import GLiNER2
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+
+extractor = GLiNER2.from_pretrained(repo_id)
+
+entities_schema = ["company", "person", "product", "location"]
+classification_schema = {"sentiment": ["positive", "negative", "neutral"]}
+structured_schema = {
+    "product": [
+        "name::str::Full product name and model",
+        "storage::str::Storage capacity",
+        "processor::str::Chip or processor information",
+        "price::str::Product price with currency",
+    ]
+}
+
+entities = extractor.extract_entities(text, entities_schema)
+classification = extractor.classify_text(text, classification_schema)
+structured = extractor.extract_json(text, structured_schema)
+
+RESULT = {
+    "entities": entities,
+    "classification": classification,
+    "structured": structured,
+}

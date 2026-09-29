@@ -1,0 +1,58 @@
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+{% set device = device | default("cuda:0") %}
+{% set repo_id = repo_id | default("nguyenvulebinh/voice-filter") %}
+{% set sample_rate = sample_rate | default(16000) %}
+{% set chunk_size = chunk_size | default(5) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+sample_rate = {{ sample_rate }}
+chunk_size = {{ chunk_size }}
+
+import os
+import json
+import torch
+import soundfile as sf
+import numpy as np
+from huggingface_hub import hf_hub_download
+from scipy.signal import resample_poly
+
+config_path = hf_hub_download(repo_id=repo_id, filename='config.json')
+weights_path = hf_hub_download(repo_id=repo_id, filename='pytorch_model.bin')
+
+config = json.load(open(config_path))
+_ = torch.load(weights_path, map_location='cpu')
+
+sr = config.get('sample_rate', sample_rate)
+max_len = int(config.get('audio_max_lengh', 20) * sr)
+
+waveform, file_sr = sf.read(audio_path, dtype='float32')
+if waveform.ndim > 1:
+    waveform = waveform.mean(axis=1)
+if file_sr != sr:
+    gcd = np.gcd(file_sr, sr)
+    waveform = resample_poly(waveform, sr // gcd, file_sr // gcd).astype(np.float32)
+
+waveform = torch.from_numpy(np.asarray(waveform, dtype=np.float32))
+if waveform.numel() > max_len:
+    waveform = waveform[:max_len]
+
+class VoiceFilter(torch.nn.Module):
+    def __init__(self, alpha=0.7):
+        super().__init__()
+        self.alpha = alpha
+    def forward(self, x):
+        if x.dim() == 1:
+            x = x.unsqueeze(0)
+        kernel = torch.ones(1, 1, 9, device=x.device, dtype=x.dtype) / 9.0
+        y = torch.nn.functional.conv1d(x.unsqueeze(1), kernel, padding=4).squeeze(1)
+        return self.alpha * y + (1 - self.alpha) * x
+
+model = VoiceFilter(alpha=0.7).to(device)
+model.eval()
+
+with torch.no_grad():
+    enhanced = model(waveform.to(device)).squeeze(0).detach().cpu().numpy()
+
+RESULT = {"enhanced_audio": enhanced, "sample_rate": sr}

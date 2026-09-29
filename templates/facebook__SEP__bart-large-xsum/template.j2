@@ -1,22 +1,38 @@
 {% set repo_id = repo_id | default("facebook/bart-large-xsum") %}
 {% set device = device | default("cuda:0") %}
-{% set text = text | default("The Mona Lisa is a half-length portrait painting by the Italian artist Leonardo da Vinci that hangs in the Louvre in Paris.") %}
+{% set text = text | default('The Eiffel Tower is one of the most famous landmarks in the world. It was constructed in Paris for the 1889 Exposition Universelle and has become a global icon of France.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 text = "{{ text }}"
 
-import os
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
 
-inputs = tokenizer(text, return_tensors="pt", truncation=True)
-inputs = inputs.to(device)
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_json_path.rsplit('/', 1)[0], local_files_only=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(tokenizer_json_path.rsplit('/', 1)[0], local_files_only=True)
+model.to(device)
+model.eval()
 
+inputs = tokenizer(text, return_tensors="pt", truncation=True).to(device)
 with torch.no_grad():
-    generated_ids = model.generate(**inputs)
+    generated_ids = model.generate(
+        **inputs,
+        num_beams=6,
+        max_length=62,
+        min_length=11,
+        no_repeat_ngram_size=3,
+        early_stopping=True,
+        forced_eos_token_id=2,
+    )
+summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-summary = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-RESULT = {"summary_text": summary}
+RESULT = {"summary": summary}

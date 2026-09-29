@@ -1,40 +1,45 @@
 {% set repo_id = repo_id | default("mabrouk/amazon-review-summarizer-bart") %}
 {% set device = device | default("cuda:0") %}
+{% set review_text = review_text | default('I really like this book. It takes a step-by-step approach to introduce the reader to the IBM Q Experience, to the basics underlying quantum computing, and to the reality of the noise involved in the current machines. This introduction is technical and shows the user how to use the IBM system either directly through the GUI on their website or by running Python code on one\'s own machine. The text provides examples of small exercises to try and stimulates ideas of new things to try. The IBM Q Exp Qiskit software modules are identified and introduced - Terra, Aer, Ignis, and Aqua, as well as the backends that one can choose to do the computing. The book ends with two great chapters on quantum algorithms.') %}
+{% set max_new_tokens = max_new_tokens | default(80) %}
+{% set min_new_tokens = min_new_tokens | default(30) %}
 {% set num_beams = num_beams | default(4) %}
-{% set min_length = min_length | default(56) %}
-{% set max_length = max_length | default(142) %}
-{% set review_text %}
-I really like this book. It takes a step-by-step approach to introduce the reader to the IBM Q Experience, to the basics underlying quantum computing, and to the reality of the noise involved in the current machines. This introduction is technical and shows the user how to use the IBM system either directly through the GUI on their website or by running Python code on one's own machine. The text provides examples of small exercises to try and stimulates ideas of new things to try. The IBM Q Exp Qiskit software modules are identified and introduced - Terra, Aer, Ignis, and Aqua, as well as the backends that one can choose to do the computing. The book ends with two great chapters on quantum algorithms.
-{% endset %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-review_text = """{{ review_text }}"""
+review_text = "{{ review_text }}"
+max_new_tokens = {{ max_new_tokens }}
+min_new_tokens = {{ min_new_tokens }}
 num_beams = {{ num_beams }}
-min_length = {{ min_length }}
-max_length = {{ max_length }}
 
-import os
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id)
-model = model.to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+from pathlib import Path
+model_dir = str(Path(model_path).parent)
+tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_dir, local_files_only=True)
+model.to(device)
+model.eval()
 
 inputs = tokenizer(review_text, return_tensors="pt", truncation=True, max_length=1024)
-inputs = {key: value.to(device) for key, value in inputs.items()}
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        min_new_tokens=min_new_tokens,
+        num_beams=num_beams,
+        early_stopping=True,
+    )
+summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-generated_tokens = model.generate(
-    **inputs,
-    num_beams=num_beams,
-    min_length=min_length,
-    max_length=max_length,
-    early_stopping=True,
-)
-summary_text = tokenizer.batch_decode(
-    generated_tokens,
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-)[0]
-
-RESULT = {"summary": summary_text}
+RESULT = {"summary": summary}

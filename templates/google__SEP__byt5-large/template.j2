@@ -1,22 +1,30 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("google/byt5-large") %}
-{% set prompt = prompt | default("Translate English to French: The quick brown fox jumps over the lazy dog.") %}
-{% set max_length = max_length | default(128) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Translate English to French: Life is like a box of chocolates.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-prompt = "{{ prompt }}"
-max_length = {{ max_length }}
+text = "{{ text }}"
 
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import torch
+from transformers import AutoTokenizer, T5ForConditionalGeneration
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+
+device_t = torch.device(device if torch.cuda.is_available() or str(device) == "cpu" else "cpu")
 
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = T5ForConditionalGeneration.from_pretrained(repo_id, torch_dtype=torch.float16 if device_t.type == "cuda" else torch.float32)
+model.to(device_t)
+model.eval()
 
-inputs = tokenizer(prompt, return_tensors="pt").to(device)
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device_t) for k, v in inputs.items()}
 
-generated_ids = model.generate(**inputs, max_length=max_length)
+with torch.no_grad():
+    output_ids = model.generate(**inputs, max_new_tokens=64)
 
-generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-RESULT = {"generated_text": generated_text}
+RESULT = {"output_text": output_text}

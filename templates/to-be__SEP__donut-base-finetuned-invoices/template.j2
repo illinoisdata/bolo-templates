@@ -1,43 +1,43 @@
 {% set repo_id = repo_id | default("to-be/donut-base-finetuned-invoices") %}
 {% set device = device | default("cuda:0") %}
-{% set document_image_path = document_image_path | default("/u/yli77/projects/ML-code-generation/data/doc.jpeg") %}
-{% set max_length = max_length | default(768) %}
-{% set num_beams = num_beams | default(1) %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/doc.jpeg') %}
+{% set prompt = prompt | default('<s_docvqa><s_question>What is the document type?</s_question><s_answer>') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-document_image_path = "{{ document_image_path }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
+image_path = "{{ image_path }}"
+prompt = "{{ prompt }}"
 
-from io import BytesIO
-from pathlib import Path
-
+import os
 import requests
-import torch
 from PIL import Image
-from transformers import DonutProcessor, VisionEncoderDecoderModel
+import torch
+from transformers import VisionEncoderDecoderModel, DonutProcessor
+from huggingface_hub import hf_hub_download
 
-torch_device = torch.device(device)
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 processor = DonutProcessor.from_pretrained(repo_id)
-model = VisionEncoderDecoderModel.from_pretrained(repo_id).to(torch_device)
+model = VisionEncoderDecoderModel.from_pretrained(repo_id)
+model.to(device)
 model.eval()
 
-if document_image_path.startswith("http://") or document_image_path.startswith("https://"):
-    response = requests.get(document_image_path, timeout=30)
-    response.raise_for_status()
-    image = Image.open(BytesIO(response.content)).convert("RGB")
+if image_path.startswith("http://") or image_path.startswith("https://"):
+    image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
 else:
-    image = Image.open(document_image_path).convert("RGB")
+    image = Image.open(image_path).convert("RGB")
 
-pixel_values = processor(images=image, return_tensors="pt").pixel_values.to(torch_device)
+pixel_values = processor(image, return_tensors="pt").pixel_values.to(device)
+input_ids = processor.tokenizer(prompt, add_special_tokens=False, return_tensors="pt").input_ids.to(device)
 
 with torch.no_grad():
-    generated_ids = model.generate(
+    outputs = model.generate(
         pixel_values,
-        max_length=max_length,
-        num_beams=num_beams,
+        decoder_input_ids=input_ids,
+        max_length=512,
+        num_beams=1,
+        do_sample=False,
     )
 
-generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-
-RESULT = {"generated_text": generated_text}
+sequence = processor.batch_decode(outputs, skip_special_tokens=False)[0]
+sequence = sequence.replace(processor.tokenizer.eos_token or "", "").replace(processor.tokenizer.pad_token or "", "")
+RESULT = {"output": sequence}

@@ -1,0 +1,36 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Pathology-Large-459M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Early detection of breast cancer improves survival rates.') %}
+{% set labels = labels | default(['DISEASE']) %}
+{% set threshold = threshold | default(0.5) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+labels = {{ labels | tojson }}
+threshold = {{ threshold }}
+
+from huggingface_hub import hf_hub_download
+from gliner import GLiNER
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+
+model = GLiNER._from_pretrained(
+    model_id=repo_id,
+    revision=None,
+    cache_dir=None,
+    force_download=False,
+    proxies=None,
+    resume_download=False,
+    local_files_only=False,
+    token=None,
+    map_location=device,
+    strict=False,
+    load_tokenizer=True,
+    resize_token_embeddings=True,
+    load_onnx_model=False,
+)
+
+entities = model.predict_entities(text, labels, flat_ner=True, threshold=threshold)
+RESULT = {"entities": entities}

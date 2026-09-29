@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("garak-llm/attackgeneration-toxicity_gpt2") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Write a short toxic-style prompt.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import os
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
+
+model_file = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+merges_file = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+generation_config_file = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+model_dir = os.path.dirname(model_file)
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir)
+model = AutoModelForCausalLM.from_pretrained(model_dir, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+inputs = tokenizer(prompt, return_tensors="pt").to(device)
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_new_tokens=32,
+        do_sample=True,
+        temperature=1.0,
+        top_p=0.95,
+        pad_token_id=tokenizer.eos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+generated_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"generated_text": generated_text}

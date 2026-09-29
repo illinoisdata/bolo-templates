@@ -1,0 +1,24 @@
+{% set task = task | default("text-generation") %}
+{% set repo_id = repo_id | default("TheBloke/LlamaGuard-7B-AWQ") %}
+{% set device = device | default("cuda:0") %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+
+repo_id = {{ repo_id | tojson }}
+task = {{ task | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(repo_id)
+model = AutoModelForCausalLM.from_pretrained(repo_id)
+model.to(device)
+
+# Run pipeline
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+output = pipe(input_prompt)
+
+# Post-process and build RESULT dict
+generated_text = output[0]["generated_text"]
+RESULT = {"generated_text": generated_text}

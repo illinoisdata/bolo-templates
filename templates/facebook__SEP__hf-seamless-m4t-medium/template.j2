@@ -1,41 +1,34 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("facebook/hf-seamless-m4t-medium") %}
-{% set text_prompt = text_prompt | default("Hello, this is a SeamlessM4T text-to-speech demo.") %}
-{% set src_lang = src_lang | default("eng") %}
-{% set tgt_lang = tgt_lang | default("fra") %}
-{% set output_audio_filename = output_audio_filename | default("text_to_speech.wav") %}
-{% set sampling_rate = sampling_rate | default(16000) %}
+{% set device = device | default("cuda:0") %}
+{% set src_text = src_text | default('Hello, my dog is cute') %}
+{% set tgt_lang = tgt_lang | default('fra') %}
+{% set generate_speech = generate_speech | default(false) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_prompt = "{{ text_prompt }}"
-src_lang = "{{ src_lang }}"
+src_text = "{{ src_text }}"
 tgt_lang = "{{ tgt_lang }}"
-output_audio_filename = "{{ output_audio_filename }}"
-sampling_rate = {{ sampling_rate }}
+generate_speech = {{ generate_speech }}
 
-from pathlib import Path
-import wave
-
-import numpy as np
+import torch
 from transformers import AutoProcessor, SeamlessM4TModel
+from huggingface_hub import hf_hub_download
 
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
 processor = AutoProcessor.from_pretrained(repo_id)
-model = SeamlessM4TModel.from_pretrained(repo_id).to(device)
+model = SeamlessM4TModel.from_pretrained(repo_id)
+model = model.to(device)
 model.eval()
 
-text_inputs = processor(text=text_prompt, src_lang=src_lang, return_tensors="pt")
-text_inputs = {key: value.to(device) for key, value in text_inputs.items()}
+inputs = processor(text=src_text, src_lang="eng", return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-generated_audio = model.generate(**text_inputs, tgt_lang=tgt_lang, generate_speech=True)[0]
-speech_waveform = generated_audio.cpu().numpy().squeeze()
+with torch.no_grad():
+    output_tokens = model.generate(**inputs, tgt_lang=tgt_lang, generate_speech=generate_speech)
 
-RESULT = {"generated_speech_waveform": speech_waveform}
+if generate_speech:
+    output_value = output_tokens[0].detach().cpu().numpy().squeeze()
+else:
+    output_value = processor.decode(output_tokens[0].tolist(), skip_special_tokens=True)
 
-def _write_wave(path: Path, data: np.ndarray, sample_rate: int) -> None:
-    clipped = np.clip(data, -1.0, 1.0)
-    pcm_data = (clipped * 32767).astype(np.int16)
-    with wave.open(str(path), "wb") as wave_file:
-        wave_file.setnchannels(1)
-        wave_file.setsampwidth(2)
-        wave_file.setframerate(sample_rate)
-        wave_file.writeframes(pcm_data.tobytes())
+RESULT = {"output": output_value}

@@ -1,0 +1,33 @@
+{% set repo_id = repo_id | default("Supabase/all-MiniLM-L6-v2") %}
+{% set device = device | default("cuda:0") %}
+{% set text_1 = text_1 | default('A quick brown fox jumps over the lazy dog.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text_1 = {{ text_1 | tojson }}
+
+from pathlib import Path
+import numpy as np
+from huggingface_hub import hf_hub_download
+from transformers import BertTokenizer
+import torch
+import onnxruntime as ort
+
+onnx_path = hf_hub_download(repo_id=repo_id, filename="onnx/model.onnx")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+tokenizer = BertTokenizer(vocab_file=vocab_path)
+providers = ["CPUExecutionProvider"] if device.startswith("cpu") else ["CUDAExecutionProvider", "CPUExecutionProvider"]
+session = ort.InferenceSession(onnx_path, providers=providers)
+
+texts = [text_1] if isinstance(text_1, str) else list(text_1)
+inputs = tokenizer(texts, padding=True, truncation=True, return_tensors="np")
+ort_inputs = {k: v.astype(np.int64) for k, v in inputs.items()}
+
+outputs = session.run(None, ort_inputs)
+last_hidden_state = torch.from_numpy(outputs[0])
+attention_mask = torch.from_numpy(inputs["attention_mask"]).unsqueeze(-1).type_as(last_hidden_state)
+summed = (last_hidden_state * attention_mask).sum(dim=1)
+counts = attention_mask.sum(dim=1).clamp(min=1e-9)
+embeddings = torch.nn.functional.normalize(summed / counts, p=2, dim=1)
+embedding = embeddings[0].detach().cpu().numpy().tolist()
+RESULT = {"embedding": embedding}

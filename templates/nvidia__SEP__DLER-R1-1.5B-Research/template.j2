@@ -1,0 +1,55 @@
+{% set repo_id = repo_id | default("nvidia/DLER-R1-1.5B-Research") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('Convert the point $(0,3)$ in rectangular coordinates to polar coordinates. Enter your answer in the form $(r,\\theta),$ where $r > 0$ and $0 \\le \\theta < 2 \\pi.$ Let\'s think step by step and output the final answer within \\boxed{}.') %}
+{% set max_new_tokens = max_new_tokens | default(256) %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = """{{ prompt }}"""
+max_new_tokens = {{ max_new_tokens }}
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+model = AutoModelForCausalLM.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16,
+    device_map=None,
+    local_files_only=True,
+)
+model = model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+
+messages = [
+    {"role": "user", "content": prompt},
+]
+
+input_ids = tokenizer.apply_chat_template(
+    messages,
+    tokenize=True,
+    add_generation_prompt=True,
+    return_tensors="pt",
+)
+input_ids = input_ids.to(model.device)
+
+with torch.inference_mode():
+    generated = model.generate(
+        input_ids,
+        max_new_tokens=max_new_tokens,
+        eos_token_id=tokenizer.eos_token_id,
+        pad_token_id=tokenizer.eos_token_id,
+    )
+
+output_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+
+RESULT = {"output_text": output_text}

@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("Qwen/Qwen3-TTS-Tokenizer-12Hz") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+audio_path = "{{ audio_path }}"
+
+import os
+import numpy as np
+import torch
+import librosa
+from qwen_tts import Qwen3TTSTokenizer
+
+if isinstance(audio_path, str) and audio_path.startswith(("http://", "https://")):
+    input_audio = audio_path
+else:
+    input_audio = audio_path
+
+model = Qwen3TTSTokenizer.from_pretrained(
+    repo_id,
+    device_map=device,
+)
+
+enc = model.encode(input_audio)
+wavs, sr = model.decode(enc)
+output_audio = wavs[0]
+
+RESULT = {
+    "tokens": enc,
+    "waveform": output_audio,
+    "sample_rate": sr,
+}

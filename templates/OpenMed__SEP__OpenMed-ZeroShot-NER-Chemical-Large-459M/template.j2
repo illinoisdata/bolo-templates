@@ -1,0 +1,23 @@
+{% set repo_id = repo_id | default("OpenMed/OpenMed-ZeroShot-NER-Chemical-Large-459M") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The patient was administered acetylsalicylic acid for pain relief.') %}
+{% set labels = labels | default(['CHEM']) %}
+{% set threshold = threshold | default(0.5) %}
+{% set flat_ner = flat_ner | default(true) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+labels = {{ labels | tojson }}
+threshold = {{ threshold }}
+flat_ner = {{ flat_ner }}
+
+from huggingface_hub import hf_hub_download
+from gliner import GLiNER
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gliner_config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+model = GLiNER.from_pretrained(repo_id, cache_dir=None)
+model.to(device)
+entities = model.predict_entities(text, labels, flat_ner=flat_ner, threshold=threshold)
+
+RESULT = {"entities": entities}

@@ -1,0 +1,19 @@
+{% set repo_id = repo_id | default("facebook/vjepa2-vitg-fpc64-256") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("video-classification") %}
+{% set num_frames = num_frames | default(64) %}
+{% set input_video_path = input_video_path | default("/u/yunqili4/projects/ML-code-generation/data/video.avi") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+num_frames = {{ num_frames }}
+input_video_path = "{{ input_video_path }}"
+
+from transformers import AutoConfig, pipeline
+
+config = AutoConfig.from_pretrained(repo_id)
+config.num_frames = num_frames
+pipe = pipeline(task=task, model=repo_id, config=config, device=device)
+pipe.model.config.num_frames = num_frames
+RESULT = pipe(input_video_path)

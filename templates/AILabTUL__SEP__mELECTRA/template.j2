@@ -1,0 +1,32 @@
+{% set repo_id = repo_id | default("AILabTUL/mELECTRA") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('This is a multilingual model supporting multiple languages.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import torch
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+spm_path = hf_hub_download(repo_id=repo_id, filename="m.model")
+
+model = AutoModelForMaskedLM.from_pretrained(repo_id, ignore_mismatched_sizes=True).to(device)
+model.eval()
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    predicted_token_ids = torch.argmax(logits, dim=-1).squeeze(0).tolist()
+    decoded_text = tokenizer.decode(predicted_token_ids, skip_special_tokens=True)
+
+RESULT = {"input_text": text, "predicted_token_ids": predicted_token_ids, "decoded_text": decoded_text}

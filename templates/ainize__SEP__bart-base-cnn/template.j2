@@ -1,39 +1,45 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("ainize/bart-base-cnn") %}
-{% set text_input = text_input | default("(CNN) -- South Korea launched an investigation Tuesday into reports of toxic chemicals being dumped at a former U.S. military base, the Defense Ministry said. The tests follow allegations of American soldiers burying chemicals on Korean soil. The first tests are being carried out by a joint military, government and civilian task force at the site of what was Camp Mercer, west of Seoul. \"Soil and underground water will be taken in the areas where toxic chemicals were allegedly buried,\" said the statement from the South Korean Defense Ministry. Once testing is finished, the government will decide on how to test more than 80 other sites -- all former bases. The alarm was raised this month when a U.S. veteran alleged barrels of the toxic herbicide Agent Orange were buried at an American base in South Korea in the late 1970s. Two of his fellow soldiers corroborated his story about Camp Carroll, about 185 miles (300 kilometers) southeast of the capital, Seoul. \"We've been working very closely with the Korean government since we had the initial claims,\" said Lt. Gen. John Johnson, who is heading the Camp Carroll Task Force. \"If we get evidence that there is a risk to health, we are going to fix it.\" A joint U.S.- South Korean investigation is being conducted at Camp Carroll to test the validity of allegations. The U.S. military sprayed Agent Orange from planes onto jungles in Vietnam to kill vegetation in an effort to expose guerrilla fighters. Exposure to the chemical has been blamed for a wide variety of ailments, including certain forms of cancer and nerve disorders. It has also been linked to birth defects, according to the Department of Veterans Affairs. Journalist Yoonjung Seo contributed to this report.") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('(CNN) -- South Korea launched an investigation Tuesday into reports of toxic chemicals being dumped at a former U.S. military base, the Defense Ministry said. The tests follow allegations of American soldiers burying chemicals on Korean soil. The first tests are being carried out by a joint military, government and civilian task force at the site of what was Camp Mercer, west of Seoul. "Soil and underground water will be taken in the areas where toxic chemicals were allegedly buried," said the statement from the South Korean Defense Ministry. Once testing is finished, the government will decide on how to test more than 80 other sites -- all former bases. The alarm was raised this month when a U.S. veteran alleged barrels of the toxic herbicide Agent Orange were buried at an American base in South Korea in the late 1970s. Two of his fellow soldiers corroborated his story about Camp Carroll, about 185 miles (300 kilometers) southeast of the capital, Seoul. "We\'ve been working very closely with the Korean government since we had the initial claims," said Lt. Gen. John Johnson, who is heading the Camp Carroll Task Force. "If we get evidence that there is a risk to health, we are going to fix it." A joint U.S.- South Korean investigation is being conducted at Camp Carroll to test the validity of allegations. The U.S. military sprayed Agent Orange from planes onto jungles in Vietnam to kill vegetation in an effort to expose guerrilla fighters. Exposure to the chemical has been blamed for a wide variety of ailments, including certain forms of cancer and nerve disorders. It has also been linked to birth defects, according to the Department of Veterans Affairs. Journalist Yoonjung Seo contributed to this report.') %}
 {% set max_length = max_length | default(142) %}
 {% set min_length = min_length | default(56) %}
-{% set length_penalty = length_penalty | default(2.0) %}
 {% set num_beams = num_beams | default(4) %}
+{% set length_penalty = length_penalty | default(2.0) %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = """{{ text_input }}"""
+text = {{ text | tojson }}
 max_length = {{ max_length }}
 min_length = {{ min_length }}
-length_penalty = {{ length_penalty }}
 num_beams = {{ num_beams }}
+length_penalty = {{ length_penalty }}
 
-from pathlib import Path
+from huggingface_hub import hf_hub_download
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
 
-encoded_inputs = tokenizer(text_input, return_tensors="pt")
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
-
-generated_ids = model.generate(
-    **encoded_inputs,
-    bos_token_id=model.config.bos_token_id,
-    eos_token_id=model.config.eos_token_id,
-    length_penalty=length_penalty,
-    max_length=max_length,
-    min_length=min_length,
-    num_beams=num_beams,
-    early_stopping=True,
-)
-
-summary = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=1024)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        bos_token_id=model.config.bos_token_id,
+        eos_token_id=model.config.eos_token_id,
+        length_penalty=length_penalty,
+        max_length=max_length,
+        min_length=min_length,
+        num_beams=num_beams,
+    )
+summary = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
 RESULT = {"summary": summary}

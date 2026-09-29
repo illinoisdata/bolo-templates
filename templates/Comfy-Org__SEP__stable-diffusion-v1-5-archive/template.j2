@@ -1,0 +1,35 @@
+{% set repo_id = repo_id | default("Comfy-Org/stable-diffusion-v1-5-archive") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('a cinematic photo of a cozy cabin in a snowy forest, ultra detailed, realistic lighting') %}
+{% set num_inference_steps = num_inference_steps | default(20) %}
+{% set guidance_scale = guidance_scale | default(7.5) %}
+{% set seed = seed | default(42) %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+num_inference_steps = {{ num_inference_steps }}
+guidance_scale = {{ guidance_scale }}
+seed = {{ seed }}
+
+import os
+import torch
+from diffusers import StableDiffusionPipeline
+from huggingface_hub import hf_hub_download
+
+weight_filename = "v1-5-pruned-emaonly-fp16.safetensors"
+weight_path = hf_hub_download(repo_id=repo_id, filename=weight_filename)
+
+pipe = StableDiffusionPipeline.from_single_file(weight_path, torch_dtype=torch.float16)
+pipe = pipe.to(device)
+if device.startswith("cuda"):
+    pipe.enable_attention_slicing()
+
+generator = torch.Generator(device=device if device.startswith("cuda") else "cpu").manual_seed(seed)
+image = pipe(
+    prompt=prompt,
+    num_inference_steps=num_inference_steps,
+    guidance_scale=guidance_scale,
+    generator=generator,
+).images[0]
+
+RESULT = {"image": image}

@@ -1,25 +1,33 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("Helsinki-NLP/opus-mt-en-it") %}
-{% set input_text = input_text | default("The cat sat on the mat.") %}
-repo_id = {{ repo_id | tojson }}
-device = {{ device | tojson }}
-input_text = {{ input_text | tojson }}
-
-from pathlib import Path
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The house is wonderful and the garden is beautiful.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, MarianTokenizer
+from transformers import MarianMTModel, MarianTokenizer
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+source_spm_path = hf_hub_download(repo_id=repo_id, filename="source.spm")
+target_spm_path = hf_hub_download(repo_id=repo_id, filename="target.spm")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+generation_config_path = hf_hub_download(repo_id=repo_id, filename="generation_config.json")
+
+_ = (config_path, tokenizer_config_path, source_spm_path, target_spm_path, vocab_path, generation_config_path)
 
 tokenizer = MarianTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+model = MarianMTModel.from_pretrained(repo_id)
+model.to(device)
+model.eval()
 
-encoded = tokenizer(input_text, return_tensors="pt")
-input_ids = encoded["input_ids"].to(device)
-attention_mask = encoded.get("attention_mask")
-if attention_mask is not None:
-    attention_mask = attention_mask.to(device)
+inputs = tokenizer([text], return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+with torch.no_grad():
+    generated_ids = model.generate(**inputs, num_beams=4, max_length=128)
+translation = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-generated_tokens = model.generate(input_ids=input_ids, attention_mask=attention_mask)
-
-translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
 RESULT = {"translation": translation}

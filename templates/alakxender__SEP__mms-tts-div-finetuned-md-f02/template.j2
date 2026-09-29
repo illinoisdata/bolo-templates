@@ -1,0 +1,21 @@
+{% set repo_id = repo_id | default("alakxender/mms-tts-div-finetuned-md-f02") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-to-audio") %}
+{% set text = text | default("މޫސުން ވަރަށް ގޯސްވެ، ފުވައްމުލަކުން ފެށިގެން އައްޑުއަށް އޮރެންޖް އެލާޓް ނެރެފި") %}
+
+task = {{ task | tojson }}
+model = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+text = {{ text | tojson }}
+
+from transformers import pipeline
+from transformers.tokenization_utils_base import BatchEncoding
+
+# Patch BatchEncoding.to to accept dtype kwarg and ignore it
+_orig_to = BatchEncoding.to
+def to(self, device=None, *, non_blocking=False, dtype=None):
+    return _orig_to(self, device, non_blocking=non_blocking)
+BatchEncoding.to = to
+
+pipe = pipeline(task=task, model=model, device=device)
+RESULT = pipe(text)

@@ -1,0 +1,1 @@
+A subset of the model files in [openai/clip-vit-large-patch14](https://huggingface.co/openai/clip-vit-large-patch14) hosted separately for more convenient installation in Invoke.

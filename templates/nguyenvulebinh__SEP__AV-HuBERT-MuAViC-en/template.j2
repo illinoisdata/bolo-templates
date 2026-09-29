@@ -1,0 +1,46 @@
+{% set repo_id = repo_id | default("nguyenvulebinh/AV-HuBERT-MuAViC-en") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("automatic-speech-recognition") -%}
+{% set input_audio = input_audio | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") -%}
+{% set scale_embedding = scale_embedding | default(false) -%}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+task = {{ task | tojson }}
+model = repo_id
+input_audio = {{ input_audio | tojson }}
+scale_embedding = {{ 'True' if scale_embedding else 'False' }}
+
+import json
+from pathlib import Path
+from huggingface_hub import snapshot_download
+from transformers import pipeline
+
+model_dir = snapshot_download(repo_id=repo_id)
+config_path = Path(model_dir) / "config.json"
+with open(config_path, encoding="utf-8") as config_file:
+    config_kwargs = json.load(config_file)
+config_kwargs["scale_embedding"] = scale_embedding
+with open(config_path, "w", encoding="utf-8") as config_file:
+    json.dump(config_kwargs, config_file)
+preprocessor_config_path = Path(model_dir) / "preprocessor_config.json"
+if not preprocessor_config_path.exists():
+    preprocessor_config = {
+        "do_normalize": True,
+        "feature_size": 1,
+        "padding_side": "right",
+        "padding_value": 0.0,
+        "return_attention_mask": False,
+        "sampling_rate": 16000,
+    }
+    with open(preprocessor_config_path, "w", encoding="utf-8") as preprocessor_file:
+        json.dump(preprocessor_config, preprocessor_file)
+model = model_dir
+pipe = pipeline(
+    task=task,
+    model=model,
+    device=device,
+    model_kwargs={"ignore_mismatched_sizes": True},
+)
+
+audio_input = input_audio
+RESULT = pipe(audio_input)

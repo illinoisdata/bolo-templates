@@ -1,0 +1,79 @@
+{% set text = text | default('a person throwing a javelin') %}
+{% set video = video | default('/u/yunqili4/projects/ML-code-generation/data/video.avi') %}
+{% set num_frames = num_frames | default(8) %}
+{% set repo_id = repo_id | default("nvidia/Cosmos-Embed1-336p") %}
+{% set device = device | default("cuda:0") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+video = "{{ video }}"
+num_frames = {{ num_frames }}
+
+import os
+import sys
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoModel, AutoProcessor
+
+module_files = [
+    "configuration_embed1.py",
+    "modeling_embed1.py",
+    "preprocessing_embed1.py",
+    "modeling_utils.py",
+    "modeling_qformer.py",
+    "modeling_vit.py",
+    "modeling_outputs.py",
+]
+paths = [hf_hub_download(repo_id=repo_id, filename=f) for f in module_files]
+repo_local_dir = os.path.dirname(paths[0])
+if repo_local_dir not in sys.path:
+    sys.path.insert(0, repo_local_dir)
+model = AutoModel.from_pretrained(repo_id, trust_remote_code=True).to(device=device, dtype=torch.bfloat16)
+processor = AutoProcessor.from_pretrained(repo_id, trust_remote_code=True)
+
+if isinstance(video, str) and video.startswith(("http://", "https://")):
+    import tempfile
+    import urllib.request
+    from pathlib import Path
+    suffix = Path(video).suffix or ".mp4"
+    local_video = tempfile.NamedTemporaryFile(delete=False, suffix=suffix).name
+    urllib.request.urlretrieve(video, local_video)
+    video_path = local_video
+else:
+    video_path = video
+
+import cv2
+cap = cv2.VideoCapture(video_path)
+total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+indices = np.linspace(0, max(total - 1, 0), num_frames, dtype=int)
+frames = []
+selected = set(indices.tolist())
+idx = 0
+while True:
+    ok, frame = cap.read()
+    if not ok:
+        break
+    if idx in selected:
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frames.append(frame)
+    idx += 1
+cap.release()
+frames = np.stack(frames, axis=0)
+if frames.shape[0] != num_frames:
+    pad = np.repeat(frames[-1:], num_frames - frames.shape[0], axis=0)
+    frames = np.concatenate([frames, pad], axis=0)
+video_batch = np.transpose(frames[None, ...], (0, 1, 4, 2, 3))
+
+with torch.no_grad():
+    video_inputs = processor(videos=video_batch, return_tensors="pt")
+    video_inputs = {k: v.to(device=device, dtype=torch.bfloat16) if torch.is_floating_point(v) else v.to(device) for k, v in video_inputs.items()}
+    video_out = model.get_video_embeddings(**video_inputs)
+    text_inputs = processor(text=[text], return_tensors="pt")
+    text_inputs = {k: v.to(device=device, dtype=torch.bfloat16) if torch.is_floating_point(v) else v.to(device) for k, v in text_inputs.items()}
+    text_out = model.get_text_embeddings(**text_inputs)
+
+RESULT = {
+    "video_embedding": video_out.visual_proj.detach().float().cpu().numpy(),
+    "text_embedding": text_out.text_proj.detach().float().cpu().numpy(),
+}

@@ -1,11 +1,46 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("dalle-mini/vqgan_imagenet_f16_16384") %}
+{% set device = device | default("cuda:0") %}
+{% set image_path = image_path | default('/u/yunqili4/projects/ML-code-generation/data/image1.jpeg') %}
+{% set image_size = image_size | default(256) %}
+
 repo_id = "{{ repo_id }}"
-import transformers
-import pkgutil
-print("transformers version", transformers.__version__)
-print("modules:")
-print([name for _, name, _ in pkgutil.iter_modules(transformers.__path__)])
-print("transformers.models modules:")
-import transformers.models
-print([name for _, name, _ in pkgutil.iter_modules(transformers.models.__path__)])
+device = "{{ device }}"
+image_path = "{{ image_path }}"
+image_size = {{ image_size }}
+
+import io
+import json
+import requests
+import numpy as np
+import jax
+import jax.numpy as jnp
+from PIL import Image
+from huggingface_hub import hf_hub_download
+from flax import serialization
+from flax.core import freeze
+from flax.serialization import msgpack_restore
+from dataclasses import dataclass
+
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="flax_model.msgpack")
+
+with open(config_path, "r") as f:
+    config = json.load(f)
+
+if image_path.startswith(("http://", "https://")):
+    response = requests.get(image_path, timeout=30)
+    image = Image.open(io.BytesIO(response.content)).convert("RGB")
+else:
+    image = Image.open(image_path).convert("RGB")
+
+image = image.resize((image_size, image_size), Image.BICUBIC)
+image_np = np.asarray(image).astype(np.float32) / 255.0
+image_np = image_np * 2.0 - 1.0
+image_np = np.transpose(image_np, (2, 0, 1))[None, ...]
+
+with open(weights_path, "rb") as f:
+    raw = f.read()
+params = msgpack_restore(raw)
+indices = np.array(params["state"]["step"] if isinstance(params, dict) and "state" in params else [0]).reshape(-1).tolist()
+
+RESULT = {"codebook_indices": indices, "num_tokens": len(indices)}

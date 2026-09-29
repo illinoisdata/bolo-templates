@@ -1,0 +1,50 @@
+{% set repo_id = repo_id | default("CobraMamba/mamba-gpt-3b") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set model = model | default(repo_id) %}
+{% set input_prompt = input_prompt | default("Hello, my name is Eric, how are you?") %}
+{% set min_new_tokens = min_new_tokens | default(2) %}
+{% set max_new_tokens = max_new_tokens | default(128) %}
+{% set do_sample = do_sample | default(False) %}
+{% set num_beams = num_beams | default(1) %}
+{% set repetition_penalty = repetition_penalty | default(1.2) %}
+{% set renormalize_logits = renormalize_logits | default(True) %}
+{% set use_fast_tokenizer = use_fast_tokenizer | default(False) %}
+
+task = {{ task | tojson }}
+model = {{ model | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+min_new_tokens = {{ min_new_tokens }}
+max_new_tokens = {{ max_new_tokens }}
+do_sample = {{ do_sample }}
+num_beams = {{ num_beams }}
+repetition_penalty = {{ repetition_penalty }}
+renormalize_logits = {{ renormalize_logits }}
+use_fast_tokenizer = {{ use_fast_tokenizer }}
+
+from transformers import AutoTokenizer, pipeline
+
+tokenizer = AutoTokenizer.from_pretrained(
+    model,
+    use_fast=use_fast_tokenizer,
+    trust_remote_code=False,
+)
+
+pipe = pipeline(
+    task=task,
+    model=model,
+    tokenizer=tokenizer,
+    device=device,
+    trust_remote_code=False,
+)
+
+RESULT = pipe(
+    input_prompt,
+    min_new_tokens=min_new_tokens,
+    max_new_tokens=max_new_tokens,
+    do_sample=do_sample,
+    num_beams=num_beams,
+    repetition_penalty=repetition_penalty,
+    renormalize_logits=renormalize_logits,
+)

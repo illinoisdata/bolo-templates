@@ -1,0 +1,20 @@
+{% set repo_id = repo_id | default("naver-clova-ocr/bros-base-uncased") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("feature-extraction") %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+
+import torch
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+encoded = pipe.tokenizer(input_prompt, return_tensors="pt")
+num_tokens = encoded["input_ids"].shape[1]
+bbox = torch.zeros((1, num_tokens, 4), dtype=torch.float32)
+encoded["bbox"] = bbox
+pipe.preprocess = lambda inputs, **kwargs: encoded
+RESULT = pipe(input_prompt)

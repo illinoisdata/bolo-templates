@@ -1,0 +1,60 @@
+{% set repo_id = repo_id | default("uer/roberta-base-chinese-extractive-qa") %}
+{% set device = device | default("cuda:0") %}
+{% set question = question | default('著名诗歌《假如生活欺骗了你》的作者是') %}
+{% set context = context | default('普希金从那里学习人民的语言，吸取了许多有益的养料，这一切对普希金后来的创作产生了很大的影响。这两年里，普希金创作了不少优秀的作品，如《囚徒》、《致大海》、《致凯恩》和《假如生活欺骗了你》等几十首抒情诗，叙事诗《努林伯爵》，历史剧《鲍里斯·戈都诺夫》，以及《叶甫盖尼·奥涅金》前六章。') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+question = "{{ question }}"
+context = "{{ context }}"
+
+import os
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_file = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_file = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+special_tokens_file = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+tokenizer_config_file = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+
+model = AutoModelForQuestionAnswering.from_pretrained(
+    os.path.dirname(model_file),
+    local_files_only=True,
+)
+tokenizer = AutoTokenizer.from_pretrained(
+    os.path.dirname(tokenizer_file),
+    local_files_only=True,
+)
+
+model.to(device)
+model.eval()
+
+inputs = tokenizer(
+    question,
+    context,
+    return_tensors="pt",
+    truncation=True,
+    max_length=512,
+)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+start_logits = outputs.start_logits
+end_logits = outputs.end_logits
+start_idx = int(torch.argmax(start_logits, dim=-1).item())
+end_idx = int(torch.argmax(end_logits, dim=-1).item())
+if end_idx < start_idx:
+    end_idx = start_idx
+
+input_ids = inputs["input_ids"][0]
+answer_ids = input_ids[start_idx : end_idx + 1]
+answer = tokenizer.decode(answer_ids, skip_special_tokens=True).strip()
+
+RESULT = {
+    "answer": answer,
+    "start_index": start_idx,
+    "end_index": end_idx,
+}

@@ -1,0 +1,40 @@
+{% set repo_id = repo_id | default("Habana/bert-base-uncased") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default("The quick brown fox jumps over the lazy dog.") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = "{{ text }}"
+
+import json
+from pathlib import Path
+
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+import torch
+
+config_path = hf_hub_download(repo_id=repo_id, filename="gaudi_config.json")
+config_dir = str(Path(config_path).parent)
+
+tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+model = AutoModelForMaskedLM.from_pretrained("bert-base-uncased")
+model.to(device)
+model.eval()
+
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+logits = outputs.logits
+mask_token_id = tokenizer.mask_token_id
+input_ids = inputs["input_ids"]
+mask_positions = (input_ids == mask_token_id).nonzero(as_tuple=False)
+if mask_positions.numel() == 0:
+    predicted_token_id = int(logits[0, -1].argmax(dim=-1).item())
+else:
+    b, pos = mask_positions[0].tolist()
+    predicted_token_id = int(logits[b, pos].argmax(dim=-1).item())
+
+predicted_token = tokenizer.decode([predicted_token_id]).strip()
+RESULT = {"predicted_token": predicted_token, "config_dir": config_dir}

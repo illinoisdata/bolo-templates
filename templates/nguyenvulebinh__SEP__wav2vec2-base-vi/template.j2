@@ -1,65 +1,52 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("nguyenvulebinh/wav2vec2-base-vi") %}
-{% set audio_path = audio_path | default("/u/yli77/projects/ML-code-generation/data/audio.wav") %}
+{% set device = device | default("cuda:0") %}
+{% set audio_path = audio_path | default('/u/yunqili4/projects/ML-code-generation/data/audio.wav') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
 audio_path = "{{ audio_path }}"
 
+import os
 import io
-from pathlib import Path
-from urllib.parse import urlparse
-
-import numpy as np
-import requests
-import soundfile as sf
 import torch
-import torchaudio.functional as F
-from transformers import AutoModelForPreTraining, AutoProcessor
+import requests
+import numpy as np
+from scipy.io import wavfile
+from huggingface_hub import hf_hub_download
+from transformers import Wav2Vec2ForPreTraining, Wav2Vec2Processor
 
-processor = AutoProcessor.from_pretrained(repo_id)
-model = AutoModelForPreTraining.from_pretrained(repo_id).to(device)
+model_file = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+processor_file = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+for fname in ["config.json", "vocab.json", "tokenizer_config.json", "special_tokens_map.json", "added_tokens.json"]:
+    hf_hub_download(repo_id=repo_id, filename=fname)
+
+processor = Wav2Vec2Processor.from_pretrained(os.path.dirname(processor_file))
+model = Wav2Vec2ForPreTraining.from_pretrained(os.path.dirname(model_file))
+model.to(device)
 model.eval()
 
-parsed_audio_path = urlparse(audio_path)
-if parsed_audio_path.scheme in {"http", "https"}:
-    streamed = requests.get(audio_path)
-    streamed.raise_for_status()
-    audio_array, sample_rate = sf.read(io.BytesIO(streamed.content), dtype="float32")
+if audio_path.startswith("http://") or audio_path.startswith("https://"):
+    audio_bytes = requests.get(audio_path, timeout=30).content
+    sr, audio = wavfile.read(io.BytesIO(audio_bytes))
 else:
-    audio_array, sample_rate = sf.read(audio_path, dtype="float32")
+    sr, audio = wavfile.read(audio_path)
 
-if audio_array.ndim > 1:
-    audio_array = np.mean(audio_array, axis=1)
+if audio.dtype != np.float32:
+    if np.issubdtype(audio.dtype, np.integer):
+        audio = audio.astype(np.float32) / max(1, np.iinfo(audio.dtype).max)
+    else:
+        audio = audio.astype(np.float32)
 
-target_sampling_rate = processor.feature_extractor.sampling_rate
-if sample_rate != target_sampling_rate:
-    resampled = F.resample(torch.from_numpy(audio_array), sample_rate, target_sampling_rate)
-    audio_array = resampled.numpy()
-    sample_rate = target_sampling_rate
+if audio.ndim > 1:
+    audio = audio.mean(axis=1)
 
-inputs = processor.feature_extractor(audio_array, sampling_rate=sample_rate, return_tensors="pt")
-inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+inputs = processor(audio, sampling_rate=16000, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
     outputs = model(**inputs)
 
-projected_states = getattr(outputs, "projected_states", None)
-codevector_logits = getattr(outputs, "codevector_logits", None)
-sampled_targets = getattr(outputs, "sampled_targets", None)
-
-if projected_states is not None:
-    projected_states = projected_states.detach().cpu()
-if codevector_logits is not None:
-    codevector_logits = codevector_logits.detach().cpu()
-if sampled_targets is not None:
-    sampled_targets = sampled_targets.detach().cpu()
-
-result_data = {}
-if projected_states is not None:
-    result_data["projected_states"] = projected_states
-if codevector_logits is not None:
-    result_data["codevector_logits"] = codevector_logits
-if sampled_targets is not None:
-    result_data["sampled_targets"] = sampled_targets
-
-RESULT = result_data
+RESULT = {
+    "loss": outputs.loss.detach().cpu().item() if outputs.loss is not None else None,
+    "projected_states_shape": tuple(outputs.projected_states.shape) if outputs.projected_states is not None else None,
+    "codevector_perplexity": outputs.codevector_perplexity.detach().cpu().item() if outputs.codevector_perplexity is not None else None,
+}

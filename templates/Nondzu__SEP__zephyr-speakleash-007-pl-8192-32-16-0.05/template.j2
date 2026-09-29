@@ -1,0 +1,14 @@
+{% set repo_id = repo_id | default("Nondzu/zephyr-speakleash-007-pl-8192-32-16-0.05") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("text-generation") %}
+{% set input_prompt = input_prompt | default("Cześć, jak mogę dziś pomóc?") %}
+
+task = {{ task | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, device=device)
+RESULT = pipe(input_prompt)

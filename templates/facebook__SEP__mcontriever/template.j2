@@ -1,30 +1,35 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("facebook/mcontriever") %}
-{% set texts = texts | default(["How does Contriever encode a sentence?", "Retrieve dense embeddings for similarity search."]) %}
+{% set device = device | default("cuda:0") %}
+{% set query = query | default('What is the capital of France?') %}
+{% set passage = passage | default('Paris is the capital and most populous city of France.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-texts = {{ texts }}
+query = "{{ query }}"
+passage = "{{ passage }}"
 
-from pathlib import Path
-
-import numpy as np
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
-model.eval()
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+tokenizer_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
 
-encoded = tokenizer(texts, padding=True, truncation=True, return_tensors="pt")
+model = AutoModel.from_pretrained(repo_id, local_files_only=True)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
+
+encoded = tokenizer([query, passage], padding=True, truncation=True, return_tensors="pt")
 encoded = {k: v.to(device) for k, v in encoded.items()}
+model = model.to(device)
+model.eval()
 
 with torch.no_grad():
     outputs = model(**encoded)
+    embeddings = outputs.last_hidden_state[:, 0]
+    embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=-1)
+    similarity = torch.matmul(embeddings[0], embeddings[1]).item()
 
-pooled_output = outputs.pooler_output
-if pooled_output is None:
-    pooled_output = outputs.last_hidden_state.mean(dim=1)
-
-embeddings = pooled_output.detach().cpu().numpy()
-
-RESULT = {"embeddings": embeddings}
+RESULT = {"query_embedding": embeddings[0].detach().cpu(), "passage_embedding": embeddings[1].detach().cpu(), "cosine_similarity": similarity}

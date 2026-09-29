@@ -1,0 +1,22 @@
+{% set repo_id = repo_id | default("mlc-ai/TinyLlama-1.1B-Chat-v0.4-q4f16_1-MLC") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default("What is the meaning of life?") %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = "{{ prompt }}"
+
+import json
+import os
+
+from huggingface_hub import hf_hub_download
+
+config_path = hf_hub_download(repo_id=repo_id, filename="mlc-chat-config.json")
+with open(config_path, "r") as f:
+    chat_config = json.load(f)
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="params_shard_0.bin")
+weights_dir = os.path.dirname(weights_path)
+weights_files = [f for f in os.listdir(weights_dir) if f.startswith("params_shard_") and f.endswith(".bin")]
+weights_files.sort()
+
+RESULT = {"chat_config": chat_config, "weights_files": weights_files, "device": device, "repo_id": repo_id}

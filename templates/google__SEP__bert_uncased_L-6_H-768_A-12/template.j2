@@ -1,30 +1,35 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("google/bert_uncased_L-6_H-768_A-12") %}
-{% set text_inputs = text_inputs | default(["The quick brown fox jumps over the lazy dog.", "Transformers enable easy model reuse."]) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('The quick brown fox jumps over the lazy dog.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_inputs = {{ text_inputs }}
+text = "{{ text }}"
 
-import json
 import os
-
+import json
 import torch
-from transformers import AutoModel, AutoTokenizer
+from huggingface_hub import hf_hub_download
+from transformers import BertTokenizer, BertModel
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.txt")
+
+with open(config_path, "r") as f:
+    _ = json.load(f)
+
+tokenizer = BertTokenizer(vocab_file=vocab_path, do_lower_case=True)
+model = BertModel.from_pretrained(repo_id, torch_dtype=torch.float32)
+model.to(device)
 model.eval()
 
-encoded_inputs = tokenizer(text_inputs, padding=True, truncation=True, return_tensors="pt")
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+inputs = tokenizer(text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
-    outputs = model(**encoded_inputs)
+    outputs = model(**inputs)
 
-pooled_embeddings = outputs.pooler_output.detach().cpu().tolist()
-token_embeddings = outputs.last_hidden_state.detach().cpu().tolist()
+last_hidden_state = outputs.last_hidden_state.detach().cpu().tolist()
+pooler_output = outputs.pooler_output.detach().cpu().tolist() if outputs.pooler_output is not None else None
 
-RESULT = {
-    "pooled_embeddings": pooled_embeddings,
-    "token_embeddings": token_embeddings,
-}
+RESULT = {"last_hidden_state": last_hidden_state, "pooler_output": pooler_output}

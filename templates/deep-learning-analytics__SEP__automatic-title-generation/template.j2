@@ -1,36 +1,40 @@
-{% set device = device | default("cuda:0") %}
 {% set repo_id = repo_id | default("deep-learning-analytics/automatic-title-generation") %}
-{% set text = text | default("summarize: A dataset of scientific paper abstracts is used to automatically generate concise, informative paper titles.") %}
-{% set max_length = max_length | default(64) %}
-{% set num_beams = num_beams | default(4) %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('Deep learning has transformed natural language processing and computer vision.') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text = "{{ text }}"
-max_length = {{ max_length }}
-num_beams = {{ num_beams }}
-
-from pathlib import Path
+text = {{ text | tojson }}
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModelForSeq2SeqLM.from_pretrained(repo_id).to(device)
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+hf_hub_download(repo_id=repo_id, filename="config.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+hf_hub_download(repo_id=repo_id, filename="spiece.model")
 
-encoded_inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=max_length)
-encoded_inputs = {key: value.to(device) for key, value in encoded_inputs.items()}
+model = AutoModelForSeq2SeqLM.from_pretrained(repo_id, local_files_only=True)
+state_dict = torch.load(weights_path, map_location="cpu")
+model.load_state_dict(state_dict)
+model.to(device)
+model.eval()
 
-generated_ids = model.generate(
-    **encoded_inputs,
-    max_length=max_length,
-    num_beams=num_beams,
-    early_stopping=True,
-)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, local_files_only=True)
 
-generated_text = tokenizer.batch_decode(
-    generated_ids,
-    skip_special_tokens=True,
-    clean_up_tokenization_spaces=True,
-)[0]
+inputs = tokenizer("summarize: " + text, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
-RESULT = {"generated_title": generated_text}
+with torch.no_grad():
+    output_ids = model.generate(
+        **inputs,
+        max_length=20,
+        num_beams=4,
+        early_stopping=True,
+    )
+
+title = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+RESULT = {"title": title}

@@ -1,0 +1,43 @@
+{% set repo_id = repo_id | default("ggml-org/Qwen3-0.6B-GGUF") %}
+{% set device = device | default("cuda:0") %}
+{% set quant_filename = quant_filename | default('Qwen3-0.6B-Q4_0.gguf') %}
+{% set prompt = prompt | default('Write a short haiku about the sea.') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+quant_filename = "{{ quant_filename }}"
+prompt = "{{ prompt }}"
+
+from huggingface_hub import hf_hub_download
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+_ = hf_hub_download(repo_id=repo_id, filename=quant_filename)
+tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B", trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(
+    "Qwen/Qwen3-0.6B",
+    trust_remote_code=True,
+    torch_dtype=torch.float16 if "cuda" in device else torch.float32,
+)
+model.to(device)
+model.eval()
+
+messages = [{"role": "user", "content": prompt}]
+input_ids = tokenizer.apply_chat_template(
+    messages,
+    tokenize=True,
+    add_generation_prompt=True,
+    return_tensors="pt",
+    return_dict=True,
+)["input_ids"].to(device)
+with torch.no_grad():
+    generated = model.generate(
+        input_ids=input_ids,
+        max_new_tokens=128,
+        do_sample=True,
+        temperature=0.7,
+        top_p=0.9,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+text = tokenizer.decode(generated[0][input_ids.shape[-1]:], skip_special_tokens=True)
+
+RESULT = {"text": text}

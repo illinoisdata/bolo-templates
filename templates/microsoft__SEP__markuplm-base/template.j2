@@ -1,26 +1,51 @@
 {% set repo_id = repo_id | default("microsoft/markuplm-base") %}
 {% set device = device | default("cuda:0") %}
-{% set text_input = text_input | default("<html><body><p>Hello world!</p></body></html>") %}
+{% set question = question | default('What is this page about?') %}
 repo_id = "{{ repo_id }}"
 device = "{{ device }}"
-text_input = "{{ text_input }}"
+question = "{{ question }}"
 
-from transformers import AutoTokenizer, AutoModel
-import torch
 import os
-import numpy as np
+import torch
+from transformers import AutoTokenizer
+from transformers.models.markuplm import MarkupLMModel
+from huggingface_hub import hf_hub_download
 
-tokenizer = AutoTokenizer.from_pretrained(repo_id)
-model = AutoModel.from_pretrained(repo_id).to(device)
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+preprocessor_config_path = hf_hub_download(repo_id=repo_id, filename="preprocessor_config.json")
+tokenizer_config_path = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+special_tokens_map_path = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+vocab_path = hf_hub_download(repo_id=repo_id, filename="vocab.json")
+merges_path = hf_hub_download(repo_id=repo_id, filename="merges.txt")
+added_tokens_path = hf_hub_download(repo_id=repo_id, filename="added_tokens.json")
+tokenizer_json_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
 
-inputs = tokenizer(text_input, return_tensors="pt")
+model_dir = os.path.dirname(config_path)
+tokenizer_dir = os.path.dirname(tokenizer_config_path)
+
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir, use_fast=True)
+model = MarkupLMModel.from_pretrained(model_dir, torch_dtype=torch.float32)
+model.to(device)
+model.eval()
+
+words = ["MarkupLM", "documents", "and", "webpages"]
+normalized_boxes = [[0, 0, 0, 0] for _ in words]
+
+# Encode text and words; MarkupLMTokenizer does not accept boxes/xpaths in this version.
+inputs = tokenizer(
+    question,
+    words,
+    return_tensors="pt",
+    padding=True,
+    truncation=True,
+)
 inputs = {k: v.to(device) for k, v in inputs.items()}
 
 with torch.no_grad():
     outputs = model(**inputs)
 
-features = outputs.last_hidden_state.cpu().numpy()
-
 RESULT = {
-    "features": features,
+    "last_hidden_state": outputs.last_hidden_state.detach().cpu().numpy(),
+    "pooler_output": outputs.pooler_output.detach().cpu().numpy() if outputs.pooler_output is not None else None,
 }

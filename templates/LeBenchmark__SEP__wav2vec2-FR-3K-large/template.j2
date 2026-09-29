@@ -1,0 +1,16 @@
+{% set repo_id = repo_id | default("LeBenchmark/wav2vec2-FR-3K-large") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("automatic-speech-recognition") %}
+{% set input_audio = input_audio | default("/u/yunqili4/projects/ML-code-generation/data/audio.wav") %}
+{% set tokenizer_repo = tokenizer_repo | default("facebook/wav2vec2-large-960h") %}
+
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+task = "{{ task }}"
+input_audio = "{{ input_audio }}"
+tokenizer_repo = "{{ tokenizer_repo }}"
+
+from transformers import pipeline
+
+pipe = pipeline(task=task, model=repo_id, tokenizer=tokenizer_repo, device=device)
+RESULT = pipe(input_audio)

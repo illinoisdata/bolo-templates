@@ -1,0 +1,42 @@
+{% set repo_id = repo_id | default("NeelNanda/SoLU_2L512W_C4_Code") %}
+{% set device = device | default("cuda:0") %}
+{% set prompt = prompt | default('def add(a, b):\n    return a + b\n\nprint(add(2, 3))') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+prompt = {{ prompt | tojson }}
+
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+
+ckpt_path = hf_hub_download(repo_id=repo_id, filename="checkpoints/tokens_021340356608.pth")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+
+tokenizer = AutoTokenizer.from_pretrained("NeelNanda/gpt-neox-tokenizer-digits")
+state = torch.load(ckpt_path, map_location="cpu")
+
+# Support common checkpoint formats used in TransformerLens-style training runs
+if isinstance(state, dict) and "model" in state:
+    state = state["model"]
+elif isinstance(state, dict) and "state_dict" in state:
+    state = state["state_dict"]
+
+# Lightweight inference summary: extract a few tensor statistics from the checkpoint
+keys = sorted([k for k, v in state.items() if torch.is_tensor(v)]) if isinstance(state, dict) else []
+selected = keys[:5]
+summary = {}
+for k in selected:
+    t = state[k].detach().float()
+    summary[k] = {
+        "shape": list(t.shape),
+        "mean": t.mean().item(),
+        "std": t.std(unbiased=False).item() if t.numel() > 1 else 0.0,
+    }
+
+encoded = tokenizer.encode(prompt)
+RESULT = {
+    "checkpoint_path": ckpt_path,
+    "config_path": config_path,
+    "prompt_token_ids": encoded,
+    "state_dict_summary": summary,
+}

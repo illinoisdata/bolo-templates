@@ -1,0 +1,26 @@
+{% set repo_id = repo_id | default("segment-any-text/sat-3l-sm") %}
+{% set device = device | default("cuda:0") %}
+{% set task = task | default("token-classification") %}
+{% set input_prompt = input_prompt | default("I love the Hong Kong University of Science and Technology, my favorite course is MATH4343: Introduction to Graph Theory.") %}
+{% set tokenizer_id = tokenizer_id | default("xlm-roberta-base") %}
+
+task = {{ task | tojson }}
+repo_id = {{ repo_id | tojson }}
+device = {{ device | tojson }}
+input_prompt = {{ input_prompt | tojson }}
+tokenizer_id = {{ tokenizer_id | tojson }}
+
+from transformers import pipeline, AutoTokenizer, XLMRobertaConfig, XLMRobertaForTokenClassification
+
+config = XLMRobertaConfig.from_pretrained(repo_id)
+config.model_type = "xlm-roberta"
+config.architectures = ["XLMRobertaForTokenClassification"]
+config.num_labels = len(config.label2id)
+
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_id)
+model = XLMRobertaForTokenClassification.from_pretrained(repo_id, config=config)
+model.to(device)
+
+inputs = input_prompt
+pipe = pipeline(task=task, model=model, tokenizer=tokenizer, device=device)
+RESULT = pipe(inputs)

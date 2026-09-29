@@ -1,0 +1,66 @@
+{% set repo_id = repo_id | default("pysentimiento/robertuito-ner") %}
+{% set device = device | default("cuda:0") %}
+{% set text = text | default('rindanse ante el mejor, leonel andres messi cuccitini. serresiete no existis, segui en al-nassr') %}
+repo_id = "{{ repo_id }}"
+device = "{{ device }}"
+text = {{ text | tojson }}
+
+import json
+import torch
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer, RobertaConfig, RobertaForTokenClassification
+
+weights_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+config_path = hf_hub_download(repo_id=repo_id, filename="config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
+_ = hf_hub_download(repo_id=repo_id, filename="tokenizer_config.json")
+_ = hf_hub_download(repo_id=repo_id, filename="special_tokens_map.json")
+
+with open(config_path, "r") as f:
+    config_dict = json.load(f)
+config = RobertaConfig.from_dict(config_dict)
+id2label = {int(k): v for k, v in config_dict["id2label"].items()}
+
+model = RobertaForTokenClassification(config)
+state_dict = torch.load(weights_path, map_location="cpu")
+state_dict.pop("roberta.embeddings.position_ids", None)
+model.load_state_dict(state_dict, strict=True)
+model.to(device)
+model.eval()
+
+tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
+
+inputs = tokenizer(text, return_tensors="pt", return_offsets_mapping=True, truncation=True)
+offset_mapping = inputs.pop("offset_mapping")[0].tolist()
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+pred_ids = outputs.logits.argmax(dim=-1)[0].tolist()
+tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0].tolist())
+
+entities = []
+current = None
+for token, pred_id, offsets in zip(tokens, pred_ids, offset_mapping):
+    if token in tokenizer.all_special_tokens:
+        continue
+    label = id2label[pred_id]
+    start, end = offsets
+    if label == "O" or start == end:
+        if current is not None:
+            entities.append(current)
+            current = None
+        continue
+    prefix, ent_type = label.split("-", 1)
+    if prefix == "B" or current is None or current["type"] != ent_type or start != current["end"]:
+        if current is not None:
+            entities.append(current)
+        current = {"type": ent_type, "text": text[start:end], "start": start, "end": end}
+    else:
+        current["text"] += text[start:end]
+        current["end"] = end
+if current is not None:
+    entities.append(current)
+
+RESULT = {"entities": entities}
