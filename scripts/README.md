@@ -12,6 +12,7 @@
 
 ### Scripts
 
-- `remove_old_output.py` for Task 1.
+- `remove_old_output.py` for Task 1. (This is a legacy version)
 - `ensure_jinja_variables.py` for Task 3.
 - `get_modelcard.py` for Task 4.
+- `check_abs_paths.py` and `ensure_pybolo_requirement.py`.

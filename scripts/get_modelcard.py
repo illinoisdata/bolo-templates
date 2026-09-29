@@ -36,11 +36,22 @@ def process(teamplte_dir: Path, available_milestones: list[str]):
             (folder / "README.md").write_text(content if content else "", encoding="utf-8")
         conn.close()
 
-        
+    # judge-archives README.md
+    conn = sqlite3.connect(teamplte_dir / "judge-archives" / "readmes.db")
+    cur = conn.cursor()
+    cur.execute("SELECT repo_id, content FROM readme")
+    for repo_id, content in cur.fetchall():
+        folder = post_processed_templates_dir / repo_id.replace("/", "__SEP__")
+        if not folder.exists() or not content:
+            continue
+        (folder / "README.md").write_text(content, encoding="utf-8")
+    conn.close()
+
+
 if __name__ == "__main__":
     TEMPLATE_DIR = Path("/u/yunqili4/scratch/templates")
     available_milestones = [
-        ("milestone1", "transformers2.db", "others.db")
+        ("db", "transformers2.db", "others.db")
     ]
     process(TEMPLATE_DIR, available_milestones)
 

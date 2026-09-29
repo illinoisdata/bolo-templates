@@ -4,7 +4,7 @@ from pathlib import Path
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
 MAIN_GUARD_RE = re.compile(r'\n*^if __name__\s*==\s*["\']__main__["\']\s*:.*\Z', re.DOTALL | re.MULTILINE)
-OUTPUT_DIR_LINE_RE = re.compile(r'^.*\boutput_dir\b.*$\n?', re.MULTILINE)
+OUTPUT_DIR_LINE_RE = re.compile(r'^.*\{[{%][^\n]*\boutput_dir\b.*$\n?', re.MULTILINE)
 MULTI_BLANK_RE = re.compile(r'\n{3,}')
 
 

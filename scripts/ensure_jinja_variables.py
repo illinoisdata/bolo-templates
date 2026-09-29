@@ -4,39 +4,51 @@ from pathlib import Path
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 DEFAULT_DEVICE = "cuda:0"
 
-REPO_LINE_RE = re.compile(r'^\{%-?\s*set\s+repo_id\s*=.*?-?%\}\s*$', re.MULTILINE)
-DEVICE_LINE_RE = re.compile(r'^\{%-?\s*set\s+device\s*=.*?-?%\}\s*$', re.MULTILINE)
-SET_LINE_RE = re.compile(r'^\{%-?\s*set\s+(\w+)\s*=\s*(.*?)\s*-?%\}\s*$', re.MULTILINE)
+TAG_RE = re.compile(r'\{%(-?)\s*(\w+)\s*(.*?)\s*(-?)%\}', re.DOTALL)
+ASSIGN_RE = re.compile(r'(\w+)\s*=\s*(.*)', re.DOTALL)
+BLOCK_TAGS = {"for", "if", "macro", "call", "filter", "with", "block"}
 
 
-def make_default(var, val):
-    return f'{{% set {var} = {var} | default({val}) %}}'
+def make_default(var, val, lstrip="", rstrip=""):
+    return f'{{%{lstrip} set {var} = {var} | default({val}) {rstrip}%}}'
 
 
 def process(path):
-    repo_id = path.parent.name.replace("__SEP__", "/")
-    canonical_repo = make_default("repo_id", f'"{repo_id}"')
-    canonical_device = make_default("device", f'"{DEFAULT_DEVICE}"')
-
+    canonical = {
+        "repo_id": '"' + path.parent.name.replace("__SEP__", "/") + '"',
+        "device": f'"{DEFAULT_DEVICE}"',
+    }
     text = path.read_text(encoding="utf-8")
-    text, repo_count = REPO_LINE_RE.subn(canonical_repo, text)
-    text, device_count = DEVICE_LINE_RE.subn(canonical_device, text)
+    out, pos, depth, seen, open_block_set = [], 0, 0, set(), False
 
-    def replace_set(m):
-        var, val = m.group(1), m.group(2).strip()
-        if var in ("repo_id", "device"):
-            return m.group(0)
-        if "| default" in val or "|default" in val:
-            return m.group(0)
-        return make_default(var, val)
+    for m in TAG_RE.finditer(text):
+        lstrip, kw, body, rstrip = m.groups()
+        new = m.group(0)
+        if kw in BLOCK_TAGS:
+            depth += 1
+        elif kw.startswith("end") and kw != "endset":
+            depth -= 1
+        elif kw == "endset" and open_block_set:
+            new += "{% endif %}"
+            open_block_set = False
+        elif kw == "set" and depth == 0:
+            assign = ASSIGN_RE.fullmatch(body)
+            if assign:
+                var, val = assign.groups()
+                if var in canonical:
+                    new = make_default(var, canonical[var], lstrip, rstrip)
+                elif var not in seen and not re.match(rf'{var}\s*\|\s*default\b', val):
+                    new = make_default(var, val, lstrip, rstrip)
+                seen.add(var)
+            elif re.fullmatch(r'\w+', body) and body not in seen:
+                new = f'{{%{lstrip} if {body} is not defined %}}' + new
+                open_block_set = True
+                seen.add(body)
+        out.append(text[pos:m.start()] + new)
+        pos = m.end()
+    text = "".join(out) + text[pos:]
 
-    text = SET_LINE_RE.sub(replace_set, text)
-
-    prepend = []
-    if device_count == 0:
-        prepend.append(canonical_device)
-    if repo_count == 0:
-        prepend.append(canonical_repo)
+    prepend = [make_default(var, val) for var, val in canonical.items() if var not in seen]
     if prepend:
         text = "\n".join(prepend) + "\n" + text
     path.write_text(text, encoding="utf-8")
